@@ -520,5 +520,92 @@ select pg_temp.chk('18m Create video (Render) is refused until the script is app
   pg_temp.err(format('select public.hs_impact_story_render(%L, 0, false)',
     (select story_id from public.impact_discovery_candidates where id = pg_temp.id('f3')))) like '%Approve the integrated narrative%');
 
+-- 19. One verified research pack, several videos (founder, 2026-11-06). Acceptance case: the EPA methane investigation and a
+-- "how to register to speak before November 10" tutorial coexist as separate stories that share verified research.
+select pg_temp.as_user(null);
+select pg_temp.put('inv', (select story_id::text from public.impact_discovery_candidates where id = pg_temp.id('f3')));
+update public.impact_stories set title = 'EPA proposes to end the Methane Super Emitter Program', video_slug = 'epa-super-emitter'
+ where id = pg_temp.id('inv');
+select pg_temp.as_user('founder@example.com');
+select pg_temp.chk('19a another video needs checked research first',
+  pg_temp.err(format($q$select public.hs_impact_story_another_video(%L, '{"objective":"participation","title":"How to register to speak at the EPA methane hearing"}')$q$,
+    pg_temp.id('inv'))) like '%has not been checked yet%');
+select pg_temp.as_user(null);
+select pg_temp.work(pg_temp.id('inv'), jsonb_build_object('pack', jsonb_build_object('hash', 'hinv', 'title', 'EPA methane', 'verified_at', now(),
+  'fresh_days', 30, 'claims', '[{"id":"hear"},{"id":"comm"}]'::jsonb)));
+select pg_temp.put('inv_before', (select md5((to_jsonb(s) - 'updated_at')::text) from public.impact_stories s where id = pg_temp.id('inv')));
+select pg_temp.as_user('stranger@example.com');
+select pg_temp.chk('19b a non-admin cannot ask for another video; anon cannot execute it',
+  pg_temp.err(format($q$select public.hs_impact_story_another_video(%L, '{"objective":"participation","title":"x video"}')$q$, pg_temp.id('inv'))) like '42501%'
+  and not has_function_privilege('anon', 'public.hs_impact_story_another_video(uuid, jsonb)', 'execute'));
+select pg_temp.as_user('founder@example.com');
+select pg_temp.chk('19c the same objective as the original (an investigation) is refused: that video exists',
+  pg_temp.err(format($q$select public.hs_impact_story_another_video(%L, '{"objective":"investigative","title":"A second investigation"}')$q$,
+    pg_temp.id('inv'))) like '%investigative video from this research is already in the library%');
+select pg_temp.chk('19d a deadline that has passed is refused',
+  pg_temp.err(format($q$select public.hs_impact_story_another_video(%L, '{"objective":"participation","title":"Register to speak","deadline":"2020-01-01"}')$q$,
+    pg_temp.id('inv'))) like '%already passed%');
+select pg_temp.put('n19', (select count(*) from net.requests)::text);
+select pg_temp.put('tut', public.hs_impact_story_another_video(pg_temp.id('inv'), jsonb_build_object('objective', 'participation',
+  'title', 'EPA Methane Hearing: How to Register to Speak Before November 10', 'deadline', (current_date + 4)::text,
+  'note', 'A short tutorial on registering to speak.', 'links', '["https://www.epa.gov/example/register-hearing"]'::jsonb))->>'candidate_id');
+select pg_temp.chk('19e Create another video files a topic tied to the original research and starts research at once',
+  (select reuse_story_id = pg_temp.id('inv') and objective = 'participation' and deadline = current_date + 4 and origin = 'founder' and start_mode = 'topic'
+     from public.impact_discovery_candidates where id = pg_temp.id('tut'))
+  and (select count(*) from net.requests) > (select v::int from _ids where k = 'n19')
+  and (select status from public.impact_discovery_research_runs where candidate_id = pg_temp.id('tut') order by requested_at desc limit 1) = 'queued');
+select pg_temp.chk('19f asking for the same new video twice is refused while it is being researched',
+  pg_temp.err(format($q$select public.hs_impact_story_another_video(%L, '{"objective":"participation","title":"Register to speak again"}')$q$,
+    pg_temp.id('inv'))) like '%already being researched%');
+select pg_temp.chk('19g an approaching deadline puts the topic first in Hot Topics',
+  (public.hs_impact_discovery_overview()->'candidates'->0->>'id') = pg_temp.id('tut')::text
+  and (public.hs_impact_discovery_overview()->'candidates'->0->>'reuse_title') = 'EPA proposes to end the Methane Super Emitter Program');
+select pg_temp.as_user(null);
+select pg_temp.chk('19h the research queue lists it first too, naming the original research pack to reuse',
+  (public.impact_discovery_nominations()->'nominated'->0->>'id') = pg_temp.id('tut')::text
+  and (public.impact_discovery_nominations()->'nominated'->0->>'reuse_slug') = 'epa-super-emitter');
+create temp table _claim19 as select public.impact_discovery_research_claim(
+  (select id from public.impact_discovery_research_runs where candidate_id = pg_temp.id('tut') order by requested_at desc limit 1)) j;
+select pg_temp.chk('19i the research job is handed the objective, the deadline and the research to reuse',
+  (select j->'candidate'->>'objective' = 'participation' and j->'candidate'->>'reuse_slug' = 'epa-super-emitter'
+          and j->'candidate'->>'deadline' = (current_date + 4)::text
+          and exists (select 1 from jsonb_array_elements(j->'library') x where x->>'video_slug' = 'epa-super-emitter' and x->>'objective' = 'investigative')
+     from _claim19));
+select pg_temp.chk('19j a pack built on earlier research must name it, and must be <original>--<video>',
+  pg_temp.err(format($q$select public.impact_discovery_research(%L, '{"outcome":"verified","source_slug":"epa-super-emitter--register-to-speak","evidence":{}}')$q$, pg_temp.id('tut'))) like '%names it%'
+  and pg_temp.err(format($q$select public.impact_discovery_research(%L, '{"outcome":"verified","source_slug":"other-pack--register","reused_from":"epa-super-emitter","evidence":{}}')$q$, pg_temp.id('tut'))) like '%reused_from must be%'
+  and pg_temp.err(format($q$select public.impact_discovery_research(%L, '{"outcome":"verified","source_slug":"epa-super-emitter","reused_from":"epa-super-emitter","evidence":{}}')$q$, pg_temp.id('tut'))) like '%reused_from must be%');
+select public.impact_discovery_research(pg_temp.id('tut'), '{"outcome":"verified","source_slug":"epa-super-emitter--register-to-speak","reused_from":"epa-super-emitter","objective":"participation","evidence":{"sources":[{"url":"https://www.epa.gov/example/register-hearing"}]}}');
+select pg_temp.put('rc19', public.impact_discovery_research_complete(
+  (select id from public.impact_discovery_research_runs where candidate_id = pg_temp.id('tut') order by requested_at desc limit 1),
+  '{"status":"verified","summary":"Reused 3 verified claims; fetched the registration page.","source_slug":"epa-super-emitter--register-to-speak"}')::text);
+select pg_temp.put('tutstory', (select story_id::text from public.impact_discovery_candidates where id = pg_temp.id('tut')));
+select pg_temp.chk('19k the tutorial is its own story: its own pack, objective, deadline and first job, linked to the investigation',
+  (select video_slug = 'epa-super-emitter--register-to-speak' and objective = 'participation' and research_of = pg_temp.id('inv')
+          and deadline = current_date + 4 and id <> pg_temp.id('inv') from public.impact_stories where id = pg_temp.id('tutstory'))
+  and (pg_temp.lastjob(pg_temp.id('tutstory'))).kind = 'pack');
+select pg_temp.chk('19l the investigation is untouched (same row, same pack, same jobs)',
+  (select md5((to_jsonb(s) - 'updated_at')::text) from public.impact_stories s where id = pg_temp.id('inv')) = (select v from _ids where k = 'inv_before'));
+select pg_temp.as_user('founder@example.com');
+select pg_temp.chk('19m both videos list the shared research; each has its own status, approvals and render state',
+  (select jsonb_array_length(public.hs_impact_story_get(pg_temp.id('inv'))->'research_videos')) = 2
+  and (public.hs_impact_story_get(pg_temp.id('tutstory'))->'research_videos'->0->>'id') = pg_temp.id('inv')::text
+  and (public.hs_impact_story_get(pg_temp.id('tutstory'))->'research_videos'->1->>'current')::boolean
+  and public.hs_impact_story_get(pg_temp.id('tutstory'))->'status' is not null
+  and not exists (select 1 from public.impact_story_approvals a where a.story_id = pg_temp.id('tutstory')));
+select pg_temp.chk('19n the library puts the video with the approaching deadline first',
+  (public.hs_impact_story_list()->0->>'id') = pg_temp.id('tutstory')::text
+  and (public.hs_impact_story_list()->0->>'research_title') = 'EPA proposes to end the Methane Super Emitter Program');
+select pg_temp.chk('19o a second participation video from the same research is now refused (from either story)',
+  pg_temp.err(format($q$select public.hs_impact_story_another_video(%L, '{"objective":"participation","title":"Another register video"}')$q$,
+    pg_temp.id('tutstory'))) like '%public participation video from this research is already in the library%');
+select pg_temp.put('edu', public.hs_impact_story_another_video(pg_temp.id('tutstory'), '{"objective":"education","title":"How to submit a written comment on the methane rule"}'::jsonb)->>'candidate_id');
+select pg_temp.chk('19p a third video asked for from the tutorial builds on the ORIGINAL research, not on the tutorial',
+  (select reuse_story_id = pg_temp.id('inv') and objective = 'education' from public.impact_discovery_candidates where id = pg_temp.id('edu')));
+select pg_temp.as_user(null);
+select pg_temp.chk('19q the story-level guard: a second video with the same objective from one research is never created',
+  pg_temp.err(format($q$select public.impact_discovery_research(%L, '{"outcome":"verified","source_slug":"epa-super-emitter--register-again","reused_from":"epa-super-emitter","objective":"participation","evidence":{}}')$q$, pg_temp.id('edu'))) is null
+  and pg_temp.err(format('select public._hs_id_create_story(%L, %L, false)', pg_temp.id('edu'), 'test')) like '%public participation video from this research is already in the library%');
+
 \o
 select count(*) || ' checks passed' as result from _res where ok;

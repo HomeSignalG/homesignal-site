@@ -158,6 +158,22 @@ alter table public.impact_discovery_candidates add constraint impact_discovery_c
 alter table public.impact_discovery_candidates drop constraint if exists impact_discovery_candidates_note_check;
 alter table public.impact_discovery_candidates add constraint impact_discovery_candidates_note_check
   check (submitted_note is null or char_length(submitted_note) <= 12000);   -- an editorial brief (2,000 until 2026-11-05)
+-- One researched event, several videos (founder, 2026-11-06). `objective` is the video this topic asks for (null: research
+-- reads it from the title and brief, homesignal-ingest impact/deliverables.detect); `deadline` a participation deadline,
+-- which puts the topic first while it is 21 days away or less; `reuse_story_id` the story whose verified research the
+-- founder asked to build on ("Create another video from this research"); `reused_from` the research pack the verified
+-- video was built on (recorded by research). A topic about an event already in the library is a duplicate ONLY when a video
+-- with the same objective exists; any other objective is a new video built on the shared research.
+alter table public.impact_discovery_candidates add column if not exists objective text;
+alter table public.impact_discovery_candidates add column if not exists deadline date;
+alter table public.impact_discovery_candidates add column if not exists reuse_story_id uuid references public.impact_stories(id);
+alter table public.impact_discovery_candidates add column if not exists reused_from text;
+alter table public.impact_discovery_candidates drop constraint if exists impact_discovery_candidates_objective_check;
+alter table public.impact_discovery_candidates add constraint impact_discovery_candidates_objective_check
+  check (objective is null or objective in ('investigative', 'participation', 'education', 'follow_up'));
+alter table public.impact_discovery_candidates drop constraint if exists impact_discovery_candidates_reused_check;
+alter table public.impact_discovery_candidates add constraint impact_discovery_candidates_reused_check
+  check (reused_from is null or (reused_from ~ '^[a-z0-9][a-z0-9-]{0,80}$' and position('--' in reused_from) = 0));
 alter table public.impact_discovery_candidates enable row level security;
 revoke all on public.impact_discovery_candidates from public, anon, authenticated;
 
@@ -352,6 +368,13 @@ begin
 end $$;
 
 -- ── founder functions (authenticated; every one checks the dashboard allowlist) ───────────────────────
+-- Approaching participation deadlines first (founder, 2026-11-06): a deadline in the next 21 days sorts by its date, ahead of
+-- every other topic; a passed or distant deadline, or none, ranks after them. One definition for the page and the research queue.
+create or replace function public._hs_id_deadline_rank(p_deadline date)
+returns integer language sql stable set search_path = public as $$
+  select case when p_deadline between current_date and current_date + 21 then p_deadline - current_date else 1000 end
+$$;
+
 create or replace function public.hs_impact_discovery_overview(p_show_closed boolean default false)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare st public.impact_discovery_settings%rowtype; last_ok public.impact_discovery_scans%rowtype; latest public.impact_discovery_scans%rowtype;
@@ -375,14 +398,16 @@ begin
         'related_candidates', c.related_candidates, 'duplicate_of', c.duplicate_of, 'status', c.status, 'status_note', c.status_note,
         'source_slug', c.source_slug, 'story_id', c.story_id, 'discovered_at', c.discovered_at, 'last_seen_at', c.last_seen_at,
         'last_verified_at', c.last_verified_at, 'origin', c.origin, 'submitted_by', c.submitted_by, 'submitted_note', c.submitted_note, 'start_mode', c.start_mode,
+        'objective', c.objective, 'deadline', c.deadline, 'reuse_story_id', c.reuse_story_id, 'reused_from', c.reused_from,
+        'reuse_title', (select o1.title from public.impact_stories o1 where o1.id = c.reuse_story_id),
         'research', public._hs_id_research_run(c.id),
         'video', case when c.story_id is null then null else public._hs_id_video_state(c.story_id) end)
-        order by (c.origin = 'founder') desc, (c.track = 'core') desc, c.score desc, c.last_seen_at desc)
+        order by public._hs_id_deadline_rank(c.deadline), (c.origin = 'founder') desc, (c.track = 'core') desc, c.score desc, c.last_seen_at desc)
       from (select * from public.impact_discovery_candidates c
              where (p_show_closed or c.status not in ('rejected', 'dismissed', 'excluded', 'stale'))
                -- the founder's experimental-track switch hides existing experimental topics too, not only new ones
                and (coalesce(st.experimental_enabled, false) or c.track <> 'experimental')
-             order by (c.origin = 'founder') desc, (c.track = 'core') desc, c.score desc, c.last_seen_at desc limit 60) c), '[]'::jsonb),   -- same order as above
+             order by public._hs_id_deadline_rank(c.deadline), (c.origin = 'founder') desc, (c.track = 'core') desc, c.score desc, c.last_seen_at desc limit 60) c), '[]'::jsonb),   -- same order as above
     'exclusions', coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at desc) from public.impact_discovery_exclusions x where x.active), '[]'::jsonb),
     'performance', public._hs_id_performance(),
     'learning', public._hs_id_learning());
@@ -455,7 +480,15 @@ declare e text := public._hs_is_admin(); t text := btrim(coalesce(p_topic->>'tit
         pl text := nullif(btrim(coalesce(p_topic->>'place', '')), ''); cat text := coalesce(nullif(btrim(coalesce(p_topic->>'category', '')), ''), 'other');
         note text := nullif(btrim(coalesce(p_topic->>'note', '')), ''); leads jsonb := '[]'::jsonb; u text; c public.impact_discovery_candidates%rowtype;
         sm text := coalesce(nullif(btrim(coalesce(p_topic->>'start', '')), ''), 'auto');
+        obj text := nullif(btrim(coalesce(p_topic->>'objective', '')), ''); dl date;
 begin
+  if obj is not null and obj not in ('investigative', 'participation', 'education', 'follow_up') then
+    raise exception 'Unknown video type.' using errcode = '22023';
+  end if;
+  if nullif(btrim(coalesce(p_topic->>'deadline', '')), '') is not null then
+    begin dl := (p_topic->>'deadline')::date; exception when others then raise exception 'The deadline must be a date (YYYY-MM-DD).' using errcode = '22023'; end;
+    if dl < current_date then raise exception 'That deadline has already passed.' using errcode = '22023'; end if;
+  end if;
   if sm not in ('auto', 'document', 'topic') then raise exception 'Starting evidence must be auto, document or topic.' using errcode = '22023'; end if;
   if char_length(t) < 5 or char_length(t) > 300 then
     raise exception 'Give the topic a title of 5 to 300 characters.' using errcode = '22023';
@@ -480,10 +513,10 @@ begin
     raise exception 'You already suggested a topic with this title. It is in the list below.' using errcode = '23505';
   end if;
   insert into public.impact_discovery_candidates (cluster_key, origin, category, track, title, place, score, reasons, evidence_status,
-    evidence, status, submitted_by, submitted_note, start_mode, discovered_at, last_seen_at)
+    evidence, status, submitted_by, submitted_note, start_mode, discovered_at, last_seen_at, objective, deadline)
   values ('founder:' || gen_random_uuid(), 'founder', cat, 'core', t, pl, 0, '["You suggested this topic."]'::jsonb,
     case when jsonb_array_length(leads) > 0 then 'leads_found' else 'social_only' end,
-    jsonb_build_object('leads', leads), 'nominated', e, note, sm, now(), now())
+    jsonb_build_object('leads', leads), 'nominated', e, note, sm, now(), now(), obj, dl)
   returning * into c;
   perform public._hs_id_event(c.id, null, 'suggested', jsonb_build_object('title', t, 'place', pl, 'category', cat, 'links', jsonb_array_length(leads), 'start', sm), e);
   return jsonb_build_object('id', c.id, 'status', c.status, 'start_mode', c.start_mode);
@@ -549,7 +582,7 @@ end $$;
 create or replace function public._hs_id_create_story(p_candidate uuid, p_actor text, p_auto boolean)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare c public.impact_discovery_candidates%rowtype; s public.impact_stories%rowtype; st public.impact_discovery_settings%rowtype;
-        n int; job jsonb; other uuid;
+        n int; job jsonb; other uuid; orig public.impact_stories%rowtype;
 begin
   -- One story creation at a time: the per-scan limit and the one-story-per-pack rule are checks across candidates, which a
   -- lock on this candidate's row alone cannot protect (two topics prepared at once would both see the old count).
@@ -599,8 +632,21 @@ begin
       raise exception 'This scan already prepared % stor%(limit %).', n, case when n = 1 then 'y ' else 'ies ' end, st.max_prepare_per_scan using errcode = '55000';
     end if;
   end if;
-  insert into public.impact_stories (video_slug, title, place, created_by, origin, discovery_candidate_id)
-  values (c.source_slug, left(c.title, 200), c.place, p_actor, 'auto_discovery', c.id) returning * into s;
+  -- a video built on earlier research: link it to the original story; never a second video with the same objective
+  if c.reused_from is not null then
+    select * into orig from public.impact_stories x where x.video_slug = c.reused_from and x.research_of is null
+     order by (x.archived_at is null) desc, x.created_at limit 1;
+    if exists (select 1 from public.impact_stories x where x.archived_at is null
+                and coalesce(x.objective, 'investigative') = coalesce(c.objective, 'investigative')
+                and (x.video_slug = c.reused_from or (orig.id is not null and x.research_of = orig.id))) then
+      raise exception 'A % video from this research is already in the library.',
+        case coalesce(c.objective, 'investigative') when 'participation' then 'public participation' when 'education' then 'how-to'
+             when 'follow_up' then 'follow-up' else 'investigative' end using errcode = '55000';
+    end if;
+  end if;
+  insert into public.impact_stories (video_slug, title, place, created_by, origin, discovery_candidate_id, objective, research_of, deadline)
+  values (c.source_slug, left(c.title, 200), c.place, p_actor, 'auto_discovery', c.id, coalesce(c.objective, 'investigative'),
+          orig.id, c.deadline) returning * into s;
   perform public._hs_is_event(s.id, 'created', jsonb_build_object('video_slug', c.source_slug, 'discovery_candidate_id', c.id,
           'bluesky', c.lead_url, 'auto', p_auto), p_actor);
   update public.impact_discovery_candidates set story_id = s.id, status = 'preparing', updated_at = now() where id = c.id;
@@ -772,6 +818,18 @@ begin
   if outcome = 'verified' and coalesce(p_payload->>'source_slug', '') !~ '^[a-z0-9][a-z0-9-]{0,80}$' then
     raise exception 'verified needs the source pack slug' using errcode = '22023';
   end if;
+  if p_payload ? 'objective' and p_payload->>'objective' not in ('investigative', 'participation', 'education', 'follow_up') then
+    raise exception 'unknown video objective' using errcode = '22023';
+  end if;
+  -- a video built on earlier research: its pack is <reused_from>--<video> (the original pack is never the new video's)
+  if outcome = 'verified' and p_payload ? 'reused_from' and (coalesce(p_payload->>'reused_from', '') !~ '^[a-z0-9][a-z0-9-]{0,80}$'
+       or position('--' in p_payload->>'reused_from') > 0
+       or left(p_payload->>'source_slug', char_length(p_payload->>'reused_from') + 2) <> (p_payload->>'reused_from') || '--') then
+    raise exception 'reused_from must be the original research pack the new video''s pack (<original>--<video>) is built on' using errcode = '22023';
+  end if;
+  if outcome = 'verified' and position('--' in p_payload->>'source_slug') > 0 and not p_payload ? 'reused_from' then
+    raise exception 'a pack built on earlier research names it (reused_from)' using errcode = '22023';
+  end if;
   if outcome = 'insufficient' and jsonb_array_length(coalesce(p_payload->'evidence'->'missing', '[]')) = 0 then
     raise exception 'insufficient needs the list of missing evidence' using errcode = '22023';
   end if;
@@ -795,6 +853,8 @@ begin
     concept = case when p_payload ? 'concept' then p_payload->'concept' || jsonb_build_object('verified', outcome = 'verified') else concept end,
     title = coalesce(left(p_payload->>'title', 300), title), place = coalesce(p_payload->>'place', place),
     source_slug = case when outcome = 'verified' then p_payload->>'source_slug' else source_slug end,
+    objective = case when outcome = 'verified' then coalesce(p_payload->>'objective', objective) else objective end,
+    reused_from = case when outcome = 'verified' then p_payload->>'reused_from' else reused_from end,
     status = case when status in ('preparing', 'ready_for_review') then status
                   when outcome = 'researching' then 'researching' when outcome = 'insufficient' then 'insufficient' else status end,
     status_note = coalesce(p_payload->>'note', status_note),
@@ -811,10 +871,14 @@ returns jsonb language sql stable security definer set search_path = public as $
     'nominated', coalesce((select jsonb_agg(jsonb_build_object('id', c.id, 'title', c.title, 'place', c.place, 'category', c.category,
         'track', c.track, 'score', c.score, 'status', c.status, 'lead_url', c.lead_url, 'evidence', c.evidence, 'related', c.related,
         'reasons', c.reasons, 'concept', c.concept, 'nominated_scan_id', c.nominated_scan_id,
-        'origin', c.origin, 'submitted_note', c.submitted_note, 'start_mode', c.start_mode) order by (c.origin = 'founder') desc, c.score desc)
+        'origin', c.origin, 'submitted_note', c.submitted_note, 'start_mode', c.start_mode, 'objective', c.objective, 'deadline', c.deadline,
+        'reuse_slug', (select coalesce(o2.video_slug, o1.video_slug) from public.impact_stories o1
+                         left join public.impact_stories o2 on o2.id = o1.research_of where o1.id = c.reuse_story_id))
+        order by public._hs_id_deadline_rank(c.deadline), (c.origin = 'founder') desc, c.score desc)
       from public.impact_discovery_candidates c
      where c.status in ('nominated', 'researching') and c.story_id is null and c.duplicate_of is null), '[]'::jsonb),
-    'library', coalesce((select jsonb_agg(jsonb_build_object('id', s.id, 'video_slug', s.video_slug, 'title', s.title, 'origin', s.origin))
+    'library', coalesce((select jsonb_agg(jsonb_build_object('id', s.id, 'video_slug', s.video_slug, 'title', s.title, 'origin', s.origin,
+        'objective', s.objective))
       from public.impact_stories s where s.archived_at is null), '[]'::jsonb))
 $$;
 
@@ -980,6 +1044,50 @@ begin
   return jsonb_build_object('existing', false, 'research', public._hs_id_research_run(p_candidate));
 end $$;
 
+-- "Create another video from this research" (Tab 17, founder 2026-11-06). One researched event can carry several videos with
+-- different audience objectives (an investigation, a how-to-register Short, a written-comment explainer, a follow-up). This
+-- files a topic that names the ORIGINAL story's research (reuse_story_id) and the objective, and starts research at once.
+-- Research builds a new pack `<original>--<video>` that reuses the original's verified claims (re-checked on every build),
+-- fetches and checks the instructions the new video needs, and writes a new script; the original story is never changed.
+-- The new video gets its own story, review, approvals, render and publication. Refused when a video with the same objective
+-- from this research already exists or is being researched.
+create or replace function public.hs_impact_story_another_video(p_story uuid, p_video jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); s public.impact_stories%rowtype; root public.impact_stories%rowtype;
+        obj text := nullif(btrim(coalesce(p_video->>'objective', '')), ''); r jsonb; cid uuid; cat text; lbl text;
+begin
+  select * into s from public.impact_stories where id = p_story;
+  if not found then raise exception 'no such story' using errcode = 'P0002'; end if;
+  if s.archived_at is not null then raise exception 'This story is archived. Restore it first.' using errcode = '55000'; end if;
+  select * into root from public.impact_stories where id = coalesce(s.research_of, s.id);
+  if root.pack is null or root.pack_hash is null then
+    raise exception 'The research of "%" has not been checked yet. Press Check sources on it first: a new video reuses only verified research.', root.title using errcode = '55000';
+  end if;
+  if obj is null or obj not in ('investigative', 'participation', 'education', 'follow_up') then
+    raise exception 'Choose what the new video is for.' using errcode = '22023';
+  end if;
+  lbl := case obj when 'participation' then 'public participation' when 'education' then 'how-to' when 'follow_up' then 'follow-up' else 'investigative' end;
+  if exists (select 1 from public.impact_stories x where x.archived_at is null and x.objective = obj and (x.id = root.id or x.research_of = root.id)) then
+    raise exception 'A % video from this research is already in the library: %.', lbl,
+      (select x.title from public.impact_stories x where x.archived_at is null and x.objective = obj and (x.id = root.id or x.research_of = root.id) limit 1)
+      using errcode = '23505';
+  end if;
+  if exists (select 1 from public.impact_discovery_candidates c where c.reuse_story_id = root.id and coalesce(c.objective, '') = obj
+              and c.story_id is null and c.status not in ('rejected', 'dismissed', 'excluded', 'stale', 'insufficient')) then
+    raise exception 'A % video from this research is already being researched. It is in Hot Topics.', lbl using errcode = '23505';
+  end if;
+  select c.category into cat from public.impact_discovery_candidates c where c.story_id = root.id limit 1;
+  r := public.hs_impact_discovery_suggest(jsonb_build_object('title', p_video->'title', 'place', coalesce(p_video->>'place', root.place),
+         'category', coalesce(cat, 'other'), 'note', p_video->'note', 'links', coalesce(p_video->'links', '[]'::jsonb),
+         'start', 'topic', 'objective', obj, 'deadline', p_video->'deadline'));
+  cid := (r->>'id')::uuid;
+  update public.impact_discovery_candidates set reuse_story_id = root.id,
+         reasons = jsonb_build_array('You asked for another video from the research of "' || root.title || '".'), updated_at = now()
+   where id = cid;
+  perform public._hs_is_event(root.id, 'another_video_requested', jsonb_build_object('candidate_id', cid, 'objective', obj, 'from_story', s.id), e);
+  return jsonb_build_object('candidate_id', cid, 'research', public.hs_impact_discovery_research_start(cid)->'research');
+end $$;
+
 -- The research job's door (service role only, through homesignal-ingest impact-research-run.yml).
 create or replace function public.impact_discovery_research_claim(p_run uuid)
 returns jsonb language plpgsql security definer set search_path = public as $$
@@ -1008,8 +1116,11 @@ begin
   return jsonb_build_object('ok', true, 'run', r.id,
     'candidate', jsonb_build_object('id', c.id, 'title', c.title, 'place', c.place, 'category', c.category, 'track', c.track,
       'origin', c.origin, 'submitted_note', c.submitted_note, 'start_mode', c.start_mode, 'lead_url', c.lead_url, 'evidence', c.evidence, 'related', c.related,
-      'reasons', c.reasons, 'concept', c.concept, 'coverage', c.coverage),
-    'library', coalesce((select jsonb_agg(jsonb_build_object('video_slug', s.video_slug, 'title', s.title))
+      'reasons', c.reasons, 'concept', c.concept, 'coverage', c.coverage, 'objective', c.objective, 'deadline', c.deadline,
+      -- the ORIGINAL research pack of the story the founder chose (a video built on a video builds on the same original)
+      'reuse_slug', (select coalesce(o2.video_slug, o1.video_slug) from public.impact_stories o1
+                       left join public.impact_stories o2 on o2.id = o1.research_of where o1.id = c.reuse_story_id)),
+    'library', coalesce((select jsonb_agg(jsonb_build_object('video_slug', s.video_slug, 'title', s.title, 'objective', s.objective))
       from public.impact_stories s where s.archived_at is null), '[]'::jsonb));
 end $$;
 
@@ -1061,14 +1172,15 @@ begin
     'public._hs_id_event(uuid, uuid, text, jsonb, text)', 'public._hs_id_next_scan(timestamptz)', 'public._hs_id_dispatch(uuid)',
     'public._hs_id_reap()', 'public._hs_id_queue_scan(text, text, text)', 'public._hs_id_performance()', 'public._hs_id_learning()',
     'public._hs_id_create_story(uuid, text, boolean)', 'public.impact_discovery_tick(timestamptz)',
-    'public._hs_id_research_run(uuid)', 'public._hs_id_video_state(uuid)', 'public._hs_id_research_dispatch(uuid)'] loop
+    'public._hs_id_research_run(uuid)', 'public._hs_id_video_state(uuid)', 'public._hs_id_research_dispatch(uuid)',
+    'public._hs_id_deadline_rank(date)'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
   end loop;
   foreach f in array array[
     'public.hs_impact_discovery_overview(boolean)', 'public.hs_impact_discovery_scan_now()',
     'public.hs_impact_discovery_decide(uuid, text, text)', 'public.hs_impact_discovery_open_story(uuid)',
     'public.hs_impact_discovery_settings_save(jsonb)', 'public.hs_impact_discovery_suggest(jsonb)', 'public.hs_impact_discovery_set_start(uuid, text)',
-    'public.hs_impact_discovery_research_start(uuid)'] loop
+    'public.hs_impact_discovery_research_start(uuid)', 'public.hs_impact_story_another_video(uuid, jsonb)'] loop
     execute 'revoke all on function ' || f || ' from public, anon';
     execute 'grant execute on function ' || f || ' to authenticated';
   end loop;

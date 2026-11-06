@@ -6264,6 +6264,25 @@ vendor; a petition, post or video never is). Both paths build the same source pa
   until the ingest change lands.
 - Tests: `test/impact_discovery_pg` 11a2-11a3, 17q-17y; `test/impact-discovery.browser.test.mjs` 7c2, 7d, 7h-7j.
 
+## IMPACT STORIES, TAB 17: ONE VERIFIED RESEARCH PACK, SEVERAL VIDEOS (founder, 2026-11-06)
+
+One researched event can produce several videos with different audience objectives; each is its own story with its own
+review, approvals, render and publication, and the original story is never changed. Engine half: homesignal-ingest
+`impact/deliverables.py` (CLAUDE.md there).
+- `impact_stories` gains `objective` (investigative | participation | education | follow_up, default investigative),
+  `research_of` (the original story whose research it reuses) and `deadline`. `hs_impact_story_get` returns
+  `research_videos`; `hs_impact_story_list` puts a video whose deadline is within 21 days first.
+- **"Create another video from this research"** (workspace header) calls `hs_impact_story_another_video(story, video)`: it
+  files a founder topic with `reuse_story_id` = the ORIGINAL story, the objective, deadline, brief and links, and starts
+  research at once. Refused when the research is unchecked, or a video (or research run) with that objective already exists.
+- Topics gain `objective`, `deadline`, `reuse_story_id`, `reused_from`. The Suggest form has "What the video is for" and a
+  deadline. `_hs_id_deadline_rank` puts a deadline within 21 days first in Hot Topics and the research queue.
+  `impact_discovery_research` requires `reused_from` for a `<base>--<video>` pack (and that prefix); `_hs_id_create_story`
+  links `research_of` and refuses a second video with the same objective from one research.
+- Apply order: merge the ingest change first (its research job reads the new task fields and sends `reused_from`), then
+  `docs/impact-stories.sql`, then `docs/impact-discovery.sql`, then the page. Tests: `test/impact_discovery_pg` §19,
+  `test/impact-stories-another-video.browser.test.mjs`.
+
 ## ENGAGE ON BLUESKY, TAB 17 (2026-10-28): the strongest posts to answer, drafted, posted BY HAND
 
 Under Hot Topics, a separate section ranks the 3-5 strongest ORIGINAL posts of each discovered topic by an Engagement
