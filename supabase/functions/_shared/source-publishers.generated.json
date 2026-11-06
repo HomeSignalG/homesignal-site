@@ -645,7 +645,8 @@
   },
   "modot-stip-locations-accepted": {
    "agency": "Missouri Department of Transportation (MoDOT)",
-   "dataset": "services2.arcgis.com, service DRAFT_STIP_Locations"
+   "dataset": "mapping.modot.org, service BusinessInt/STIP",
+   "status_const": "Programmed in STIP 2027-2031"
   },
   "montgomery-county-commercial-permits": {
    "agency": "Montgomery County",

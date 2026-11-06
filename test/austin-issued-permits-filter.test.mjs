@@ -29,6 +29,9 @@ if (e) {
      'rows without both coordinates are excluded at source');
   ok(!/\bOR\b/i.test(w), 'the filter has no OR that could widen it');
   ok(e.recency_days === 365, 'the 365-day window is unchanged');
+  // original_zip became a NUMBER column (Socrata 400 'Type mismatch for upper, is number' on every
+  // ZIP from 2026-10-21). An exact text match cannot work on it; the numeric form is required.
+  ok(e.zip_numeric === true, 'original_zip is queried as a number (zip_numeric)');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
