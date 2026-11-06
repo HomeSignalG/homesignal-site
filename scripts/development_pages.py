@@ -34,6 +34,7 @@ ROLE_LABEL = {
 ENTITY_ORDER = {r: i for i, r in enumerate((
     "governing_body", "filing_receiver", "applicant", "master_developer", "buyer_under_contract",
     "landowner_of_record", "designer", "consultant"))}
+RECORD_LINKS_MAX = 12   # record pages listed on a dossier page
 DOC_KINDS = ("source_record", "water_filing", "government_record", "document", "dc_entity")
 
 
@@ -153,6 +154,48 @@ def load(path, required):
                 sys.exit(f"ERROR: development dossier {key!r}: a link has no https source")
         out[key] = d
     return out
+
+
+TITLE_MAX = 64      # Google shows about 60 characters; the brand overlay swaps "HomeSignal" for a name one longer
+DESC_MAX = 155      # what a search result shows of a description
+_ABBREV = {"inc", "co", "corp", "llc", "ltd", "lp", "st", "dr", "mr", "mrs", "ms", "no", "u.s", "vs", "etc"}
+
+
+def page_title(name, where):
+    """The page title: the project's name, then where it is, then the brand. The Type pill stays on
+    the page (it is the source's word and can read oddly in a title); a title that would run past
+    TITLE_MAX drops the place and keeps the name."""
+    full = f"{name}, {where} | HomeSignal" if where else f"{name} | HomeSignal"
+    return full if len(full) <= TITLE_MAX else f"{name} | HomeSignal"
+
+
+def meta_description(text, fallback):
+    """The description search results show: whole sentences from the dossier's own summary that fit
+    in DESC_MAX, so the first facts (what, where) lead. A sentence ends at . ! or ? before a capital
+    letter, never after an abbreviation ("Inc."). One sentence too long for the limit is cut at a word
+    and ends with an ellipsis. Nothing is reworded."""
+    t = re.sub(r"\s+", " ", str(text or "")).strip()
+    if not t:
+        return fallback
+    sents, start = [], 0
+    for m in re.finditer(r"[.!?](?=\s+[A-Z\"'(])", t):
+        last = t[start:m.end()].rsplit(None, 1)[-1].rstrip(".").lower()
+        if last in _ABBREV:
+            continue
+        sents.append(t[start:m.end()].strip())
+        start = m.end()
+    if start < len(t):
+        sents.append(t[start:].strip())
+    out = ""
+    for x in sents:
+        nxt = f"{out} {x}".strip()
+        if len(nxt) > DESC_MAX:
+            break
+        out = nxt
+    if out:
+        return out
+    cut = t[:DESC_MAX - 1].rsplit(" ", 1)[0].rstrip(",;:- ")
+    return cut + "\u2026"
 
 
 def classifier_input(d):
@@ -408,14 +451,23 @@ def render(d, pages, built, head, crumb_place=None):
     kind, life = d.get("_type") or "", d.get("_lifecycle") or ""
     canon = f'{d.get("_base", "")}{d["path"]}'
     summary = _stmts(d, "summary")
-    desc = (summary[0]["body"] if summary else f"Public records, official documents and timeline for {name}.")[:300]
-    title = f"{name}" + (f" — {kind}" if kind else "") + (f" in {where}" if where else "") + " | HomeSignal"
+    desc = meta_description(summary[0]["body"] if summary else "", f"Public records, official documents and timeline for {name}.")
+    title = page_title(name, where)
+    modified = str(d.get("updated_at") or "")[:10]
+    modified = modified if DAY_RE.match(modified) else ""
     # Breadcrumb: home, the county (no page of its own, so plain text and not in the structured
     # list), the development.
     crumbs = [("HomeSignal", "/"), (name, d["path"])]
-    ld = {"@context": "https://schema.org", "@type": "BreadcrumbList",
-          "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": n,
-                               "item": f'{d.get("_base", "")}{u}'} for i, (n, u) in enumerate(crumbs)]}
+    crumb_ld = {"@type": "BreadcrumbList",
+                "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": n,
+                                     "item": f'{d.get("_base", "")}{u}'} for i, (n, u) in enumerate(crumbs)]}
+    # The page itself. dateModified is the day the dossier's own links or statements last changed
+    # (the snapshot's updated_at), never the build day; with none on record it is left out.
+    page_ld = {"@type": "WebPage", "@id": canon, "url": canon, "name": name, "description": desc,
+               "inLanguage": "en-US"}
+    if modified:
+        page_ld["dateModified"] = modified
+    ld = {"@context": "https://schema.org", "@graph": [crumb_ld, page_ld]}
     crumb_nav = ('<nav class="crumbs" aria-label="Breadcrumb"><a href="/">HomeSignal</a> › '
                  + (f'<span>{esc(where)}</span> › ' if where else "")
                  + f'<span aria-current="page">{esc(name)}</span></nav>')
@@ -447,10 +499,12 @@ def render(d, pages, built, head, crumb_place=None):
             z = x.get("zip")
             if z in pages:
                 land.append(f'<li><a href="/map/{esc(z)}/">ZIP {esc(z)} ({esc(pages[z]["name"])}) on the map</a>'
+                            f' · <a href="/community/{esc(z)}/">ZIP {esc(z)} page</a>'
                             f' <span class="small">{esc(x.get("parcels"))} associated parcel'
                             f'{"" if x.get("parcels") == 1 else "s"}</span></li>')
     other = [z for z in zips if not any(f"/map/{z}/" in s for s in land)]
-    land += [f'<li><a href="/map/{esc(z)}/">ZIP {esc(z)} ({esc(pages[z]["name"])}) on the map</a></li>' for z in other]
+    land += [f'<li><a href="/map/{esc(z)}/">ZIP {esc(z)} ({esc(pages[z]["name"])}) on the map</a>'
+             f' · <a href="/community/{esc(z)}/">ZIP {esc(z)} page</a></li>' for z in other]
     map_inner = (f'<ul class="plain">{"".join(land)}</ul><p class="small">Associated land is land the linked records '
                  f'tie to this project. It is not a confirmed project footprint unless an approved site plan says so.</p>'
                  if land else "")
@@ -511,6 +565,9 @@ def render(d, pages, built, head, crumb_place=None):
         cov = ('<div class="jody"><p class="small">HomeSignal\'s own explainers. They are editorial, not government '
                'records, and are listed only after they are public.</p>' + cov + '</div>')
 
+    recs = "".join(f'<li><a href="{esc(u)}">{esc(prose(n))}</a></li>' for n, u in (d.get("_records") or []))
+    recs = (f'<ul class="plain">{recs}</ul><p class="small">The record pages on this site for the filings linked '
+            f'above. Each opens the agency\'s own record.</p>') if recs else ""
     parts = [
         ("overview", "Overview", ov, "a HomeSignal summary"),
         ("changed", "What changed", _stmt_list(_stmts(d, "latest"), "dlatest"), "a recorded change"),
@@ -519,11 +576,12 @@ def render(d, pages, built, head, crumb_place=None):
         ("map", "Map & land", map_inner, "a location"),
         ("entities", "Entities", f'<ul class="cards">{orgs}</ul>' if orgs else "", "a linked entity"),
         ("documents", "Official documents", f'<ul class="cards">{docs}</ul>' if docs else "", "a linked official document"),
+        ("records", "Related record pages", recs, ""),   # a bonus list: its absence is not a gap worth naming
         ("timeline", "Timeline", _timeline(d), "a dated event"),
         ("coverage", "HomeSignal coverage", cov, "a HomeSignal video or post"),
     ]
     shown = [p for p in parts if p[2]]
-    missing = [p[3] for p in parts if not p[2]]
+    missing = [p[3] for p in parts if not p[2] and p[3]]
     toc = ('<nav class="toc" aria-label="On this page"><ul>'
            + "".join(f'<li><a href="{d["path"]}#{i}">{esc(t)}</a></li>' for i, t, _, _ in shown) + "</ul></nav>"
            if len(shown) > 1 else "")
@@ -537,8 +595,9 @@ def render(d, pages, built, head, crumb_place=None):
         + "".join(_section(i, t, inner) for i, t, inner, _ in shown)
         + gaps
         + '<footer class="method"><p class="small">Every fact on this page links to its source. A link is shown only '
-          'after a HomeSignal reviewer checked it against the source. Page compiled '
-          f'<time datetime="{esc(built)}">{BUILT_HUMAN}</time>.</p>'
+          'after a HomeSignal reviewer checked it against the source. '
+          + (f'Last updated <time datetime="{esc(modified)}">{esc(day(modified))}</time>. ' if modified else "")
+          + f'Page compiled <time datetime="{esc(built)}">{BUILT_HUMAN}</time>.</p>'
           '</footer></main>' + SITE_FOOTER)
     # The shell's stylesheets are written for the app shell, which this script-free page does not
     # load; the page carries its own layout instead.
@@ -558,10 +617,14 @@ def link_pages(dossiers, pages, projects):
         for z in zips_of(d):
             if z in pages:
                 pages[z].setdefault("dossiers", []).append((d["display_name"], d["path"]))
+        seen = set()
         for l in _links(d, "source_record"):
             pr = projects.get(l.get("ref"))
             if pr is not None:
                 pr.setdefault("part_of", []).append((d["display_name"], d["path"]))
+                if pr["path"] not in seen and len(seen) < RECORD_LINKS_MAX:
+                    seen.add(pr["path"])
+                    d.setdefault("_records", []).append((pr["title"], pr["path"]))
 
 
 LAND_INDEX_SCHEMA = "development-land-index/1"
