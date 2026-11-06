@@ -222,9 +222,11 @@ ok(pa.includes('>The filing in 40 seconds</span>') && !/#Shorts|#jodytracks/.tes
 ok(pa.includes('<p class="t">Data-center listing</p><p class="small">Defining record</p>') && !pa.includes('atlas record dc-1'),
    'the defining-record card is named by the source it links to');
 ok(!pa.includes('id="changed"') && !pa.includes('href="/development/ma/valley-campus/#changed"')
-   && pa.includes('<p class="empty" id="not-yet">Not on record yet: a recorded change.</p>'),
-   'an empty section is not drawn or listed; what is missing is said once', (pa.match(/id="not-yet">[^<]*/) || [''])[0]);
-ok(pb.includes('id="not-yet"') && /Not on record yet: [^<]*a linked entity/.test(pb), 'the same rule on the other page');
+   && pa.includes('<div class="empty" id="not-yet"><p>No recorded change in the sources HomeSignal tracks.</p></div>'),
+   'an empty section is not drawn or listed; what is missing is said once, one line per gap',
+   (pa.match(/id="not-yet">.*?<\/div>/) || [''])[0]);
+ok(pb.includes('id="not-yet"') && !/a linked entity|a location|Not on record yet/.test(pb),
+   'gaps a reader does not need (no entity, no location) are not listed', (pb.match(/id="not-yet">.*?<\/div>/) || [''])[0]);
 const hero = pa.slice(pa.indexOf('<section class="hero"'), pa.indexOf('</section>', pa.indexOf('<section class="hero"')));
 ok(!hero.includes('/map/') && pa.includes('href="/map/01002/"'), 'the hero does not repeat the map links');
 ok(/<nav class="crumbs"[^>]*><a href="\/">HomeSignal<\/a> › <span>Hampshire County, MA<\/span> › <span aria-current="page">/.test(pa),
@@ -259,6 +261,93 @@ ok(!read(build(withProtest('2026-12-01'), { now: '2026-12-02T00:00:00' }).out, A
 ok(!read(build(withProtest('2026-12-01', 'http://agency.example.gov/f')).out, A).includes('class="protest"'), 'a form link that is not https is not shown');
 ok(!read(build(withProtest('soon')).out, A).includes('class="protest"'), 'an undated window is not shown');
 ok(!pa.includes('class="protest"'), 'a filing with no protest window shows no box');
+
+// 3e. SEO/editorial review (2026-11-06): a summary under the title built from the reviewed links,
+// no contradicting "no deadline" line, one timeline event per filing, grouped entities, plain
+// citations, a curated Bluesky list, and the record dates in the footer.
+{
+  const x = withProtest('2026-12-01');
+  const v = x.dossiers['valley-campus'];
+  v.statements = v.statements.filter((s) => s.kind !== 'summary' && s.kind !== 'next');
+  v.links.push(
+    { kind: 'organization', ref: 'MA:Example Digital, LLC', role: 'master_developer', grade: 'a', evidence_url: W,
+      evidence_label: 'Change record x123', text: 'Named as the developer in the change record', facts: {} },
+    { kind: 'organization', ref: 'MA:Example Authority', role: 'governing_body', grade: 'a', evidence_url: 'https://notice.example.gov/1',
+      evidence_label: 'Authority notices', text: 'Adopted the project area plan', facts: {} },
+    { kind: 'organization', ref: 'MA:Example Ranch, Inc.', role: 'applicant', grade: 'b', evidence_url: W, date: '2026-10-15',
+      evidence_label: 'Change record x123', text: 'Applicant on change application x123', facts: {} },
+    { kind: 'organization', ref: 'MA:Example Water LLC', role: 'consultant', grade: 'a', evidence_url: 'https://water.example.gov/doc.pdf',
+      evidence_label: 'Application page 8', text: 'Prepared the depletion study', facts: {} },
+    { kind: 'document', ref: 'https://water.example.gov/doc.pdf', role: 'primary_document', grade: 'a', date: '2026-10-15',
+      date_label: 'Filed', evidence_url: 'https://water.example.gov/doc.pdf', evidence_label: 'Scanned document 1',
+      text: 'Change application x123, as filed, with exhibits', aspect: 'Water', facts: {} },
+    { kind: 'document', ref: W + '?details', role: 'primary_document', grade: 'a', date: '2026-10-15', date_label: 'Filed',
+      evidence_url: W, evidence_label: 'Change Details x123', text: 'Change details for x123', aspect: 'Water', facts: {} },
+    { kind: 'document', ref: 'https://water.example.gov/other.pdf', role: 'primary_document', grade: 'a', date: '2026-10-15',
+      date_label: 'Filed', evidence_url: 'https://water.example.gov/other.pdf', evidence_label: 'Scanned document 2',
+      text: 'Request to consolidate x1234', facts: {} },
+    { kind: 'news_report', ref: 'https://news.example.com/a', role: 'reported_by', grade: 'b', date: '2026-06-04',
+      date_label: 'Published', evidence_url: 'https://news.example.com/a', evidence_label: 'Example News', text: 'Developer shrinks the site', facts: {} });
+  const P = (rk, day, text) => ({ kind: 'bluesky_post', ref: 'bsky:at://did:plc:x/app.bsky.feed.post/' + rk, role: 'explains', grade: 'a',
+    evidence_url: 'https://bsky.app/profile/x/post/' + rk, facts: { text, published_at: day + 'T12:00:00Z' } });
+  const long = 'A water filing says the campus would use about 987 acre-feet a year, near the ranch figure that it would replace each year. Is th';
+  v.links = v.links.filter((l) => l.kind !== 'bluesky_post');
+  v.links.push(P('p1', '2026-10-20', 'one'), P('p2', '2026-10-21', 'two'), P('p3', '2026-10-22', 'three'),
+    P('p4', '2026-10-23', 'four'), P('p5', '2026-10-24', long),
+    P('p6', '2026-11-02', 'The filing covers 558 MILLION gallons.\n\n🎥 https://youtu.be/q-phnTGrMRQ\nhttps://jodytracks.com\n\n#Tag'));
+  const pg = read(build(x).out, A);
+  const hero = pg.slice(pg.indexOf('<section class="hero"'), pg.indexOf('</section>', pg.indexOf('<section class="hero"')));
+  ok(/<title>Valley data center &lt;campus&gt;, Hampshire County, MA \| HomeSignal<\/title>/.test(pg),
+     'the title is the name and the place (short state when the full name runs past 64 characters); no Type word', (pg.match(/<title>.*?<\/title>/) || [''])[0]);
+  ok(/<meta name="description" content="Track the Valley data center &lt;campus&gt; in Hampshire County, Massachusetts: official records, parcels, the developer, water filings and timeline\.">/.test(pg),
+     'the description names what the page holds', (pg.match(/<meta name="description"[^>]*>/) || [''])[0]);
+  ok(hero.includes('<ul class="dsum">') && hero.indexOf('class="dsum"') < hero.indexOf('Follow this development'),
+     'a summary sits under the title, before the Follow button');
+  ok(hero.includes('is a data center in Hampshire County, Massachusetts.') && hero.includes('href="https://atlas.example.org/dc/1"'),
+     'its first sentence is the Type and place, with the defining record as source');
+  ok(hero.includes('name Example Digital, LLC as the master developer') && hero.includes('Example Authority as the governing body'),
+     'it names the developer and governing body from their links');
+  ok(hero.includes('Permanent change application x123, filed Oct 15, 2026. The state lists it as unapproved (checked Oct 28, 2026). That status is for the water-rights application, not for the development as a whole.'),
+     'it states the filing status as the application\'s, not the development\'s');
+  ok(hero.includes('tie 13 parcels in ZIP 01002 and 01003 to the project. That is associated land, not a confirmed project footprint.'),
+     'it counts the associated land without calling it a footprint');
+  ok(!pg.includes('No HomeSignal summary published') && !/upcoming hearing or deadline/.test(pg),
+     'no gap line contradicts the summary or the open protest window');
+  ok(/<section id="next"[^>]*>.*Dec 1, 2026<\/strong>: protest period ends for Permanent change application x123/.test(pg),
+     'the protest deadline is listed under What\'s next');
+  const tl = (pg.match(/<ol class="timeline">.*?<\/ol>/) || [''])[0];
+  const oct15 = tl.split('<li>').filter((li) => li.includes('datetime="2026-10-15"'));
+  ok(oct15.length === 2, 'the filing and the documents that name it are one event; a document for another filing stays its own', String(oct15.length));
+  ok(oct15.some((li) => li.includes('Water-rights filing: Permanent change application x123') && li.includes('Filed by Example Ranch, Inc.')
+     && li.includes('Change application x123, as filed, with exhibits') && li.includes('Sources:')),
+     'the event names the applicant and lists each document as a source');
+  ok(oct15.some((li) => li.includes('Request to consolidate x1234')), 'x1234 is not folded into x123');
+  ok(/<span>Reported<\/span>.*?<span class="chip">News report<\/span>/.test(tl), 'a news report is marked as reporting');
+  const ents = (pg.match(/<section id="entities".*?<\/section>/) || [''])[0];
+  ok(ents.indexOf('<h3>Developer and governing agencies</h3>') >= 0
+     && ents.indexOf('<h3>Developer and governing agencies</h3>') < ents.indexOf('<h3>Applicants, buyers and landowners</h3>')
+     && ents.indexOf('<h3>Applicants, buyers and landowners</h3>') < ents.indexOf('<h3>Consultants and designers</h3>'),
+     'entities are grouped: decision-makers, then applicants and owners, then consultants');
+  ok(pg.includes('<h2 id="h-map">Associated land and parcel maps</h2>') && !pg.includes('Map &amp; land'), 'the land section says what it holds');
+  const main = pg.slice(pg.indexOf('<main'), pg.indexOf('</main>'));
+  const cites = [...main.matchAll(/<a href="https:\/\/[^"]+" rel="([^"]+)"/g)].map((m) => m[1]);
+  ok(cites.length > 10 && cites.every((r) => r === 'noopener'), 'source citations carry no nofollow', JSON.stringify(cites));
+  ok(/<a class="btn" href="https:\/\/agency\.example\.gov\/protest-form" rel="nofollow noopener">/.test(pg), 'the protest form action keeps nofollow');
+  ok(/href="\/follow-development\.html[^"]*" rel="nofollow"/.test(pg), 'the Follow action keeps nofollow');
+  const bs = (pg.match(/<h3>Bluesky updates<\/h3>.*?<\/ul>/) || [''])[0];
+  ok(bs.includes('editorial coverage, not official project records') && (bs.match(/<li>/g) || []).length === 5,
+     'Bluesky: a curated list, at most five posts', String((bs.match(/<li>/g) || []).length));
+  ok(bs.indexOf('Nov 2, 2026') < bs.indexOf('Oct 24, 2026') && !bs.includes('>one<'), 'newest first; the oldest past five is left out');
+  ok(bs.includes('<p>The filing covers 558 MILLION gallons.</p>') && !/youtu\.be|jodytracks\.com|🎥|#Tag/.test(bs),
+     'a post excerpt drops links, emoji and hashtags');
+  ok(bs.includes('near the ranch figure that it would replace each year. Is th…</p>'), 'a cut-off excerpt says so');
+  ok(bs.includes('href="https://bsky.app/profile/x/post/p6" rel="noopener">View post on Bluesky</a>'), 'each post links to Bluesky');
+  ok(!tl.includes('bsky.app'), 'posts are not timeline events');
+  ok(/Status of Permanent change application x123 last checked with the state: <time datetime="2026-10-28">Oct 28, 2026<\/time>/.test(pg)
+     && /Last updated <time datetime="2026-10-29">/.test(pg)
+     && pg.includes('href="/how-it-works.html"') && pg.includes('href="/contact.html">Report a correction'),
+     'the footer gives the record dates, how sources are checked, and how to report a correction');
+}
 
 // 6. one code path
 const src = readFileSync(join(root, 'scripts', 'development_pages.py'), 'utf8').toLowerCase();
