@@ -427,7 +427,7 @@ def _timeline(d):
     upcoming = (" An upcoming deadline is marked and sits at the top."
                 if any(r["kind"] == "deadline" for r in rows) else "")
     return (f'<p class="small">Dates are each source\'s own, newest first.{upcoming} News reports are marked; they are '
-            f'not government actions. HomeSignal videos and posts are listed separately below.</p>'
+            f'not government actions.</p>'
             f'<ol class="timeline">{"".join(lis)}</ol>')
 
 
@@ -788,8 +788,7 @@ def render(d, pages, built, head, crumb_place=None):
                     + f'<p class="ptext">{esc(_post_text(f.get("text")))}</p><p class="small">' + links + '</p></div></li>')
         moving = len(posts) > 1
         track = "".join(post_li(l) for l in posts) + ("".join(post_li(l, True) for l in posts) if moving else "")
-        cov += ('<h3>Bluesky</h3><p class="small">HomeSignal\'s reporting and commentary on this project. '
-                'These posts are editorial coverage, not official project records.</p>'
+        cov += ('<h3>Bluesky</h3>'
                 f'<div class="reel{" moving" if moving else ""}" role="region" aria-label="Bluesky posts">'
                 f'<ul class="reel-track posts" style="--n:{len(posts)}">{track}</ul></div>')
     if cov:
