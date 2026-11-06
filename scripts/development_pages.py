@@ -113,7 +113,23 @@ def site_chrome():
            'font-weight:700;text-decoration:none}\n'
            '.hs-menutoggle:focus-visible~.hs-header__actions .hs-header__menu{outline:2px solid var(--green);outline-offset:2px}\n'
            '@media (max-width:1023px){.hs-menutoggle:checked~.hs-nav{display:flex}}\n')
-    return chrome[0], chrome[1], css
+    # The site's own Share box (#shareModal), with its inline handlers removed: this page allows no
+    # inline script, so lib/dossier-header.js opens, fills and closes it. Its rules come from app.css.
+    modal = _one(r'<div class="overlay" id="shareModal".*?\n  </div>\n</div>', shell, "share box")
+    modal = re.sub(r'\s+onclick="[^"]*"', "", modal)
+    want = (".overlay{", ".overlay.show{", ".modal{", ".modal .mhead{", ".modal .mclose{", ".modal .mbadge{",
+            ".modal h3{", ".modal p.msub{", ".modal .mbody{", ".linkbox{", ".linkbox .url{", ".linkbox button{",
+            ".sharegrid{", ".sopt{", ".sopt .si{", ".sopt:hover .si{", ".sopt:hover{", ".netnote{", ".netnote b{")
+    lines = [ln.strip() for ln in app.splitlines()]
+    # The first rule for each selector; the later .sharegrid{} is the phone rule, added below.
+    picked = [next((ln for ln in lines if ln.startswith(w)), None) for w in want]
+    if None in picked:
+        sys.exit(f"ERROR: share box rule missing from app.css: {want[picked.index(None)]}")
+    pop = _one(r'(@keyframes pop\{.*?\}\})', app, "share box animation")
+    css += ("\n".join(picked) + "\n" + pop + "\n.overlay{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\","
+            "Roboto,Helvetica,Arial,sans-serif;line-height:1.4;" + root + lroot + "}\n"
+            "@media (max-width:620px){.sharegrid{grid-template-columns:repeat(3,1fr)}}\n")
+    return chrome[0], chrome[1] + "\n" + modal, css
 
 
 SITE_HEADER, SITE_FOOTER, CHROME_CSS = site_chrome()
@@ -149,6 +165,7 @@ CSP_TO = "img-src 'self' data: https://i.ytimg.com; font-src 'self';"
 CSP_SCRIPT_FROM = "script-src 'none';"
 CSP_SCRIPT_TO = "script-src 'self';"
 HEADER_JS_V = hashlib.md5(_read("lib/dossier-header.js").encode()).hexdigest()[:8]
+SHARE_JS_V = hashlib.md5(_read("lib/share-modal.js").encode()).hexdigest()[:8]
 
 
 def yt_id(url):
@@ -916,7 +933,8 @@ def render(d, pages, built, head, crumb_place=None):
             sys.exit("ERROR: development page head has no img-src to widen for video thumbnails")
         h = h.replace(CSP_FROM, CSP_TO, 1)
     body = body.replace(RETURN_TOKEN, quote(d["path"], safe=""), 1)
-    return (h + f'<body>\n{body}\n<script src="/lib/dossier-header.js?v={HEADER_JS_V}" defer></script>\n'
+    return (h + f'<body>\n{body}\n<script src="/lib/share-modal.js?v={SHARE_JS_V}" defer></script>\n'
+            f'<script src="/lib/dossier-header.js?v={HEADER_JS_V}" defer></script>\n'
             '</body>\n</html>\n')
 
 

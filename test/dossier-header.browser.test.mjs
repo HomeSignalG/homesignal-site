@@ -1,9 +1,11 @@
 // The development dossier page's header buttons (lib/dossier-header.js), in Chromium, with the page's
 // real header (development_pages.SITE_HEADER), its header CSS and its script-src 'self' CSP.
 // Founder, 2026-11-06: "where is share button and login in top right corner".
+// Founder, same day, showing the site's "Share Jody" box: Share must open THAT box, not the device's share sheet.
 // Proves: signed out shows Share + Sign in (to the site sign-in, returning here), no avatar; a stored
-// session shows the initials avatar (to My Places) instead of Sign in; Share copies the page link
-// where there is no share sheet; without the script, Sign in still works and Share stays hidden.
+// session shows the initials avatar (to My Places) instead of Sign in; Share opens the site's Share box
+// (#shareModal from partials/shell.html, its 12 targets from lib/share-modal.js) for this page, Copy
+// copies the link, and the box closes; without the script, Sign in still works and Share stays hidden.
 //   Run: node test/dossier-header.browser.test.mjs
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
@@ -17,16 +19,18 @@ let fails = 0;
 const ok = (c, name, detail) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + name); if (!c) { fails++; if (detail !== undefined) console.log('           detail: ' + JSON.stringify(detail).slice(0, 400)); } };
 
 const py = spawnSync('python3', ['-c', 'import sys,json; sys.path.insert(0,"scripts"); import development_pages as d; '
-  + 'print(json.dumps({"h": d.SITE_HEADER.replace(d.RETURN_TOKEN, "%2Fdevelopment%2Fut%2Fx%2F"), "css": d.CHROME_CSS, "v": d.HEADER_JS_V}))'],
+  + 'print(json.dumps({"h": d.SITE_HEADER.replace(d.RETURN_TOKEN, "%2Fdevelopment%2Fut%2Fx%2F"), "f": d.SITE_FOOTER, "css": d.CHROME_CSS, "v": d.HEADER_JS_V, "sv": d.SHARE_JS_V}))'],
   { cwd: root, encoding: 'utf8' });
-const { h, css, v } = JSON.parse(py.stdout);
+const { h, f, css, v, sv } = JSON.parse(py.stdout);
 const page = (withScript) => `<!doctype html><html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self';">
 <link rel="canonical" href="https://jodytracks.com/development/ut/x/"><title>X dossier</title><style>${css}</style></head>
-<body>${h}<main>page</main>${withScript ? `<script src="/lib/dossier-header.js?v=${v}" defer></script>` : ''}</body></html>`;
+<body>${h}<main>page</main>${f}${withScript ? `<script src="/lib/share-modal.js?v=${sv}" defer></script><script src="/lib/dossier-header.js?v=${v}" defer></script>` : ''}</body></html>`;
 const JS = readFileSync(join(root, 'lib', 'dossier-header.js'), 'utf8');
+const SJS = readFileSync(join(root, 'lib', 'share-modal.js'), 'utf8');
 const srv = createServer((req, res) => {
   if (req.url.startsWith('/lib/dossier-header.js')) { res.writeHead(200, { 'content-type': 'text/javascript' }); return res.end(JS); }
+  if (req.url.startsWith('/lib/share-modal.js')) { res.writeHead(200, { 'content-type': 'text/javascript' }); return res.end(SJS); }
   res.writeHead(200, { 'content-type': 'text/html' }); res.end(page(!req.url.includes('noscript')));
 });
 await new Promise(r => srv.listen(0, r));
@@ -47,11 +51,31 @@ ok(await p.getAttribute('#hs-signin', 'href') === '/?signin=1&return=%2Fdevelopm
 const box = await p.locator('#hs-share').boundingBox(), sbox = await p.locator('#hs-signin').boundingBox();
 ok(box && sbox && box.x > 640 && sbox.x > box.x && box.y < 80, 'Share and Sign in sit at the top right', { box, sbox });
 
-// 2. Share copies the link where there is no share sheet.
-await p.evaluate(() => { try { Object.defineProperty(navigator, 'share', { value: undefined, configurable: true }); } catch (e) {} });
+// 2. Share opens the site's Share box, never the device's share sheet.
+await p.evaluate(() => { window.__nativeShare = 0; Object.defineProperty(navigator, 'share', { value: () => { window.__nativeShare++; return Promise.resolve(); }, configurable: true }); });
+ok(!(await vis('#shareModal')), 'the Share box starts closed');
 await p.click('#hs-share');
-await p.waitForFunction(() => document.getElementById('hs-share').textContent === 'Link copied');
-ok(await p.evaluate(() => navigator.clipboard.readText()) === 'https://jodytracks.com/development/ut/x/', 'Share copied the page link');
+ok(await vis('#shareModal'), 'Share opens the site Share box');
+ok(await p.evaluate(() => window.__nativeShare) === 0, 'the device share sheet is not used');
+ok((await p.textContent('#shareTitle')).trim() === 'Share HomeSignal', 'the box has the site heading', await p.textContent('#shareTitle'));
+const names = await p.$$eval('#shareGrid .sopt', (els) => els.map((e) => e.lastChild.textContent.trim()));
+ok(names.length === 12 && names.includes('Copy link') && names.includes('Bluesky') && names.includes('Nextdoor'), 'the box has the site 12 share targets', names);
+ok((await p.textContent('#shareUrl')).trim() === 'jodytracks.com/development/ut/x/', 'the box shows this page link', await p.textContent('#shareUrl'));
+const fb = await p.getAttribute('#shareGrid a.sopt[href*="facebook"]', 'href');
+ok(fb === 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent('https://jodytracks.com/development/ut/x/'), 'Facebook shares this page', fb);
+ok(await vis('.netnote'), 'the box has the site "Why sharing matters" note');
+await p.click('#copyBtn');
+await p.waitForFunction(() => document.getElementById('copyBtn').textContent === 'Copied ✓');
+ok(await p.evaluate(() => navigator.clipboard.readText()) === 'https://jodytracks.com/development/ut/x/', 'Copy copies the page link');
+await p.evaluate(() => navigator.clipboard.writeText(''));
+await p.click('#shareGrid [data-hs-copy]');
+ok(await p.evaluate(() => navigator.clipboard.readText()) === 'https://jodytracks.com/development/ut/x/', 'the Copy link target copies the page link');
+await p.click('#shareModal .mclose');
+ok(!(await vis('#shareModal')), 'the close button closes the box');
+await p.click('#hs-share'); await p.keyboard.press('Escape');
+ok(!(await vis('#shareModal')), 'Escape closes the box');
+await p.click('#hs-share'); await p.mouse.click(10, 10);
+ok(!(await vis('#shareModal')), 'a click outside closes the box');
 
 // 3. Signed in (a stored session in this browser).
 await p.evaluate(() => localStorage.setItem('sb-qwnnmljucajnexpxdgxr-auth-token',

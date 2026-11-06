@@ -523,6 +523,7 @@
     // property or a ZIP label is HS.openPremiumModal, below, which re-binds AFTER this
     // runs. An unbound open falls back to the page URL, exactly as it always has.
     if (id === 'premiumModal') HS.premiumContext = null;
+    if (id === 'shareModal') buildShare();   // the page's URL can change after boot (HS.shareUrlOverride)
     _lastFocus = document.activeElement;
     el.classList.add('show');
     const f = el.querySelector('input,button,[tabindex]'); if (f) f.focus();
@@ -2694,39 +2695,33 @@
   };
 
   // -------------------------------------------------- share -------------------
-  const SHARE = [
-    { t: 'Copy link', bg: 'var(--green)', ic: '⧉', fn: 'copy' },
-    { t: 'Messages', bg: '#34c759', ic: '💬', u: u => 'sms:?&body=' + u },
-    { t: 'Email', bg: '#7c8a82', ic: '✉', u: (u, x) => 'mailto:?subject=' + x + '&body=' + u },
-    { t: 'Facebook', bg: '#1877f2', ic: 'f', u: u => 'https://www.facebook.com/sharer/sharer.php?u=' + u },
-    { t: 'Nextdoor', bg: '#00b246', ic: '◍', u: u => 'https://nextdoor.com/sharekit/?source=share&body=' + u },
-    { t: 'WhatsApp', bg: '#25d366', ic: '✆', u: u => 'https://wa.me/?text=' + u },
-    { t: 'Telegram', bg: '#29a9eb', ic: '➤', u: (u, x) => 'https://t.me/share/url?url=' + u + '&text=' + x },
-    { t: 'Signal', bg: '#3a76f0', ic: '◉', fn: 'copy' },
-    { t: 'Reddit', bg: '#ff4500', ic: 'R', u: (u, x) => 'https://www.reddit.com/submit?url=' + u + '&title=' + x },
-    { t: 'X', bg: '#111', ic: '𝕏', u: (u, x) => 'https://twitter.com/intent/tweet?url=' + u + '&text=' + x },
-    { t: 'Bluesky', bg: '#1185fe', ic: '✦', u: (u, x) => 'https://bsky.app/intent/compose?text=' + x + '%20' + u },
-    { t: 'LinkedIn', bg: '#0a66c2', ic: 'in', u: u => 'https://www.linkedin.com/sharing/share-offsite/?url=' + u }
-  ];
-  function shareUrl() {
-    // share the current page URL (centralized, like the live site's share.js)
-    return HS.shareUrlOverride || location.href;
+  // The share targets and the grid live in lib/share-modal.js, shared with the static
+  // development pages, so the Share box is the same everywhere. It is loaded here on demand.
+  const SHARE_MODAL_SRC = '/lib/share-modal.js?v=0ca33db7';
+  function shareUrl() { return HS.shareUrlOverride || location.href; }
+  function loadShareModalLib() {
+    if (HS.fillShareBox) return Promise.resolve();
+    if (HS._shareLib) return HS._shareLib;
+    HS._shareLib = new Promise(function (resolve, reject) {
+      const s = document.createElement('script');
+      s.src = SHARE_MODAL_SRC;
+      s.onload = function () { resolve(); };
+      s.onerror = function () { HS._shareLib = null; reject(new Error('share box script failed')); };
+      document.head.appendChild(s);
+    });
+    return HS._shareLib;
   }
   function buildShare() {
-    const grid = $('shareGrid'); if (!grid) return;
-    $('shareUrl').textContent = shareUrl().replace(/^https?:\/\//, '');
-    const u = encodeURIComponent(shareUrl()), x = encodeURIComponent('See what’s changing around a place you follow on HomeSignal');
-    grid.innerHTML = SHARE.map((s, i) => {
-      const href = s.u ? s.u(u, x) : '#';
-      const tag = s.u ? 'a' : 'button';
-      const attr = s.u ? `href="${href}" target="_blank" rel="noopener"` : `type="button" onclick="HS.copyLink()"`;
-      return `<${tag} class="sopt" ${attr}><span class="si" style="background:${s.bg}">${s.ic}</span>${HS.esc(s.t)}</${tag}>`;
-    }).join('');
+    if (!$('shareGrid')) return;
+    loadShareModalLib().then(function () { HS.fillShareBox(shareUrl()); }).catch(function (e) { console.warn('share', e); });
   }
+  document.addEventListener('click', function (e) {
+    const t = e.target && e.target.closest && e.target.closest('#shareGrid [data-hs-copy]');
+    if (t) { e.preventDefault(); HS.copyLink(); }
+  });
   HS.copyLink = function () {
-    const t = shareUrl();
-    try { navigator.clipboard.writeText(t); } catch (e) {}
-    const b = $('copyBtn'); if (b) { b.textContent = 'Copied ✓'; setTimeout(() => (b.textContent = 'Copy'), 1800); }
+    if (HS.copyShareLink) return HS.copyShareLink(shareUrl());
+    try { navigator.clipboard.writeText(shareUrl()); } catch (e) {}
   };
 
   // -------------------------------------------------- toast -------------------
