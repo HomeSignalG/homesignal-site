@@ -13458,3 +13458,8 @@ inside it, since the old layer dated by filing and layer 8 dates by issue). The 
   recon-fetch run 42265451897) returns count 19,015 and a newest issue date of 2026-10-17. The arcgis connector gains
   `http1_only` (sources/http1.ts: `Deno.createHttpClient({ http2: false })`); if the runtime cannot make that client the
   fetch fails with "http1_only: ..." rather than using HTTP/2. Test: `test/arcgis-http1-only.test.ts`.
+  - **Corrected after the deploy, 2026-11-06 18:25Z: HTTP/2 was not the cause.** With `http1_only` live (deploy run
+    42270013209), the engine made the HTTP/1.1 client and still failed on 35801 and 35806: "Connection reset by peer"
+    from 204.29.185.113:443 (pg_net 30910, 30913). The server drops connections from Supabase's network whatever the
+    protocol, while a GitHub runner is answered. Not worked around. Its stored records are carried forward while it fails.
+    `http1_only` stays on the entry; it is harmless and the reason it fails is now the server's own reset.
