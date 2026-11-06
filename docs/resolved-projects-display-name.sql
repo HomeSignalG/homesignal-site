@@ -15,7 +15,7 @@
 -- column is covered by anon's table-level SELECT, so select=* keeps working.
 --
 -- Values (founder decision, 2026-10-29):
---   stratos-box-elder → 'Stratos data center project', basis 'record'
+--   stratos-box-elder → 'Stratos Data Center Project', basis 'record' (title case, founder 2026-11-06)
 --       (MIDA PMN notice 1075195 names the "STRATOS PROJECT AREA").
 --   eagle-mountain    → 'Eagle Mountain land assembly', basis 'descriptive'
 --       JODY's own label for where the land is. No public record names this project, and the page
@@ -65,8 +65,8 @@ comment on column public.resolved_projects.display_name is
 comment on column public.resolved_projects.display_name_basis is
   'record = a public record names the project; descriptive = JODY''s own label (the page says so).';
 
-update public.resolved_projects set display_name = 'Stratos data center project', display_name_basis = 'record'
- where project_key = 'stratos-box-elder' and display_name is null;
+update public.resolved_projects set display_name = 'Stratos Data Center Project', display_name_basis = 'record'
+ where project_key = 'stratos-box-elder' and (display_name is null or display_name = 'Stratos data center project');
 
 update public.resolved_projects set display_name = 'Eagle Mountain land assembly', display_name_basis = 'descriptive'
  where project_key = 'eagle-mountain' and display_name is null;
@@ -76,7 +76,7 @@ do $$
 declare n int; b _rp_before; a_rows text; a_parcels text;
 begin
   select count(*) into n from public.resolved_projects
-   where (project_key = 'stratos-box-elder' and display_name = 'Stratos data center project' and display_name_basis = 'record')
+   where (project_key = 'stratos-box-elder' and display_name = 'Stratos Data Center Project' and display_name_basis = 'record')
       or (project_key = 'eagle-mountain' and display_name = 'Eagle Mountain land assembly' and display_name_basis = 'descriptive');
   if n <> 2 then raise exception 'expected the 2 decided names, found %', n; end if;
   select * into b from _rp_before;

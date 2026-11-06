@@ -28,7 +28,7 @@ before=$(q "select md5(string_agg(id::text||project_key||coalesce(community_id::
 
 P -f "$F" >/dev/null 2>&1 && ok1=t || ok1=f; ck "applies" "$ok1"
 P -f "$F" >/dev/null 2>&1 && ok2=t || ok2=f; ck "re-applying changes nothing and does not fail" "$ok2"
-ck "Stratos: record name" "$(q "select display_name = 'Stratos data center project' and display_name_basis = 'record' from public.resolved_projects where project_key = 'stratos-box-elder'")"
+ck "Stratos: record name" "$(q "select display_name = 'Stratos Data Center Project' and display_name_basis = 'record' from public.resolved_projects where project_key = 'stratos-box-elder'")"
 ck "Eagle Mountain: JODY's descriptive label, not an official name" "$(q "select display_name = 'Eagle Mountain land assembly' and display_name_basis = 'descriptive' from public.resolved_projects where project_key = 'eagle-mountain'")"
 after=$(q "select md5(string_agg(id::text||project_key||coalesce(community_id::text,''),',' order by project_key collate \"C\")) || md5((select string_agg(id::text||project_id::text||coalesce(apn,'')||coalesce(zip,'')||in_anchor::text, ',' order by id::text collate \"C\") from public.resolved_project_parcels)) from public.resolved_projects")
 ck "ids, keys, communities and parcels unchanged" "$([ "$before" = "$after" ] && echo t || echo f)"

@@ -254,7 +254,7 @@ ok(!pa.includes('class="protest"'), 'a filing with no protest window shows no bo
   const bs = (pg.match(/<h3>Bluesky<\/h3>.*?<\/ul><\/div>/) || [''])[0];
   ok(!pg.includes('Bluesky updates'), 'the heading is just "Bluesky"');
   ok(!pg.includes('own explainers'), 'no "own explainers" sentence above the videos');
-  ok(bs.includes('editorial coverage, not official project records') && (bs.match(/<li>/g) || []).length === 5
+  ok(!pg.includes('editorial coverage') && !pg.includes('listed separately below') && (bs.match(/<li>/g) || []).length === 5
      && (bs.match(/<li aria-hidden="true">/g) || []).length === 5,
      'Bluesky: at most five posts, then a hidden copy of each so the reel can loop', String((bs.match(/<li>/g) || []).length));
   ok(bs.includes('<div class="reel moving" role="region" aria-label="Bluesky posts"><ul class="reel-track posts" style="--n:5">'),
