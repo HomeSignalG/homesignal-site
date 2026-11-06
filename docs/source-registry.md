@@ -13453,6 +13453,8 @@ inside it, since the old layer dated by filing and layer 8 dates by issue). The 
 - **fdot-active-construction-projects**: not changed. `gis.fdot.gov` answered 502 (Azure Application Gateway) to the layer,
   its metadata and a count on 2026-11-06 17:49Z; every FDOT web map found on ArcGIS Online reads the same server, and the only
   other copy is a 2019 WFS. Its stored records are carried forward while it fails.
-- **huntsville-building-permits**: not changed. pg_net still gets "Stream error in the HTTP/2 framing layer" from
-  `maps.huntsvilleal.gov`; no hosted copy on ArcGIS Online. Tested from a GitHub runner over HTTP/1.1 (homesignal-ingest
-  `scripts/recon/huntsville-2026-11-06.json`); result recorded on the PR.
+- **huntsville-building-permits**: the server is alive; HTTP/2 is what breaks. pg_net gets "Stream error in the HTTP/2
+  framing layer" and the engine "error sending request", while a GitHub runner's HTTP/1.1 request (homesignal-ingest
+  recon-fetch run 42265451897) returns count 19,015 and a newest issue date of 2026-10-17. The arcgis connector gains
+  `http1_only` (sources/http1.ts: `Deno.createHttpClient({ http2: false })`); if the runtime cannot make that client the
+  fetch fails with "http1_only: ..." rather than using HTTP/2. Test: `test/arcgis-http1-only.test.ts`.

@@ -23,6 +23,7 @@
 // outSR=4326, resultOffset/resultRecordCount paging, exceededTransferLimit honored. Point
 // geometry {x:lng,y:lat} is flattened into __lng/__lat so the column_map reads it uniformly.
 
+import { http1Client } from "./http1.ts";
 import { attemptFetch } from "./fetch-retry.ts";
 import { dropNullIsland } from "./null-island.ts";
 import { scopeField } from "./scope-text.ts";
@@ -53,6 +54,10 @@ import { aliasFileFor, applyIdentityAlias, type AliasVerdict, type IdentityAlias
 export interface ArcgisRegistryEntry {
   registry_id: string;
   platform: "arcgis";
+  /** OPT-IN: send this source's requests over HTTP/1.1 only (sources/http1.ts), for servers that break
+   *  on HTTP/2. If the runtime cannot make an HTTP/1.1-only client the fetch FAILS with a clear reason,
+   *  never silently falls back to HTTP/2. Absent ⇒ the default fetch, byte-identical to before. */
+  http1_only?: boolean;
   /** The FeatureServer LAYER query base, e.g.
    *  "https://services6.arcgis.com/ABC/arcgis/rest/services/Permits/FeatureServer/0". */
   service_url: string;
@@ -887,7 +892,7 @@ async function fetchRows(
     url.searchParams.set("resultRecordCount", String(pageSize));
     if (orderBy) url.searchParams.set("orderByFields", orderBy);
     url.searchParams.set("f", "json");
-    const page = await getWithBackoff(url.toString(), deps) as {
+    const page = await getWithBackoff(url.toString(), deps, entry.http1_only === true) as {
       features?: ArcgisFeature[];
       exceededTransferLimit?: boolean;
       error?: { message?: string };
@@ -1003,8 +1008,11 @@ export function soleTypeCol(entry: ArcgisRegistryEntry): string | null {
   return String(ts);
 }
 
-async function getWithBackoff(url: string, deps: ArcgisDeps): Promise<unknown> {
+async function getWithBackoff(url: string, deps: ArcgisDeps, http1 = false): Promise<unknown> {
   const headers: Record<string, string> = { "Accept": "application/json", "User-Agent": "HomeSignal public-records refresh (contact: admin@homesignal.net)" };
+  // HTTP/1.1-only (entry.http1_only). No client => fail with the reason, never quietly use HTTP/2.
+  const client = http1 ? http1Client() : null;
+  if (http1 && !client) throw new Error("http1_only: this runtime cannot create an HTTP/1.1-only client");
   // LONG-QUERY POST FALLBACK (Scottsdale class, 2026-07-16): classic ArcGIS Server on IIS
   // caps GET query strings at 2,048 chars (IIS maxQueryString → 404.15), so a long verbatim
   // type whitelist in the WHERE 404s as a GET. ArcGIS query endpoints accept the identical
@@ -1019,8 +1027,9 @@ async function getWithBackoff(url: string, deps: ArcgisDeps): Promise<unknown> {
         headers: { ...headers, "Content-Type": "application/x-www-form-urlencoded" },
         body: url.slice(qs + 1),
         signal: AbortSignal.timeout(30000),
-      }
-    : { headers, signal: AbortSignal.timeout(30000) };
+        ...(client ? { client } : {}),
+      } as RequestInit
+    : { headers, signal: AbortSignal.timeout(30000), ...(client ? { client } : {}) } as RequestInit;
   let delay = 800;
   let lastNet: Error | null = null;   // connection reset etc. (sources/fetch-retry.ts)
   for (let attempt = 0; attempt < 4; attempt++) {
