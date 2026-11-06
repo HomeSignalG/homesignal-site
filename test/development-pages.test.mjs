@@ -372,8 +372,11 @@ ok(written.some((p) => p.startsWith('development/')) && refused.length === 0,
   const tiles = pg.slice(pg.indexOf('<div class="tiles">'), pg.indexOf('</div>', pg.lastIndexOf('</details>')));
   const det = tiles.match(/<details[^>]*>/g) || [];
   ok(det.length >= 6 && det.every((t) => t === '<details>'), 'every tile is a <details> that starts closed', JSON.stringify(det));
-  ok(!/<script(?! type="application\/ld\+json"| src="\/lib\/(?:share-modal|dossier-header)\.js)/.test(pg) && !pg.includes('<nav class="toc"'),
-     'no other script, and the separate jump list is gone');
+  // The tiles open and close with no script. The only scripts are the JSON-LD and the site header's
+  // own (lib/share-modal.js + lib/dossier-header.js), which never touch a tile.
+  const scripts = pg.match(/<script(?! type="application\/ld\+json")[^>]*>/g) || [];
+  ok(scripts.every((t) => /src="\/lib\/(?:share-modal|dossier-header)\.js/.test(t)) && !pg.includes('<nav class="toc"'),
+     'no tile script (only the header scripts), and the separate jump list is gone', JSON.stringify(scripts));
   const heads = [...pg.matchAll(/<summary>.*?<h2 id="h-([a-z]+)">(.*?)<\/h2><span class="ts">(.*?)<\/span>.*?<\/summary><div class="tb" id="([a-z]+)">/g)];
   ok(heads.length === det.length && heads.every((m) => m[1] === m[4] && m[3].length > 0),
      'each tile has a heading and a one-line description in its summary, and the body carries the section id', JSON.stringify(heads.map((m) => [m[1], m[2], m[4]])));

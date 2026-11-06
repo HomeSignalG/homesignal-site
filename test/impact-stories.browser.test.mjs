@@ -915,12 +915,19 @@ await page.evaluate(() => {
 await page.waitForTimeout(80);
 await page.click('#is [data-act=step][data-step=media]'); await page.waitForTimeout(50);
 let dtxt = await page.locator('#is-next-box').innerText();
-ok(/send your 6 fix requests/i.test(dtxt) && /Retry would stop the same way/i.test(dtxt) && !/Something went wrong/i.test(dtxt),
+ok(/send your 6 fix requests to Claude/i.test(dtxt) && /Why not Retry\?/.test(dtxt) && !/Something went wrong/i.test(dtxt),
    'picture drift: the top box says the next step is to send the 6 fix requests, and why Retry would not help');
+ok(await page.evaluate(() => { const li = [...document.querySelectorAll('#is-next-box .is-path li')];
+     return li.length === 5 && li[0].getAttribute('aria-current') === 'step' && /you are here/i.test(li[0].textContent) && /Render the videos/.test(li[4].textContent); }),
+   'picture drift: the box shows the numbered path to finished videos, step 1 marked "you are here"');
+ok(await page.locator('#is [data-act=fixstart]').count() === 1 && await page.locator('#is [data-act=render]').count() === 0,
+   'picture drift: one Fix button on the page, and no Render button (it would stop the same way)');
+ok(await page.evaluate(() => [...document.querySelectorAll('#is .is-badge')].filter((b) => /Not sent yet/.test(b.textContent)).length === 1),
+   'picture drift: the shared "Not sent yet" status is shown once, not on every request');
 ok(await page.locator('#is #is-next-box [data-act=retry]').count() === 0
-   && await page.locator('#is #is-next-box .is-btn.primary[data-act=fixstart]', { hasText: 'Fix (6)' }).count() === 1
+   && await page.locator('#is #is-next-box .is-btn.primary[data-act=fixstart]', { hasText: 'Send 6 fix requests' }).count() === 1
    && await page.locator('#is #is-next-box [data-act=vprep][data-new="1"]').count() === 1,
-   'picture drift: no Retry; Fix (6) is the one green button, Prepare the pictures is the alternative');
+   'picture drift: no Retry; Send 6 fix requests is the one green button, Prepare the pictures is the alternative');
 let dmed = await page.locator('#is-media-now').innerText();
 ok(!/Ready for your review/i.test(dmed) && /newest render did not run/i.test(dmed), 'picture drift: Media review no longer says "Ready for your review"');
 await page.evaluate(() => { window.db.media.fix_requests = []; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
