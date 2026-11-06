@@ -334,11 +334,17 @@ ok(!pa.includes('class="protest"'), 'a filing with no protest window shows no bo
   ok(cites.length > 10 && cites.every((r) => r === 'noopener'), 'source citations carry no nofollow', JSON.stringify(cites));
   ok(/<a class="btn" href="https:\/\/agency\.example\.gov\/protest-form" rel="nofollow noopener">/.test(pg), 'the protest form action keeps nofollow');
   ok(/href="\/follow-development\.html[^"]*" rel="nofollow"/.test(pg), 'the Follow action keeps nofollow');
-  const bs = (pg.match(/<h3>Bluesky updates<\/h3>.*?<\/ul>/) || [''])[0];
-  ok(bs.includes('editorial coverage, not official project records') && (bs.match(/<li>/g) || []).length === 5,
-     'Bluesky: a curated list, at most five posts', String((bs.match(/<li>/g) || []).length));
+  const bs = (pg.match(/<h3>Bluesky<\/h3>.*?<\/ul><\/div>/) || [''])[0];
+  ok(!pg.includes('Bluesky updates'), 'the heading is just "Bluesky"');
+  ok(!pg.includes('own explainers'), 'no "own explainers" sentence above the videos');
+  ok(bs.includes('editorial coverage, not official project records') && (bs.match(/<li>/g) || []).length === 5
+     && (bs.match(/<li aria-hidden="true">/g) || []).length === 5,
+     'Bluesky: at most five posts, then a hidden copy of each so the reel can loop', String((bs.match(/<li>/g) || []).length));
+  ok(bs.includes('<div class="reel moving" role="region" aria-label="Bluesky posts"><ul class="reel-track posts" style="--n:5">'),
+     'the posts are tiles in a moving reel, like the videos');
+  ok(!/<li aria-hidden="true">.*?<a (?!tabindex="-1")/.test(bs.replace(/<li>.*?<\/li>/g, '')), 'the copies are out of the keyboard order');
   ok(bs.indexOf('Nov 2, 2026') < bs.indexOf('Oct 24, 2026') && !bs.includes('>one<'), 'newest first; the oldest past five is left out');
-  ok(bs.includes('<p>The filing covers 558 MILLION gallons.</p>') && !/youtu\.be|jodytracks\.com|🎥|#Tag/.test(bs),
+  ok(bs.includes('<p class="ptext">The filing covers 558 MILLION gallons.</p>') && !/youtu\.be|jodytracks\.com|🎥|#Tag/.test(bs),
      'a post excerpt drops links, emoji and hashtags');
   ok(bs.includes('near the ranch figure that it would replace each year. Is th…</p>'), 'a cut-off excerpt says so');
   ok(bs.includes('href="https://bsky.app/profile/x/post/p6" rel="noopener">View post on Bluesky</a>'), 'each post links to Bluesky');

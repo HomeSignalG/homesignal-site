@@ -466,6 +466,9 @@ h3{font-size:1.05rem;margin:1.2rem 0 .4rem}section{scroll-margin-top:4rem}
 .vthumb img,.vthumb .noimg{display:block;width:100%;height:100%;object-fit:cover}
 .vtag{position:absolute;left:.4rem;bottom:.4rem;background:rgba(0,0,0,.72);color:#fff;font-size:.72rem;font-weight:600;border-radius:6px;padding:.05rem .4rem}
 .vtitle{display:block;font-size:.9rem;font-weight:600;line-height:1.35;margin-top:.45rem}
+.reel-track.posts>li{width:18rem;display:flex}
+.ptile{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:.6rem .8rem;display:flex;flex-direction:column}
+.ptile p{margin:.15rem 0}.ptile .ptext{flex:1}
 .reel.moving .reel-track{animation:reel calc(var(--n) * 7s) linear infinite}
 .reel.moving:hover .reel-track,.reel.moving:focus-within .reel-track{animation-play-state:paused}
 @keyframes reel{to{transform:translateX(-50%)}}
@@ -734,25 +737,30 @@ def render(d, pages, built, head, crumb_place=None):
         track = "".join(card(l) for l in vids_all) + ("".join(card(l, True) for l in vids_all) if moving else "")
         cov += (f'<h3>Videos</h3><div class="reel{" moving" if moving else ""}" role="region" aria-label="Videos">'
                 f'<ul class="reel-track" style="--n:{len(vids_all)}">{track}</ul></div>')
-    # Bluesky: a curated list (only posts a reviewer linked), newest first, at most five, in the
-    # page's own HTML. Each is the post's date, its text, a link to the post and, when the link
-    # names one, the source document it discusses.
+    # Bluesky: a curated set (only posts a reviewer linked), newest first, at most five, in the
+    # page's own HTML. Each tile is the post's date, its text, a link to the post and, when the link
+    # names one, the source document it discusses. Tiles move left in a reel, like the videos.
     posts = sorted(posts, key=lambda l: str((l.get("facts") or {}).get("published_at") or ""), reverse=True)[:5]
     if posts:
-        def post_li(l):
+        def post_li(l, copy=False):
             f = l.get("facts") or {}
             src = safe_url(f.get("source_url"))
-            return ('<li>' + (f'<p class="small"><time datetime="{esc(str(f.get("published_at"))[:10])}">'
-                              f'{esc(day(f.get("published_at")))}</time></p>' if day(f.get("published_at")) else "")
-                    + f'<p>{esc(_post_text(f.get("text")))}</p><p class="small">'
-                    + _src(l.get("evidence_url"), "View post on Bluesky").strip()
-                    + (f' · {_src(src, "Read the source document").strip()}' if src else "") + '</p></li>')
-        cov += ('<h3>Bluesky updates</h3><p class="small">HomeSignal\'s reporting and commentary on this project. '
+            links = _src(l.get("evidence_url"), "View post on Bluesky").strip() + (
+                f' · {_src(src, "Read the source document").strip()}' if src else "")
+            if copy:
+                links = links.replace("<a ", '<a tabindex="-1" ')
+            return (('<li aria-hidden="true">' if copy else '<li>') + '<div class="ptile">'
+                    + (f'<p class="small"><time datetime="{esc(str(f.get("published_at"))[:10])}">'
+                       f'{esc(day(f.get("published_at")))}</time></p>' if day(f.get("published_at")) else "")
+                    + f'<p class="ptext">{esc(_post_text(f.get("text")))}</p><p class="small">' + links + '</p></div></li>')
+        moving = len(posts) > 1
+        track = "".join(post_li(l) for l in posts) + ("".join(post_li(l, True) for l in posts) if moving else "")
+        cov += ('<h3>Bluesky</h3><p class="small">HomeSignal\'s reporting and commentary on this project. '
                 'These posts are editorial coverage, not official project records.</p>'
-                '<ul class="cards">' + "".join(post_li(l) for l in posts) + "</ul>")
+                f'<div class="reel{" moving" if moving else ""}" role="region" aria-label="Bluesky posts">'
+                f'<ul class="reel-track posts" style="--n:{len(posts)}">{track}</ul></div>')
     if cov:
-        cov = ('<div class="jody"><p class="small">HomeSignal\'s own explainers. They are editorial, not government '
-               'records, and are listed only after they are public.</p>' + cov + '</div>')
+        cov = '<div class="jody">' + cov + '</div>'
 
     recs = "".join(f'<li><a href="{esc(u)}">{esc(prose(n))}</a></li>' for n, u in (d.get("_records") or []))
     recs = (f'<ul class="plain">{recs}</ul><p class="small">The record pages on this site for the filings linked '
