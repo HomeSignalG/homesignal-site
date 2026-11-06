@@ -6505,3 +6505,20 @@ audio, sources. Up to 60 scenes and 60,000 characters of narration; the pasted s
 - ⛔ **Apply order:** merge homesignal-ingest first, then apply `docs/impact-stories.sql`, then `docs/impact-discovery.sql`, then
   deploy the page. Not applied to production (founder: not until approved). Existing stories are `jody` and unchanged.
 - Tests: `test/creator-script.test.mjs`, `test/impact-creator.browser.test.mjs`, `test/impact_creator_pg` (`impact-creator-suite.yml`).
+
+## IMPACT STORIES, TAB 17: STORY TYPE (2026-11-06)
+
+Investigative (default) · Public Policy · Public Participation / How-To. `impact_discovery_candidates.story_type` = auto | an
+explicit type. **The ONE detector is `_hs_id_story_type_detect(title, note)`** (docs/impact-discovery.sql): action phrases in
+the title (register to speak, submit a comment, sign the petition, attend the meeting, how to testify, deadline to …) decide
+with high confidence, in the note with medium; a proposed rule/bill with no action phrase is Public Policy. It runs at read
+time and never writes the column, so an explicit choice is never overwritten. `_hs_id_story_type` resolves (explicit, else
+detected); the overview, nominations and the research claim send `story_type`, `story_type_detected`, `story_type_resolved`.
+`hs_impact_discovery_set_story_type` changes it (same locks as the starting evidence); Suggest a topic takes `story_type`.
+- Page: the topic card shows the type chip and an override (`lib/acq-impact-discovery.js` `typeLine`); Story Outline shows
+  the participation review panel (`viewParticipation`) from the engine's `validation.participation` (status Ready for
+  Review / Needs Evidence / Expired / Blocked, agency, action, deadline and days left, event, verified link, steps,
+  alternatives, visual plan). The page decides nothing. Revision section `participation` is accepted.
+- Engine half and the How-To Short rules: homesignal-ingest CLAUDE.md "STORY TYPES AND THE HOW-TO SHORT".
+- Either apply order is safe (the engine treats a missing type as investigative; the page shows no control without it).
+- Tests: `test/impact_discovery_pg` 19a-19m, `test/impact-participation.browser.test.mjs` (fixture exported from the engine).
