@@ -62,7 +62,7 @@ ok(offenders.length === 0, '1g no site file decides "cancelled" from text; the f
 // ── 2. every meetings reader selects is_cancelled ────────────────────────────────────────────
 const DATA = read('lib/data.js');
 const reads = DATA.match(/from\('meetings'\)\s*\.select\(\s*'[^']*'/g) || [];
-ok(reads.length === 3, '2a lib/data.js reads the meetings table exactly three times (found ' + reads.length + ')');
+ok(reads.length === 5, '2a lib/data.js reads the meetings table exactly five times (two are the last-met reads, 2026-11-06) (found ' + reads.length + ')');
 ok(reads.every((r) => /is_cancelled/.test(r)), '2b every lib/data.js meetings read selects is_cancelled');
 ok(!/from\('meetings'\)\s*\.select\('\*'\)/.test(DATA), '2c no bare select(\'*\') on meetings (a computed field is not in *)');
 ok(/cancelled:\s*m\.is_cancelled === true/.test(DATA.slice(DATA.indexOf('function normMeeting'), DATA.indexOf('function normMeeting') + 2000)),

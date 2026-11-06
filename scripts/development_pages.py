@@ -34,7 +34,23 @@ ROLE_LABEL = {
 ENTITY_ORDER = {r: i for i, r in enumerate((
     "governing_body", "filing_receiver", "applicant", "master_developer", "buyer_under_contract",
     "landowner_of_record", "designer", "consultant"))}
+RECORD_LINKS_MAX = 12   # record pages listed on a dossier page
 DOC_KINDS = ("source_record", "water_filing", "government_record", "document", "dc_entity")
+ENTITY_GROUPS = (
+    ("Developer and governing agencies", ("governing_body", "filing_receiver", "master_developer")),
+    ("Applicants, buyers and landowners", ("applicant", "buyer_under_contract", "landowner_of_record")),
+    ("Consultants and designers", ("designer", "consultant")),
+)
+STATE_NAMES = dict(zip(
+    "AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR "
+    "PA RI SC SD TN TX UT VT VA WA WV WI WY".split(),
+    ["Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware",
+     "District of Columbia", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas",
+     "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi",
+     "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York",
+     "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island",
+     "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington",
+     "West Virginia", "Wisconsin", "Wyoming"]))
 
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -155,6 +171,48 @@ def load(path, required):
     return out
 
 
+TITLE_MAX = 64      # Google shows about 60 characters; the brand overlay swaps "HomeSignal" for a name one longer
+DESC_MAX = 155      # what a search result shows of a description
+_ABBREV = {"inc", "co", "corp", "llc", "ltd", "lp", "st", "dr", "mr", "mrs", "ms", "no", "u.s", "vs", "etc"}
+
+
+def page_title(name, where):
+    """The page title: the project's name, then where it is, then the brand. The Type pill stays on
+    the page (it is the source's word and can read oddly in a title); a title that would run past
+    TITLE_MAX drops the place and keeps the name."""
+    full = f"{name}, {where} | HomeSignal" if where else f"{name} | HomeSignal"
+    return full if len(full) <= TITLE_MAX else f"{name} | HomeSignal"
+
+
+def meta_description(text, fallback):
+    """The description search results show: whole sentences from the dossier's own summary that fit
+    in DESC_MAX, so the first facts (what, where) lead. A sentence ends at . ! or ? before a capital
+    letter, never after an abbreviation ("Inc."). One sentence too long for the limit is cut at a word
+    and ends with an ellipsis. Nothing is reworded."""
+    t = re.sub(r"\s+", " ", str(text or "")).strip()
+    if not t:
+        return fallback
+    sents, start = [], 0
+    for m in re.finditer(r"[.!?](?=\s+[A-Z\"'(])", t):
+        last = t[start:m.end()].rsplit(None, 1)[-1].rstrip(".").lower()
+        if last in _ABBREV:
+            continue
+        sents.append(t[start:m.end()].strip())
+        start = m.end()
+    if start < len(t):
+        sents.append(t[start:].strip())
+    out = ""
+    for x in sents:
+        nxt = f"{out} {x}".strip()
+        if len(nxt) > DESC_MAX:
+            break
+        out = nxt
+    if out:
+        return out
+    cut = t[:DESC_MAX - 1].rsplit(" ", 1)[0].rstrip(",;:- ")
+    return cut + "\u2026"
+
+
 def classifier_input(d):
     """What the ONE Type/lifecycle authority is asked about: the defining record as the owning
     table states it. No defining record means no Type is claimed."""
@@ -208,7 +266,9 @@ def _src(url, label):
     u = safe_url(url)
     if not u:
         return ""
-    return f' <a href="{esc(u)}" rel="nofollow noopener">{esc(prose(label) or "Source")}</a>'
+    # An editorially checked source is an ordinary citation: no nofollow (2026-11-06). Account and
+    # form actions (Follow, the protest form) keep theirs.
+    return f' <a href="{esc(u)}" rel="noopener">{esc(prose(label) or "Source")}</a>'
 
 
 def _links(d, *kinds):
@@ -256,32 +316,88 @@ def _doc_title(l):
     return l.get("evidence_label") or l.get("ref")
 
 
+def _filing_name(f):
+    return f'{f.get("filing_type") or "Water-rights filing"} {f.get("filing_no") or ""}'.strip()
+
+
+def _names_filing(text, no):
+    return bool(no) and re.search(rf"(?<![A-Za-z0-9]){re.escape(str(no))}(?![A-Za-z0-9])", str(text or ""), re.I)
+
+
+def _org_name(l):
+    return str(l.get("ref") or "").split(":", 1)[-1]
+
+
 def _timeline(d):
+    """Events, not database rows (2026-11-06). A water filing and the documents filed with it on
+    the same day are one event, listing each document as a source. A news report says it is a
+    news report. Dates are each source's own."""
+    links = d.get("links") or []
     rows = []
-    for l in d.get("links") or []:
+    for l in links:
         f = l.get("facts") or {}
         date, label = l.get("date"), l.get("date_label")
         if not date and l["kind"] == "water_filing" and f.get("filed_on"):
             date, label = f["filed_on"], f.get("date_label") or "Filed"
         if not date or l["kind"] in ("youtube_video", "bluesky_post", "organization"):
             continue
-        rows.append((str(date), label, l.get("aspect"), _doc_title(l), l.get("evidence_url"),
-                     l.get("evidence_label"), l.get("role")))
+        rows.append({"date": str(date)[:10], "label": label, "aspect": l.get("aspect"), "title": _doc_title(l),
+                     "kind": l["kind"], "link": l, "sources": [(l.get("evidence_url"), l.get("evidence_label"))]})
     for s in d.get("statements") or []:
         if s.get("date") and s.get("kind") in ("latest", "known"):
-            rows.append((str(s["date"]), s.get("date_label"), s.get("aspect"), s.get("title") or s["body"],
-                         s.get("evidence_url"), s.get("evidence_label"), None))
-    rows.sort(key=lambda r: r[0], reverse=True)
+            rows.append({"date": str(s["date"])[:10], "label": s.get("date_label"), "aspect": s.get("aspect"),
+                         "title": s.get("title") or s["body"], "kind": "statement", "link": None,
+                         "sources": [(s.get("evidence_url"), s.get("evidence_label"))]})
+    # Fold the same-day documents that name a water filing into that filing's event.
+    for ev in [r for r in rows if r["kind"] == "water_filing"]:
+        f = ev["link"].get("facts") or {}
+        no = f.get("filing_no")
+        ev["title"] = f'Water-rights filing: {_filing_name(f)}'
+        who = [_org_name(l) for l in links if l.get("kind") == "organization" and l.get("role") == "applicant"
+               and _names_filing(l.get("text"), no)]
+        ev["body"] = (f'Filed by {", ".join(who)}.' if who else "")
+        ev["label"] = "Filed"
+        ev["sources"] = [(ev["link"].get("evidence_url"), "State change record")]
+        docs = []
+        for r in list(rows):
+            if r is ev or r["date"] != ev["date"] or r["kind"] not in ("document", "government_record"):
+                continue
+            if _names_filing(r["title"], no) or _names_filing(r["link"].get("evidence_label"), no):
+                rows.remove(r)
+                docs.append(r)
+        for r in docs:
+            ev["sources"].append((r["link"].get("evidence_url"), r["title"]))
+            ev["aspect"] = ev["aspect"] or r["aspect"]
+    rows.sort(key=lambda r: r["date"], reverse=True)
     if not rows:
         return ""
-    lis = "".join(
-        f'<li><div class="tdate"><time datetime="{esc(r[0])}">{esc(day(r[0]))}</time>'
-        f'<span>{esc(r[1] or "")}</span></div><div class="tbody">'
-        + (f'<p class="chips"><span class="chip">{esc(r[2])}</span></p>' if r[2] else "")
-        + f'<p>{esc(prose(r[3]))}</p>' + (f'<p>{_src(r[4], r[5]).strip()}</p>' if _src(r[4], r[5]) else "")
-        + '</div></li>' for r in rows)
-    return (f'<p class="small">Dates are each source\'s own, newest first. HomeSignal videos and posts are '
-            f'listed separately below; they are not government events.</p><ol class="timeline">{lis}</ol>')
+
+    def srcs(r):
+        seen, out = set(), []
+        for u, lab in r["sources"]:
+            su = safe_url(u)
+            if su and su not in seen:
+                seen.add(su)
+                out.append(_src(su, lab).strip())
+        return " · ".join(out)
+
+    lis = []
+    for r in rows:
+        news = r["kind"] == "news_report"
+        chips = ([esc(r["aspect"])] if r["aspect"] else []) + (["News report"] if news else [])
+        label = "Reported" if news else (r["label"] or "")
+        sl = srcs(r)
+        lis.append(
+            f'<li><div class="tdate"><time datetime="{esc(r["date"])}">{esc(day(r["date"]))}</time>'
+            f'<span>{esc(label)}</span></div><div class="tbody">'
+            + ('<p class="chips">' + "".join(f'<span class="chip">{c}</span>' for c in chips) + '</p>' if chips else "")
+            + f'<p>{esc(prose(r["title"]))}</p>'
+            + (f'<p>{esc(prose(r["body"]))}</p>' if r.get("body") else "")
+            + (f'<p class="small">{"Sources" if len(r["sources"]) > 1 else "Source"}: {sl}</p>' if sl else "")
+            + '</div></li>')
+    return (f'<p class="small">Dates are each source\'s own, newest first. News reports are marked; they are '
+            f'not government actions. HomeSignal videos and posts are listed separately below.</p>'
+            f'<ol class="timeline">{"".join(lis)}</ol>')
 
 
 # The footer's date as words. Rendered as a token beside the build-day token and replaced in
@@ -360,24 +476,29 @@ h3{font-size:1.05rem;margin:1.2rem 0 .4rem}section{scroll-margin-top:4rem}
 """
 
 
-def _protests(d):
+def _open_protests(d):
     """Open protest windows of the linked water filings, from the state's own change record
     (facts.protest, development_water_protest). A window is open while its protest end date is on
     or after the build day (d["_today"], the real UTC date; the page is rebuilt at least daily, so
-    the box leaves the page the day after the window closes). An unknown build day, an undated
-    window or a form link that is not https shows nothing: the page never offers a form it cannot
+    the window leaves the page the day after it closes). An unknown build day, an undated window
+    or a form link that is not https counts as not open: the page never offers a form it cannot
     say is open."""
     today = str(d.get("_today") or "")
     if not DAY_RE.match(today):
-        return ""
+        return []
     out = []
     for l in _links(d, "water_filing"):
         pr = (l.get("facts") or {}).get("protest") or {}
         end, form = str(pr.get("protest_end") or ""), safe_url(pr.get("form_url"))
-        if not DAY_RE.match(end) or end < today or not form:
-            continue
-        f = l.get("facts") or {}
-        filing = f'{f.get("filing_type") or "Water-rights filing"} {f.get("filing_no") or ""}'.strip()
+        if DAY_RE.match(end) and end >= today and form:
+            out.append({"link": l, "pr": pr, "end": end, "form": form, "filing": _filing_name(l.get("facts") or {})})
+    return out
+
+
+def _protests(d):
+    out = []
+    for w in _open_protests(d):
+        pr, end, form, filing = w["pr"], w["end"], w["form"], w["filing"]
         already = (f' The state\'s record lists it as {esc(str(pr["protested"]).lower())}.'
                    if str(pr.get("protested") or "").strip() else "")
         checked = day(pr.get("checked_at"))
@@ -392,6 +513,81 @@ def _protests(d):
     return "".join(out)
 
 
+def _protest_deadlines(d):
+    """The open protest windows as What's next items, so the page never says no deadline is on
+    record while the header shows one."""
+    lis = []
+    for w in _open_protests(d):
+        pr = w["pr"]
+        checked = day(pr.get("checked_at"))
+        lis.append(f'<li><strong>{esc(day(w["end"]))}</strong>: protest period ends for {esc(prose(w["filing"]))}.'
+                   f'{_src(pr.get("record_url"), "State change record")}'
+                   + (f' <span class="small">Checked {esc(checked)}.</span>' if checked else "") + '</li>')
+    return f'<ul class="dnext">{"".join(lis)}</ul>' if lis else ""
+
+
+def _sentence(text_html, url, label):
+    return f'<li>{text_html}{_src(url, label)}</li>'
+
+
+def _derived_summary(d, name, kind, life, where):
+    """A short summary built only from the reviewed links: the defining record's Type and
+    lifecycle, the developer and governing body, each water filing and its stated status, and the
+    associated land. Every sentence carries its source. Nothing is inferred beyond those fields."""
+    out = []
+    df = d.get("defining") or {}
+    if kind and where:
+        what = (f'{life.lower()} ' if life and "unknown" not in life.lower() else "") + kind.lower()
+        art = "an" if what[:1] in "aeiou" else "a"
+        out.append(_sentence(f'{esc(name)} is {art} {esc(what)} in {esc(where)}.',
+                             df.get("evidence_url"), df.get("evidence_label") or "Defining record"))
+    orgs = d.get("links") or []
+    named = []
+    for role, words in (("master_developer", "the master developer"), ("governing_body", "the governing body")):
+        for l in orgs:
+            if l.get("kind") == "organization" and l.get("role") == role:
+                named.append((f'{esc(_org_name(l))} as {words}', l.get("evidence_url"), l.get("evidence_label")))
+                break
+    if named:
+        parts = [f'{t}{_src(u, lab)}' for t, u, lab in named]
+        out.append(f'<li>The linked public records name {" and ".join(parts)}.</li>')
+    for l in _links(d, "water_filing"):
+        f = l.get("facts") or {}
+        filed = day(f.get("filed_on") or l.get("date"))
+        pr = f.get("protest") or {}
+        checked = day(pr.get("checked_at"))
+        st = str(f.get("status") or "").strip()
+        txt = (f'The records include {esc(prose(_filing_name(f)))}' + (f', filed {esc(filed)}' if filed else "") + '.')
+        if st:
+            txt += (f' The state lists it as {esc(st.lower())}' + (f' (checked {esc(checked)})' if checked else "")
+                    + '. That status is for the water-rights application, not for the development as a whole.')
+        out.append(_sentence(txt, l.get("evidence_url"), l.get("evidence_label")))
+    for l in _links(d, "land_assembly"):
+        zs = [x for x in (l.get("facts") or {}).get("zips") or [] if isinstance(x, dict)]
+        n = sum(int(x.get("parcels") or 0) for x in zs)
+        if n:
+            zl = " and ".join(str(x.get("zip")) for x in zs)
+            out.append(_sentence(f'The linked records tie {n} parcel{"" if n == 1 else "s"} in ZIP '
+                                 f'{esc(zl)} to the project. That is associated land, not a confirmed project footprint.',
+                                 l.get("evidence_url"), l.get("evidence_label")))
+    if not out:
+        return ""
+    return (f'<ul class="dsum">{"".join(out)}</ul><p class="small">Summary assembled by HomeSignal from the reviewed '
+            f'records on this page. Each sentence links to its source.</p>')
+
+
+def _post_text(s):
+    """A Bluesky post as an excerpt: links and hashtags left out (the post itself is linked)."""
+    raw = str(s or "")
+    s = re.sub(r"[\U0001F000-\U0001FAFF\u2600-\u27BF\uFE0F]", "", re.sub(r"https?://\S+", "", raw))
+    lines = [ln.strip() for ln in prose(s).splitlines()]
+    t = re.sub(r"\s+([.,:;!?])", r"\1", " ".join(ln for ln in lines if re.search(r"\w", ln))).strip()
+    # The account feed stores a post's first 120 characters; a cut-off excerpt says so.
+    if len(raw) >= 115 and not re.search(r"[.!?\"')]$", t):
+        t += "…"
+    return t
+
+
 def render(d, pages, built, head, crumb_place=None):
     """One dossier page. `pages` is the ZIP pages dict (for names and links); `head` is
     gen_zip_pages._head; `built` is the build-day token."""
@@ -404,18 +600,39 @@ def render(d, pages, built, head, crumb_place=None):
         c = pages[z].get("county_label") or (f'{pages[z]["county"]} County' if pages[z].get("county") else "")
         if c and c not in counties:
             counties.append(c)
-    where = (f'{" and ".join(counties)}, {pages[zips[0]].get("state") or d["state"]}' if counties else "")
+    st = pages[zips[0]].get("state") or d["state"] if zips else d["state"]
+    where = (f'{" and ".join(counties)}, {st}' if counties else "")
+    where_long = (f'{" and ".join(counties)}, {STATE_NAMES.get(str(st).upper(), st)}' if counties else "")
     kind, life = d.get("_type") or "", d.get("_lifecycle") or ""
     canon = f'{d.get("_base", "")}{d["path"]}'
     summary = _stmts(d, "summary")
-    desc = (summary[0]["body"] if summary else f"Public records, official documents and timeline for {name}.")[:300]
-    title = f"{name}" + (f" — {kind}" if kind else "") + (f" in {where}" if where else "") + " | HomeSignal"
+    has = [w for w, ok in (("official records", bool(_links(d, *DOC_KINDS))),
+                           ("parcels", bool(_links(d, "land_assembly"))),
+                           ("the developer", any(l.get("role") == "master_developer" for l in _links(d, "organization"))),
+                           ("water filings", bool(_links(d, "water_filing"))),
+                           ("timeline", True)) if ok]
+    lead = (f"{life.lower()} " if life and "unknown" not in life.lower() else "")
+    auto_desc = (f"Track the {lead}{name}" + (f" in {where_long}" if where_long else "") + ": "
+                 + (", ".join(has[:-1]) + " and " + has[-1] if len(has) > 1 else has[0]) + ".")
+    desc = meta_description(summary[0]["body"] if summary else auto_desc, auto_desc)
+    title = page_title(name, where_long)
+    if where and title == page_title(name, ""):
+        title = page_title(name, where)   # the full state name did not fit; try the short form
+    modified = str(d.get("updated_at") or "")[:10]
+    modified = modified if DAY_RE.match(modified) else ""
     # Breadcrumb: home, the county (no page of its own, so plain text and not in the structured
     # list), the development.
     crumbs = [("HomeSignal", "/"), (name, d["path"])]
-    ld = {"@context": "https://schema.org", "@type": "BreadcrumbList",
-          "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": n,
-                               "item": f'{d.get("_base", "")}{u}'} for i, (n, u) in enumerate(crumbs)]}
+    crumb_ld = {"@type": "BreadcrumbList",
+                "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": n,
+                                     "item": f'{d.get("_base", "")}{u}'} for i, (n, u) in enumerate(crumbs)]}
+    # The page itself. dateModified is the day the dossier's own links or statements last changed
+    # (the snapshot's updated_at), never the build day; with none on record it is left out.
+    page_ld = {"@type": "WebPage", "@id": canon, "url": canon, "name": name, "description": desc,
+               "inLanguage": "en-US"}
+    if modified:
+        page_ld["dateModified"] = modified
+    ld = {"@context": "https://schema.org", "@graph": [crumb_ld, page_ld]}
     crumb_nav = ('<nav class="crumbs" aria-label="Breadcrumb"><a href="/">HomeSignal</a> › '
                  + (f'<span>{esc(where)}</span> › ' if where else "")
                  + f'<span aria-current="page">{esc(name)}</span></nav>')
@@ -433,24 +650,29 @@ def render(d, pages, built, head, crumb_place=None):
               f'rel="nofollow">Follow this development</a></p>'
               f'<p class="small">Saves this development to your HomeSignal account. It does not sign you up for email.</p></div>')
 
-    # Overview, what we know and don't, impacts
-    ov = _stmt_list(summary, "dsum") + (
+    # The summary sits under the title: a reviewer's own summary when there is one, else one
+    # assembled from the reviewed links (each sentence with its source).
+    lede = _stmt_list(summary, "dsum") if summary else _derived_summary(d, name, kind, life, where_long)
+    # Overview: what we know and don't, impacts
+    ov = (
         f'<h3>What the records show</h3>{_stmt_list(_stmts(d, "known"), "dknown")}' if _stmts(d, "known") else "") + (
         f'<h3>Not known yet</h3>{_stmt_list(_stmts(d, "unknown"), "dunk")}' if _stmts(d, "unknown") else "") + (
         f'<h3>Possible effects named in the records</h3>{_stmt_list(_stmts(d, "impact"), "dimp")}'
         if _stmts(d, "impact") else "")
 
-    # Map & land: the ZIP and map pages, and the land as associated, never as a footprint
+    # Associated land: the ZIP and map pages, and the land as associated, never as a footprint
     land = []
     for l in _links(d, "land_assembly"):
         for x in (l.get("facts") or {}).get("zips") or []:
             z = x.get("zip")
             if z in pages:
                 land.append(f'<li><a href="/map/{esc(z)}/">ZIP {esc(z)} ({esc(pages[z]["name"])}) on the map</a>'
+                            f' · <a href="/community/{esc(z)}/">ZIP {esc(z)} page</a>'
                             f' <span class="small">{esc(x.get("parcels"))} associated parcel'
                             f'{"" if x.get("parcels") == 1 else "s"}</span></li>')
     other = [z for z in zips if not any(f"/map/{z}/" in s for s in land)]
-    land += [f'<li><a href="/map/{esc(z)}/">ZIP {esc(z)} ({esc(pages[z]["name"])}) on the map</a></li>' for z in other]
+    land += [f'<li><a href="/map/{esc(z)}/">ZIP {esc(z)} ({esc(pages[z]["name"])}) on the map</a>'
+             f' · <a href="/community/{esc(z)}/">ZIP {esc(z)} page</a></li>' for z in other]
     map_inner = (f'<ul class="plain">{"".join(land)}</ul><p class="small">Associated land is land the linked records '
                  f'tie to this project. It is not a confirmed project footprint unless an approved site plan says so.</p>'
                  if land else "")
@@ -466,8 +688,17 @@ def render(d, pages, built, head, crumb_place=None):
         return (f'<p><strong>{esc(ROLE_LABEL.get(l["role"], l["role"]))}</strong>'
                 + (f'. {esc(prose(l["text"]))}' if l.get("text") else "") + "</p>"
                 + (f'<p class="small">{src}</p>' if src else ""))
-    orgs = "".join(f'<li><p class="t">{esc(ref.split(":", 1)[1])}</p>{"".join(role_line(l) for l in ls)}</li>'
-                   for ref, ls in ents.items())
+    groups = []
+    for head_, roles in ENTITY_GROUPS:
+        cards = "".join(f'<li><p class="t">{esc(ref.split(":", 1)[1])}</p>{"".join(role_line(l) for l in ls)}</li>'
+                        for ref, ls in ents.items() if ls[0]["role"] in roles)
+        if cards:
+            groups.append((head_, cards))
+    rest = "".join(f'<li><p class="t">{esc(ref.split(":", 1)[1])}</p>{"".join(role_line(l) for l in ls)}</li>'
+                   for ref, ls in ents.items() if not any(ls[0]["role"] in r for _, r in ENTITY_GROUPS))
+    if rest:
+        groups.append(("Other entities", rest))
+    orgs = "".join(f'<h3>{esc(h_)}</h3><ul class="cards">{c}</ul>' for h_, c in groups)
 
     def doc_li(l):
         rec = safe_url((l.get("facts") or {}).get("record_url"))
@@ -503,42 +734,67 @@ def render(d, pages, built, head, crumb_place=None):
         track = "".join(card(l) for l in vids_all) + ("".join(card(l, True) for l in vids_all) if moving else "")
         cov += (f'<h3>Videos</h3><div class="reel{" moving" if moving else ""}" role="region" aria-label="Videos">'
                 f'<ul class="reel-track" style="--n:{len(vids_all)}">{track}</ul></div>')
+    # Bluesky: a curated list (only posts a reviewer linked), newest first, at most five, in the
+    # page's own HTML. Each is the post's date, its text, a link to the post and, when the link
+    # names one, the source document it discusses.
+    posts = sorted(posts, key=lambda l: str((l.get("facts") or {}).get("published_at") or ""), reverse=True)[:5]
     if posts:
-        cov += '<h3>Bluesky posts</h3><ul class="plain">' + "".join(
-            f'<li>{esc(day((l["facts"] or {}).get("published_at")))}: {esc(prose((l["facts"] or {}).get("text")))}'
-            + _src(l.get("evidence_url"), "Post on Bluesky") + "</li>" for l in posts) + "</ul>"
+        def post_li(l):
+            f = l.get("facts") or {}
+            src = safe_url(f.get("source_url"))
+            return ('<li>' + (f'<p class="small"><time datetime="{esc(str(f.get("published_at"))[:10])}">'
+                              f'{esc(day(f.get("published_at")))}</time></p>' if day(f.get("published_at")) else "")
+                    + f'<p>{esc(_post_text(f.get("text")))}</p><p class="small">'
+                    + _src(l.get("evidence_url"), "View post on Bluesky").strip()
+                    + (f' · {_src(src, "Read the source document").strip()}' if src else "") + '</p></li>')
+        cov += ('<h3>Bluesky updates</h3><p class="small">HomeSignal\'s reporting and commentary on this project. '
+                'These posts are editorial coverage, not official project records.</p>'
+                '<ul class="cards">' + "".join(post_li(l) for l in posts) + "</ul>")
     if cov:
         cov = ('<div class="jody"><p class="small">HomeSignal\'s own explainers. They are editorial, not government '
                'records, and are listed only after they are public.</p>' + cov + '</div>')
 
+    recs = "".join(f'<li><a href="{esc(u)}">{esc(prose(n))}</a></li>' for n, u in (d.get("_records") or []))
+    recs = (f'<ul class="plain">{recs}</ul><p class="small">The record pages on this site for the filings linked '
+            f'above. Each opens the agency\'s own record.</p>') if recs else ""
+    nxt = _stmt_list(_stmts(d, "next"), "dnext") + _protest_deadlines(d)
+    # Each part: id, heading, content, and what to say when it is empty (None: say nothing).
     parts = [
-        ("overview", "Overview", ov, "a HomeSignal summary"),
-        ("changed", "What changed", _stmt_list(_stmts(d, "latest"), "dlatest"), "a recorded change"),
-        ("next", "What's next", _stmt_list(_stmts(d, "next"), "dnext"),
-         "an upcoming hearing or deadline confirmed in the sources HomeSignal tracks"),
-        ("map", "Map & land", map_inner, "a location"),
-        ("entities", "Entities", f'<ul class="cards">{orgs}</ul>' if orgs else "", "a linked entity"),
-        ("documents", "Official documents", f'<ul class="cards">{docs}</ul>' if docs else "", "a linked official document"),
-        ("timeline", "Timeline", _timeline(d), "a dated event"),
-        ("coverage", "HomeSignal coverage", cov, "a HomeSignal video or post"),
+        ("overview", "Overview", ov, None),
+        ("changed", "What changed", _stmt_list(_stmts(d, "latest"), "dlatest"),
+         "No recorded change in the sources HomeSignal tracks."),
+        ("next", "What's next", nxt, "No upcoming hearing or deadline confirmed in the sources HomeSignal tracks."),
+        ("entities", "Entities", orgs, None),
+        ("documents", "Official documents", f'<ul class="cards">{docs}</ul>' if docs else "", None),
+        ("records", "Related record pages", recs, None),
+        ("timeline", "Timeline", _timeline(d), None),
+        ("map", "Associated land and parcel maps", map_inner, None),
+        ("coverage", "HomeSignal coverage", cov, None),
     ]
     shown = [p for p in parts if p[2]]
-    missing = [p[3] for p in parts if not p[2]]
+    missing = [p[3] for p in parts if not p[2] and p[3]] + ([] if lede else ["No HomeSignal summary published."])
     toc = ('<nav class="toc" aria-label="On this page"><ul>'
            + "".join(f'<li><a href="{d["path"]}#{i}">{esc(t)}</a></li>' for i, t, _, _ in shown) + "</ul></nav>"
            if len(shown) > 1 else "")
-    gaps = (f'<p class="empty" id="not-yet">Not on record yet: {esc("; ".join(missing))}.</p>' if missing else "")
+    gaps = (f'<div class="empty" id="not-yet">{"".join(f"<p>{esc(m)}</p>" for m in missing)}</div>' if missing else "")
     body = (
         '<a class="skip" href="#main">Skip to content</a>'
         + SITE_HEADER +
                 f'<main id="main" class="wrap">{crumb_nav}<section class="hero" aria-labelledby="h1">'
         f'<h1 id="h1">{esc(name)}</h1>'
-        + (f'<p class="where">{esc(where)}</p>' if where else "") + f'{note}{defin}{follow}{_protests(d)}</section>{toc}'
+        + (f'<p class="where">{esc(where)}</p>' if where else "") + f'{note}{defin}{lede}{follow}{_protests(d)}</section>{toc}'
         + "".join(_section(i, t, inner) for i, t, inner, _ in shown)
         + gaps
         + '<footer class="method"><p class="small">Every fact on this page links to its source. A link is shown only '
-          'after a HomeSignal reviewer checked it against the source. Page compiled '
-          f'<time datetime="{esc(built)}">{BUILT_HUMAN}</time>.</p>'
+          'after a HomeSignal reviewer checked it against the source. '
+          + (f'Last updated <time datetime="{esc(modified)}">{esc(day(modified))}</time>. ' if modified else "")
+          + f'Page compiled <time datetime="{esc(built)}">{BUILT_HUMAN}</time>.</p>'
+        + "".join(f'<p class="small">Status of {esc(prose(_filing_name(l.get("facts") or {})))} last checked with the state: '
+                  f'<time datetime="{esc(str(c)[:10])}">{esc(day(c))}</time>.</p>'
+                  for l in _links(d, "water_filing")
+                  for c in [((l.get("facts") or {}).get("protest") or {}).get("checked_at")] if day(c))
+        + '<nav aria-label="About this page"><a href="/how-it-works.html">How HomeSignal checks its sources</a>'
+          '<a href="/contact.html">Report a correction</a></nav>'
           '</footer></main>' + SITE_FOOTER)
     # The shell's stylesheets are written for the app shell, which this script-free page does not
     # load; the page carries its own layout instead.
@@ -558,10 +814,14 @@ def link_pages(dossiers, pages, projects):
         for z in zips_of(d):
             if z in pages:
                 pages[z].setdefault("dossiers", []).append((d["display_name"], d["path"]))
+        seen = set()
         for l in _links(d, "source_record"):
             pr = projects.get(l.get("ref"))
             if pr is not None:
                 pr.setdefault("part_of", []).append((d["display_name"], d["path"]))
+                if pr["path"] not in seen and len(seen) < RECORD_LINKS_MAX:
+                    seen.add(pr["path"])
+                    d.setdefault("_records", []).append((pr["title"], pr["path"]))
 
 
 LAND_INDEX_SCHEMA = "development-land-index/1"

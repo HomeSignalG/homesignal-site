@@ -198,6 +198,12 @@ await page.click('#is [data-act=doc][data-doc=short_b]');
 ok((await page.locator('#is').innerText()).includes('Editorial exception — second Short unavailable'), 'Short B: the exception is shown, nothing invented');
 await page.click('#is [data-act=revise][data-sec=short_b]'); await page.waitForTimeout(50);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_section_revision' && c[1].p_section === 'short_b')), 'Short B: a revision note names its part');
+// a blocked script: Approve is off and says why, and the next-step button is about fixing it, not approving it
+ok(await page.locator('#is [data-act=decide][data-a=narrative][data-d=approved]').isDisabled()
+   && (await page.locator('#is #is-dec-blocked-narrative').innerText()).includes('Approve turns on once the script passes')
+   && (await page.locator('#is #is-next-box').innerText()).includes('See what needs fixing')
+   && !(await page.locator('#is #is-next-box button').allInnerTexts()).some((t) => /approve/i.test(t)),
+   'blocked script: Approve is off with the reason, and the next step says to fix it');
 await page.evaluate(() => { window.db.nstate = 'pending'; window.db.nwhy = 'Ready for your decision.'; });
 await page.click('#is [data-act=step][data-step=intake]'); await page.click('#is [data-act=step][data-step=script]');
 await page.evaluate(() => window.HS.acqImpactStories.load(window.client, document.getElementById('is'))); await page.waitForTimeout(80);
