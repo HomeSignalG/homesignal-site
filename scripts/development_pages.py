@@ -293,12 +293,45 @@ def _stmt_list(items, cls):
     return f'<ul class="{cls}">{"".join(lis)}</ul>'
 
 
-def _section(h_id, title, inner):
-    """A section with something in it. An empty one is not drawn; what is missing is said once,
-    at the end of the page (see render)."""
+# Small line icons for the tiles (inline SVG: the page ships no script and loads no image for
+# them). Decorative only; each tile's heading says what it holds.
+_ICON_PATHS = {
+    "overview": '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+    "changed": '<path d="M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5"/>',
+    "next": '<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+    "impacts": '<path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h13V9.5"/>',
+    "timeline": '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    "entities": '<circle cx="9" cy="8" r="3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.2A4.5 4.5 0 0 1 21 18.5"/>',
+    "documents": '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/>',
+    "map": '<path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6z"/><path d="M9 4v14M15 6v14"/>',
+    "coverage": '<rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="m10 9.5 5 2.5-5 2.5z"/>',
+}
+
+
+def _icon(t_id):
+    path = _ICON_PATHS.get(t_id, _ICON_PATHS["overview"])
+    return (f'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" '
+            f'stroke-linecap="round" stroke-linejoin="round" focusable="false">{path}</svg>')
+
+
+def _tile(t_id, title, sub, inner):
+    """One expandable information tile (2026-11-06): a <details> that starts closed, its heading
+    and a one-line description in the <summary>, the section's content in the body. Nothing is
+    removed: the body holds exactly what the section held. The id sits on the body, inside the
+    <details>, so a link to #<id> opens the tile in browsers that reveal a fragment target's
+    closed <details> ancestor (the HTML "ancestor details revealing" rule); the page needs no
+    script for it."""
     if not inner:
         return ""
-    return f'<section id="{h_id}" aria-labelledby="h-{h_id}"><h2 id="h-{h_id}">{esc(title)}</h2>{inner}</section>'
+    return (f'<section class="tile" aria-labelledby="h-{t_id}"><details>'
+            f'<summary><span class="ti" aria-hidden="true">{_icon(t_id)}</span>'
+            f'<span class="tt"><h2 id="h-{t_id}">{esc(title)}</h2><span class="ts">{esc(sub)}</span></span>'
+            f'<span class="chev" aria-hidden="true"></span></summary>'
+            f'<div class="tb" id="{t_id}">{inner}</div></details></section>')
+
+
+def _n(n, one, many):
+    return f'{n} {one if n == 1 else many}'
 
 
 def _doc_title(l):
@@ -441,8 +474,22 @@ h3{font-size:1.05rem;margin:1.2rem 0 .4rem}section{scroll-margin-top:4rem}
 .protest{background:var(--tint);border:1px solid var(--green2);border-radius:12px;padding:.8rem 1rem;margin:1rem 0 0}
 .protest p{margin:.35rem 0}.protest .t{font-weight:700}
 .note{background:var(--panel);border:1px dashed var(--line);border-radius:10px;padding:.5rem .8rem;font-size:.875rem;color:var(--ink2)}
-.toc{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);margin-top:1.4rem;padding-block:.4rem}
-.toc ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:.2rem 1rem;font-size:.88rem}.toc a{text-decoration:none}
+.tiles{display:grid;grid-template-columns:minmax(0,1fr);gap:.75rem;margin-top:1.8rem}
+.tile{margin:0;min-width:0}.tile details{background:var(--panel);border:1px solid var(--line);border-radius:12px}
+.tile summary{display:flex;align-items:center;gap:.9rem;padding:16px 20px;min-height:56px;cursor:pointer;list-style:none;border-radius:12px}
+.tile summary::-webkit-details-marker{display:none}.tile summary::marker{content:""}
+.tile summary:hover{background:var(--tint)}.tile summary:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.tile details[open]>summary{border-bottom:1px solid var(--line);border-radius:12px 12px 0 0}
+.ti{flex:none;display:grid;place-items:center;width:40px;height:40px;border-radius:10px;background:var(--tint);color:var(--green)}
+.tt{flex:1;min-width:0}.tile h2{font-size:1.08rem;margin:0;line-height:1.3}
+.ts{display:block;font-size:.875rem;color:var(--ink2);margin-top:.1rem}
+.chev{flex:none;width:10px;height:10px;border-right:2px solid var(--ink3);border-bottom:2px solid var(--ink3);
+ transform:translateY(-3px) rotate(45deg);transition:transform .15s ease}
+.tile details[open]>summary .chev{transform:translateY(2px) rotate(225deg)}
+.tb{padding:4px 20px 18px;scroll-margin-top:9rem}.tb>h3:first-child,.tb>p:first-child,.tb>ul:first-child{margin-top:.9rem}
+.tb [id]{scroll-margin-top:9rem}
+@media (prefers-reduced-motion:reduce){.chev{transition:none}}
+@media (max-width:520px){.tile summary{padding:14px 16px;gap:.7rem}.tb{padding:4px 16px 16px}.ti{width:36px;height:36px}}
 .dsum{list-style:none;padding:0;font-size:1.06rem}.dsum li{margin:.4rem 0}
 .dknown,.dunk,.dimp,.dlatest,.dnext,.plain{padding-left:1.2rem}.dknown li,.dunk li,.dimp li,.plain li{margin:.35rem 0}
 .dlatest{list-style:none;padding:0}.dlatest li{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--green);
@@ -656,9 +703,10 @@ def render(d, pages, built, head, crumb_place=None):
     # Overview: what we know and don't, impacts
     ov = (
         f'<h3>What the records show</h3>{_stmt_list(_stmts(d, "known"), "dknown")}' if _stmts(d, "known") else "") + (
-        f'<h3>Not known yet</h3>{_stmt_list(_stmts(d, "unknown"), "dunk")}' if _stmts(d, "unknown") else "") + (
-        f'<h3>Possible effects named in the records</h3>{_stmt_list(_stmts(d, "impact"), "dimp")}'
-        if _stmts(d, "impact") else "")
+        f'<h3>Not known yet</h3>{_stmt_list(_stmts(d, "unknown"), "dunk")}' if _stmts(d, "unknown") else "")
+    impacts = _stmt_list(_stmts(d, "impact"), "dimp")
+    if impacts:
+        impacts = f'<h3>Possible effects named in the records</h3>{impacts}'
 
     # Associated land: the ZIP and map pages, and the land as associated, never as a footprint
     land = []
@@ -758,32 +806,50 @@ def render(d, pages, built, head, crumb_place=None):
     recs = (f'<ul class="plain">{recs}</ul><p class="small">The record pages on this site for the filings linked '
             f'above. Each opens the agency\'s own record.</p>') if recs else ""
     nxt = _stmt_list(_stmts(d, "next"), "dnext") + _protest_deadlines(d)
-    # Each part: id, heading, content, and what to say when it is empty (None: say nothing).
+    timeline = _timeline(d)
+    n_events = timeline.count('<li><div class="tdate">')
+    n_docs = len(_links(d, *DOC_KINDS))
+    n_vid, n_post = len(vids_all), len(posts)
+    records_block = ""
+    if docs:
+        records_block += f'<ul class="cards">{docs}</ul>'
+    if recs:
+        records_block += f'<div id="records"><h3>Related record pages</h3>{recs}</div>'
+    # Each tile: id, heading, one-line description, content, and what to say when it is empty
+    # (None: say nothing). An empty tile is not drawn.
     parts = [
-        ("overview", "Overview", ov, None),
-        ("changed", "What changed", _stmt_list(_stmts(d, "latest"), "dlatest"),
+        ("overview", "Project overview", "What the records show and what is not known yet", ov, None),
+        ("changed", "What changed", "The most recent recorded changes", _stmt_list(_stmts(d, "latest"), "dlatest"),
          "No recorded change in the sources HomeSignal tracks."),
-        ("next", "What's next", nxt, "No upcoming hearing or deadline confirmed in the sources HomeSignal tracks."),
-        ("entities", "Entities", orgs, None),
-        ("documents", "Official documents", f'<ul class="cards">{docs}</ul>' if docs else "", None),
-        ("records", "Related record pages", recs, None),
-        ("timeline", "Timeline", _timeline(d), None),
-        ("map", "Associated land and parcel maps", map_inner, None),
-        ("coverage", "HomeSignal coverage", cov, None),
+        ("next", "What's Next", "Upcoming deadlines, application decisions and expected events", nxt,
+         "No upcoming hearing or deadline confirmed in the sources HomeSignal tracks."),
+        ("impacts", "Community impacts", "Possible effects named in the linked records", impacts, None),
+        ("timeline", "Project Timeline",
+         f'{_n(n_events, "dated event", "dated events")}, newest first', timeline, None),
+        ("entities", "Organizations & People",
+         f'{_n(len(ents), "organization", "organizations")}: developers, agencies, applicants, landowners and consultants',
+         orgs, None),
+        ("documents", "Official Records",
+         (f'{_n(n_docs, "government filing or document", "government filings and documents")} with links to the originals'
+          if n_docs else "Record pages on this site for the linked filings"), records_block, None),
+        ("map", "Land & Maps", "Associated parcels and links to the ZIP maps", map_inner, None),
+        ("coverage", "HomeSignal Coverage",
+         ", ".join(x for x in (_n(n_vid, "video", "videos") if n_vid else "",
+                               _n(n_post, "Bluesky post", "Bluesky posts") if n_post else "") if x)
+         or "HomeSignal videos and Bluesky posts", cov, None),
     ]
-    shown = [p for p in parts if p[2]]
-    missing = [p[3] for p in parts if not p[2] and p[3]] + ([] if lede else ["No HomeSignal summary published."])
-    toc = ('<nav class="toc" aria-label="On this page"><ul>'
-           + "".join(f'<li><a href="{d["path"]}#{i}">{esc(t)}</a></li>' for i, t, _, _ in shown) + "</ul></nav>"
-           if len(shown) > 1 else "")
+    shown = [p for p in parts if p[3]]
+    missing = [p[4] for p in parts if not p[3] and p[4]] + ([] if lede else ["No HomeSignal summary published."])
+    tiles = ('<div class="tiles">' + "".join(_tile(i, t, sub, inner) for i, t, sub, inner, _ in shown) + '</div>'
+             if shown else "")
     gaps = (f'<div class="empty" id="not-yet">{"".join(f"<p>{esc(m)}</p>" for m in missing)}</div>' if missing else "")
     body = (
         '<a class="skip" href="#main">Skip to content</a>'
         + SITE_HEADER +
                 f'<main id="main" class="wrap">{crumb_nav}<section class="hero" aria-labelledby="h1">'
         f'<h1 id="h1">{esc(name)}</h1>'
-        + (f'<p class="where">{esc(where)}</p>' if where else "") + f'{note}{defin}{lede}{follow}{_protests(d)}</section>{toc}'
-        + "".join(_section(i, t, inner) for i, t, inner, _ in shown)
+        + (f'<p class="where">{esc(where)}</p>' if where else "") + f'{note}{defin}{lede}{follow}{_protests(d)}</section>'
+        + tiles
         + gaps
         + '<footer class="method"><p class="small">Every fact on this page links to its source. A link is shown only '
           'after a HomeSignal reviewer checked it against the source. '

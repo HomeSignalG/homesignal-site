@@ -5941,6 +5941,16 @@ official records so you do not miss things like change and amendments"*. SQL of 
   - **Bluesky updates:** only reviewer-linked posts (`bluesky_post` links), newest five, text without links or hashtags,
     "View post on Bluesky", plus `facts.source_url` when present. Never timeline events.
   - Tests: `test/development-pages.test.mjs` 3e.
+- **Sections are expandable tiles (2026-11-06, founder).** Under the page header every section is a closed `<details>`
+  tile (`development_pages._tile`): icon, heading, a one-line description with counts from the page's own lists, a chevron.
+  Order: Project overview, What changed, What's Next, Community impacts (only when an `impact` statement exists), Project
+  Timeline, Organizations & People, Official Records (documents plus the related record pages, `#records`), Land & Maps,
+  HomeSignal Coverage. Empty tiles are not drawn; gaps are still listed once in `#not-yet`. The name, place, Type,
+  lifecycle, summary, Follow and an open protest window stay in the page header, never in a tile. The sticky jump list is
+  gone. Each section id sits on the tile BODY (inside `<details>`), so a link to `#timeline` etc. opens the tile through
+  the browser's own fragment reveal (checked in Chromium); no script. `.tiles` is `minmax(0,1fr)` or the video reel's
+  max-content width widens the page on phones. Tests: `test/development-pages.test.mjs` 3f,
+  `test/development-pages-tiles.browser.test.mjs` (fixture shared via `test/lib/development-pages-fixture.mjs`).
 
 ## IMPACT STORIES, TAB 17 (2026-10-25): built from the founder's v2.4 handoff
 
