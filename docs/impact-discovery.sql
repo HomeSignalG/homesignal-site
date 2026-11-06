@@ -160,6 +160,16 @@ alter table public.impact_discovery_candidates drop constraint if exists impact_
 alter table public.impact_discovery_candidates add constraint impact_discovery_candidates_creation_mode_check
   check (creation_mode in ('jody', 'creator') and (creation_mode = 'creator') = (creator_script is not null)
          and (creator_script is null or creator_script_hash ~ '^[0-9a-f]{32}$'));
+
+-- What the story is FOR (2026-11-06): auto (decided by _hs_id_story_type_detect at read time), or the founder's explicit
+-- choice. Detection never writes this column, so an explicit choice is never overwritten.
+alter table public.impact_discovery_candidates add column if not exists story_type text not null default 'auto';
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'impact_discovery_candidates_story_type_check') then
+    alter table public.impact_discovery_candidates add constraint impact_discovery_candidates_story_type_check
+      check (story_type in ('auto', 'investigative', 'public_policy', 'participation'));
+  end if;
+end $$;
 alter table public.impact_discovery_candidates drop constraint if exists impact_discovery_candidates_origin_check;
 alter table public.impact_discovery_candidates add constraint impact_discovery_candidates_origin_check check (origin in ('scan', 'founder'));
 alter table public.impact_discovery_candidates alter column lead_uri drop not null;
@@ -364,6 +374,67 @@ begin
 end $$;
 
 -- ── founder functions (authenticated; every one checks the dashboard allowlist) ───────────────────────
+-- ── story type: the ONE detector (2026-11-06) ────────────────────────────────────────────────────────────────────────
+-- Investigative (the default) · Public Policy (a proposed rule, bill or decision and its consequences) · Public
+-- Participation / How-To (the viewer's goal is to take part: register, speak, comment, testify, sign, attend). Phrases in
+-- the TITLE decide with high confidence; phrases only in the founder's note decide with medium confidence. When both a
+-- participation and a policy phrase appear, the primary viewer objective is taking part, and the policy context stays
+-- secondary. homesignal-ingest never re-detects: research is given the resolved type (impact_discovery_research_claim).
+create or replace function public._hs_id_story_type_detect(p_title text, p_note text default null)
+returns jsonb language plpgsql immutable set search_path = public as $$
+declare t text := lower(coalesce(p_title, '')); n text := lower(left(coalesce(p_note, ''), 4000)); sig text[] := '{}'; m text;
+        part text := '(how (do i|do you|to|can i|can you) (register|sign up|speak|testify|comment|participate|take part|sign|attend|weigh in|get involved)'
+                     '|register(ing|ed)? to (speak|testify|comment)|speak(ing)? at (the |a |an |this )?(public |virtual )?(hearing|meeting|council|commission|board)'
+                     '|submit(ting)? (a |your |written |public )*comments?|public comment (period|deadline|portal)|sign (the|this|our) petition'
+                     '|attend (the|a|this) (public )?(meeting|hearing)|how to testify|testify at|deadline to (participate|register|comment|speak|testify)'
+                     '|registration (deadline|closes|is open))';
+        pol text := '(proposed rule|proposes|proposal to|rulemaking|regulation|\mrule\M|\mbill\M|legislation|ordinance|repeal|rescind|executive order|\mpolicy\M|amendment)';
+begin
+  for m in select (regexp_matches(t, part, 'g'))[1] loop sig := sig || ('title: ' || m); end loop;
+  if array_length(sig, 1) > 0 then
+    return jsonb_build_object('type', 'participation', 'confidence', 'high', 'signals', to_jsonb(sig[1:3]));
+  end if;
+  for m in select (regexp_matches(n, part, 'g'))[1] loop sig := sig || ('note: ' || m); end loop;
+  if array_length(sig, 1) > 0 then
+    return jsonb_build_object('type', 'participation', 'confidence', 'medium', 'signals', to_jsonb(sig[1:3]));
+  end if;
+  for m in select (regexp_matches(t, pol, 'g'))[1] loop sig := sig || ('title: ' || m); end loop;
+  if array_length(sig, 1) > 0 then
+    return jsonb_build_object('type', 'public_policy', 'confidence', 'medium', 'signals', to_jsonb(sig[1:3]));
+  end if;
+  return jsonb_build_object('type', 'investigative', 'confidence', 'low', 'signals', '[]'::jsonb);
+end $$;
+
+-- The type research works to: the founder's explicit choice, else the detector's answer.
+create or replace function public._hs_id_story_type(p_story_type text, p_title text, p_note text)
+returns text language sql immutable set search_path = public as $$
+  select case when p_story_type in ('investigative', 'public_policy', 'participation') then p_story_type
+              else public._hs_id_story_type_detect(p_title, p_note)->>'type' end
+$$;
+
+-- Change a topic's story type (Auto-detect or an explicit type). Same refusals as the starting evidence: not once the topic
+-- is verified or has a story, and not while research is working on it.
+create or replace function public.hs_impact_discovery_set_story_type(p_candidate uuid, p_type text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); c public.impact_discovery_candidates%rowtype;
+begin
+  if p_type not in ('auto', 'investigative', 'public_policy', 'participation') then
+    raise exception 'Story type must be auto, investigative, public_policy or participation.' using errcode = '22023';
+  end if;
+  select * into c from public.impact_discovery_candidates where id = p_candidate for update;
+  if not found then raise exception 'no such topic' using errcode = 'P0002'; end if;
+  if c.story_id is not null or (c.evidence_status = 'verified' and c.source_slug is not null) then
+    raise exception 'This topic is already verified. Change the story type in a new suggestion.' using errcode = '55000';
+  end if;
+  if exists (select 1 from public.impact_discovery_research_runs where candidate_id = c.id and status = 'working') then
+    raise exception 'Research is working on this topic. Change it when the run finishes.' using errcode = '55000';
+  end if;
+  update public.impact_discovery_candidates set story_type = p_type, updated_at = now() where id = c.id;
+  perform public._hs_id_event(c.id, null, 'story_type', jsonb_build_object('from', c.story_type, 'to', p_type), e);
+  return jsonb_build_object('ok', true, 'story_type', p_type,
+    'story_type_resolved', public._hs_id_story_type(p_type, c.title, c.submitted_note));
+end $$;
+
 create or replace function public.hs_impact_discovery_overview(p_show_closed boolean default false)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare st public.impact_discovery_settings%rowtype; last_ok public.impact_discovery_scans%rowtype; latest public.impact_discovery_scans%rowtype;
@@ -388,6 +459,7 @@ begin
         'source_slug', c.source_slug, 'story_id', c.story_id, 'discovered_at', c.discovered_at, 'last_seen_at', c.last_seen_at,
         'last_verified_at', c.last_verified_at, 'origin', c.origin, 'submitted_by', c.submitted_by, 'submitted_note', c.submitted_note, 'start_mode', c.start_mode,
         'creation_mode', c.creation_mode, 'creator_script', c.creator_script, 'creator_script_hash', c.creator_script_hash,
+        'story_type', c.story_type, 'story_type_detected', public._hs_id_story_type_detect(c.title, c.submitted_note), 'story_type_resolved', public._hs_id_story_type(c.story_type, c.title, c.submitted_note),
         'research', public._hs_id_research_run(c.id),
         'video', case when c.story_id is null then null else public._hs_id_video_state(c.story_id) end)
         order by (c.origin = 'founder') desc, (c.track = 'core') desc, c.score desc, c.last_seen_at desc)
@@ -469,6 +541,7 @@ declare e text := public._hs_is_admin(); t text := btrim(coalesce(p_topic->>'tit
         note text := nullif(btrim(coalesce(p_topic->>'note', '')), ''); leads jsonb := '[]'::jsonb; u text; c public.impact_discovery_candidates%rowtype;
         sm text := coalesce(nullif(btrim(coalesce(p_topic->>'start', '')), ''), 'auto');
         mode text := coalesce(nullif(btrim(coalesce(p_topic->>'mode', '')), ''), 'jody'); cs jsonb; ch text;
+        sty text := coalesce(nullif(btrim(coalesce(p_topic->>'story_type', '')), ''), 'auto');
 begin
   if mode not in ('jody', 'creator') then raise exception 'Creation mode must be jody or creator.' using errcode = '22023'; end if;
   if mode = 'creator' then
@@ -478,6 +551,9 @@ begin
     raise exception 'A script was sent with "Let JODY write the story". Choose "I will provide the script" to keep it.' using errcode = '22023';
   end if;
   if sm not in ('auto', 'document', 'topic') then raise exception 'Starting evidence must be auto, document or topic.' using errcode = '22023'; end if;
+  if sty not in ('auto', 'investigative', 'public_policy', 'participation') then
+    raise exception 'Story type must be auto, investigative, public_policy or participation.' using errcode = '22023';
+  end if;
   if char_length(t) < 5 or char_length(t) > 300 then
     raise exception 'Give the topic a title of 5 to 300 characters.' using errcode = '22023';
   end if;
@@ -501,16 +577,17 @@ begin
     raise exception 'You already suggested a topic with this title. It is in the list below.' using errcode = '23505';
   end if;
   insert into public.impact_discovery_candidates (cluster_key, origin, category, track, title, place, score, reasons, evidence_status,
-    evidence, status, submitted_by, submitted_note, start_mode, creation_mode, creator_script, creator_script_hash, discovered_at, last_seen_at)
+    evidence, status, submitted_by, submitted_note, start_mode, creation_mode, creator_script, creator_script_hash, story_type, discovered_at, last_seen_at)
   values ('founder:' || gen_random_uuid(), 'founder', cat, 'core', t, pl, 0,
     case when mode = 'creator' then '["You suggested this topic and wrote its script."]'::jsonb else '["You suggested this topic."]'::jsonb end,
     case when jsonb_array_length(leads) > 0 then 'leads_found' else 'social_only' end,
-    jsonb_build_object('leads', leads), 'nominated', e, note, sm, mode, cs, ch, now(), now())
+    jsonb_build_object('leads', leads), 'nominated', e, note, sm, mode, cs, ch, sty, now(), now())
   returning * into c;
   perform public._hs_id_event(c.id, null, 'suggested', jsonb_build_object('title', t, 'place', pl, 'category', cat, 'links', jsonb_array_length(leads),
-    'start', sm, 'mode', mode, 'scenes', case when cs is null then null else jsonb_array_length(cs->'scenes') end, 'script_hash', ch), e);
+    'start', sm, 'mode', mode, 'scenes', case when cs is null then null else jsonb_array_length(cs->'scenes') end, 'script_hash', ch, 'story_type', sty), e);
   return jsonb_build_object('id', c.id, 'status', c.status, 'start_mode', c.start_mode, 'creation_mode', c.creation_mode,
-    'creator_script_hash', c.creator_script_hash);
+    'creator_script_hash', c.creator_script_hash, 'story_type', c.story_type,
+    'story_type_resolved', public._hs_id_story_type(c.story_type, c.title, c.submitted_note));
 end $$;
 
 -- Change a topic's starting evidence before (or between) research runs, e.g. after a run said "insufficient". Refused once the
@@ -871,7 +948,8 @@ returns jsonb language sql stable security definer set search_path = public as $
     'nominated', coalesce((select jsonb_agg(jsonb_build_object('id', c.id, 'title', c.title, 'place', c.place, 'category', c.category,
         'track', c.track, 'score', c.score, 'status', c.status, 'lead_url', c.lead_url, 'evidence', c.evidence, 'related', c.related,
         'reasons', c.reasons, 'concept', c.concept, 'nominated_scan_id', c.nominated_scan_id,
-        'origin', c.origin, 'submitted_note', c.submitted_note, 'start_mode', c.start_mode) order by (c.origin = 'founder') desc, c.score desc)
+        'origin', c.origin, 'submitted_note', c.submitted_note, 'start_mode', c.start_mode,
+        'story_type', c.story_type, 'story_type_detected', public._hs_id_story_type_detect(c.title, c.submitted_note), 'story_type_resolved', public._hs_id_story_type(c.story_type, c.title, c.submitted_note)) order by (c.origin = 'founder') desc, c.score desc)
       from public.impact_discovery_candidates c
      where c.status in ('nominated', 'researching') and c.story_id is null and c.duplicate_of is null), '[]'::jsonb),
     'library', coalesce((select jsonb_agg(jsonb_build_object('id', s.id, 'video_slug', s.video_slug, 'title', s.title, 'origin', s.origin))
@@ -1069,6 +1147,7 @@ begin
     'candidate', jsonb_build_object('id', c.id, 'title', c.title, 'place', c.place, 'category', c.category, 'track', c.track,
       'origin', c.origin, 'submitted_note', c.submitted_note, 'start_mode', c.start_mode, 'lead_url', c.lead_url, 'evidence', c.evidence, 'related', c.related,
       'creation_mode', c.creation_mode, 'creator_script', c.creator_script, 'creator_script_hash', c.creator_script_hash,
+      'story_type', c.story_type, 'story_type_detected', public._hs_id_story_type_detect(c.title, c.submitted_note), 'story_type_resolved', public._hs_id_story_type(c.story_type, c.title, c.submitted_note),
       'reasons', c.reasons, 'concept', c.concept, 'coverage', c.coverage),
     'library', coalesce((select jsonb_agg(jsonb_build_object('video_slug', s.video_slug, 'title', s.title))
       from public.impact_stories s where s.archived_at is null), '[]'::jsonb));
@@ -1122,13 +1201,15 @@ begin
     'public._hs_id_event(uuid, uuid, text, jsonb, text)', 'public._hs_id_next_scan(timestamptz)', 'public._hs_id_dispatch(uuid)',
     'public._hs_id_reap()', 'public._hs_id_queue_scan(text, text, text)', 'public._hs_id_performance()', 'public._hs_id_learning()',
     'public._hs_id_create_story(uuid, text, boolean)', 'public.impact_discovery_tick(timestamptz)',
-    'public._hs_id_research_run(uuid)', 'public._hs_id_video_state(uuid)', 'public._hs_id_research_dispatch(uuid)'] loop
+    'public._hs_id_research_run(uuid)', 'public._hs_id_video_state(uuid)', 'public._hs_id_research_dispatch(uuid)',
+    'public._hs_id_story_type_detect(text, text)', 'public._hs_id_story_type(text, text, text)'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
   end loop;
   foreach f in array array[
     'public.hs_impact_discovery_overview(boolean)', 'public.hs_impact_discovery_scan_now()',
     'public.hs_impact_discovery_decide(uuid, text, text)', 'public.hs_impact_discovery_open_story(uuid)',
     'public.hs_impact_discovery_settings_save(jsonb)', 'public.hs_impact_discovery_suggest(jsonb)', 'public.hs_impact_discovery_set_start(uuid, text)',
+    'public.hs_impact_discovery_set_story_type(uuid, text)',
     'public.hs_impact_discovery_research_start(uuid)', 'public.hs_impact_discovery_creator_script_save(uuid, jsonb, text)'] loop
     execute 'revoke all on function ' || f || ' from public, anon';
     execute 'grant execute on function ' || f || ' to authenticated';

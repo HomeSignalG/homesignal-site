@@ -1,0 +1,1037 @@
+{
+ "open": {
+  "body": {
+   "schema": "impact-story/3",
+   "discovery": {
+    "story_type": "participation",
+    "profile": "public_affairs",
+    "action": {
+     "action_type": "register_to_speak",
+     "agency": {
+      "text": "U.S. Environmental Protection Agency",
+      "claims": [
+       "agency"
+      ]
+     },
+     "url": "https://survey.alchemer.com/s3/9078544/OG-Recon2-PublicHearing-2026",
+     "url_claims": [
+      "link"
+     ],
+     "deadline": {
+      "date": "2026-11-10",
+      "time": null,
+      "tz": null,
+      "claims": [
+       "dl"
+      ]
+     },
+     "event": {
+      "start": "2026-11-16",
+      "end": "2026-11-17",
+      "format": "virtual",
+      "claims": [
+       "hear"
+      ]
+     },
+     "attend_vs_speak": {
+      "text": "The form asks whether you want to provide testimony or observe.",
+      "claims": [
+       "opt"
+      ]
+     },
+     "confirmation": {
+      "text": "Registered speakers receive connection instructions by email.",
+      "claims": [
+       "email"
+      ]
+     },
+     "outcome": {
+      "text": "EPA considers the comments it receives in developing the final rule.",
+      "claims": [
+       "record"
+      ]
+     },
+     "steps": [
+      {
+       "text": "Open EPA's hearing registration form",
+       "claims": [
+        "link"
+       ]
+      },
+      {
+       "text": "Enter your name, email address and affiliation",
+       "claims": [
+        "contact"
+       ]
+      },
+      {
+       "text": "Choose to provide testimony",
+       "claims": [
+        "opt"
+       ]
+      },
+      {
+       "text": "Select an available speaking session",
+       "claims": [
+        "session"
+       ]
+      },
+      {
+       "text": "Click Submit",
+       "claims": [
+        "submit"
+       ]
+      }
+     ],
+     "alternatives": [
+      {
+       "action_type": "submit_comment",
+       "text": "Submit a written comment to the docket",
+       "url": "https://www.regulations.gov/docket/EPA-HQ-OAR-2025-0163",
+       "deadline": {
+        "date": "2026-12-16",
+        "claims": [
+         "comm"
+        ]
+       },
+       "claims": [
+        "comm"
+       ]
+      }
+     ],
+     "lead": "primary",
+     "verified_at": "2026-11-06"
+    },
+    "arc_note": "fixture"
+   },
+   "shorts": {
+    "a": {
+     "question": "How do you register to speak at EPA's methane hearing?",
+     "emotion": "MOTIVATION",
+     "title": "How to register to speak at EPA's methane hearing",
+     "title_claims": [
+      "agency",
+      "dl"
+     ],
+     "description": {
+      "text": "Register to speak at EPA's virtual hearing by November 10, 2026: https://survey.alchemer.com/s3/9078544/OG-Recon2-PublicHearing-2026",
+      "claims": [
+       "dl",
+       "link"
+      ]
+     },
+     "beats": [
+      {
+       "beat": "concern",
+       "narration": [
+        {
+         "text": "EPA is proposing to end the Methane Super Emitter Program.",
+         "claims": [
+          "stake"
+         ]
+        },
+        {
+         "text": "And it will hold a virtual public hearing on the proposal.",
+         "claims": [
+          "agency"
+         ]
+        }
+       ],
+       "visual": {
+        "kind": "representative_image",
+        "category": "air",
+        "subject": "an oil and gas site",
+        "emotion": "concern",
+        "shot": "wide",
+        "camera": "static",
+        "transition": "cut",
+        "duration": 8,
+        "why": "what is at stake",
+        "asset": {
+         "status": "registry"
+        }
+       }
+      },
+      {
+       "beat": "urgency",
+       "narration": [
+        {
+         "text": "Registration to speak closes November 10, 2026.",
+         "claims": [
+          "dl"
+         ]
+        }
+       ],
+       "visual": {
+        "kind": "representative_image",
+        "category": "air",
+        "subject": "an oil and gas site",
+        "emotion": "concern",
+        "shot": "wide",
+        "camera": "static",
+        "transition": "cut",
+        "duration": 8,
+        "why": "what is at stake",
+        "asset": {
+         "status": "registry"
+        }
+       }
+      },
+      {
+       "beat": "empowerment",
+       "narration": [
+        {
+         "text": "Open EPA's hearing registration form.",
+         "claims": [
+          "link"
+         ]
+        },
+        {
+         "text": "Enter your name, email address and affiliation.",
+         "claims": [
+          "contact"
+         ]
+        },
+        {
+         "text": "Choose that you would like to provide testimony, not only observe.",
+         "claims": [
+          "opt"
+         ]
+        },
+        {
+         "text": "Select an available speaking session that fits your day.",
+         "claims": [
+          "session"
+         ]
+        },
+        {
+         "text": "Click Submit to complete your registration.",
+         "claims": [
+          "submit"
+         ]
+        },
+        {
+         "text": "EPA emails registered speakers the connection instructions.",
+         "claims": [
+          "email"
+         ]
+        }
+       ],
+       "visual": {
+        "kind": "data_card",
+        "category": "record",
+        "subject": "the steps",
+        "emotion": "concern",
+        "shot": "wide",
+        "camera": "static",
+        "transition": "cut",
+        "duration": 8,
+        "why": "what is at stake",
+        "asset": {
+         "status": "card"
+        },
+        "layout": "steps"
+       }
+      },
+      {
+       "beat": "motivation",
+       "narration": [
+        {
+         "text": "The hearing is virtual, on November 16 and 17, 2026.",
+         "claims": [
+          "hear"
+         ]
+        },
+        {
+         "text": "EPA will consider every comment it receives in the final rule.",
+         "claims": [
+          "record"
+         ]
+        },
+        {
+         "text": "Register by November 10, 2026, and put your own testimony on the public record.",
+         "claims": [
+          "dl"
+         ]
+        }
+       ],
+       "visual": {
+        "kind": "representative_image",
+        "category": "air",
+        "subject": "an oil and gas site",
+        "emotion": "concern",
+        "shot": "wide",
+        "camera": "static",
+        "transition": "cut",
+        "duration": 8,
+        "why": "what is at stake",
+        "asset": {
+         "status": "registry"
+        }
+       }
+      }
+     ]
+    }
+   },
+   "arc": {}
+  },
+  "pack": {
+   "slug": "epa-methane-hearing-register-to-speak",
+   "claims": [
+    {
+     "id": "agency",
+     "status": "stated",
+     "text": "The U.S. Environmental Protection Agency will hold a virtual public hearing on the proposed rule.",
+     "quote": "The U.S. Environmental Protection Agency will hold a virtual public hearing on the proposed rule.",
+     "source": "epa",
+     "source_url": "https://www.epa.gov/controlling-air-pollution-oil-and-natural-gas-operations/2026-actions-reduce-burden-oil-and-natural",
+     "numbers": []
+    },
+    {
+     "id": "link",
+     "status": "stated",
+     "text": "Register to speak at the hearing: https://survey.alchemer.com/s3/9078544/OG-Recon2-PublicHearing-2026",
+     "quote": "Register to speak at the hearing: https://survey.alchemer.com/s3/9078544/OG-Recon2-PublicHearing-2026",
+     "source": "epa",
+     "source_url": "https://www.epa.gov/controlling-air-pollution-oil-and-natural-gas-operations/2026-actions-reduce-burden-oil-and-natural",
+     "numbers": []
+    },
+    {
+     "id": "dl",
+     "status": "stated",
+     "text": "Registration to speak closes November 10, 2026.",
+     "quote": "Registration to speak closes November 10, 2026.",
+     "source": "epa",
+     "source_url": "https://www.epa.gov/controlling-air-pollution-oil-and-natural-gas-operations/2026-actions-reduce-burden-oil-and-natural",
+     "numbers": [
+      "10",
+      "2026"
+     ]
+    },
+    {
+     "id": "hear",
+     "status": "stated",
+     "text": "The hearing will be held virtually on November 16 and 17, 2026.",
+     "quote": "The hearing will be held virtually on November 16 and 17, 2026.",
+     "source": "epa",
+     "source_url": "https://www.epa.gov/controlling-air-pollution-oil-and-natural-gas-operations/2026-actions-reduce-burden-oil-and-natural",
+     "numbers": [
+      "16",
+      "17",
+      "2026"
+     ]
+    },
+    {
+     "id": "opt",
+     "status": "stated",
+     "text": "Choose whether you would like to provide testimony or observe the hearing.",
+     "quote": "Choose whether you would like to provide testimony or observe the hearing.",
+     "source": "form",
+     "source_url": "https://survey.alchemer.com/s3/9078544/OG-Recon2-PublicHearing-2026",
+     "numbers": []
+    },
+    {
+     "id": "contact",
+     "status": "stated",
+     "text": "Enter your name, email address and affiliation.",
+     "quote": "Enter your name, email address and affiliation.",
+     "source": "form",
+     "source_url": "https://survey.alchemer.com/s3/9078544/OG-Recon2-PublicHearing-2026",
+     "numbers": []
+    },
+    {
+     "id": "session",
+     "status": "stated",
+     "text": "Select an available speaking session.",
+     "quote": "Select an available speaking session.",
+     "source": "form",
+     "source_url": "https://survey.alchemer.com/s3/9078544/OG-Recon2-PublicHearing-2026",
+     "numbers": []
+    },
+    {
+     "id": "submit",
+     "status": "stated",
+     "text": "Click Submit to complete your registration.",
+     "quote": "Click Submit to complete your registration.",
+     "source": "form",
+     "source_url": "https://survey.alchemer.com/s3/9078544/OG-Recon2-PublicHearing-2026",
+     "numbers": []
+    },
+    {
+     "id": "email",
+     "status": "stated",
+     "text": "Registered speakers will receive connection instructions by email.",
+     "quote": "Registered speakers will receive connection instructions by email.",
+     "source": "epa",
+     "source_url": "https://www.epa.gov/controlling-air-pollution-oil-and-natural-gas-operations/2026-actions-reduce-burden-oil-and-natural",
+     "numbers": []
+    },
+    {
+     "id": "comm",
+     "status": "stated",
+     "text": "Written comments must be received on or before December 16, 2026.",
+     "quote": "Written comments must be received on or before December 16, 2026.",
+     "source": "docket",
+     "source_url": "https://www.regulations.gov/docket/EPA-HQ-OAR-2025-0163",
+     "numbers": [
+      "16",
+      "2026"
+     ]
+    },
+    {
+     "id": "stake",
+     "status": "stated",
+     "text": "The proposal would rescind the Methane Super Emitter Program.",
+     "quote": "The proposal would rescind the Methane Super Emitter Program.",
+     "source": "epa",
+     "source_url": "https://www.epa.gov/controlling-air-pollution-oil-and-natural-gas-operations/2026-actions-reduce-burden-oil-and-natural",
+     "numbers": []
+    },
+    {
+     "id": "record",
+     "status": "stated",
+     "text": "EPA will consider all comments received in developing the final rule.",
+     "quote": "EPA will consider all comments received in developing the final rule.",
+     "source": "epa",
+     "source_url": "https://www.epa.gov/controlling-air-pollution-oil-and-natural-gas-operations/2026-actions-reduce-burden-oil-and-natural",
+     "numbers": []
+    }
+   ],
+   "files": [
+    {
+     "path": "01-epa.html",
+     "url": "https://www.epa.gov/controlling-air-pollution-oil-and-natural-gas-operations/2026-actions-reduce-burden-oil-and-natural",
+     "sha256": "x"
+    },
+    {
+     "path": "02-form.html",
+     "url": "https://survey.alchemer.com/s3/9078544/OG-Recon2-PublicHearing-2026",
+     "sha256": "y"
+    },
+    {
+     "path": "03-docket.html",
+     "url": "https://www.regulations.gov/docket/EPA-HQ-OAR-2025-0163",
+     "sha256": "z"
+    }
+   ],
+   "sources": [
+    {
+     "id": "epa",
+     "label": "EPA hearing page",
+     "url": "https://www.epa.gov/controlling-air-pollution-oil-and-natural-gas-operations/2026-actions-reduce-burden-oil-and-natural",
+     "role": "documents"
+    },
+    {
+     "id": "form",
+     "label": "EPA hearing registration form",
+     "url": "https://survey.alchemer.com/s3/9078544/OG-Recon2-PublicHearing-2026",
+     "role": "documents"
+    },
+    {
+     "id": "docket",
+     "label": "Regulations.gov docket",
+     "url": "https://www.regulations.gov/docket/EPA-HQ-OAR-2025-0163",
+     "role": "documents"
+    }
+   ],
+   "conflicts": [],
+   "verified_at": "2026-11-06",
+   "hash": "h"
+  },
+  "validation": {
+   "narrative": {
+    "ok": true,
+    "blocking": [],
+    "warnings": []
+   },
+   "participation": {
+    "story_type": "participation",
+    "label": "Public Participation / How-To",
+    "action_type": "register_to_speak",
+    "action_label": "Register to speak",
+    "agency": "U.S. Environmental Protection Agency",
+    "url": "https://survey.alchemer.com/s3/9078544/OG-Recon2-PublicHearing-2026",
+    "url_official": true,
+    "url_linked_from": "https://www.epa.gov/controlling-air-pollution-oil-and-natural-gas-operations/2026-actions-reduce-burden-oil-and-natural",
+    "deadline": {
+     "date": "2026-11-10",
+     "time": null,
+     "tz": null,
+     "state": "open",
+     "days_left": 4
+    },
+    "event": {
+     "start": "2026-11-16",
+     "end": "2026-11-17",
+     "time": null,
+     "tz": null,
+     "format": "virtual"
+    },
+    "steps": [
+     "Open EPA's hearing registration form",
+     "Enter your name, email address and affiliation",
+     "Choose to provide testimony",
+     "Select an available speaking session",
+     "Click Submit"
+    ],
+    "alternatives": [
+     {
+      "action_type": "submit_comment",
+      "label": "Submit a comment",
+      "text": "Submit a written comment to the docket",
+      "url": "https://www.regulations.gov/docket/EPA-HQ-OAR-2025-0163",
+      "deadline": "2026-12-16",
+      "state": "open"
+     }
+    ],
+    "lead": "primary",
+    "verified_at": "2026-11-06",
+    "short_timing": [
+     {
+      "beat": "concern",
+      "ends": 9.2
+     },
+     {
+      "beat": "urgency",
+      "ends": 13.3
+     },
+     {
+      "beat": "empowerment",
+      "ends": 33.7
+     },
+     {
+      "beat": "motivation",
+      "ends": 49.3
+     }
+    ],
+    "status": "ready",
+    "unresolved": [],
+    "ok": true,
+    "blocking": [],
+    "warnings": []
+   }
+  }
+ },
+ "expired": {
+  "body": {
+   "schema": "impact-story/3",
+   "discovery": {
+    "story_type": "participation",
+    "profile": "public_affairs",
+    "action": {
+     "action_type": "register_to_speak",
+     "agency": {
+      "text": "U.S. Environmental Protection Agency",
+      "claims": [
+       "agency"
+      ]
+     },
+     "url": "https://survey.alchemer.com/s3/9078544/OG-Recon2-PublicHearing-2026",
+     "url_claims": [
+      "link"
+     ],
+     "deadline": {
+      "date": "2026-11-10",
+      "time": null,
+      "tz": null,
+      "claims": [
+       "dl"
+      ]
+     },
+     "event": {
+      "start": "2026-11-16",
+      "end": "2026-11-17",
+      "format": "virtual",
+      "claims": [
+       "hear"
+      ]
+     },
+     "attend_vs_speak": {
+      "text": "The form asks whether you want to provide testimony or observe.",
+      "claims": [
+       "opt"
+      ]
+     },
+     "confirmation": {
+      "text": "Registered speakers receive connection instructions by email.",
+      "claims": [
+       "email"
+      ]
+     },
+     "outcome": {
+      "text": "EPA considers the comments it receives in developing the final rule.",
+      "claims": [
+       "record"
+      ]
+     },
+     "steps": [
+      {
+       "text": "Open EPA's hearing registration form",
+       "claims": [
+        "link"
+       ]
+      },
+      {
+       "text": "Enter your name, email address and affiliation",
+       "claims": [
+        "contact"
+       ]
+      },
+      {
+       "text": "Choose to provide testimony",
+       "claims": [
+        "opt"
+       ]
+      },
+      {
+       "text": "Select an available speaking session",
+       "claims": [
+        "session"
+       ]
+      },
+      {
+       "text": "Click Submit",
+       "claims": [
+        "submit"
+       ]
+      }
+     ],
+     "alternatives": [
+      {
+       "action_type": "submit_comment",
+       "text": "Submit a written comment to the docket",
+       "url": "https://www.regulations.gov/docket/EPA-HQ-OAR-2025-0163",
+       "deadline": {
+        "date": "2026-12-16",
+        "claims": [
+         "comm"
+        ]
+       },
+       "claims": [
+        "comm"
+       ]
+      }
+     ],
+     "lead": "primary",
+     "verified_at": "2026-11-06"
+    },
+    "arc_note": "fixture"
+   },
+   "shorts": {
+    "a": {
+     "question": "How do you register to speak at EPA's methane hearing?",
+     "emotion": "MOTIVATION",
+     "title": "How to register to speak at EPA's methane hearing",
+     "title_claims": [
+      "agency",
+      "dl"
+     ],
+     "description": {
+      "text": "Register to speak at EPA's virtual hearing by November 10, 2026: https://survey.alchemer.com/s3/9078544/OG-Recon2-PublicHearing-2026",
+      "claims": [
+       "dl",
+       "link"
+      ]
+     },
+     "beats": [
+      {
+       "beat": "concern",
+       "narration": [
+        {
+         "text": "EPA is proposing to end the Methane Super Emitter Program.",
+         "claims": [
+          "stake"
+         ]
+        },
+        {
+         "text": "And it will hold a virtual public hearing on the proposal.",
+         "claims": [
+          "agency"
+         ]
+        }
+       ],
+       "visual": {
+        "kind": "representative_image",
+        "category": "air",
+        "subject": "an oil and gas site",
+        "emotion": "concern",
+        "shot": "wide",
+        "camera": "static",
+        "transition": "cut",
+        "duration": 8,
+        "why": "what is at stake",
+        "asset": {
+         "status": "registry"
+        }
+       }
+      },
+      {
+       "beat": "urgency",
+       "narration": [
+        {
+         "text": "Registration to speak closes November 10, 2026.",
+         "claims": [
+          "dl"
+         ]
+        }
+       ],
+       "visual": {
+        "kind": "representative_image",
+        "category": "air",
+        "subject": "an oil and gas site",
+        "emotion": "concern",
+        "shot": "wide",
+        "camera": "static",
+        "transition": "cut",
+        "duration": 8,
+        "why": "what is at stake",
+        "asset": {
+         "status": "registry"
+        }
+       }
+      },
+      {
+       "beat": "empowerment",
+       "narration": [
+        {
+         "text": "Open EPA's hearing registration form.",
+         "claims": [
+          "link"
+         ]
+        },
+        {
+         "text": "Enter your name, email address and affiliation.",
+         "claims": [
+          "contact"
+         ]
+        },
+        {
+         "text": "Choose that you would like to provide testimony, not only observe.",
+         "claims": [
+          "opt"
+         ]
+        },
+        {
+         "text": "Select an available speaking session that fits your day.",
+         "claims": [
+          "session"
+         ]
+        },
+        {
+         "text": "Click Submit to complete your registration.",
+         "claims": [
+          "submit"
+         ]
+        },
+        {
+         "text": "EPA emails registered speakers the connection instructions.",
+         "claims": [
+          "email"
+         ]
+        }
+       ],
+       "visual": {
+        "kind": "data_card",
+        "category": "record",
+        "subject": "the steps",
+        "emotion": "concern",
+        "shot": "wide",
+        "camera": "static",
+        "transition": "cut",
+        "duration": 8,
+        "why": "what is at stake",
+        "asset": {
+         "status": "card"
+        },
+        "layout": "steps"
+       }
+      },
+      {
+       "beat": "motivation",
+       "narration": [
+        {
+         "text": "The hearing is virtual, on November 16 and 17, 2026.",
+         "claims": [
+          "hear"
+         ]
+        },
+        {
+         "text": "EPA will consider every comment it receives in the final rule.",
+         "claims": [
+          "record"
+         ]
+        },
+        {
+         "text": "Register by November 10, 2026, and put your own testimony on the public record.",
+         "claims": [
+          "dl"
+         ]
+        }
+       ],
+       "visual": {
+        "kind": "representative_image",
+        "category": "air",
+        "subject": "an oil and gas site",
+        "emotion": "concern",
+        "shot": "wide",
+        "camera": "static",
+        "transition": "cut",
+        "duration": 8,
+        "why": "what is at stake",
+        "asset": {
+         "status": "registry"
+        }
+       }
+      }
+     ]
+    }
+   },
+   "arc": {}
+  },
+  "pack": {
+   "slug": "epa-methane-hearing-register-to-speak",
+   "claims": [
+    {
+     "id": "agency",
+     "status": "stated",
+     "text": "The U.S. Environmental Protection Agency will hold a virtual public hearing on the proposed rule.",
+     "quote": "The U.S. Environmental Protection Agency will hold a virtual public hearing on the proposed rule.",
+     "source": "epa",
+     "source_url": "https://www.epa.gov/controlling-air-pollution-oil-and-natural-gas-operations/2026-actions-reduce-burden-oil-and-natural",
+     "numbers": []
+    },
+    {
+     "id": "link",
+     "status": "stated",
+     "text": "Register to speak at the hearing: https://survey.alchemer.com/s3/9078544/OG-Recon2-PublicHearing-2026",
+     "quote": "Register to speak at the hearing: https://survey.alchemer.com/s3/9078544/OG-Recon2-PublicHearing-2026",
+     "source": "epa",
+     "source_url": "https://www.epa.gov/controlling-air-pollution-oil-and-natural-gas-operations/2026-actions-reduce-burden-oil-and-natural",
+     "numbers": []
+    },
+    {
+     "id": "dl",
+     "status": "stated",
+     "text": "Registration to speak closes November 10, 2026.",
+     "quote": "Registration to speak closes November 10, 2026.",
+     "source": "epa",
+     "source_url": "https://www.epa.gov/controlling-air-pollution-oil-and-natural-gas-operations/2026-actions-reduce-burden-oil-and-natural",
+     "numbers": [
+      "10",
+      "2026"
+     ]
+    },
+    {
+     "id": "hear",
+     "status": "stated",
+     "text": "The hearing will be held virtually on November 16 and 17, 2026.",
+     "quote": "The hearing will be held virtually on November 16 and 17, 2026.",
+     "source": "epa",
+     "source_url": "https://www.epa.gov/controlling-air-pollution-oil-and-natural-gas-operations/2026-actions-reduce-burden-oil-and-natural",
+     "numbers": [
+      "16",
+      "17",
+      "2026"
+     ]
+    },
+    {
+     "id": "opt",
+     "status": "stated",
+     "text": "Choose whether you would like to provide testimony or observe the hearing.",
+     "quote": "Choose whether you would like to provide testimony or observe the hearing.",
+     "source": "form",
+     "source_url": "https://survey.alchemer.com/s3/9078544/OG-Recon2-PublicHearing-2026",
+     "numbers": []
+    },
+    {
+     "id": "contact",
+     "status": "stated",
+     "text": "Enter your name, email address and affiliation.",
+     "quote": "Enter your name, email address and affiliation.",
+     "source": "form",
+     "source_url": "https://survey.alchemer.com/s3/9078544/OG-Recon2-PublicHearing-2026",
+     "numbers": []
+    },
+    {
+     "id": "session",
+     "status": "stated",
+     "text": "Select an available speaking session.",
+     "quote": "Select an available speaking session.",
+     "source": "form",
+     "source_url": "https://survey.alchemer.com/s3/9078544/OG-Recon2-PublicHearing-2026",
+     "numbers": []
+    },
+    {
+     "id": "submit",
+     "status": "stated",
+     "text": "Click Submit to complete your registration.",
+     "quote": "Click Submit to complete your registration.",
+     "source": "form",
+     "source_url": "https://survey.alchemer.com/s3/9078544/OG-Recon2-PublicHearing-2026",
+     "numbers": []
+    },
+    {
+     "id": "email",
+     "status": "stated",
+     "text": "Registered speakers will receive connection instructions by email.",
+     "quote": "Registered speakers will receive connection instructions by email.",
+     "source": "epa",
+     "source_url": "https://www.epa.gov/controlling-air-pollution-oil-and-natural-gas-operations/2026-actions-reduce-burden-oil-and-natural",
+     "numbers": []
+    },
+    {
+     "id": "comm",
+     "status": "stated",
+     "text": "Written comments must be received on or before December 16, 2026.",
+     "quote": "Written comments must be received on or before December 16, 2026.",
+     "source": "docket",
+     "source_url": "https://www.regulations.gov/docket/EPA-HQ-OAR-2025-0163",
+     "numbers": [
+      "16",
+      "2026"
+     ]
+    },
+    {
+     "id": "stake",
+     "status": "stated",
+     "text": "The proposal would rescind the Methane Super Emitter Program.",
+     "quote": "The proposal would rescind the Methane Super Emitter Program.",
+     "source": "epa",
+     "source_url": "https://www.epa.gov/controlling-air-pollution-oil-and-natural-gas-operations/2026-actions-reduce-burden-oil-and-natural",
+     "numbers": []
+    },
+    {
+     "id": "record",
+     "status": "stated",
+     "text": "EPA will consider all comments received in developing the final rule.",
+     "quote": "EPA will consider all comments received in developing the final rule.",
+     "source": "epa",
+     "source_url": "https://www.epa.gov/controlling-air-pollution-oil-and-natural-gas-operations/2026-actions-reduce-burden-oil-and-natural",
+     "numbers": []
+    }
+   ],
+   "files": [
+    {
+     "path": "01-epa.html",
+     "url": "https://www.epa.gov/controlling-air-pollution-oil-and-natural-gas-operations/2026-actions-reduce-burden-oil-and-natural",
+     "sha256": "x"
+    },
+    {
+     "path": "02-form.html",
+     "url": "https://survey.alchemer.com/s3/9078544/OG-Recon2-PublicHearing-2026",
+     "sha256": "y"
+    },
+    {
+     "path": "03-docket.html",
+     "url": "https://www.regulations.gov/docket/EPA-HQ-OAR-2025-0163",
+     "sha256": "z"
+    }
+   ],
+   "sources": [
+    {
+     "id": "epa",
+     "label": "EPA hearing page",
+     "url": "https://www.epa.gov/controlling-air-pollution-oil-and-natural-gas-operations/2026-actions-reduce-burden-oil-and-natural",
+     "role": "documents"
+    },
+    {
+     "id": "form",
+     "label": "EPA hearing registration form",
+     "url": "https://survey.alchemer.com/s3/9078544/OG-Recon2-PublicHearing-2026",
+     "role": "documents"
+    },
+    {
+     "id": "docket",
+     "label": "Regulations.gov docket",
+     "url": "https://www.regulations.gov/docket/EPA-HQ-OAR-2025-0163",
+     "role": "documents"
+    }
+   ],
+   "conflicts": [],
+   "verified_at": "2026-11-06",
+   "hash": "h"
+  },
+  "validation": {
+   "narrative": {
+    "ok": false,
+    "blocking": [
+     "Action: the deadline (2026-11-10) has passed, so the story cannot tell viewers to register to speak. Lead with the open alternative instead (lead: \"alternative\"): Submit a comment by 2026-12-16.",
+     "Short A motivation: 'Register by November 10, 2026, and put your own testimony on the public record.' tells viewers to register, but registration closed on 2026-11-10."
+    ],
+    "warnings": []
+   },
+   "participation": {
+    "story_type": "participation",
+    "label": "Public Participation / How-To",
+    "action_type": "register_to_speak",
+    "action_label": "Register to speak",
+    "agency": "U.S. Environmental Protection Agency",
+    "url": "https://survey.alchemer.com/s3/9078544/OG-Recon2-PublicHearing-2026",
+    "url_official": true,
+    "url_linked_from": "https://www.epa.gov/controlling-air-pollution-oil-and-natural-gas-operations/2026-actions-reduce-burden-oil-and-natural",
+    "deadline": {
+     "date": "2026-11-10",
+     "time": null,
+     "tz": null,
+     "state": "expired",
+     "days_left": -1
+    },
+    "event": {
+     "start": "2026-11-16",
+     "end": "2026-11-17",
+     "time": null,
+     "tz": null,
+     "format": "virtual"
+    },
+    "steps": [
+     "Open EPA's hearing registration form",
+     "Enter your name, email address and affiliation",
+     "Choose to provide testimony",
+     "Select an available speaking session",
+     "Click Submit"
+    ],
+    "alternatives": [
+     {
+      "action_type": "submit_comment",
+      "label": "Submit a comment",
+      "text": "Submit a written comment to the docket",
+      "url": "https://www.regulations.gov/docket/EPA-HQ-OAR-2025-0163",
+      "deadline": "2026-12-16",
+      "state": "open"
+     }
+    ],
+    "lead": "primary",
+    "verified_at": "2026-11-06",
+    "short_timing": [
+     {
+      "beat": "concern",
+      "ends": 9.2
+     },
+     {
+      "beat": "urgency",
+      "ends": 13.3
+     },
+     {
+      "beat": "empowerment",
+      "ends": 33.7
+     },
+     {
+      "beat": "motivation",
+      "ends": 49.3
+     }
+    ],
+    "status": "expired",
+    "unresolved": [
+     "Action: the deadline (2026-11-10) has passed, so the story cannot tell viewers to register to speak. Lead with the open alternative instead (lead: \"alternative\"): Submit a comment by 2026-12-16.",
+     "Short A motivation: 'Register by November 10, 2026, and put your own testimony on the public record.' tells viewers to register, but registration closed on 2026-11-10."
+    ],
+    "ok": false,
+    "blocking": [
+     "Action: the deadline (2026-11-10) has passed, so the story cannot tell viewers to register to speak. Lead with the open alternative instead (lead: \"alternative\"): Submit a comment by 2026-12-16.",
+     "Short A motivation: 'Register by November 10, 2026, and put your own testimony on the public record.' tells viewers to register, but registration closed on 2026-11-10."
+    ],
+    "warnings": []
+   }
+  }
+ }
+}
