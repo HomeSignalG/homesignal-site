@@ -520,5 +520,57 @@ select pg_temp.chk('18m Create video (Render) is refused until the script is app
   pg_temp.err(format('select public.hs_impact_story_render(%L, 0, false)',
     (select story_id from public.impact_discovery_candidates where id = pg_temp.id('f3')))) like '%Approve the integrated narrative%');
 
+-- 19. Story type (2026-11-06): Investigative · Public Policy · Public Participation / How-To --------------------------------------
+select pg_temp.chk('19a the EPA hearing title is detected as participation, with high confidence',
+  (select x->>'type' = 'participation' and x->>'confidence' = 'high'
+     from (select public._hs_id_story_type_detect('EPA Methane Hearing — How to Register to Speak Before November 10', null) x) q));
+select pg_temp.chk('19b the other action phrases are detected too',
+  (select bool_and(public._hs_id_story_type_detect(t, null)->>'type' = 'participation') from unnest(array[
+    'Speak at the hearing on the rezoning', 'How to submit a public comment on the landfill permit', 'Sign the petition to save the creek',
+    'Attend the meeting on Tuesday', 'How to testify at the state senate', 'Deadline to participate is Friday',
+    'How do I speak at a public hearing before Friday?']) t));
+select pg_temp.chk('19c a proposed rule with no action phrase is public policy; an ordinary topic stays investigative',
+  public._hs_id_story_type_detect('EPA proposes to rescind the Methane Super Emitter Program', null)->>'type' = 'public_policy'
+  and public._hs_id_story_type_detect('Truck yard planned next to Wildwood Park', null)->>'type' = 'investigative');
+select pg_temp.chk('19d a participation phrase only in the note decides with medium confidence; the title outranks the note',
+  public._hs_id_story_type_detect('EPA methane rule', 'Show viewers how to register to speak.')->>'confidence' = 'medium'
+  and public._hs_id_story_type_detect('EPA methane rule', 'Show viewers how to register to speak.')->>'type' = 'participation');
+select pg_temp.chk('19e when both appear, the primary objective is taking part',
+  public._hs_id_story_type_detect('Proposed rule: how to submit a comment before the deadline', null)->>'type' = 'participation');
+select pg_temp.as_user('founder@example.com');
+select pg_temp.put('st1', public.hs_impact_discovery_suggest('{"title":"EPA Methane Hearing — How to Register to Speak Before November 10","links":["https://www.epa.gov/x"]}')->>'id');
+select pg_temp.chk('19f a suggestion with no choice is auto; the overview shows what was detected and the type research will use',
+  (select x->>'story_type' = 'auto' and x->'story_type_detected'->>'type' = 'participation' and x->>'story_type_resolved' = 'participation'
+     from jsonb_array_elements(public.hs_impact_discovery_overview()->'candidates') x where x->>'id' = pg_temp.id('st1')::text));
+select public.hs_impact_discovery_set_story_type(pg_temp.id('st1'), 'public_policy');
+select pg_temp.chk('19g the founder''s override wins over detection, and is recorded as an event',
+  (select x->>'story_type' = 'public_policy' and x->>'story_type_resolved' = 'public_policy' and x->'story_type_detected'->>'type' = 'participation'
+     from jsonb_array_elements(public.hs_impact_discovery_overview()->'candidates') x where x->>'id' = pg_temp.id('st1')::text)
+  and exists (select 1 from public.impact_discovery_events where candidate_id = pg_temp.id('st1') and kind = 'story_type'));
+select pg_temp.put('st2', public.hs_impact_discovery_suggest('{"title":"Truck yard planned next to the creek","story_type":"participation"}')->>'id');
+select pg_temp.chk('19h an explicit choice in the suggestion is kept, even when detection says otherwise',
+  (select story_type from public.impact_discovery_candidates where id = pg_temp.id('st2')) = 'participation');
+select pg_temp.chk('19i a bad story type is refused (suggest and set)',
+  pg_temp.err($q$select public.hs_impact_discovery_suggest('{"title":"Another topic here","story_type":"documentary"}')$q$) like '%Story type must be%'
+  and pg_temp.err(format('select public.hs_impact_discovery_set_story_type(%L, %L)', pg_temp.id('st1'), 'documentary')) like '%Story type must be%');
+select pg_temp.as_user(null);
+select pg_temp.chk('19j nothing writes the detected type into the column (detection is read-time only)',
+  (select story_type from public.impact_discovery_candidates where id = pg_temp.id('st2')) = 'participation'
+  and not exists (select 1 from public.impact_discovery_candidates where story_type not in ('auto', 'investigative', 'public_policy', 'participation')));
+select pg_temp.chk('19k a non-admin cannot change the story type; anon cannot execute it; the detector is internal',
+  pg_temp.err(format('select public.hs_impact_discovery_set_story_type(%L, %L)', pg_temp.id('st1'), 'auto')) like '42501%'
+  and not has_function_privilege('anon', 'public.hs_impact_discovery_set_story_type(uuid, text)', 'execute')
+  and not has_function_privilege('authenticated', 'public._hs_id_story_type_detect(text, text)', 'execute'));
+select pg_temp.as_user('founder@example.com');
+select pg_temp.put('st_r', public.hs_impact_discovery_research_start(pg_temp.id('st2'))->'research'->>'id');
+select pg_temp.as_user(null);
+select pg_temp.chk('19l the research claim carries the resolved type to the engine',
+  (public.impact_discovery_research_claim(pg_temp.id('st_r'))->'candidate'->>'story_type_resolved') = 'participation');
+select pg_temp.as_user('founder@example.com');
+select pg_temp.chk('19m the story type cannot change while research is working on the topic',
+  pg_temp.err(format('select public.hs_impact_discovery_set_story_type(%L, %L)', pg_temp.id('st2'), 'auto')) like '%Research is working%');
+select pg_temp.as_user(null);
+select public.impact_discovery_research_complete(pg_temp.id('st_r'), '{"status":"failed","summary":"test"}');
+
 \o
 select count(*) || ' checks passed' as result from _res where ok;

@@ -82,7 +82,7 @@ ok(/rpc\('hs_impact_story_fix_confirm', \{ p_story: S\.open, p_batch: id, p_plan
    'page: the plan is shown with Confirm (sending the md5 the page showed) and Cancel');
 
 ok(/function viewAccountability\(m, r\)/.test(js) && /viewAccountability\(d\.accountability, r\.accountability\)/.test(js)
-   && /p_section: 'accountability'/.test(js) && /'visuals', 'accountability'\) then/.test(sql),
+   && /p_section: 'accountability'/.test(js) && /'visuals', 'accountability', 'participation'\) then/.test(sql),
    'page+sql: the Accountability research section reads the responsibility map, and deeper research is a revision note');
 ok(/accountability: 'C\. Accountability'/.test(js) && /consequences: 'E\. Consequences'/.test(js), 'page: the accountability arc beats have labels');
 
