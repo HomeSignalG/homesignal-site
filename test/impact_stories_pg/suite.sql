@@ -503,6 +503,29 @@ select pg_temp.chk('12e2 while the videos render it is the engine''s turn, and t
    public._hs_is_status(pg_temp.id('s')::uuid)->>'owner' = 'working'
    and public._hs_is_status(pg_temp.id('s')::uuid)->>'library' = 'rendering');
 insert into _ids select 'r1', (pg_temp.lastjob()).id;
+-- 12z1-12z3 (2026-11-07): a render the engine refused because the approved pictures no longer match (VisualsChanged)
+-- cannot be fixed by Retry: the visuals read out of date, Retry and Render are refused, the next step is Prepare.
+begin;
+select public.hs_impact_story_job_claim(pg_temp.id('r1')::uuid);
+select public.hs_impact_story_job_fail(pg_temp.id('r1')::uuid, 'The story''s pictures changed since you approved them (approved a, now b).',
+  '{"code":"visuals_changed"}'::jsonb);
+select pg_temp.chk('12z1 changed pictures: the visuals read out of date and the next step is Prepare the visuals',
+  pg_temp.vis()->>'state' = 'stale' and pg_temp.vis()->>'why' like 'The video code changed%'
+  and pg_temp.stage() = 'visuals' and pg_temp.nxt() = 'Prepare the visuals'
+  and (public._hs_is_status(pg_temp.id('s')::uuid)->'job'->>'visuals_changed')::boolean);
+select pg_temp.chk('12z2 changed pictures: Retry and Render are refused with a readable reason',
+  pg_temp.err(format('select public.hs_impact_story_job_retry(%L)', pg_temp.id('r1'))) like '55000%Prepare the visuals again%'
+  and pg_temp.err(format('select public.hs_impact_story_render(%L, 7)', pg_temp.id('s'))) like '55000%');
+rollback;
+begin;
+select public.hs_impact_story_job_claim(pg_temp.id('r1')::uuid);
+select public.hs_impact_story_job_fail(pg_temp.id('r1')::uuid, 'A photo you approved can no longer be used: oak. Prepare the visuals again; nothing was rendered.');
+select pg_temp.chk('12z3 a render failed before the code existed is read from the engine''s own sentence; any other failure can still be retried',
+  pg_temp.vis()->>'state' = 'stale'
+  and pg_temp.err(format('select public.hs_impact_story_job_retry(%L)', pg_temp.id('r1'))) like '55000%'
+  and not public._hs_is_visuals_changed('render', 'failed', null, 'The render failed: OSError')
+  and not public._hs_is_visuals_changed('visuals', 'failed', '{"code":"visuals_changed"}', null));
+rollback;
 select pg_temp.chk('12f the worker gets the approved body', (public.hs_impact_story_job_claim(pg_temp.id('r1')::uuid)->'base_body'->>'schema') = 'impact-story/2');
 select public.hs_impact_story_job_complete(pg_temp.id('r1')::uuid, jsonb_build_object('assets',
   (select jsonb_agg(x) from jsonb_array_elements(pg_temp.files(pg_temp.id('r1')::uuid)) x where x->>'asset' <> 'thumbnail')));
