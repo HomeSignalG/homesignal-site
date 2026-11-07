@@ -1040,8 +1040,10 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(120);
 kbox = await page.locator('#is-next-box').innerText();
-ok(/Your next step/i.test(kbox) && /Read the plan below, then press Confirm/.test(kbox) && await page.locator('#is #is-next-box .is-btn.primary[data-act=readplan]').count() === 1,
-   'plan ready: the top box says to read Claude’s plan and confirm it, with one button');
+ok(/Your next step/i.test(kbox) && /PLAN: read what Claude will change/.test(kbox) && /Shorter shots\./.test(kbox)
+   && await page.locator('#is #is-next-box [data-act=fixconfirm]').count() === 1 && await page.locator('#is #is-next-box [data-act=fixplancancel]').count() === 1
+   && await page.locator('#is [data-act=fixconfirm]').count() === 1 && await page.locator('#is a[href="#is-fix-plan"]').count() === 0,
+   'plan ready: the plan itself, Confirm and Cancel are in the top box, under a PLAN heading, and nowhere else (founder 2026-11-07)');
 ok(await page.locator('#is .is-next-box').count() === 1 && await page.locator('#is .is-btn.primary[data-act=fixblocked]').count() === 0,
    'plan ready: exactly one action box on the page');
 await page.evaluate(() => { window.db.media.fix_batch = { id: 'b1', status: 'planning', requests: 3, requested_at: '2026-11-06T22:31:00Z' };
