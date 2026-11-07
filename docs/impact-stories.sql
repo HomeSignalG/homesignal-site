@@ -2504,7 +2504,8 @@ begin
     'public._hs_is_line_notes(uuid)',
     'public._hs_is_choice_key(uuid)', 'public._hs_is_visuals(uuid)', 'public._hs_is_rejections(uuid)', 'public._hs_is_shot_decisions(bigint)',
     'public._hs_is_shot_print(jsonb)', 'public._hs_is_creator_hash(jsonb)', 'public._hs_is_creator_problems(jsonb)',
-    'public._hs_is_creator_require(jsonb)', 'public._hs_is_creator_state(uuid)'] loop
+    'public._hs_is_creator_require(jsonb)', 'public._hs_is_creator_state(uuid)',
+    'public._hs_is_visuals_changed(text, text, jsonb, text)'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
   end loop;
   foreach f in array array[
