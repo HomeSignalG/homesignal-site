@@ -6173,6 +6173,16 @@ Results.
   are refused, the next step is Prepare the visuals, and `_hs_is_status.job.visuals_changed` lets the page drop Retry
   (#2655/#2657 built that box). pg 12z1-12z3.
 
+## IMPACT STORIES, TAB 17: "NOT ABOUT THIS STORY — CONTINUE PREPARING" (2026-11-07)
+
+Founder: "the article does not matter but there is no button to disregard it and continue". When Prepare (or a render)
+stops on an Outdated status and the engine's check named the newer events with keys (homesignal-ingest
+`currency.event_key`), the Visuals stop shows **Not about this story — continue preparing**: `hs_impact_story_currency_dismiss`
+records the keys (append-only `impact_story_currency_dismissals`; only a key a failed job of this story reported), then the
+page prepares again. The claim sends `story.currency_dismissed`, and the check lists those events as dismissed instead of
+blocking; anything new still blocks. A stop from before keys existed offers only Prepare again. A render stopped the same way shows **Not about this story — render again** in Media review (keeps the approved pictures). The Visuals stop reads `currency` through `_hs_is_visuals` (added after a self-audit found the first version never passed it; pg 12y0). Apply order: ingest first,
+then `docs/impact-stories.sql`, then the page. Tests: pg 12y1-12y4, `test/impact-stories.browser.test.mjs`.
+
 ## IMPACT STORIES, TAB 17: FAILED VIDEOS ARE FIXED BEFORE YOU WATCH THEM ⚖️ FOUNDER (2026-11-07)
 
 "if you have to fix things, than you should fix before i have to watch. otherwise you are wasting my time". When a render

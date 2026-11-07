@@ -747,6 +747,18 @@ txt = await page.locator('#is-media-now').innerText();
 ok(/the last render stopped/i.test(txt) && txt.includes('Outdated status') && txt.includes('Next: Check sources again.') && txt.includes('1 more item'),
    'media now: a stopped render says so, names the reason that needs a person, and the next step');
 ok(!/rendering now/i.test(await page.locator('#is').innerText()), 'media now: nothing says it is rendering once it stopped');
+ok(await page.locator('#is [data-act=cdismiss]').count() === 0, 'media: a stop with no keyed events offers no Not-about-this-story button');
+await page.evaluate(() => { window.db.media.blocked.currency = { state: 'stale', events: [{ key: 'abcdef0123456789', summary: 'October 30, 2026' }] };
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(80);
+await page.click('#is [data-act=step][data-step=media]'); await page.waitForTimeout(50);
+ok(await page.locator('#is [data-act=cdismiss][data-then=render][data-keys="abcdef0123456789"]', { hasText: 'render again' }).count() === 1,
+   'media: a render stopped on a keyed newer event offers "Not about this story — render again"');
+await page.evaluate(() => { window.calls = []; });
+await page.click('#is [data-act=cdismiss][data-then=render]'); await page.waitForTimeout(120);
+ok(await page.evaluate(() => { const n = window.calls.map((c) => c[0]); const i = n.indexOf('hs_impact_story_currency_dismiss'), j = n.indexOf('hs_impact_story_render');
+     return i >= 0 && j > i && n.indexOf('hs_impact_story_visuals_prepare') < 0; }),
+   'media: it sets the event aside, then renders again (approved pictures kept, nothing prepared)');
 await page.evaluate(() => { window.db.status = window.__st; const m = window.db.media; delete m.blocked; m.current = true; m.hum = false; m.stale_reason = null; m.fix_requests = []; m.fix_batch = null; });
 // the quality gates (2026-10-27): a file the visual gate failed, a blocked render with licensed candidates, the status check
 await page.evaluate(() => {
@@ -960,8 +972,26 @@ await page.evaluate(() => {
 await page.waitForTimeout(120);
 const obox = await page.evaluate(() => (document.querySelector('#is #is-next-box') || {}).innerText || '');
 ok(!/no photo|photo search/i.test(obox) && /newer/i.test(obox) && obox.includes('Democrats win House majority with Trump approval at historic low')
-   && /fix the check/i.test(obox) && await page.locator('#is #is-next-box [data-act=retry]').count() === 0,
+   && /Prepare the visuals again/.test(obox) && await page.locator('#is #is-next-box [data-act=retry]').count() === 0
+   && await page.locator('#is [data-act=cdismiss]').count() === 0,
    'next step: a Prepare stopped on an Outdated status names the headline and never says the photo search failed');
+// founder 2026-11-07: "the article does not matter but there is no button to disregard it and continue". A check that
+// names the event with a key offers "Not about this story — continue preparing": it sets the event aside, then prepares.
+await page.evaluate(() => {
+  const b = window.db.visuals.blocked;
+  b.currency = { state: 'stale', events: [{ key: '0123456789abcdef', kind: 'document_link_changed', summary: 'Democrats win House majority' },
+                                         { key: '0123456789abcdef', summary: 'dup' }, { key: '<bad>', summary: 'no key' }] };
+  window.HS.acqImpactStories._state.data = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(120);
+const dbox = await page.evaluate(() => (document.querySelector('#is #is-next-box') || {}).innerText || '');
+ok(/Not about this story/.test(dbox) && await page.locator('#is #is-next-box [data-act=cdismiss][data-keys="0123456789abcdef"]').count() === 1,
+   'next step: a keyed Outdated status offers "Not about this story — continue preparing" with only the valid key');
+await page.evaluate(() => { window.calls = []; });
+await page.click('#is #is-next-box [data-act=cdismiss]'); await page.waitForTimeout(120);
+ok(await page.evaluate(() => { const n = window.calls.map((c) => c[0]); const i = n.indexOf('hs_impact_story_currency_dismiss'), j = n.indexOf('hs_impact_story_visuals_prepare');
+     return i >= 0 && j > i && JSON.stringify(window.calls[i][1].p_keys) === '["0123456789abcdef"]' && window.calls[j][1].p_new === true; }),
+   'not about this story: sets the event aside, then prepares the visuals again');
 await page.evaluate(() => { Object.assign(window.db, window.__beforeBlocked); });
 // A render refused because the pictures no longer match the approved set (founder, 2026-11-06, EPA methane story:
 // "i have no idea if it is fixing requests or i am supposed to press retry"). Retry would fail the same way.

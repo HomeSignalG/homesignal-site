@@ -401,6 +401,25 @@ create table if not exists public.impact_story_photo_rejections (
 alter table public.impact_story_photo_rejections enable row level security;
 revoke all on public.impact_story_photo_rejections from public, anon, authenticated;
 
+-- "Not about this story" (founder, 2026-11-07: "the article does not matter but there is no button to disregard it and
+-- continue"). The latest-development check (homesignal-ingest impact/currency.py) names every newer event with a key
+-- (event_key: where it was seen, its kind and its own words). The founder can set an event aside; its key is then sent
+-- with every later job's story (impact_story_job_claim: currency_dismissed) and the check lists it as dismissed instead
+-- of blocking. Only a key a failed job of this story reported can be dismissed. Anything new or different gets a new
+-- key and still blocks. Append-only; the newest row per key decides.
+create table if not exists public.impact_story_currency_dismissals (
+  id        bigint generated always as identity primary key,
+  story_id  uuid not null references public.impact_stories(id),
+  event_key text not null check (event_key ~ '^[0-9a-f]{16}$'),
+  decision  text not null check (decision in ('dismissed', 'restored')),
+  event     jsonb not null check (jsonb_typeof(event) = 'object'),
+  job_id    uuid,
+  actor     text not null,
+  at        timestamptz not null default now()
+);
+alter table public.impact_story_currency_dismissals enable row level security;
+revoke all on public.impact_story_currency_dismissals from public, anon, authenticated;
+
 -- The founder's decision on ONE shot of one set of previews (2026-10-30, "an approve, reject, need new photo, under
 -- every picture"). Append-only and tied to the manifest and its hash, like the media decisions; the newest row per
 -- shot of the current previews is the one that counts. approved: accepted. rejected: not acceptable (a shot showing a
@@ -500,6 +519,9 @@ create trigger impact_story_uploads_append_only before update or delete on publi
   for each row execute function public._hs_is_append_only();
 drop trigger if exists impact_story_shot_decisions_append_only on public.impact_story_shot_decisions;
 create trigger impact_story_shot_decisions_append_only before update or delete on public.impact_story_shot_decisions
+  for each row execute function public._hs_is_append_only();
+drop trigger if exists impact_story_currency_dismissals_append_only on public.impact_story_currency_dismissals;
+create trigger impact_story_currency_dismissals_append_only before update or delete on public.impact_story_currency_dismissals
   for each row execute function public._hs_is_append_only();
 drop trigger if exists impact_story_photo_rejections_append_only on public.impact_story_photo_rejections;
 create trigger impact_story_photo_rejections_append_only before update or delete on public.impact_story_photo_rejections
@@ -1386,7 +1408,8 @@ begin
   if vj.id is not null and vj.status = 'failed' and (m.id is null or vj.created_at > m.created_at) then
     blocked := jsonb_build_object('job_id', vj.id, 'at', vj.completed_at, 'error', vj.error,
       'blocked', coalesce((vj.result->>'blocked')::boolean, false), 'failures', coalesce(vj.result->'failures', '[]'::jsonb),
-      'candidates', coalesce(vj.result->'candidates', '[]'::jsonb), 'candidates_error', vj.result->'candidates_error');
+      'candidates', coalesce(vj.result->'candidates', '[]'::jsonb), 'candidates_error', vj.result->'candidates_error',
+      'currency', vj.result->'currency');   -- the newer events and their keys, for "Not about this story"
   end if;
   if vj.id is not null and vj.status in ('queued', 'running') then
     st := 'preparing'; why := 'Preparing the preview stills.';
@@ -1746,6 +1769,42 @@ begin
   return jsonb_build_object('ok', true, 'photo', p_photo);
 end $$;
 
+-- The event keys currently set aside for a story (newest row per key is 'dismissed').
+create or replace function public._hs_is_currency_dismissed(p_story uuid)
+returns jsonb language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(event_key order by event_key), '[]'::jsonb) from (
+    select distinct on (event_key) event_key, decision from public.impact_story_currency_dismissals
+     where story_id = p_story order by event_key, id desc) d where decision = 'dismissed';
+$$;
+
+-- "Not about this story — continue": set aside newer events the check reported, then the page prepares again. Each key
+-- must be one a failed job of this story reported in its latest-development check (result.currency.events[].key).
+create or replace function public.hs_impact_story_currency_dismiss(p_story uuid, p_keys text[])
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); k text; ev jsonb; jid uuid; n int := 0;
+begin
+  perform 1 from public.impact_stories where id = p_story for update;
+  if not found then raise exception 'no such story' using errcode = 'P0002'; end if;
+  if coalesce(cardinality(p_keys), 0) = 0 then raise exception 'Nothing to set aside.' using errcode = '22023'; end if;
+  if cardinality(p_keys) > 50 then raise exception 'Too many at once.' using errcode = '22023'; end if;
+  foreach k in array (select array_agg(distinct x) from unnest(p_keys) x) loop
+    select x, j.id into ev, jid
+      from public.impact_story_jobs j, jsonb_array_elements(coalesce(j.result->'currency'->'events', '[]'::jsonb)) x
+     where j.story_id = p_story and j.status = 'failed' and x->>'key' = k
+     order by j.created_at desc limit 1;
+    if ev is null then
+      raise exception 'That update was not reported by a check of this story.' using errcode = '22023';
+    end if;
+    insert into public.impact_story_currency_dismissals (story_id, event_key, decision, event, job_id, actor)
+    values (p_story, k, 'dismissed', jsonb_build_object('summary', left(ev->>'summary', 400), 'source', ev->>'source',
+                                                       'kind', ev->>'kind'), jid, e);
+    n := n + 1;
+  end loop;
+  update public.impact_stories set updated_at = now() where id = p_story;
+  perform public._hs_is_event(p_story, 'currency_dismissed', jsonb_build_object('keys', to_jsonb(p_keys)), e);
+  return jsonb_build_object('ok', true, 'dismissed', n);
+end $$;
+
 -- Record a photo the founder uploaded (the file is already in impact-media at <story>/uploads/<p_upload>.jpg|png, put
 -- there by the dashboard with the admin's own session) and make it this subject's photo choice. The founder must
 -- confirm the permission statement; the credit is shown on screen with the photo. The engine checks p_sha256 against
@@ -1902,7 +1961,8 @@ begin
   select * into s from public.impact_stories where id = j.story_id;
   select * into v from public.impact_story_versions where story_id = j.story_id and version = j.base_version;
   return jsonb_build_object('claimed', true, 'id', j.id, 'kind', j.kind, 'input', j.input, 'base_version', j.base_version,
-    'story', jsonb_build_object('id', s.id, 'video_slug', s.video_slug, 'title', s.title, 'pack', s.pack),
+    'story', jsonb_build_object('id', s.id, 'video_slug', s.video_slug, 'title', s.title, 'pack', s.pack,
+                                'currency_dismissed', public._hs_is_currency_dismissed(s.id)),
     'base_body', v.body, 'asset_choices', coalesce(j.input->'asset_choices', '[]'::jsonb));
 end $$;
 
@@ -2675,7 +2735,7 @@ begin
     'public._hs_is_choice_key(uuid)', 'public._hs_is_visuals(uuid)', 'public._hs_is_rejections(uuid)', 'public._hs_is_shot_decisions(bigint)',
     'public._hs_is_shot_print(jsonb)', 'public._hs_is_creator_hash(jsonb)', 'public._hs_is_creator_problems(jsonb)',
     'public._hs_is_creator_require(jsonb)', 'public._hs_is_creator_state(uuid)',
-    'public._hs_is_visuals_changed(text, text, jsonb, text)'] loop
+    'public._hs_is_visuals_changed(text, text, jsonb, text)', 'public._hs_is_currency_dismissed(uuid)'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
   end loop;
   foreach f in array array[
@@ -2696,7 +2756,7 @@ begin
     'public.hs_impact_story_shot_decide(uuid, bigint, text, text, text, text, text)',
     'public.hs_impact_story_shots_approve(uuid, bigint, text, text, _text)', 'public.hs_impact_story_photos_reject(uuid, bigint, _text, text)',
     'public.hs_impact_story_creator_revise(uuid, integer, jsonb, text)', 'public.hs_impact_story_creator_flag_decide(uuid, integer, text, text, text)',
-    'public.hs_impact_story_creator_revision_withdraw(uuid, bigint)'] loop
+    'public.hs_impact_story_creator_revision_withdraw(uuid, bigint)', 'public.hs_impact_story_currency_dismiss(uuid, _text)'] loop
     execute 'revoke all on function ' || f || ' from public, anon';
     execute 'grant execute on function ' || f || ' to authenticated';
   end loop;

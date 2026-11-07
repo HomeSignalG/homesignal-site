@@ -567,6 +567,36 @@ select pg_temp.chk('12z3 a render failed before the code existed is read from th
   and not public._hs_is_visuals_changed('render', 'failed', null, 'The render failed: OSError')
   and not public._hs_is_visuals_changed('visuals', 'failed', '{"code":"visuals_changed"}', null));
 rollback;
+-- 12y1-12y4 (2026-11-07, founder: "no button to disregard new article and continue"): a newer event the check named
+-- with a key can be set aside; its key then rides on every later job's story, and an unreported key is refused.
+begin;
+select public.hs_impact_story_job_claim(pg_temp.id('r1')::uuid);
+select public.hs_impact_story_job_fail(pg_temp.id('r1')::uuid, 'Nothing was rendered: Outdated status',
+  '{"blocked":true,"failures":[{"code":"outdated_status"}],"currency":{"state":"stale","events":[{"key":"0123456789abcdef","kind":"document_link_changed","summary":"Democrats win House majority","source":"https://x.example/a"}]}}'::jsonb);
+select pg_temp.chk('12y1 an unreported or malformed key is refused',
+  pg_temp.err(format('select public.hs_impact_story_currency_dismiss(%L, array[''fedcba9876543210''])', pg_temp.id('s'))) like '22023%'
+  and pg_temp.err(format('select public.hs_impact_story_currency_dismiss(%L, array[]::text[])', pg_temp.id('s'))) like '22023%');
+-- the real case: Prepare (a visuals job) stopped on the check. Inserted as the worker leaves it: failed, with the result.
+insert into public.impact_story_jobs (story_id, kind, base_version, idempotency_key, status, result, error, requested_by, completed_at)
+values (pg_temp.id('s')::uuid, 'visuals', pg_temp.cur(), 'test-12y0-visuals-stop', 'failed',
+  '{"blocked":true,"failures":[{"code":"outdated_status"}],"currency":{"state":"stale","events":[{"key":"abcdef0123456789","summary":"x"}]}}',
+  'Nothing was rendered: Outdated status', 'worker', now() + interval '1 hour');
+select pg_temp.chk('12y0 the Visuals stop the page reads carries the check''s keyed events (the button needs them)',
+  public._hs_is_visuals(pg_temp.id('s')::uuid)->'blocked'->'currency'->'events'->0->>'key' = 'abcdef0123456789'
+  and (public.hs_impact_story_currency_dismiss(pg_temp.id('s')::uuid, array['abcdef0123456789'])->>'dismissed')::int = 1);
+select public.hs_impact_story_currency_dismiss(pg_temp.id('s')::uuid, array['0123456789abcdef', '0123456789abcdef']);
+select pg_temp.chk('12y2 the reported key is set aside once, with what it was, and an event',
+  (select count(*) from public.impact_story_currency_dismissals where event_key = '0123456789abcdef' and decision = 'dismissed'
+     and event->>'summary' = 'Democrats win House majority') = 1
+  and exists (select 1 from public.impact_story_events where story_id = pg_temp.id('s')::uuid and kind = 'currency_dismissed'));
+select public.hs_impact_story_job_retry(pg_temp.id('r1')::uuid);
+select pg_temp.chk('12y3 the next job''s story carries the dismissed key',
+  public.hs_impact_story_job_claim(pg_temp.id('r1')::uuid)->'story'->'currency_dismissed' = '["0123456789abcdef", "abcdef0123456789"]'::jsonb);
+select pg_temp.chk('12y4 dismissals are append-only and hidden from visitors',
+  pg_temp.err('delete from public.impact_story_currency_dismissals') is not null
+  and not has_table_privilege('anon', 'public.impact_story_currency_dismissals', 'select')
+  and not has_function_privilege('anon', 'public.hs_impact_story_currency_dismiss(uuid, text[])', 'execute'));
+rollback;
 select pg_temp.chk('12f the worker gets the approved body', (public.hs_impact_story_job_claim(pg_temp.id('r1')::uuid)->'base_body'->>'schema') = 'impact-story/2');
 select public.hs_impact_story_job_complete(pg_temp.id('r1')::uuid, jsonb_build_object('assets',
   (select jsonb_agg(x) from jsonb_array_elements(pg_temp.files(pg_temp.id('r1')::uuid)) x where x->>'asset' <> 'thumbnail')));
