@@ -44,3 +44,22 @@ $P -c "do \$\$ begin
   then raise exception 'FAIL: photo sets after the upgrade differ from what the old rule showed'; end if;
 end \$\$;" && echo "upgrade: photo sets equal the old newest-per-subject choices"
 
+# upgrade path: a database from before story numbers. Re-applying numbers the existing stories 8000.. in creation order
+# (row_number, not nextval in a sorted subquery), and the next new story takes the number after the highest one.
+$P -c "alter table public.impact_stories alter column story_number drop default;
+       alter table public.impact_stories drop constraint impact_stories_story_number_check;
+       alter table public.impact_stories alter column story_number drop not null;
+       alter sequence public.impact_story_number_seq owned by none;
+       drop sequence public.impact_story_number_seq;
+       update public.impact_stories set story_number = null;
+       update public.impact_stories set created_at = now() - (row_number * interval '1 hour')
+         from (select id as rid, row_number() over (order by id desc) as row_number from public.impact_stories) r where id = r.rid;"
+$P -f "$ROOT/docs/impact-stories.sql" >/dev/null
+$P -c "do \$\$ declare n int; begin
+  select count(*) into n from public.impact_stories;
+  if n < 2 then raise exception 'FAIL: the numbering check needs at least 2 stories, has %', n; end if;
+  if exists (select 1 from (select story_number, 7999 + row_number() over (order by created_at, id) as want
+                              from public.impact_stories) x where story_number <> want)
+  then raise exception 'FAIL: existing stories are not numbered 8000.. in creation order'; end if;
+  if nextval('public.impact_story_number_seq') <> 8000 + n then raise exception 'FAIL: the next number does not follow the highest'; end if;
+end \$\$;" && echo "upgrade: existing stories numbered 8000.. in creation order; the next number follows"
