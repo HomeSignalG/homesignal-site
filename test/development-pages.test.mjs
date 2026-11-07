@@ -48,8 +48,11 @@ for (const [p, h] of [[A, pa], [B, pb]]) {
   ok((h.match(/<h1[ >]/g) || []).length === 1, `${p} has one H1`);
   ok(!/href="\/(layout|app)\.css/.test(h) && /<style>[^<]*\.wrap\{/.test(h), `${p} carries its own layout, not the app shell's stylesheets`);
   const scripts = [...h.matchAll(/<script\b[^>]*>/g)].map(m => m[0]).filter(t => !/application\/ld\+json/.test(t));
-  ok(scripts.length === 1 && /^<script src="\/lib\/dossier-header\.js\?v=[0-9a-f]{8}" defer><\/?/.test(scripts[0] + '<'),
-     `${p} ships only the header script and structured data`, JSON.stringify(scripts));
+  ok(scripts.length === 2 && /^<script src="\/lib\/share-modal\.js\?v=[0-9a-f]{8}" defer>$/.test(scripts[0])
+     && /^<script src="\/lib\/dossier-header\.js\?v=[0-9a-f]{8}" defer>$/.test(scripts[1]),
+     `${p} ships only the site Share box script, the header script and structured data`, JSON.stringify(scripts));
+  ok(h.includes('<div class="overlay" id="shareModal">') && !/<div class="overlay" id="shareModal"[^>]*onclick/.test(h)
+     && !/\son[a-z]+="/.test(h), `${p} carries the site Share box with no inline handlers`);
   ok(/script-src 'self';/.test(h) && !/script-src[^;]*unsafe-inline/.test(h), `${p} allows only same-origin scripts, no inline code`);
 }
 
@@ -370,10 +373,10 @@ ok(written.some((p) => p.startsWith('development/')) && refused.length === 0,
   const det = tiles.match(/<details[^>]*>/g) || [];
   ok(det.length >= 6 && det.every((t) => t === '<details>'), 'every tile is a <details> that starts closed', JSON.stringify(det));
   // The tiles open and close with no script. The only scripts are the JSON-LD and the site header's
-  // own (lib/dossier-header.js, #2650), which never touches a tile.
+  // own (lib/share-modal.js + lib/dossier-header.js), which never touch a tile.
   const scripts = pg.match(/<script(?! type="application\/ld\+json")[^>]*>/g) || [];
-  ok(scripts.every((t) => /src="\/lib\/dossier-header\.js/.test(t)) && !pg.includes('<nav class="toc"'),
-     'no tile script (only the header script), and the separate jump list is gone', JSON.stringify(scripts));
+  ok(scripts.every((t) => /src="\/lib\/(?:share-modal|dossier-header)\.js/.test(t)) && !pg.includes('<nav class="toc"'),
+     'no tile script (only the header scripts), and the separate jump list is gone', JSON.stringify(scripts));
   const heads = [...pg.matchAll(/<summary>.*?<h2 id="h-([a-z]+)">(.*?)<\/h2><span class="ts">(.*?)<\/span>.*?<\/summary><div class="tb" id="([a-z]+)">/g)];
   ok(heads.length === det.length && heads.every((m) => m[1] === m[4] && m[3].length > 0),
      'each tile has a heading and a one-line description in its summary, and the body carries the section id', JSON.stringify(heads.map((m) => [m[1], m[2], m[4]])));

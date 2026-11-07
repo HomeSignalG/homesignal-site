@@ -171,6 +171,23 @@ const iSave = F.log.findIndex(e => e.kind === 'rpc' && e.name === 'signup_comple
 ok(iVerify > -1 && iSave > iVerify, '3h the save happened after the code was verified, never before', { iVerify, iSave });
 ok(pageErrors.length === 0, '3i no page errors', pageErrors);
 
+// 4. The header's Share opens the site Share box, its targets from lib/share-modal.js (the same
+// file the static development pages use), for this page.
+await page.keyboard.press('Escape');
+await page.evaluate(() => document.querySelectorAll('.overlay.show').forEach((o) => o.classList.remove('show')));
+await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base });
+// The new account's onboarding covers the page, so call the header button's own handler.
+ok(await page.getAttribute('#hs-share', 'onclick') === "HS.openModal('shareModal')", '4 the header Share button opens #shareModal');
+await page.evaluate(() => HS.openModal('shareModal'));
+await page.waitForFunction(() => document.querySelectorAll('#shareGrid .sopt').length === 12, null, { timeout: 5000 }).catch(() => {});
+ok(await page.locator('#shareModal').isVisible(), '4a Share opens the site Share box');
+const targets = await page.$$eval('#shareGrid .sopt', (els) => els.map((e) => e.lastChild.textContent.trim()));
+ok(targets.length === 12 && targets[0] === 'Copy link' && targets[11] === 'LinkedIn', '4b it lists the 12 share targets', targets);
+ok((await page.textContent('#shareUrl')).includes('alerts.html?zip=97702'), '4c it shares this page', await page.textContent('#shareUrl'));
+await page.evaluate(() => document.querySelector('#shareGrid [data-hs-copy]').click());
+ok((await page.evaluate(() => navigator.clipboard.readText())).endsWith('/alerts.html?zip=97702'), '4d Copy link copies this page');
+ok(pageErrors.length === 0, '4e no page errors', pageErrors);
+
 await ctx.close();
 await browser.close();
 server.close();

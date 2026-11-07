@@ -1295,7 +1295,9 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
   so charts/UI are inline SVG / hand-rolled — no external chart libs.
 - **Analytics** (`events.js`) is anonymous, INSERT-only, and must never throw or
   block the UI. Don't add PII to it.
-- **Sharing** is centralized in `share.js` (loaded everywhere); it always shares the
+- **Sharing:** the Share box is `#shareModal` (`partials/shell.html`) filled by `lib/share-modal.js` (the one list of
+  targets, used by `shell.js` and the static development pages). `share.js` is an older popover only `404.html` loads.
+  *(Older wording, kept:)* **Sharing** is centralized in `share.js` (loaded everywhere); it always shares the
   current URL. Don't reimplement share UI per page.
 
 ## 5. Deploy & workflow
@@ -5887,9 +5889,14 @@ One page per real-world development, built from REVIEWED links to objects HomeSi
   `partials/shell.html` and their rules from `app.css` / `layout.css` at build time, so they cannot drift. The phone Menu opens with a
   checkbox. Test 3d in `test/development-pages.test.mjs`.
 - **Share, Sign in and the account avatar are back in the header (founder, 2026-11-06: "where is share button and login").** The page
-  does not load `shell.js`; its ONE script is `lib/dossier-header.js` (CSP `script-src 'self'`, no inline code): Share uses the
-  share sheet or copies the link; a session stored in this browser shows the initials avatar (to My Places), else Sign in is a plain
-  link to `/?signin=1&return=<page>` (works without the script). Test `test/dossier-header.browser.test.mjs`.
+  does not load `shell.js`; its scripts are `lib/share-modal.js` and `lib/dossier-header.js` (CSP `script-src 'self'`, no inline
+  code). A session stored in this browser shows the initials avatar (to My Places), else Sign in is a plain link to
+  `/?signin=1&return=<page>` (works without the script). Test `test/dossier-header.browser.test.mjs`.
+  - ⛔ **Share opens the SITE's Share box, never a page-specific one (founder, 2026-11-06: "this is share button on website how
+    can you make such a mistake").** The first version opened the device share sheet. Now the build copies `#shareModal` from
+    `partials/shell.html` (inline handlers removed) and its rules from `app.css`, and the 12 targets come from
+    `lib/share-modal.js`, which `shell.js` also loads (on demand) for every app page. Do not add a share list anywhere else.
+    Tests: `test/dossier-header.browser.test.mjs`, `test/alerts-save-topics.browser.test.mjs` §4.
 - **No other script.** Follow opens `follow-development.html` (noindex), which uses `HS.toggleFollow`
   (`app_follows` target_type `development`). Development follows are not yet listed in My Places.
 - `pages.yml` fetches `email-assets/seo/development-dossiers.json`; a missing object (Storage 400 `not_found`) means
