@@ -6149,6 +6149,13 @@ Results.
   something to fix there. Source chips show the record's first words, not ids.
 - Tests: `test/impact_stories_pg` 12e2, 12i2-12i4; `test/impact-stories.browser.test.mjs` (the Stratos case; 11 checks fail on
   the pre-audit page).
+- **The Media review step follows what the founder already did (founder, 2026-11-07: "the update in needs you needs to be
+  automatic once i review and complete an action").** `_hs_is_status` no longer says "Review each video and the thumbnail"
+  whatever was decided. In order: auto-fix running (working) · a fix plan waiting for Confirm (you) · Claude writing the plan
+  or making the fixes (working) · a stalled or needs_you batch · fix requests saved but not sent · the files not yet reviewed
+  by name · blocked videos with no request. The library re-reads the list every 8 s while any story is "Working on it" and
+  redraws only the cards (`scheduleLibraryPoll`). Tests: pg 12i, 12k3, 12f3b, 12P5b, 12f6d;
+  `test/impact-stories-library-refresh.browser.test.mjs`.
 - **A render refused because the approved pictures changed (2026-11-07).** The engine raises `VisualsChanged` when the
   approved pictures no longer hash the same (e.g. code merged after the approval) and fails the job with
   `{code: visuals_changed}` (homesignal-ingest #1043). `_hs_is_visuals_changed` reads that code, or, for renders failed
