@@ -1283,13 +1283,21 @@ begin
     select coalesce(jsonb_agg(jsonb_build_object('asset', d.asset, 'shot_id', d.shot_id, 'decision', d.decision,
              'subject_id', d.subject_id, 'photo_id', d.photo_id, 'note', d.note, 'actor', d.actor, 'at', d.at) order by d.asset, d.shot_id), '[]'::jsonb),
            count(*) filter (where d.decision = 'rejected' and d.photo_id is null and d.manifest_hash = m.manifest_hash),
-           coalesce(jsonb_agg(distinct d.subject_id) filter (where d.decision = 'new_photo' and d.subject_id is not null), '[]'::jsonb),
-           -- "Need new photo" with what the photo should show (founder, 2026-11-06): the engine searches the founder's
-           -- words for that shot's subject, and a photo found for it goes on that shot
-           coalesce(jsonb_agg(jsonb_build_object('subject_id', d.subject_id, 'asset', d.asset, 'shot_id', d.shot_id, 'note', d.note)
-                              order by d.asset, d.shot_id)
-                    filter (where d.decision = 'new_photo' and d.subject_id is not null and d.note is not null), '[]'::jsonb)
-      into sd, nrej, more, reqs from public._hs_is_shot_decisions(m.id) d;
+           coalesce(jsonb_agg(distinct d.subject_id) filter (where d.decision = 'new_photo' and d.subject_id is not null), '[]'::jsonb)
+      into sd, nrej, more from public._hs_is_shot_decisions(m.id) d;
+    -- What the founder asked a shot to show (founder, 2026-11-06/07): the note on "Need new photo" OR on a Reject. The
+    -- engine searches those words for that shot's subject and puts a photo found for it on that shot. A request lasts
+    -- across preparations: it is the shot's newest decision on ANY previews made from this narrative, so preparing again
+    -- before deciding on the new previews never drops it. Approving the shot (on new previews) ends it.
+    select coalesce(jsonb_agg(jsonb_build_object('subject_id', q.subject_id, 'asset', q.asset, 'shot_id', q.shot_id, 'note', q.note)
+                              order by q.asset, q.shot_id), '[]'::jsonb)
+      into reqs
+      from (select distinct on (d.asset, d.shot_id) d.*
+              from public.impact_story_shot_decisions d
+              join public.impact_story_visual_manifests m2 on m2.id = d.manifest_id
+             where m2.story_id = p_story and m2.narrative_hash = m.narrative_hash
+             order by d.asset, d.shot_id, d.id desc) q
+     where q.decision in ('new_photo', 'rejected') and q.subject_id is not null and nullif(btrim(q.note), '') is not null;
     -- A shot approved on the previous previews whose picture did not change shows as approved again ("Approved
     -- earlier, same picture"), unless it has a decision of its own on these previews. Shown only; the one "Approve all
     -- visuals" decision is unchanged and is still made on these previews.
