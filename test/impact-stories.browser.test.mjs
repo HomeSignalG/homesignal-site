@@ -958,6 +958,24 @@ dtxt = await page.locator('#is-next-box').innerText();
 ok(/working on it/i.test(dtxt) && /Nothing is needed from you/.test(dtxt) && await page.locator('#is #is-next-box button').count() === 0,
    'picture drift while the fixer works: the top box says nothing is needed, with no buttons');
 await page.evaluate(() => { window.db.status = window.__beforeDrift.status; window.db.media = window.__beforeDrift.media; });
+// A failed Generate while current videos are on file (founder, 2026-11-07, EPA methane story: an error in a green tile):
+// one action box, red, at the top; Media review adds no box of its own.
+await page.evaluate(() => {
+  window.__beforeGen = { status: window.db.status, media: JSON.parse(JSON.stringify(window.db.media)) };
+  const base = window.db.status, m = window.db.media;
+  m.current = true; m.hum = false; delete m.blocked; m.fix_batch = null; m.fix_requests = [];
+  window.db.status = () => Object.assign(base(), { stage: 'media', owner: 'you', next: 'Review each video and the thumbnail',
+    job: { id: 'jgen', kind: 'generate', status: 'failed', attempts: 1, created_at: '2026-11-06T23:00:00Z', completed_at: '2026-11-06T23:01:00Z',
+      error: 'The story outline was edited after it was written, so the committed script no longer matches it.' } });
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(80);
+await page.click('#is [data-act=step][data-step=media]'); await page.waitForTimeout(50);
+ok(await page.locator('#is .is-next-box').count() === 1 && await page.locator('#is #is-next-box.failed').count() === 1
+   && /Something went wrong/i.test(await page.locator('#is-next-box').innerText())
+   && await page.evaluate(() => getComputedStyle(document.getElementById('is-next-box')).borderTopColor) === 'rgb(192, 57, 43)',
+   'failed job: exactly one action box on the page, at the top, with a red border');
+await page.evaluate(() => { window.db.status = window.__beforeGen.status; window.db.media = window.__beforeGen.media; });
 // Videos that failed the picture checks (Stratos, 2026-11-06: "i keep getting the same your next step over an over").
 // The step must change something, never "Review each video" again.
 await page.evaluate(() => {
