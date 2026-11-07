@@ -1408,7 +1408,8 @@ begin
   if vj.id is not null and vj.status = 'failed' and (m.id is null or vj.created_at > m.created_at) then
     blocked := jsonb_build_object('job_id', vj.id, 'at', vj.completed_at, 'error', vj.error,
       'blocked', coalesce((vj.result->>'blocked')::boolean, false), 'failures', coalesce(vj.result->'failures', '[]'::jsonb),
-      'candidates', coalesce(vj.result->'candidates', '[]'::jsonb), 'candidates_error', vj.result->'candidates_error');
+      'candidates', coalesce(vj.result->'candidates', '[]'::jsonb), 'candidates_error', vj.result->'candidates_error',
+      'currency', vj.result->'currency');   -- the newer events and their keys, for "Not about this story"
   end if;
   if vj.id is not null and vj.status in ('queued', 'running') then
     st := 'preparing'; why := 'Preparing the preview stills.';
