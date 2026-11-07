@@ -319,6 +319,11 @@ ok(/Say what the new photo should show/.test(await page.locator('#is').innerText
    'visuals: a request with no description is refused in the page');
 await page.locator('#is #is-vask-want').fill('A photo of Hakeem Jeffries');
 await page.locator('#is #is-vask-why').fill('The Capitol says nothing about who is running');
+// a background redraw (previews loading, a job poll) keeps what was typed (Codex, #2665)
+await page.evaluate(() => window.HS.acqImpactStories.load(window.client, document.getElementById('is'))); await page.waitForTimeout(150);
+ok(await page.locator('#is #is-vask-want').inputValue() === 'A photo of Hakeem Jeffries'
+   && await page.locator('#is #is-vask-why').inputValue() === 'The Capitol says nothing about who is running',
+   'visuals: a redraw keeps what was typed in the photo request box');
 await page.locator('#is [data-act=vaskgo]').click(); await page.waitForTimeout(80);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_shot_decide' && c[1].p_decision === 'new_photo' && c[1].p_asset === 'main' && c[1].p_shot === 'a1-s1' && c[1].p_manifest_id === 41 && c[1].p_expected_hash === 'a'.repeat(64)
      && c[1].p_note === 'A photo of Hakeem Jeffries\n\nWhy not this one: The Capitol says nothing about who is running')),
