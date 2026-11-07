@@ -49,8 +49,10 @@ select public.hs_youtube_video_file_decide('p1','short2','approved');
 select pg_temp.chk('4d a new explicit approval revives it once', (pg_temp.job('p1','short2')).status='scheduled' and (select count(*) from public.video_bluesky_jobs where slug='p1' and file_key='short2')=1);
 select public.hs_youtube_video_file_decide('p1','short2','pending');
 select pg_temp.chk('4e Undo (pending) also cancels', (pg_temp.job('p1','short2')).status='cancelled');
-select pg_temp.chk('4f the thumbnail never creates a job', (select count(*) from public.video_bluesky_jobs where file_key not in ('final','short1','short2')) = 0
-   and (public.hs_youtube_video_file_decide('p1','thumbnail','approved') is not null) and (select count(*) from public.video_bluesky_jobs where slug='p1')=3);
+select public.hs_youtube_video_file_decide('p1','thumbnail','approved');
+select pg_temp.chk('4f approving a thumbnail with no Bluesky copy creates ONE held job (docs/video-bluesky-thumbnail.sql)',
+   (select count(*) from public.video_bluesky_jobs where slug='p1')=4
+   and (pg_temp.job('p1','thumbnail')).status='held' and (pg_temp.job('p1','thumbnail')).hold_reason like '%no_caption%');
 -- 5. a changed caption cannot publish under the old approval
 select public.hs_video_bluesky_caption_set('p1','short1','Will this mean MORE noise?');
 select pg_temp.chk('5a editing resets the approval', (select coalesce(file_decisions->'short1'->>'status','pending') from public.youtube_video_reviews where slug='p1') = 'pending');
@@ -147,7 +149,7 @@ select pg_temp.chk('11d authenticated cannot run a worker or internal function',
 select pg_temp.chk('11e service_role runs the worker functions', has_function_privilege('service_role','public.video_job_claim(uuid,text,int,text)','execute'));
 select pg_temp.chk('11f the table has no direct grants', not has_table_privilege('authenticated','public.video_bluesky_jobs','select') and not has_table_privilege('anon','public.video_bluesky_jobs','select'));
 select pg_temp.as_user('founder@example.com');
-select pg_temp.chk('11g the dashboard list covers every item', jsonb_array_length(public.hs_video_jobs_list()) = 6);
+select pg_temp.chk('11g the dashboard list covers every item, the thumbnail included', jsonb_array_length(public.hs_video_jobs_list()) = 7);
 -- 12. a founder caption with the [YOUTUBE LINK] placeholder and NO link_youtube flag (2026-10-26, project 3004)
 insert into public.youtube_video_reviews (slug, title, files, meta, bsky_posts) values ('p2', 'Project Two',
  '{"short1":{"path":"p2/short1.mp4","bytes":700,"sha256":"q1"}}', '{}',
@@ -165,5 +167,27 @@ select pg_temp.chk('12e the link replaces the placeholder in place, once, and is
 select pg_temp.chk('12f the job records the link it carries', (pg_temp.job('p2','short1')).youtube_url = 'https://youtu.be/hp3RLwtBkU8');
 select pg_temp.chk('12g changing the link sends the approved item back to waiting', (public.hs_video_youtube_url_set('p2','https://youtu.be/qEv0XlxlvcY')->>'approvals_reset')::int = 1
   and (pg_temp.job('p2','short1')).status='cancelled');
+-- 13. the thumbnail is a Bluesky post (founder, 2026-11-07): one job, a VIDEO time, held until the YouTube link exists
+insert into public.youtube_video_reviews (slug, title, files, meta, bsky_posts) values ('p3', 'Project Three',
+ '{"final":{"path":"p3/final.mp4","bytes":600,"sha256":"m3"},"thumbnail":{"path":"p3/versions/thumbnail/v2-ab.png","bytes":1500000,"sha256":"th3","version":2}}', '{}',
+ '{"thumbnail":{"caption":"Who decides the Speaker?\n\nSign the petition:\nhttps://www.change.org/p/x","hashtags":["JodyTracks"],"alt":"Thumbnail: Speaker Petition","link_youtube":true}}');
+insert into storage.objects (bucket_id, name, metadata) values ('jody-videos','p3/final.mp4','{"size":600}'),('jody-videos','p3/versions/thumbnail/v2-ab.png','{"size":1500000}');
+select public.hs_youtube_video_file_decide('p3','thumbnail','approved');
+select pg_temp.chk('13a an approved thumbnail without the YouTube link is HELD for the link', (pg_temp.job('p3','thumbnail')).status='held' and (pg_temp.job('p3','thumbnail')).hold_reason like '%missing_youtube_url%');
+select pg_temp.chk('13b the main video has no job of its own from the thumbnail approval', (pg_temp.job('p3','final')).id is null);
+select public.hs_video_youtube_url_set('p3','https://youtu.be/qEv0XlxlvcY');
+select pg_temp.chk('13c entering the link schedules the thumbnail', (pg_temp.job('p3','thumbnail')).status='scheduled' and (pg_temp.job('p3','thumbnail')).scheduled_slot > now());
+select pg_temp.chk('13d its frozen text is the caption, the link, then the tags',
+  (pg_temp.job('p3','thumbnail')).post_text = E'Who decides the Speaker?\n\nSign the petition:\nhttps://www.change.org/p/x\nhttps://youtu.be/qEv0XlxlvcY\n\n#JodyTracks');
+select pg_temp.chk('13e it freezes the thumbnail file, not a video file', (pg_temp.job('p3','thumbnail')).file_path='p3/versions/thumbnail/v2-ab.png' and (pg_temp.job('p3','thumbnail')).file_bytes=1500000 and (pg_temp.job('p3','thumbnail')).file_sha256='th3');
+select pg_temp.chk('13f its time comes from the one picker (a VIDEO time)', position('bsky_next_slot(''video'')' in (select prosrc from pg_proc where oid='public.video_next_slot(text)'::regprocedure)) > 0);
+select pg_temp.chk('13g the dashboard list shows the thumbnail item', exists (select 1 from jsonb_array_elements(public.hs_video_jobs_list()) x where x->>'slug'='p3' and x->>'file_key'='thumbnail' and x->>'job_status'='scheduled'));
+select public.hs_video_bluesky_caption_set('p3','thumbnail','Who decides? A new caption.');
+select pg_temp.chk('13h editing the thumbnail caption resets its approval and cancels the job', (select coalesce(file_decisions->'thumbnail'->>'status','pending') from public.youtube_video_reviews where slug='p3')='pending' and (pg_temp.job('p3','thumbnail')).status='cancelled');
+select public.hs_youtube_video_file_decide('p3','thumbnail','approved');
+select pg_temp.chk('13i re-approval schedules it again, still one job', (pg_temp.job('p3','thumbnail')).status='scheduled' and (select count(*) from public.video_bluesky_jobs where slug='p3' and file_key='thumbnail')=1);
+select public.video_job_mark_external('p3','thumbnail','https://bsky.app/profile/jody.bsky.social/post/3kthumb','posted by hand');
+select pg_temp.chk('13j a thumbnail posted by hand can be marked external', (pg_temp.job('p3','thumbnail')).status='external');
+select pg_temp.chk('13k a key outside the four is still refused', pg_temp.throws($q$select public.hs_video_bluesky_caption_set('p3','poster','x')$q$) and public.video_bsky_sync('p3','poster')='not_a_video_item');
 \o
 select 'ALL ' || count(*) || ' CHECKS PASSED' from _res where ok;

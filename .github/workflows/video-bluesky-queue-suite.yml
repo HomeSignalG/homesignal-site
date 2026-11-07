@@ -8,6 +8,7 @@ on:
       - 'docs/video-bluesky-queue.sql'
       - 'docs/youtube-video-review.sql'
       - 'docs/youtube-video-file-decide-queue-apply.sql'
+      - 'docs/video-bluesky-thumbnail.sql'
       - 'test/video_bluesky_queue_pg/**'
       - '.github/workflows/video-bluesky-queue-suite.yml'
   push:
@@ -16,6 +17,7 @@ on:
       - 'docs/video-bluesky-queue.sql'
       - 'docs/youtube-video-review.sql'
       - 'docs/youtube-video-file-decide-queue-apply.sql'
+      - 'docs/video-bluesky-thumbnail.sql'
       - 'test/video_bluesky_queue_pg/**'
   workflow_dispatch: {}
 
