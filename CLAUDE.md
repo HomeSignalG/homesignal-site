@@ -6416,6 +6416,14 @@ video from the first import. Tab 16 shows what the sync found; typing a link by 
 video post also carries `https://jodytracks.com`. Tests: `test/youtube_channel_sync_pg` (CI `youtube-channel-sync-suite.yml`),
 `test/youtube-channel-sync.test.mjs`. Runbook: homesignal-ingest `docs/VIDEO_BLUESKY.md`.
 
+**Thumbnails are Bluesky posts too (founder, 2026-11-07).** `docs/video-bluesky-thumbnail.sql` adds `'thumbnail'` as a
+fourth queue item (a fail-closed splice of the live bodies plus the table's `file_key` check). Approving a Tab 16 thumbnail
+creates its one job; it takes a VIDEO time (no time added) and waits for the YouTube main video's link like the other items.
+Tab 16 draws the thumbnail's Bluesky box only when `hs_video_jobs_list` lists it; Tab 12 previews it as an image. The
+publisher half (image post, shrunk under 1 MB) is homesignal-ingest #1071. ⚠️ Replaying `docs/video-bluesky-queue.sql`,
+`docs/youtube-video-file-decide-queue-apply.sql` or `docs/youtube-video-outdated.sql` drops the thumbnail again: re-apply
+the thumbnail file after any of them. Tests: `test/video_bluesky_queue_pg` §13 + 4f/11g, `test/video-bluesky-queue.browser.test.mjs`.
+
 ## BLUESKY PUBLISHING SCHEDULE (Tab 12) + MAPS vs SHORTS ⚖️ FOUNDER (2026-10-27)
 
 One schedule, two queues: 2 MAPS + 2 video posts a day, America/Los_Angeles (shown in Central too), never within 150 minutes.

@@ -65,6 +65,43 @@ await page.click('#vq .vq-card[data-vq-job="j2"] [data-vq="cancel"]'); await pag
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_video_job_cancel' && c[1].p_id === 'j2')) && await page.evaluate(() => window.reloaded === true), 'tab 12: cancel calls the gated function and refreshes');
 await page.click('#vq .vq-card[data-vq-job="j1"] [data-vq="retry"]'); await page.waitForTimeout(50);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_video_job_retry' && c[1].p_id === 'j1')), 'tab 12: retry calls the gated function');
+
+// The thumbnail is a Bluesky post too (docs/video-bluesky-thumbnail.sql). Its box appears only when the database lists it.
+ok(await page.locator('#yv .yv-thumbwrap .yv-bsky').count() === 0, 'tab 16: no thumbnail box while the database does not list the thumbnail (older database)');
+await page.evaluate(() => {
+  const base = window.client.rpc;
+  window.client.rpc = (n, a) => {
+    if (n === 'hs_video_jobs_list') {
+      window.calls.push([n, a]);
+      return Promise.resolve({ data: [
+        { slug: 'p', file_key: 'final', title: 'Port X', decision: 'pending', text: null, file_path: 'p/f.mp4' },
+        { slug: 'p', file_key: 'thumbnail', title: 'Port X', decision: 'approved', job_id: 'jt', job_status: 'held', hold_reason: 'missing_youtube_url',
+          text: 'Who decides?\n\n#JodyTracks', alt: 'Thumbnail: Speaker Petition', file_path: 'p/t.png', link_youtube: true },
+      ], error: null });
+    }
+    return base(n, a);
+  };
+});
+await page.evaluate(() => window.HS.acqYoutubeVideos.load(window.client, document.getElementById('yv')));
+const tbox = page.locator('#yv .yv-thumbwrap .yv-bsky[data-key="thumbnail"]');
+ok(await tbox.count() === 1, 'tab 16: the thumbnail tile carries its own Bluesky box once the database lists it');
+ok((await tbox.locator('.yv-balt').getAttribute('placeholder')).startsWith('Describe the image'), 'tab 16: the thumbnail asks for an image description');
+ok((await tbox.innerText()).includes('once the main video is public on YouTube'), 'tab 16: the thumbnail post says it waits for the YouTube link');
+await tbox.locator('.yv-bcap').fill('Thumbnail caption');
+await tbox.locator('.yv-bsave').click(); await page.waitForTimeout(50);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_video_bluesky_caption_set' && c[1].p_key === 'thumbnail' && c[1].p_caption === 'Thumbnail caption')), 'tab 16: saving the thumbnail copy names the thumbnail item');
+await page.evaluate(() => { window.confirmText = ''; window.confirm = (m) => { window.confirmText = m; return true; }; });
+await page.click('#yv .yv-thumbwrap .yv-fapprove'); await page.waitForTimeout(50);
+ok(await page.evaluate(() => /queued for Bluesky/.test(window.confirmText)), 'tab 16: approving the thumbnail says it will be queued for Bluesky');
+await page.evaluate(async () => {
+  document.getElementById('vq').removeAttribute('data-vq-wired'); document.getElementById('vq').innerHTML = '';
+  const items = await window.HS.acqBlueskyVideos.fetch(window.client);
+  window.HS.acqBlueskyVideos.mount(window.client, document.getElementById('vq'), items, () => {});
+});
+const tcard = page.locator('#vq .vq-card[data-vq-job="jt"]');
+ok((await tcard.innerText()).includes('Thumbnail (image post)') && (await tcard.innerText()).includes('Image description'), 'tab 12: the thumbnail job is labelled an image post');
+await tcard.locator('.vq-play').click(); await page.waitForTimeout(100);
+ok(await tcard.locator('img').count() === 1 && await tcard.locator('video').count() === 0, 'tab 12: the thumbnail preview is an image, not a video player');
 await browser.close();
 console.log(fails ? '\n' + fails + ' FAILED' : '\nall passed');
 process.exit(fails ? 1 : 0);
