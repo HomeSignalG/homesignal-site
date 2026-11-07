@@ -6149,6 +6149,12 @@ Results.
   something to fix there. Source chips show the record's first words, not ids.
 - Tests: `test/impact_stories_pg` 12e2, 12i2-12i4; `test/impact-stories.browser.test.mjs` (the Stratos case; 11 checks fail on
   the pre-audit page).
+- **A render refused because the approved pictures changed (2026-11-07).** The engine raises `VisualsChanged` when the
+  approved pictures no longer hash the same (e.g. code merged after the approval) and fails the job with
+  `{code: visuals_changed}` (homesignal-ingest #1043). `_hs_is_visuals_changed` reads that code, or, for renders failed
+  before it, the engine's own two sentences. With it the visuals read `stale` ("The video code changed…"), Retry and Render
+  are refused, the next step is Prepare the visuals, and `_hs_is_status.job.visuals_changed` lets the page drop Retry
+  (#2655/#2657 built that box). pg 12z1-12z3.
 
 ## IMPACT STORIES, TAB 17: FAILED VIDEOS ARE FIXED BEFORE YOU WATCH THEM ⚖️ FOUNDER (2026-11-07)
 

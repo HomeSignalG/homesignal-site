@@ -952,6 +952,15 @@ dtxt = await page.locator('#is-next-box').innerText();
 ok(/prepare the pictures again/i.test(dtxt) && await page.locator('#is #is-next-box .is-btn.primary[data-act=vprep][data-new="1"]').count() === 1
    && await page.locator('#is #is-next-box [data-act=retry]').count() === 0,
    'picture drift, no fixes waiting: the one button prepares the pictures again');
+// the engine's other VisualsChanged sentence carries no "pictures changed" wording: the database's flag is what tells the page
+await page.evaluate(() => { const st = window.db.status(); st.job = Object.assign({}, st.job, { visuals_changed: true,
+  error: 'A photo you approved can no longer be used: oak. Prepare the visuals again; nothing was rendered.' });
+  window.db.status = () => st; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(80);
+dtxt = await page.locator('#is-next-box').innerText();
+ok(!/Something went wrong/i.test(dtxt) && await page.locator('#is #is-next-box [data-act=retry]').count() === 0
+   && await page.locator('#is #is-next-box [data-act=vprep][data-new="1"]').count() === 1,
+   'picture drift read from the database flag (a photo no longer usable): no Retry, Prepare the pictures again');
 await page.evaluate(() => { window.db.media.fix_batch = { status: 'working', requests: 6, requested_at: '2026-11-06T21:30:00Z' }; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
 await page.waitForTimeout(80);
 dtxt = await page.locator('#is-next-box').innerText();

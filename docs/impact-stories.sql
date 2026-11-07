@@ -904,6 +904,7 @@ begin
       'id', j.id, 'kind', j.kind, 'status', j.status, 'error', coalesce(j.error, public._hs_is_not_started(j)), 'attempts', j.attempts,
       'created_at', j.created_at, 'started_at', j.started_at, 'completed_at', j.completed_at,
       'not_started', public._hs_is_not_started(j) is not null,
+      'visuals_changed', public._hs_is_visuals_changed(j.kind, j.status, j.result, j.error),
       'stuck', (j.status in ('queued', 'running') and j.created_at < now() - public._hs_is_stuck_after(j.kind))
                or public._hs_is_not_started(j) is not null) end);
 end $$;
@@ -964,6 +965,17 @@ begin
   return jsonb_build_object('job_id', j.id, 'status', 'queued', 'existing', false);
 end $$;
 
+-- A render that stopped because the approved pictures no longer match what the engine plans (homesignal-ingest
+-- build.VisualsChanged). Read from the engine's result code; renders failed before the code existed are read from the
+-- engine's own two sentences. A retry cannot fix it; preparing the visuals again can.
+create or replace function public._hs_is_visuals_changed(p_kind text, p_status text, p_result jsonb, p_error text)
+returns boolean language sql immutable set search_path = public as $$
+  select coalesce(p_kind = 'render' and p_status = 'failed'
+     and (p_result->>'code' = 'visuals_changed'
+          or (p_result is null and (p_error like 'The story''s pictures changed since you approved them%'
+                                    or p_error like 'A photo you approved can no longer be used:%'))), false)
+$$;
+
 create or replace function public._hs_is_retry(p_job uuid, p_actor text)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare j public.impact_story_jobs%rowtype; other int;
@@ -973,6 +985,9 @@ begin
   if not (j.status = 'failed' or (j.status in ('queued', 'running') and j.created_at < now() - public._hs_is_stuck_after(j.kind))
           or public._hs_is_not_started(j) is not null) then
     raise exception 'This job is not failed or stuck, so it cannot be retried.' using errcode = '55000';
+  end if;
+  if public._hs_is_visuals_changed(j.kind, j.status, j.result, j.error) then
+    raise exception 'This render stopped because the pictures changed since you approved them. Prepare the visuals again and approve them; a retry would stop the same way.' using errcode = '55000';
   end if;
   if j.attempts >= 5 then raise exception 'This job has been tried 5 times. Check the error and start a new request.' using errcode = '55000'; end if;
   select count(*) into other from public.impact_story_jobs where story_id = j.story_id and status in ('queued', 'running') and id <> p_job;
@@ -1243,7 +1258,7 @@ declare s public.impact_stories%rowtype; na jsonb := public._hs_is_artifact_stat
         ck jsonb := public._hs_is_choice_key(p_story); m public.impact_story_visual_manifests%rowtype;
         ev public.impact_story_visual_events%rowtype; vj public.impact_story_jobs%rowtype; st text; why text; cur boolean := false;
         nblk int := 0; blocked jsonb; nrej int := 0; sd jsonb := '[]'::jsonb; more jsonb := '[]'::jsonb; ndrawn int := 0;
-        carried jsonb := '[]'::jsonb; cur_shots jsonb; cur_id bigint;
+        carried jsonb := '[]'::jsonb; cur_shots jsonb; cur_id bigint; changed boolean := false;
 begin
   select * into s from public.impact_stories where id = p_story;
   select * into vj from public.impact_story_jobs where story_id = p_story and kind = 'visuals' order by created_at desc limit 1;
@@ -1257,6 +1272,14 @@ begin
            jsonb_array_elements(coalesce(a.value->'shots', '[]'::jsonb)) sh
      where coalesce(sh->'illustration', 'null'::jsonb) <> 'null'::jsonb;
     cur := cur and ndrawn = 0;
+    -- The newest render of these previews stopped because the engine now plans different pictures (code merged since
+    -- the approval, 2026-11-06): these previews no longer describe what a render would show. Prepare them again.
+    changed := exists (select 1 from public.impact_story_jobs r where r.id = (
+                 select r2.id from public.impact_story_jobs r2 where r2.story_id = p_story and r2.kind = 'render'
+                  order by r2.created_at desc limit 1)
+               and public._hs_is_visuals_changed(r.kind, r.status, r.result, r.error)
+               and r.input->'visual_manifest'->>'manifest_id' = m.id::text);
+    cur := cur and not changed;
     select * into ev from public.impact_story_visual_events where manifest_id = m.id order by id desc limit 1;
     nblk := coalesce((m.counts->>'blocked')::int, 0);
     cur_shots := coalesce(m.manifest->'assets', '{}'::jsonb); cur_id := m.id;
@@ -1299,6 +1322,7 @@ begin
                 when m.narrative_hash <> na->>'hash' then 'The narrative changed since these previews were made. Prepare the visuals again.'
                 when m.pack_hash is distinct from s.pack_hash then 'The sources changed since these previews were made. Prepare the visuals again.'
                 when m.choices_key <> ck->>'key' then 'You chose or rejected a photo since these previews were made. Prepare the visuals again.'
+                when changed then 'The video code changed since you approved these pictures, so the render stopped. Prepare the visuals again and approve them.'
                 when ndrawn > 0 then 'These previews were made before drawings were removed (' || ndrawn || ' drawn shot(s)). Prepare the visuals again.'
                 else 'The renderer changed since these previews were made. Prepare the visuals again.' end;
   elsif nblk > 0 or nrej > 0 or not m.approvable then
@@ -2569,7 +2593,8 @@ begin
     'public._hs_is_line_notes(uuid)',
     'public._hs_is_choice_key(uuid)', 'public._hs_is_visuals(uuid)', 'public._hs_is_rejections(uuid)', 'public._hs_is_shot_decisions(bigint)',
     'public._hs_is_shot_print(jsonb)', 'public._hs_is_creator_hash(jsonb)', 'public._hs_is_creator_problems(jsonb)',
-    'public._hs_is_creator_require(jsonb)', 'public._hs_is_creator_state(uuid)'] loop
+    'public._hs_is_creator_require(jsonb)', 'public._hs_is_creator_state(uuid)',
+    'public._hs_is_visuals_changed(text, text, jsonb, text)'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
   end loop;
   foreach f in array array[
