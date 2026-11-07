@@ -79,4 +79,9 @@ $P -At -c "select md5(prosrc) from pg_proc where proname = 'hs_youtube_videos_li
 $P -f "$ROOT/docs/youtube-video-outdated.sql" >/dev/null
 $P -f "$ROOT/docs/youtube-video-outdated.sql" >/dev/null
 echo "ok outdated applies twice"
+# the parts (2026-11-07): applied on top; the original checks must still pass, then the per-part ones
+$P -f "$ROOT/docs/youtube-video-outdated-parts.sql" >/dev/null
+$P -f "$ROOT/docs/youtube-video-outdated-parts.sql" >/dev/null
+echo "ok outdated parts apply twice"
 $P -f "$HERE/outdated.sql"
+$P -f "$HERE/outdated-parts.sql"

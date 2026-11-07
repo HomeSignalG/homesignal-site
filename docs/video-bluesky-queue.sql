@@ -5,6 +5,9 @@
 --   functions only (video_bsky_links_youtube, video_bsky_text, video_bsky_problems, video_bsky_apply, hs_video_youtube_url_set,
 --   hs_video_jobs_list), extracted from this file; md5(prosrc) of each equals the body here.
 --
+-- 2026-11-07: a fourth item, 'thumbnail' (an image post), is added by docs/video-bluesky-thumbnail.sql as a splice of the
+--   live bodies. Replaying this file drops it again: re-apply that file after any replay.
+--
 -- WHAT THIS IS
 --   One approval per item (Main Video, Short 1, Short 2), recorded by public.hs_youtube_video_file_decide
 --   (docs/youtube-video-review.sql, the per-file approval of site #2220), creates EXACTLY ONE Bluesky job

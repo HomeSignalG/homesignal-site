@@ -6173,6 +6173,16 @@ Results.
   are refused, the next step is Prepare the visuals, and `_hs_is_status.job.visuals_changed` lets the page drop Retry
   (#2655/#2657 built that box). pg 12z1-12z3.
 
+## IMPACT STORIES, TAB 17: "NOT ABOUT THIS STORY — CONTINUE PREPARING" (2026-11-07)
+
+Founder: "the article does not matter but there is no button to disregard it and continue". When Prepare (or a render)
+stops on an Outdated status and the engine's check named the newer events with keys (homesignal-ingest
+`currency.event_key`), the Visuals stop shows **Not about this story — continue preparing**: `hs_impact_story_currency_dismiss`
+records the keys (append-only `impact_story_currency_dismissals`; only a key a failed job of this story reported), then the
+page prepares again. The claim sends `story.currency_dismissed`, and the check lists those events as dismissed instead of
+blocking; anything new still blocks. A stop from before keys existed offers only Prepare again. A render stopped the same way shows **Not about this story — render again** in Media review (keeps the approved pictures). The Visuals stop reads `currency` through `_hs_is_visuals` (added after a self-audit found the first version never passed it; pg 12y0). Apply order: ingest first,
+then `docs/impact-stories.sql`, then the page. Tests: pg 12y1-12y4, `test/impact-stories.browser.test.mjs`.
+
 ## IMPACT STORIES, TAB 17: FAILED VIDEOS ARE FIXED BEFORE YOU WATCH THEM ⚖️ FOUNDER (2026-11-07)
 
 "if you have to fix things, than you should fix before i have to watch. otherwise you are wasting my time". When a render
@@ -6416,6 +6426,14 @@ video from the first import. Tab 16 shows what the sync found; typing a link by 
 video post also carries `https://jodytracks.com`. Tests: `test/youtube_channel_sync_pg` (CI `youtube-channel-sync-suite.yml`),
 `test/youtube-channel-sync.test.mjs`. Runbook: homesignal-ingest `docs/VIDEO_BLUESKY.md`.
 
+**Thumbnails are Bluesky posts too (founder, 2026-11-07).** `docs/video-bluesky-thumbnail.sql` adds `'thumbnail'` as a
+fourth queue item (a fail-closed splice of the live bodies plus the table's `file_key` check). Approving a Tab 16 thumbnail
+creates its one job; it takes a VIDEO time (no time added) and waits for the YouTube main video's link like the other items.
+Tab 16 draws the thumbnail's Bluesky box only when `hs_video_jobs_list` lists it; Tab 12 previews it as an image. The
+publisher half (image post, shrunk under 1 MB) is homesignal-ingest #1071. ⚠️ Replaying `docs/video-bluesky-queue.sql`,
+`docs/youtube-video-file-decide-queue-apply.sql` or `docs/youtube-video-outdated.sql` drops the thumbnail again: re-apply
+the thumbnail file after any of them. Tests: `test/video_bluesky_queue_pg` §13 + 4f/11g, `test/video-bluesky-queue.browser.test.mjs`.
+
 ## BLUESKY PUBLISHING SCHEDULE (Tab 12) + MAPS vs SHORTS ⚖️ FOUNDER (2026-10-27)
 
 One schedule, two queues: 2 MAPS + 2 video posts a day, America/Los_Angeles (shown in Central too), never within 150 minutes.
@@ -6656,3 +6674,9 @@ file_decide, md5-guarded). Engine half: homesignal-ingest `scripts/video_project
   (55006). The page says "Out of date", disables Approve and makes Full rebuild the main button.
 - Tests: `test/youtube_video_revision_plans_pg/outdated.sql` (production's decide body, `live-decide.sql`),
   `test/youtube-video-outdated.browser.test.mjs`.
+- **Each kind of file is compared on what it reads** (`docs/youtube-video-outdated-parts.sql`, after the file above):
+  main video `main` (no Shorts), Shorts `video`, thumbnail `thumb` (no scenes, Shorts or voice). The first live
+  reading (2026-11-07) showed why: #1049 changed only the Shorts' openings and the broad rule flagged 21 approved main
+  videos and thumbnails. A version recorded before the parts is compared on `all`/`video` (never narrower); a file
+  with no fingerprint uses the time its own part last changed (`<part>_changed_at`). Test:
+  `test/youtube_video_revision_plans_pg/outdated-parts.sql`.
