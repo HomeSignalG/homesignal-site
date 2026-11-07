@@ -595,6 +595,27 @@ await page.evaluate(() => { window.db.visuals = Object.assign({}, window.db.visu
   window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
 await page.waitForTimeout(100);
 ok(await page.locator('#is [data-act=vapprove]').count() === 0 && (await page.locator('#is').innerText()).includes('Needs fixes'), 'visuals: a blocked shot leaves no approve button');
+// The green "Your next step" button must do something on the Visuals step (founder, 2026-11-07: "i click the button in
+// the green outline box but nothing happens"). It used to only open Visuals, the page already on screen.
+await page.evaluate(() => { const st = window.HS.acqImpactStories._state; st.step = 'visuals';
+  window.db.status = () => Object.assign(window.db.baseStatus(), { stage: 'visuals', owner: 'you', job: null, next: 'Replace the blocked pictures, then prepare the visuals again' });
+  window.db.visuals = Object.assign({}, window.db.visuals, { why: 'The previews could not be confirmed to match the render. Prepare the visuals again.' });
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(80);
+ok(await page.locator('#is-next-box [data-act=step][data-step=visuals]').count() === 0
+   && await page.locator('#is-next-box [data-act=vprep][data-new="1"]').count() === 1
+   && (await page.locator('#is-next-box').innerText()).includes('could not be confirmed to match the render'),
+   'visuals: with no shot to fix, the next-step button prepares the visuals again (not a dead "open Visuals")');
+await page.evaluate(() => { window.calls.length = 0; });
+await page.click('#is-next-box [data-act=vprep]'); await page.waitForTimeout(80);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_visuals_prepare' && c[1].p_new === true)),
+   'visuals: pressing the next-step button queues new previews');
+await page.evaluate(() => { const v = window.db.visuals; v.manifest.assets.main.shots[1] = Object.assign({}, v.manifest.assets.main.shots[1], { status: 'blocked' });
+  window.HS.acqImpactStories._state.step = 'visuals'; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(80);
+ok(await page.locator('#is-next-box [data-act=vgoto][data-k=main][data-group="1"]').count() === 1,
+   'visuals: with a blocked shot, the next-step button goes to the part holding it');
+await page.evaluate(() => { window.db.visuals.manifest.assets.main.shots[1].status = 'flagged'; });
 await page.evaluate(() => { window.db.visuals = Object.assign({}, window.db.visuals, { state: 'approved', why: 'Approved.' });
   window.db.status = () => Object.assign(window.db.baseStatus(), { stage: 'media', next: 'Render the videos' });
   window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
