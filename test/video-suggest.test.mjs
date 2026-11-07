@@ -33,5 +33,14 @@ ok(!/impact_discovery/.test(sql.replace(/--.*$/gm, '')) && !/rpc\('hs_impact/.te
 ok(/revoke all on public\.youtube_video_suggestions from public, anon, authenticated/.test(sql) && /enable row level security/.test(sql),
   '1g the table is closed to visitors');
 
+// The note box must hold what the database holds. It once cut a pasted brief at 2,000 characters, mid-word,
+// and the rest of the founder's instructions never reached the video run (2026-11-07).
+{
+  const box = (lib.match(/id="vs-note"[^>]*maxlength="(\d+)"/) || [])[1];
+  const col = (sql.match(/youtube_video_suggestions_note_check\s+check \(note is null or char_length\(note\) <= (\d+)\)/) || [])[1];
+  const fn = (sql.match(/char_length\(note\) > (\d+) then raise/) || [])[1];
+  ok(box === '12000' && col === '12000' && fn === '12000', '1j the note box, the column and the function all allow 12,000 characters');
+}
+
 if (fails) { console.log(fails + ' failed'); process.exit(1); }
 console.log('all passed');

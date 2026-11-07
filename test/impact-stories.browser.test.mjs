@@ -947,6 +947,21 @@ ok(/no photo found/i.test(bbox) && bbox.includes('no usable licensed photo of Fa
    && !/upload/i.test(bbox) && !/Something went wrong/i.test(bbox) && await page.locator('#is #is-next-box [data-act=retry]').count() === 0
    && await page.locator('#is #is-next-box .is-btn.primary').count() === 0,
    'next step: a Prepare stopped for no photo names the subjects, never asks for an upload, and offers no Retry');
+// The same stop for an Outdated status is not a photo problem (House Speaker story, 2026-11-07: a news page's headline
+// stopped Prepare and the page said the photo search needed fixing). Failure detail verbatim from that job.
+await page.evaluate(() => {
+  window.db.visuals = { state: 'none', counts: {}, manifest: null, blocked: { job_id: 'jvb', blocked: true, at: '2026-11-07T14:58:00Z',
+    error: 'Nothing was rendered: Outdated status: Democrats win House majority with Trump approval at historic low',
+    failures: [{ code: 'outdated_status', label: 'Outdated status', detail: 'Democrats win House majority with Trump approval at historic low',
+                 action: 'Check sources again and ask Claude to rewrite the status from the newest decision, then approve again.' },
+               { code: 'weak_opening', asset: 'main', label: 'Weak opening', detail: 'the first picture is not an essential subject.' }], candidates: [] } };
+  window.HS.acqImpactStories._state.data = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(120);
+const obox = await page.evaluate(() => (document.querySelector('#is #is-next-box') || {}).innerText || '');
+ok(!/no photo|photo search/i.test(obox) && /newer/i.test(obox) && obox.includes('Democrats win House majority with Trump approval at historic low')
+   && /fix the check/i.test(obox) && await page.locator('#is #is-next-box [data-act=retry]').count() === 0,
+   'next step: a Prepare stopped on an Outdated status names the headline and never says the photo search failed');
 await page.evaluate(() => { Object.assign(window.db, window.__beforeBlocked); });
 // A render refused because the pictures no longer match the approved set (founder, 2026-11-06, EPA methane story:
 // "i have no idea if it is fixing requests or i am supposed to press retry"). Retry would fail the same way.

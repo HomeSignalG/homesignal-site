@@ -28,7 +28,7 @@ create table if not exists public.youtube_video_suggestions (
   title         text not null check (char_length(title) between 5 and 300),
   place         text check (place is null or char_length(place) <= 200),
   links         jsonb not null default '[]'::jsonb check (jsonb_typeof(links) = 'array'),
-  note          text check (note is null or char_length(note) <= 2000),
+  note          text check (note is null or char_length(note) <= 12000),
   status        text not null default 'waiting'
                 check (status in ('waiting', 'picked', 'made', 'declined', 'withdrawn')),
   status_note   text check (status_note is null or char_length(status_note) <= 2000),
@@ -38,6 +38,12 @@ create table if not exists public.youtube_video_suggestions (
   updated_at    timestamptz not null default now(),
   constraint youtube_video_suggestions_made_has_slug check (status <> 'made' or project_slug is not null)
 );
+
+-- The note is a brief and may be long: 12,000 characters (it was 2,000, and the page's box silently cut a pasted brief at
+-- 2,000, mid-word, so most of the founder's instructions for 'Get Jeffries OUT!' never reached the video run; 2026-11-07).
+alter table public.youtube_video_suggestions drop constraint if exists youtube_video_suggestions_note_check;
+alter table public.youtube_video_suggestions add constraint youtube_video_suggestions_note_check
+  check (note is null or char_length(note) <= 12000);
 
 -- One open suggestion per title, so a double click never queues the same video twice.
 create unique index if not exists youtube_video_suggestions_open_title
@@ -77,7 +83,7 @@ begin
     raise exception 'Give the video a subject of 5 to 300 characters.' using errcode = '22023';
   end if;
   if pl is not null and char_length(pl) > 200 then raise exception 'The place is longer than 200 characters.' using errcode = '22023'; end if;
-  if note is not null and char_length(note) > 2000 then raise exception 'The note is longer than 2,000 characters.' using errcode = '22023'; end if;
+  if note is not null and char_length(note) > 12000 then raise exception 'The note is longer than 12,000 characters.' using errcode = '22023'; end if;
   links := public._hs_yvs_clean_links(p_topic->'links');
   if exists (select 1 from public.youtube_video_suggestions s
              where lower(btrim(s.title)) = lower(t) and s.status in ('waiting', 'picked')) then
@@ -282,7 +288,7 @@ begin
                                                             where not s.links @> jsonb_build_array(x)), '[]'::jsonb));
   add_note := nullif(btrim(coalesce(more->>'note', '')), '');
   v_note := case when add_note is null then s.note when s.note is null then add_note else s.note || E'\n' || add_note end;
-  if v_note is not null and char_length(v_note) > 2000 then raise exception 'The note is longer than 2,000 characters.' using errcode = '22023'; end if;
+  if v_note is not null and char_length(v_note) > 12000 then raise exception 'The note is longer than 12,000 characters.' using errcode = '22023'; end if;
   if exists (select 1 from public.youtube_video_suggestions o
              where o.id <> s.id and lower(btrim(o.title)) = lower(btrim(s.title)) and o.status in ('waiting', 'picked')) then
     raise exception 'Another open suggestion has the same subject. Withdraw one of them first.' using errcode = '23505';

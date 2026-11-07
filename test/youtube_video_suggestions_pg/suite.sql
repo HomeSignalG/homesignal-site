@@ -31,8 +31,13 @@ select pg_temp.chk('2f links that are not a list are refused', pg_temp.err($q$se
 select pg_temp.chk('2g more than 20 links are refused',
   pg_temp.err(format('select public.hs_youtube_video_suggest(%L)', jsonb_build_object('title', 'Another project here',
     'links', (select jsonb_agg('https://x.gov/' || g) from generate_series(1, 21) g)))) like '22023%');
-select pg_temp.chk('2h a long note is refused', pg_temp.err(format('select public.hs_youtube_video_suggest(%L)',
-  jsonb_build_object('title', 'Another project here', 'note', repeat('x', 2001)))) like '22023%');
+select pg_temp.chk('2h a note over 12,000 characters is refused', pg_temp.err(format('select public.hs_youtube_video_suggest(%L)',
+  jsonb_build_object('title', 'Another project here', 'note', repeat('x', 12001)))) like '22023%');
+-- A long brief is kept whole (the box once cut a pasted brief at 2,000 characters, mid-word; 2026-11-07).
+select public.hs_youtube_video_suggest(jsonb_build_object('title', 'A long brief project', 'note', repeat('y', 12000)));
+select pg_temp.chk('2h2 a 12,000-character brief is stored whole',
+  (select char_length(note) = 12000 from public.youtube_video_suggestions where title = 'A long brief project'));
+delete from public.youtube_video_suggestions where title = 'A long brief project';  -- keep the counts below as they were
 
 -- 3. listing and withdrawing
 select public.hs_youtube_video_suggest('{"title":"Second project to film"}');
