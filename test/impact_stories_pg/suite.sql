@@ -764,6 +764,46 @@ select public.hs_impact_story_job_complete((pg_temp.lastjob()).id, jsonb_build_o
 select pg_temp.chk('12p a new render needs reviewing again; a file that failed its checks cannot be approved', pg_temp.stage() = 'media'
    and pg_temp.fst('main') = 'pending' and pg_temp.fst('short_a') = 'blocked'
    and pg_temp.err(format('select public.hs_impact_story_media_decide(%L, %s, %L)', pg_temp.id('s'), pg_temp.fid('short_a'), 'approved')) like '%media checks failed%');
+-- 12A. videos that failed their checks are fixed before the founder is asked to watch them (founder, 2026-11-07) ------
+insert into _ids select 'rp', (select id::text from public.impact_story_jobs where story_id = pg_temp.id('s')::uuid and kind = 'render'
+   and status = 'complete' order by completed_at desc limit 1);
+select pg_temp.chk('12A1 a video that failed only its media checks is rendered again by the system, once, with the same picture set',
+   (pg_temp.lastjob()).kind = 'render' and (pg_temp.lastjob()).status = 'queued' and (pg_temp.lastjob()).requested_by = 'system:auto-fix'
+   and (pg_temp.lastjob()).input->>'auto_rerender_of' = pg_temp.id('rp')
+   and (pg_temp.lastjob()).input->'visual_manifest' = (select input->'visual_manifest' from public.impact_story_jobs where id = pg_temp.id('rp')::uuid)
+   and (select url from net.requests order by id desc limit 1) like '%/impact-story-render.yml/dispatches'
+   and not exists (select 1 from public.impact_story_media_decisions where actor = 'system:auto-fix')
+   and public._hs_is_status(pg_temp.id('s')::uuid)->>'owner' = 'working');
+select public.hs_impact_story_job_claim((pg_temp.lastjob()).id);
+select public.hs_impact_story_job_complete((pg_temp.lastjob()).id, jsonb_build_object('assets', pg_temp.files((pg_temp.lastjob()).id, false)));
+insert into _ids select 'afb', (select id::text from public.impact_story_fix_batches where requested_by = 'system:auto-fix');
+select pg_temp.chk('12A2 failing again after that retry: no third render; the system writes a fix request for the failed video and sends it to the fixer',
+   (pg_temp.lastjob()).status = 'complete'
+   and (select count(*) from public.impact_story_jobs where story_id = pg_temp.id('s')::uuid and status in ('queued', 'running')) = 0
+   and pg_temp.id('afb') is not null
+   and (select status from public.impact_story_fix_batches where id = pg_temp.id('afb')::uuid) = 'plan_queued'
+   and (select jsonb_agg(r->>'asset') from public.impact_story_fix_batches b, jsonb_array_elements(b.requests) r where b.id = pg_temp.id('afb')::uuid) = '["short_a"]'
+   and (select note from public.impact_story_media_decisions where actor = 'system:auto-fix') like 'The automatic checks failed on this video%'
+   and (select body from net.requests order by id desc limit 1) = jsonb_build_object('ref', 'main', 'inputs', jsonb_build_object('batch', pg_temp.id('afb'), 'mode', 'plan')));
+select pg_temp.chk('12A3 while it is being fixed it is the engine''s turn, not the founder''s, and the page knows the batch is automatic',
+   public._hs_is_status(pg_temp.id('s')::uuid)->>'owner' = 'working'
+   and pg_temp.nxt() like 'Fixing the videos that failed the checks%'
+   and (public._hs_is_media(pg_temp.id('s')::uuid)->'fix_batch'->>'auto')::boolean);
+select pg_temp.chk('12A4 never twice for the same render', public._hs_is_auto_fix(pg_temp.id('s')::uuid, (pg_temp.lastjob()).id)->>'action' = 'none'
+   and (select count(*) from public.impact_story_fix_batches where requested_by = 'system:auto-fix') = 1);
+select public.impact_fix_batch_claim(pg_temp.id('afb')::uuid);
+select public.impact_fix_batch_plan(pg_temp.id('afb')::uuid, jsonb_build_object('summary', 'Fix the media checks.', 'items',
+  (select jsonb_agg(jsonb_build_object('decision_id', r->'id', 'understood', 'The checks failed.', 'changes', '["Re-encode the Short."]'::jsonb))
+     from public.impact_story_fix_batches b, jsonb_array_elements(b.requests) r where b.id = pg_temp.id('afb')::uuid)));
+select pg_temp.chk('12A5 an automatic batch''s plan is carried out at once (the plan is kept); the work run is started',
+   (select status from public.impact_story_fix_batches where id = pg_temp.id('afb')::uuid) = 'queued'
+   and (select confirmed_by from public.impact_story_fix_batches where id = pg_temp.id('afb')::uuid) = 'system:auto-fix'
+   and (select plan from public.impact_story_fix_batches where id = pg_temp.id('afb')::uuid)->>'summary' = 'Fix the media checks.'
+   and (select body from net.requests order by id desc limit 1) = jsonb_build_object('ref', 'main', 'inputs', jsonb_build_object('batch', pg_temp.id('afb'), 'mode', 'work')));
+select public.impact_fix_batch_claim(pg_temp.id('afb')::uuid);
+select public.impact_fix_batch_complete(pg_temp.id('afb')::uuid, jsonb_build_object('status', 'done', 'summary', 'Fixed.', 'outcomes',
+  (select jsonb_agg(jsonb_build_object('decision_id', r->'id', 'outcome', 'fixed', 'note', 'ok'))
+     from public.impact_story_fix_batches b, jsonb_array_elements(b.requests) r where b.id = pg_temp.id('afb')::uuid)));
 select pg_temp.chk('12q a file from an older render cannot be decided',
    pg_temp.err(format('select public.hs_impact_story_media_decide(%L, %s, %L)', pg_temp.id('s'), (select min(id) from public.impact_story_assets), 'approved')) like '%not part of the current render%');
 
@@ -825,6 +865,12 @@ select pg_temp.chk('12r6 a file the visual quality gate failed is blocked and ca
   and pg_temp.err(format('select public.hs_impact_story_media_decide(%L, %s, %L)', pg_temp.id('s'), pg_temp.fid('short_a'), 'approved')) like '%visual quality gate failed: Too many documents and cards%'
   and public._hs_is_media(pg_temp.id('s')::uuid)->'blocked' = 'null'::jsonb
   and public._hs_is_media(pg_temp.id('s')::uuid)->'currency'->>'state' = 'current');
+select pg_temp.chk('12r6b a picture-check failure that rendering again cannot fix goes straight to the fixer: no new render, one automatic request for that video only',
+  (select count(*) from public.impact_story_jobs where story_id = pg_temp.id('s')::uuid and status in ('queued', 'running')) = 0
+  and (select jsonb_agg(r->>'asset') from public.impact_story_fix_batches b, jsonb_array_elements(b.requests) r
+        where b.requested_by = 'system:auto-fix' and b.status = 'plan_queued') = '["short_a"]'
+  and (select note from public.impact_story_media_decisions where actor = 'system:auto-fix' order by id desc limit 1) like '%Too many documents and cards%'
+  and public._hs_is_status(pg_temp.id('s')::uuid)->>'owner' = 'working');
 select pg_temp.chk('12r7 a file with no quality report (rendered before the gates) is not blocked by it', pg_temp.fst('main') = 'pending');
 
 -- 10. a story written before the outline, and its old approvals --------------------------------------

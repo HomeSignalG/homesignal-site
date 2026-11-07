@@ -6156,6 +6156,23 @@ Results.
   are refused, the next step is Prepare the visuals, and `_hs_is_status.job.visuals_changed` lets the page drop Retry
   (#2655/#2657 built that box). pg 12z1-12z3.
 
+## IMPACT STORIES, TAB 17: FAILED VIDEOS ARE FIXED BEFORE YOU WATCH THEM ⚖️ FOUNDER (2026-11-07)
+
+"if you have to fix things, than you should fix before i have to watch. otherwise you are wasting my time". When a render
+finishes, `hs_impact_story_job_complete` calls `_hs_is_auto_fix(story, job)` (docs/impact-stories.sql; a failure there is an
+`auto_fix_failed` event and never undoes the render):
+- **Every failed video only needs the renderer to try again** (its media checks failed, or every quality failure is
+  `render_mismatch`): a new render is queued by `system:auto-fix` with the same input plus `auto_rerender_of`. Once only: a
+  render that was itself such a retry goes to the fixer instead.
+- **Otherwise:** one `rejected` media decision per failed video (actor `system:auto-fix`, the failed checks named), sent as a
+  batch with only those requests. `impact_fix_batch_plan` carries out an automatic batch's plan at once (`confirmed_by
+  system:auto-fix`; the plan is kept). The founder's own notes never ride in it, so their plans still wait for a confirm.
+- Never twice for one render, never while a fix batch is active. Nothing is approved: a fix that changes the script makes a new
+  version the founder approves as always.
+- **Page:** a failed video has no player and no Approve button ("Watch it anyway" under Details). While an automatic batch runs
+  (`fix_batch.auto`), the story is the engine's turn (`_hs_is_status` owner `working`) and Media review says it is being fixed.
+- Tests: `test/impact_stories_pg` 12A1-12A5, 12r6b; `test/impact-stories.browser.test.mjs`.
+
 ## IMPACT STORIES, TAB 17: THE STORYBOARD WORKSPACE, FIVE GATES AND THE PRODUCTION AUDIT (2026-11-05)
 
 Founder brief "Story Editor UX and Narrative Quality". Page only (`lib/acq-impact-stories.js`), no SQL; the engine half is
