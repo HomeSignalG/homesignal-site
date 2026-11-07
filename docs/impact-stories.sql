@@ -1258,7 +1258,7 @@ declare s public.impact_stories%rowtype; na jsonb := public._hs_is_artifact_stat
         ck jsonb := public._hs_is_choice_key(p_story); m public.impact_story_visual_manifests%rowtype;
         ev public.impact_story_visual_events%rowtype; vj public.impact_story_jobs%rowtype; st text; why text; cur boolean := false;
         nblk int := 0; blocked jsonb; nrej int := 0; sd jsonb := '[]'::jsonb; more jsonb := '[]'::jsonb; ndrawn int := 0;
-        reqs jsonb := '[]'::jsonb;
+        reqs jsonb := '[]'::jsonb; npend int := 0;
         carried jsonb := '[]'::jsonb; cur_shots jsonb; cur_id bigint; changed boolean := false;
 begin
   select * into s from public.impact_stories where id = p_story;
@@ -1302,6 +1302,13 @@ begin
              where m2.story_id = p_story and m2.narrative_hash = na->>'hash' and na->>'state' = 'approved'   -- the approved script only (Codex, #2665)
              order by d.asset, d.shot_id, d.id desc) q
      where q.decision in ('new_photo', 'rejected') and q.subject_id is not null and nullif(btrim(q.note), '') is not null;
+    -- A request these previews were not prepared with (founder, 2026-11-07: "stilll no"): the previews still show the old
+    -- picture, so they are out of date until Prepare runs with the request. One the engine already searched (it is in the
+    -- input of the job that made these previews) stays a request but no longer makes them stale, so nothing loops.
+    select count(*) into npend from jsonb_array_elements(reqs) r
+     where not coalesce((select j.input->'photo_requests' from public.impact_story_jobs j where j.id = m.job_id), '[]'::jsonb)
+               @> jsonb_build_array(jsonb_build_object('asset', r->>'asset', 'shot_id', r->>'shot_id', 'note', r->>'note'));
+    cur := cur and npend = 0;
     -- A shot approved on the previous previews whose picture did not change shows as approved again ("Approved
     -- earlier, same picture"), unless it has a decision of its own on these previews. Shown only; the one "Approve all
     -- visuals" decision is unchanged and is still made on these previews.
@@ -1336,6 +1343,7 @@ begin
                 when m.narrative_hash <> na->>'hash' then 'The narrative changed since these previews were made. Prepare the visuals again.'
                 when m.pack_hash is distinct from s.pack_hash then 'The sources changed since these previews were made. Prepare the visuals again.'
                 when m.choices_key <> ck->>'key' then 'You chose or rejected a photo since these previews were made. Prepare the visuals again.'
+                when npend > 0 then 'You asked for ' || npend || ' different photo(s) since these previews were made. Prepare the visuals again to get them.'
                 when changed then 'The video code changed since you approved these pictures, so the render stopped. Prepare the visuals again and approve them.'
                 when ndrawn > 0 then 'These previews were made before drawings were removed (' || ndrawn || ' drawn shot(s)). Prepare the visuals again.'
                 else 'The renderer changed since these previews were made. Prepare the visuals again.' end;

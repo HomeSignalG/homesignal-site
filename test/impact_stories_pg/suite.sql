@@ -393,6 +393,11 @@ select pg_temp.chk('12V28a a described request is listed for its shot, with the 
   pg_temp.vis()->'photo_requests' = jsonb_build_array(jsonb_build_object('subject_id', 'oak-trees', 'asset', 'main', 'shot_id', 'a1-s1',
     'note', E'A photo of Hakeem Jeffries\n\nWhy not this one: the Capitol says nothing about who is running'))
   and pg_temp.vis()->'more_photos_for' = '["oak-trees"]'::jsonb);
+-- 12V28a2 (founder, 2026-11-07 "stilll no"): previews made without that request are out of date, so the page says to
+-- prepare again instead of offering to approve the old picture
+select pg_temp.chk('12V28a2 a request the previews were not prepared with makes them stale',
+  pg_temp.vis()->>'state' = 'stale' and pg_temp.vis()->>'why' like 'You asked for 1 different photo(s)%Prepare the visuals again%'
+  and pg_temp.err(format('select public.hs_impact_story_render(%L, %s)', pg_temp.id('s'), pg_temp.cur())) like '%Approve the visuals before rendering%');
 select public.hs_impact_story_visuals_prepare(pg_temp.id('s')::uuid, pg_temp.cur(), true);
 select pg_temp.chk('12V28b the Prepare job carries it', (pg_temp.lastjob()).input->'more_photos_for' = '["oak-trees"]'::jsonb
   and (pg_temp.lastjob()).input->'photo_requests'->0->>'shot_id' = 'a1-s1'
@@ -402,7 +407,8 @@ select public.hs_impact_story_job_complete((pg_temp.lastjob()).id, jsonb_build_o
 -- 12V28c (2026-11-07): preparing again before deciding on the new previews does not drop the request
 select pg_temp.chk('12V28c a request lasts across preparations until the shot is decided again',
   pg_temp.vis()->'photo_requests'->0->>'shot_id' = 'a1-s1'
-  and pg_temp.vis()->'photo_requests'->0->>'note' like 'A photo of Hakeem Jeffries%');
+  and pg_temp.vis()->'photo_requests'->0->>'note' like 'A photo of Hakeem Jeffries%'
+  and pg_temp.vis()->>'state' = 'ready');   -- 12V28c2: prepared with the request, so not stale again (no loop)
 select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'main', 'a1-s1', 'rejected',
   'The photo needs to be of jeffries');
 select pg_temp.chk('12V28d a Reject with a note asks for what the note says (founder, 2026-11-07)',
