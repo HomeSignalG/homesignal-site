@@ -52,7 +52,10 @@ await page.evaluate(() => {
   const derived = { ledger: [{ where: 'Act 1.1', line: 'Line of act 1.', claim: 'approved', status: 'stated', quote: 'Quote for approved', source: 'Notice', url: 'https://example.gov/nod' }],
     variants: { variants: [{ destination: 'youtube', asset: 'main', format: '16:9', title: 'Who gets the dock?', description: 'desc', publish: 'manual' },
       { destination: 'tiktok', asset: 'short_a', format: '9:16', title: 't', caption: 'c #JODYTracks', connection: 'not_connected', publish: 'manual' },
-      { destination: 'bluesky', asset: 'post', format: 'text', text: 'Approved dock.\n\nFull investigation: (pending)', chars: 40, fits: true, full_video_pending: true, publish: 'manual' }] } };
+      { destination: 'bluesky', asset: 'post', format: 'text', text: 'Approved dock.\n\nRegister to speak at the public hearing by Nov. 10:\nhttps://www.epa.gov/hearing/register\n\nFull investigation: (pending)', chars: 140, fits: true, full_video_pending: true, publish: 'manual',
+        action_url: 'https://www.epa.gov/hearing/register', action_deadline: '2026-11-10', manual: false, action_missing: false }],
+      actions: [{ origin: 'actions[0]', action_type: 'register_to_speak', label: 'Register to speak at the public hearing', url: 'https://www.epa.gov/hearing/register', deadline: '2026-11-10', state: 'open', verified: true, problems: [] },
+        { origin: 'actions[1]', action_type: 'submit_comment', label: 'Submit an official public comment', url: 'https://www.regulations.gov/x', deadline: '2026-11-01', state: 'expired', verified: true, problems: [] }] } };
   window.client = { rpc: (n, a) => {
     window.calls.push([n, a]);
     const d = {
@@ -787,6 +790,8 @@ txt = await page.locator('#is').innerText();
 ok(txt.includes('Not published') && txt.includes('Not connected') && txt.includes('Full video URL pending') && txt.includes('unavailable'), 'distribution: not published / not connected / pending URL / publishing unavailable');
 ok(await page.locator('#is [data-act=export]').isDisabled(), 'distribution: export stays locked until every approval is in place');
 ok(!/publish now|schedule post/i.test(txt), 'distribution: no publish or schedule action');
+ok(txt.includes('Action link included · deadline 2026-11-10') && txt.includes('https://www.epa.gov/hearing/register'), 'distribution: the Bluesky post shows its verified action link (impact/action_link.py)');
+ok(txt.includes('Public actions found in research') && txt.includes('Closed') && txt.includes('Submit an official public comment'), 'distribution: every recorded action is listed with its state; a closed one says Closed');
 await page.click('#is [data-act=step][data-step=results]');
 txt = await page.locator('#is').innerText();
 ok(txt.includes('Not published') && !/\b0\b/.test(txt.replace(/0-3|utm|impact-/g, '')), 'results: nothing is shown as zero');
