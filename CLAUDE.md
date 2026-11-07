@@ -6182,6 +6182,12 @@ records the keys (append-only `impact_story_currency_dismissals`; only a key a f
 page prepares again. The claim sends `story.currency_dismissed`, and the check lists those events as dismissed instead of
 blocking; anything new still blocks. A stop from before keys existed offers only Prepare again. A render stopped the same way shows **Not about this story — render again** in Media review (keeps the approved pictures). The Visuals stop reads `currency` through `_hs_is_visuals` (added after a self-audit found the first version never passed it; pg 12y0). Apply order: ingest first,
 then `docs/impact-stories.sql`, then the page. Tests: pg 12y1-12y4, `test/impact-stories.browser.test.mjs`.
+- **The other answer (founder, 2026-11-07: "there are no buttons to give me options to do something").** Beside every
+  "Not about this story" button, **Update the story with this news** → `hs_impact_story_currency_update(story, keys)` (the
+  same key check): one research line note on path `main.status` naming the news (no second while one is open or with
+  Claude), then Fix (plan → you confirm → work; homesignal-ingest `impact/fixes/FIXES.md` says what that path means). The
+  top box of a render stopped this way (`media.blocked`, same job) offers both buttons instead of "Something went wrong /
+  Retry". Tests: pg 12x1-12x5, browser "update the story" / "render stopped on keyed newer news".
 
 ## IMPACT STORIES, TAB 17: FAILED VIDEOS ARE FIXED BEFORE YOU WATCH THEM ⚖️ FOUNDER (2026-11-07)
 

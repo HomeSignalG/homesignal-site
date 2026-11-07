@@ -1805,6 +1805,44 @@ begin
   return jsonb_build_object('ok', true, 'dismissed', n);
 end $$;
 
+-- "Update the story with this news" (founder, 2026-11-07: "there are no buttons to give me options to do something"). The
+-- other answer to an Outdated-status stop, beside "Not about this story": one research note naming the newer events
+-- (path main.status, which the fixer reads as "every line that states the status", homesignal-ingest FIXES.md), then Fix:
+-- Claude reads the newest record, adds it to the pack and writes a plan the founder confirms. Each key must be one a
+-- failed job of this story reported, as for a dismissal. A second press while that note is open or with Claude adds none.
+create or replace function public.hs_impact_story_currency_update(p_story uuid, p_keys text[])
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); s public.impact_stories%rowtype; k text; ev jsonb; parts text[] := '{}'; nt text; nid bigint;
+begin
+  select * into s from public.impact_stories where id = p_story for update;
+  if not found then raise exception 'no such story' using errcode = 'P0002'; end if;
+  if s.archived_at is not null then raise exception 'This story is archived. Restore it first.' using errcode = '55000'; end if;
+  if coalesce(cardinality(p_keys), 0) = 0 then raise exception 'Nothing to update the story with.' using errcode = '22023'; end if;
+  if cardinality(p_keys) > 50 then raise exception 'Too many at once.' using errcode = '22023'; end if;
+  foreach k in array (select array_agg(distinct x order by x) from unnest(p_keys) x) loop
+    ev := null;
+    select x into ev
+      from public.impact_story_jobs j, jsonb_array_elements(coalesce(j.result->'currency'->'events', '[]'::jsonb)) x
+     where j.story_id = p_story and j.status = 'failed' and x->>'key' = k
+     order by j.created_at desc limit 1;
+    if ev is null then
+      raise exception 'That update was not reported by a check of this story.' using errcode = '22023';
+    end if;
+    parts := parts || format('"%s" (%s)', left(coalesce(ev->>'summary', ev->>'text', ''), 220), coalesce(ev->>'source', 'our notices'));
+  end loop;
+  nt := left('A source read again shows something newer than the script says: ' || array_to_string(parts, '; '), 900) ||
+        ' Read the newest record, add it to the source pack, and update every line that states the status.';
+  select (l->>'id')::bigint into nid from jsonb_array_elements(public._hs_is_line_notes(s.id)) l
+   where l->>'status' in ('open', 'sending') and l->>'path' = 'main.status' limit 1;
+  if nid is null then
+    insert into public.impact_story_line_notes (story_id, version, path, line_text, kind, note, actor)
+    values (s.id, s.current_version, 'main.status', null, 'research', nt, e) returning id into nid;
+    perform public._hs_is_event(s.id, 'line_note', jsonb_build_object('id', nid, 'path', 'main.status', 'research', true,
+                                                                     'keys', to_jsonb(p_keys)), e);
+  end if;
+  return public.hs_impact_story_fix_start(s.id) || jsonb_build_object('note_id', nid);
+end $$;
+
 -- Record a photo the founder uploaded (the file is already in impact-media at <story>/uploads/<p_upload>.jpg|png, put
 -- there by the dashboard with the admin's own session) and make it this subject's photo choice. The founder must
 -- confirm the permission statement; the credit is shown on screen with the photo. The engine checks p_sha256 against
@@ -2756,7 +2794,8 @@ begin
     'public.hs_impact_story_shot_decide(uuid, bigint, text, text, text, text, text)',
     'public.hs_impact_story_shots_approve(uuid, bigint, text, text, _text)', 'public.hs_impact_story_photos_reject(uuid, bigint, _text, text)',
     'public.hs_impact_story_creator_revise(uuid, integer, jsonb, text)', 'public.hs_impact_story_creator_flag_decide(uuid, integer, text, text, text)',
-    'public.hs_impact_story_creator_revision_withdraw(uuid, bigint)', 'public.hs_impact_story_currency_dismiss(uuid, _text)'] loop
+    'public.hs_impact_story_creator_revision_withdraw(uuid, bigint)', 'public.hs_impact_story_currency_dismiss(uuid, _text)',
+    'public.hs_impact_story_currency_update(uuid, _text)'] loop
     execute 'revoke all on function ' || f || ' from public, anon';
     execute 'grant execute on function ' || f || ' to authenticated';
   end loop;

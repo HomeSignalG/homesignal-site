@@ -597,6 +597,30 @@ select pg_temp.chk('12y4 dismissals are append-only and hidden from visitors',
   and not has_table_privilege('anon', 'public.impact_story_currency_dismissals', 'select')
   and not has_function_privilege('anon', 'public.hs_impact_story_currency_dismiss(uuid, text[])', 'execute'));
 rollback;
+-- 12x1-12x5 (2026-11-07, founder: "there are no buttons to give me options to do something"): the other answer to a
+-- newer-news stop. "Update the story" writes one research note naming the news on main.status, then starts Fix.
+begin;
+select public.hs_impact_story_job_claim(pg_temp.id('r1')::uuid);
+select public.hs_impact_story_job_fail(pg_temp.id('r1')::uuid, 'Nothing was rendered: Outdated status',
+  '{"blocked":true,"failures":[{"code":"outdated_status"}],"currency":{"state":"stale","events":[{"key":"0123456789abcdef","kind":"document_link_changed","summary":"Rule 3.15 amendments: hearing Nov. 20, 2026","source":"https://www.rrc.texas.gov/x"}]}}'::jsonb);
+select pg_temp.chk('12x1 an unreported or empty key list is refused',
+  pg_temp.err(format('select public.hs_impact_story_currency_update(%L, array[''fedcba9876543210''])', pg_temp.id('s'))) like '22023%'
+  and pg_temp.err(format('select public.hs_impact_story_currency_update(%L, array[]::text[])', pg_temp.id('s'))) like '22023%'
+  and not exists (select 1 from public.impact_story_line_notes where story_id = pg_temp.id('s')::uuid and path = 'main.status'));
+select public.hs_impact_story_currency_update(pg_temp.id('s')::uuid, array['0123456789abcdef']);
+select pg_temp.chk('12x2 one research note on main.status names the news and its source',
+  (select count(*) from public.impact_story_line_notes where story_id = pg_temp.id('s')::uuid and path = 'main.status'
+     and kind = 'research' and note like '%Rule 3.15 amendments: hearing Nov. 20, 2026%' and note like '%rrc.texas.gov%'
+     and note like '%update every line that states the status%' and char_length(note) <= 1000) = 1);
+select pg_temp.chk('12x3 Fix is started with that note',
+  exists (select 1 from public.impact_story_fix_batches where story_id = pg_temp.id('s')::uuid));
+select public.hs_impact_story_currency_update(pg_temp.id('s')::uuid, array['0123456789abcdef']);
+select pg_temp.chk('12x4 a second press adds no second note',
+  (select count(*) from public.impact_story_line_notes where story_id = pg_temp.id('s')::uuid and path = 'main.status') = 1);
+select pg_temp.chk('12x5 visitors cannot call it',
+  not has_function_privilege('anon', 'public.hs_impact_story_currency_update(uuid, text[])', 'execute')
+  and has_function_privilege('authenticated', 'public.hs_impact_story_currency_update(uuid, text[])', 'execute'));
+rollback;
 select pg_temp.chk('12f the worker gets the approved body', (public.hs_impact_story_job_claim(pg_temp.id('r1')::uuid)->'base_body'->>'schema') = 'impact-story/2');
 select public.hs_impact_story_job_complete(pg_temp.id('r1')::uuid, jsonb_build_object('assets',
   (select jsonb_agg(x) from jsonb_array_elements(pg_temp.files(pg_temp.id('r1')::uuid)) x where x->>'asset' <> 'thumbnail')));
