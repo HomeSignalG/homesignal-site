@@ -99,6 +99,47 @@ const q = await page.locator(S2).textContent();
 ok(q.includes('Your note asks a question') && !q.includes('Change the wording'), '13 a question says a script change is needed');
 ok(await page.locator(S2 + '.yv-rebuild').count() === 1, '14 and Full rebuild is right there');
 
+// 2026-11-07, video 3014: the founder rejected the main video with a note, then pressed Full rebuild, which read no
+// note and returned the same video as "Revised". The rebuild now carries the saved note: the question says so, the
+// running state shows the note, and the finished version lists what the script change did.
+const TH = '.yv-file[data-key="thumbnail"] ';
+await page.evaluate(() => {
+  window.plans = []; window.confirms = []; window.calls = [];
+  window.row.revisions = [];
+  window.row.file_decisions = { thumbnail: { status: 'rejected', version: 1, note: 'remove the act that has the quality of life checklist' } };
+});
+await load();
+await page.click(TH + '.yv-rebuild');
+await page.waitForFunction(() => window.calls.some((x) => x[0] === 'hs_youtube_video_rebuild'));
+ok(await page.evaluate(() => /carried out in the script first/.test(window.confirms[0]) && window.confirms[0].includes('quality of life checklist')),
+   '15 Full rebuild says the saved note is carried out first');
+// an edited but unsaved note is not silently dropped: the founder is told to save it first
+await page.evaluate(() => { window.calls = []; window.row.revisions = []; });
+await load();
+await page.fill(TH + '.yv-fnote-in', 'something else');
+await page.click(TH + '.yv-rebuild');
+ok(await page.evaluate(() => !window.calls.some((c) => c[0] === 'hs_youtube_video_rebuild')), '16 an unsaved edit to the note starts nothing');
+ok((await page.locator(TH).textContent()).includes('Press Save note first'), '17 and says to save the note first');
+// running, then finished with the script change listed
+await page.evaluate(() => {
+  window.row.revisions = [{ id: 'r7', file_key: 'thumbnail', parent_version: 1, status: 'running', attempts: 1, started_at: '2026-11-07T10:00:00Z',
+    instruction: 'remove the act that has the quality of life checklist', plan: { mode: 'rebuild', apply_note: true }, created_at: '2026-11-07T10:00:00Z' }];
+});
+await load();
+const run = await page.locator(TH).textContent();
+ok(run.includes('Changing the script so your note is done') && run.includes('Your note: remove the act'), '18 the running rebuild shows the note it carries out');
+await page.evaluate(() => {
+  Object.assign(window.row.revisions[0], { status: 'succeeded', result_version: 2,
+    result: { summary: 'Changed the script from your note: ...' },
+    plan: { mode: 'rebuild', apply_note: true, corrections: [], dropped: [],
+      script: { verdict: 'changed', changes: ["Removed the scene 'Quality-of-Life Checklist' (checklist)."] } } });
+  window.row.files.thumbnail.version = 2;
+  window.row.file_decisions = {};
+});
+await load();
+const done = await page.locator(TH).textContent();
+ok(done.includes('Changed the script from your note') && done.includes("Removed the scene 'Quality-of-Life Checklist'"), '19 the new version lists the script change');
+
 await browser.close();
 if (fails) { console.log(fails + ' failed'); process.exit(1); }
 console.log('all rebuild page checks passed');
