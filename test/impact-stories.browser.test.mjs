@@ -337,7 +337,27 @@ await page.evaluate(() => { window.db.visuals.photo_requests = [{ subject_id: 'o
 await page.waitForTimeout(120);
 ok(/You asked for: The photo needs to be of jeffries/.test(await page.locator('#is').innerText()),
    'visuals: a request carried from earlier previews (a Reject note) shows under its shot');
-await page.evaluate(() => { delete window.db.visuals.photo_requests; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+// what the last Prepare did with it (audit, 2026-11-07): a search that found nothing says so, a placed photo is labelled
+ok(!/No usable photo was found/.test(await page.locator('#is').innerText()) && await page.locator('#is .is-badge', { hasText: 'Found for your request' }).count() === 0,
+   'visuals: no outcome is claimed before a Prepare has searched the request');
+await page.evaluate(() => { window.db.visuals.manifest.requests_unfound = [{ asset: 'main', shot_id: 'a1-s1', request: 'The photo needs to be of jeffries' }];
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+ok(/No usable photo was found for this request/.test(await page.locator('#is').innerText()),
+   'visuals: a request the search found nothing for says so under its shot');
+await page.evaluate(() => { window.db.visuals.photo_requests[0].note = 'Hakeem Jeffries at a podium';
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+ok(!/No usable photo was found/.test(await page.locator('#is').innerText()),
+   'visuals: a reworded request is not reported as not found before it has been searched');
+await page.evaluate(() => { delete window.db.visuals.manifest.requests_unfound;
+  window.db.visuals.manifest.auto_choices = [{ subject_id: 'oak-trees', candidate_id: 'oak', entry: { id: 'oak', for_shot: { asset: 'main', shot: 'a1-s1' } } }];
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+ok(await page.locator('#is .is-badge', { hasText: 'Found for your request' }).count() === 1,
+   'visuals: the photo the code put on a shot for a request is labelled Found for your request');
+await page.evaluate(() => { delete window.db.visuals.manifest.auto_choices; delete window.db.visuals.photo_requests;
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
 await page.waitForTimeout(120);
 // a reject asks in the page, never in a browser pop-up
 await page.evaluate(() => { window.realConfirm = window.confirm; window.realPrompt = window.prompt;
