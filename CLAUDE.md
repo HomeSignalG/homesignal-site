@@ -6666,3 +6666,9 @@ file_decide, md5-guarded). Engine half: homesignal-ingest `scripts/video_project
   (55006). The page says "Out of date", disables Approve and makes Full rebuild the main button.
 - Tests: `test/youtube_video_revision_plans_pg/outdated.sql` (production's decide body, `live-decide.sql`),
   `test/youtube-video-outdated.browser.test.mjs`.
+- **Each kind of file is compared on what it reads** (`docs/youtube-video-outdated-parts.sql`, after the file above):
+  main video `main` (no Shorts), Shorts `video`, thumbnail `thumb` (no scenes, Shorts or voice). The first live
+  reading (2026-11-07) showed why: #1049 changed only the Shorts' openings and the broad rule flagged 21 approved main
+  videos and thumbnails. A version recorded before the parts is compared on `all`/`video` (never narrower); a file
+  with no fingerprint uses the time its own part last changed (`<part>_changed_at`). Test:
+  `test/youtube_video_revision_plans_pg/outdated-parts.sql`.
