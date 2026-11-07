@@ -6622,6 +6622,16 @@ every build, and at most 25% of its narration may repeat the original's.
 - **Apply order:** merge homesignal-ingest first, then `docs/impact-stories.sql`, then `docs/impact-discovery.sql`, then the page.
 - Tests: `test/impact_discovery_pg` §20 (20a-20o), `test/impact-stories-another-video.browser.test.mjs`, `test/impact-stories.test.mjs`.
 
+## TAB 16 FULL REBUILD CARRIES OUT THE SAVED REJECTION NOTE (2026-11-07)
+
+`hs_youtube_video_rebuild` used to read no note, so video 3014 was rejected with "remove the act that has the quality of
+life checklist", rebuilt unchanged, and shown as "Revised". SQL of record `docs/youtube-video-rebuild-applies-note.sql`
+(after `docs/youtube-video-rebuild.sql`; apply only once homesignal-ingest #1051 is on main). When the file's current
+version is rejected with a saved note, the rebuild sends that note with plan `{"mode":"rebuild","apply_note":true}`; the
+worker changes the script first and builds nothing if the note changed nothing. The page says so before and after
+(Full rebuild refuses an edited-but-unsaved note; a finished file lists the script changes). Tests:
+`test/youtube_video_revision_plans_pg/rebuild-note.sql`, `test/youtube-video-rebuild.browser.test.mjs` 15-19.
+
 ## IMPACT STORIES, TAB 17: THUMBNAIL SENTENCE AND THE BLUESKY ACTION LINK (2026-11-07)
 
 Engine half: homesignal-ingest CLAUDE.md "THUMBNAIL SENTENCE AND VERIFIED ACTION LINKS". The page decides nothing:

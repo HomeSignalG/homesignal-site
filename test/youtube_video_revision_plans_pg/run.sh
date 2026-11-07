@@ -50,3 +50,14 @@ $P -f "$ROOT/docs/youtube-video-rebuild.sql" >/dev/null
 $P -f "$ROOT/docs/youtube-video-rebuild.sql" >/dev/null
 echo "ok step-8 applies twice"
 $P -f "$HERE/rebuild.sql"
+# Full rebuild carries out the saved rejection note (2026-11-07): refuses an unknown rebuild body, applies twice
+if $P -c "create or replace function public.hs_youtube_video_rebuild(p_slug text, p_key text) returns jsonb language plpgsql as \$\$ begin return null; end \$\$" >/dev/null \
+   && $P -f "$ROOT/docs/youtube-video-rebuild-applies-note.sql" >/dev/null 2>&1; then
+  echo "FAIL guard: the rebuild-note SQL applied over an unknown hs_youtube_video_rebuild"; exit 1
+fi
+echo "ok rebuild-note guard refuses an unknown hs_youtube_video_rebuild"
+$P -f "$ROOT/docs/youtube-video-rebuild.sql" >/dev/null   # put the step-8 rebuild back (live before this change)
+$P -f "$ROOT/docs/youtube-video-rebuild-applies-note.sql" >/dev/null
+$P -f "$ROOT/docs/youtube-video-rebuild-applies-note.sql" >/dev/null
+echo "ok rebuild-note applies twice"
+$P -f "$HERE/rebuild-note.sql"
