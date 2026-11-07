@@ -6639,3 +6639,20 @@ Titles & thumbnail edits `packaging.thumbnail.subline` (the existing line editor
 Distribution shows, on the Bluesky post, "Action link included · deadline …", "Edited by hand · kept as written" or
 "Leaves out the verified action link", and lists `derived.variants.actions` with Open / Closed / Verified states; Visuals
 shows the thumbnail's sentence and CTA from the manifest. Test: `test/impact-stories.browser.test.mjs` (distribution).
+
+## TAB 16: A FILE BUILT FROM AN OLDER SCRIPT IS "OUT OF DATE" AND CANNOT BE APPROVED (2026-11-07)
+
+Founder: "fix this error so never happens again". Video 3014's main video version 4 was rebuilt at 15:16Z from a script
+six minutes older than the founder's checklist note (#1051, 15:21Z) and showed as "Revised, awaiting review", checklist
+included; its thumbnail v4 likewise predated the sentence and action line (#1060). SQL of record
+`docs/youtube-video-outdated.sql` (after `docs/youtube-video-rebuild-applies-note.sql`; splices the live list and
+file_decide, md5-guarded). Engine half: homesignal-ingest `scripts/video_project_heads.py` (CLAUDE.md there).
+- **One decision, `_hs_yv_file_outdated(slug, key)`:** the version's recorded fingerprint (`meta.project_fp`, from the
+  worker; for an original upload, the review row's) against `youtube_video_project_heads` (the script on main). The
+  thumbnail compares `all`; the videos compare `video`, which leaves out thumbnail, action links, YouTube texts and notes,
+  so a thumbnail-only change never flags a video. No fingerprint: out of date when the script changed after the file was
+  made. No head (project not on main): unknown, blocks nothing.
+- `hs_youtube_videos_list` sends `outdated` per file; `hs_youtube_video_file_decide` refuses to approve an out-of-date file
+  (55006). The page says "Out of date", disables Approve and makes Full rebuild the main button.
+- Tests: `test/youtube_video_revision_plans_pg/outdated.sql` (production's decide body, `live-decide.sql`),
+  `test/youtube-video-outdated.browser.test.mjs`.
