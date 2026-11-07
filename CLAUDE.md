@@ -6611,3 +6611,11 @@ every build, and at most 25% of its narration may repeat the original's.
   impact-stories.sql still applies on a database without impact-discovery.sql.
 - **Apply order:** merge homesignal-ingest first, then `docs/impact-stories.sql`, then `docs/impact-discovery.sql`, then the page.
 - Tests: `test/impact_discovery_pg` §20 (20a-20o), `test/impact-stories-another-video.browser.test.mjs`, `test/impact-stories.test.mjs`.
+
+## IMPACT STORIES, TAB 17: THUMBNAIL SENTENCE AND THE BLUESKY ACTION LINK (2026-11-07)
+
+Engine half: homesignal-ingest CLAUDE.md "THUMBNAIL SENTENCE AND VERIFIED ACTION LINKS". The page decides nothing:
+Titles & thumbnail edits `packaging.thumbnail.subline` (the existing line editor and line-note path; no SQL change);
+Distribution shows, on the Bluesky post, "Action link included · deadline …", "Edited by hand · kept as written" or
+"Leaves out the verified action link", and lists `derived.variants.actions` with Open / Closed / Verified states; Visuals
+shows the thumbnail's sentence and CTA from the manifest. Test: `test/impact-stories.browser.test.mjs` (distribution).
