@@ -1287,7 +1287,7 @@ begin
       into sd, nrej, more from public._hs_is_shot_decisions(m.id) d;
     -- What the founder asked a shot to show (founder, 2026-11-06/07): the note on "Need new photo" OR on a Reject. The
     -- engine searches those words for that shot's subject and puts a photo found for it on that shot. A request lasts
-    -- across preparations: it is the shot's newest decision on ANY previews made from this narrative, so preparing again
+    -- across preparations: it is the shot's newest decision on ANY previews made from the APPROVED narrative, so preparing again
     -- before deciding on the new previews never drops it. Approving the shot (on new previews) ends it.
     select coalesce(jsonb_agg(jsonb_build_object('subject_id', q.subject_id, 'asset', q.asset, 'shot_id', q.shot_id, 'note', q.note)
                               order by q.asset, q.shot_id), '[]'::jsonb)
@@ -1295,7 +1295,7 @@ begin
       from (select distinct on (d.asset, d.shot_id) d.*
               from public.impact_story_shot_decisions d
               join public.impact_story_visual_manifests m2 on m2.id = d.manifest_id
-             where m2.story_id = p_story and m2.narrative_hash = m.narrative_hash
+             where m2.story_id = p_story and m2.narrative_hash = na->>'hash' and na->>'state' = 'approved'   -- the approved script only (Codex, #2665)
              order by d.asset, d.shot_id, d.id desc) q
      where q.decision in ('new_photo', 'rejected') and q.subject_id is not null and nullif(btrim(q.note), '') is not null;
     -- A shot approved on the previous previews whose picture did not change shows as approved again ("Approved
