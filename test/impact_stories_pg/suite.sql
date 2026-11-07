@@ -575,7 +575,7 @@ select public.hs_impact_story_job_retry(pg_temp.id('r1')::uuid);
 select public.hs_impact_story_job_claim(pg_temp.id('r1')::uuid);
 select public.hs_impact_story_job_complete(pg_temp.id('r1')::uuid, jsonb_build_object('assets', pg_temp.files(pg_temp.id('r1')::uuid)));
 select pg_temp.chk('12i four files recorded, each pending review', (select count(*) from public.impact_story_assets) = 4
-   and pg_temp.fst('main') = 'pending' and pg_temp.stage() = 'media' and pg_temp.nxt() = 'Review each video and the thumbnail'
+   and pg_temp.fst('main') = 'pending' and pg_temp.stage() = 'media' and pg_temp.nxt() = 'Review these: main video, Short A, Short B, thumbnail'
    and public._hs_is_status(pg_temp.id('s')::uuid)->>'library' = 'needs_review'
    and jsonb_array_length(public.hs_impact_story_get(pg_temp.id('s')::uuid)->'media'->'files') = 4);
 select pg_temp.chk('12i2 finished videos are the founder''s turn; made with today''s engine, so no hum',
@@ -614,6 +614,8 @@ select pg_temp.chk('12k2 a second fix request does not remove the first: both li
    and public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests'->0->>'asset' = 'main'
    and public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests'->1->>'asset' = 'thumbnail'
    and not exists (select 1 from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests') x where x->>'status' <> 'open'));
+select pg_temp.chk('12k3 the next step follows the review: two fix requests saved and not sent, so the step says to send them',
+   pg_temp.nxt() = 'Send your 2 fix requests with Fix in Media review' and public._hs_is_status(pg_temp.id('s')::uuid)->>'owner' = 'you');
 -- Start fixes: the two open requests go out as one batch, the fixer claims it and records what it did.
 select pg_temp.as_user('stranger@example.com');
 select pg_temp.chk('12f1 non-admin cannot start fixes', pg_temp.err(format('select public.hs_impact_story_fix_start(%L)', pg_temp.id('s'))) like '42501%');
@@ -631,6 +633,8 @@ select pg_temp.chk('12f3 Fix queues one batch carrying both open requests, PLAN 
    and public._hs_is_media(pg_temp.id('s')::uuid)->'fix_batch'->>'phase' = 'plan'
    and (public._hs_is_media(pg_temp.id('s')::uuid)->'fix_batch'->>'requests')::int = 2
    and not exists (select 1 from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests') x where x->'batch'->>'status' <> 'plan_queued'));
+select pg_temp.chk('12f3b sent: Claude is writing the plan, so it is not the founder''s turn',
+   pg_temp.nxt() like 'Claude is reading your fix requests%' and public._hs_is_status(pg_temp.id('s')::uuid)->>'owner' = 'working');
 select pg_temp.chk('12f4 a second press returns the same batch', (public.hs_impact_story_fix_start(pg_temp.id('s')::uuid)->>'existing')::boolean
    and (select count(*) from public.impact_story_fix_batches) = 1);
 select pg_temp.chk('12f4b Fix starts the PLAN run on main for this batch, and a second press while waiting starts it again',
@@ -680,6 +684,8 @@ select pg_temp.chk('12P5 the plan is waiting for the founder: the page shows it 
    and jsonb_array_length(public.impact_fix_batches_list()) = 0
    and (public.hs_impact_story_fix_start(pg_temp.id('s')::uuid)->>'existing')::boolean
    and (select count(*) from net.requests where url like '%impact-fix-run.yml%') = 2);
+select pg_temp.chk('12P5b a plan waiting for Confirm is the founder''s turn and the step says so',
+   pg_temp.nxt() like 'Read Claude''s fix plan%' and public._hs_is_status(pg_temp.id('s')::uuid)->>'owner' = 'you');
 select pg_temp.chk('12P6 confirm needs the plan the page showed', pg_temp.err(format('select public.hs_impact_story_fix_confirm(%L, %L, %L)',
    pg_temp.id('s'), pg_temp.id('fb'), 'stale-md5')) like '%plan changed since this page loaded%'
    and (select status from public.impact_story_fix_batches) = 'planned');
@@ -705,6 +711,8 @@ select pg_temp.chk('12f6 claimed: working, out of the list, cannot be claimed tw
    public._hs_is_media(pg_temp.id('s')::uuid)->'fix_batch'->>'status' = 'working'
    and jsonb_array_length(public.impact_fix_batches_list()) = 0
    and pg_temp.err(format('select public.impact_fix_batch_claim(%L)', pg_temp.id('fb'))) like '55000%');
+select pg_temp.chk('12f6d the fixer is working: not the founder''s turn',
+   pg_temp.nxt() like 'Claude is making the fixes%' and public._hs_is_status(pg_temp.id('s')::uuid)->>'owner' = 'working');
 select pg_temp.chk('12f7 completion is checked: a summary, every request accounted for, no stray ids, a needs_you request is not done',
    pg_temp.err(format('select public.impact_fix_batch_complete(%L, %L)', pg_temp.id('fb'), '{"status":"done","outcomes":[]}')) like '%say what was done%'
    and pg_temp.err(format('select public.impact_fix_batch_complete(%L, %L)', pg_temp.id('fb'), '{"status":"done","summary":"x","outcomes":[]}')) like '%every request needs an outcome%'
