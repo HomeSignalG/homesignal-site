@@ -1014,6 +1014,36 @@ dtxt = await page.locator('#is-next-box').innerText();
 ok(/working on it/i.test(dtxt) && /Nothing is needed from you/.test(dtxt) && await page.locator('#is #is-next-box button').count() === 0,
    'picture drift while the fixer works: the top box says nothing is needed, with no buttons');
 await page.evaluate(() => { window.db.status = window.__beforeDrift.status; window.db.media = window.__beforeDrift.media; });
+// A render that stopped on news the script does not tell (founder, 2026-11-07: "there are no buttons ... build the
+// buttons"). The two items are the ones from the methane story's failed render.
+await page.evaluate(() => {
+  window.__beforeNews = { status: window.db.status, media: JSON.parse(JSON.stringify(window.db.media)) };
+  const base = window.db.status; window.db.media.fix_batch = null;
+  window.db.status = () => Object.assign(base(), { stage: 'media', owner: 'you',
+    job: { id: 'jnews', kind: 'render', status: 'failed', attempts: 1, created_at: '2026-11-07T18:00:00Z',
+      error: 'Nothing was rendered: Outdated status: The proposed amendments ...',
+      outdated: [{ key: 'a'.repeat(32), source: 'https://www.rrc.texas.gov/news/', summary: 'The proposed amendments to rules §§ 3.15 and 3.58, related to Senate Bill 1150 (89th Legislative Session, 2025), have been posted for public comment.', videos: ['main', 'short_a'] },
+                 { key: 'b'.repeat(32), source: 'https://www.rrc.texas.gov/news/', summary: 'The RRC will host a hybrid public hearing to receive verbal comments, beginning at 10 a.m., on Friday, November 20, 2026.', videos: ['main'] }] } });
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(80);
+let ntxt = await page.locator('#is-next-box').innerText();
+ok(!/Something went wrong/i.test(ntxt) && /Is it about this story/.test(ntxt) && /November 20, 2026/.test(ntxt) && /rrc\.texas\.gov/.test(ntxt)
+   && await page.locator('#is #is-next-box [data-act=curupdate]').count() === 1 && await page.locator('#is #is-next-box [data-act=curdismiss]').count() === 1
+   && await page.locator('#is #is-next-box [data-act=retry]').count() === 0,
+   'news stop: the box lists the news and offers Update the story / Not about this story, never a bare Retry');
+await page.click('#is #is-next-box [data-act=curdismiss]'); await page.waitForTimeout(60);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_currency_dismiss' && c[1].p_job === 'jnews'
+   && c[1].p_keys.join() === ['a'.repeat(32), 'b'.repeat(32)].join())), 'news stop: Not about this story sends every item of that job');
+await page.evaluate(() => window.HS.acqImpactStories.load(window.client, document.getElementById('is'))); await page.waitForTimeout(80);
+await page.click('#is #is-next-box [data-act=curupdate]'); await page.waitForTimeout(60);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_currency_update' && c[1].p_job === 'jnews')), 'news stop: Update the story sends the job to Fix');
+await page.evaluate(() => { window.db.media.fix_batch = { status: 'planning', requests: 1, requested_at: '2026-11-07T18:10:00Z' }; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(80);
+ntxt = await page.locator('#is-next-box').innerText();
+ok(/Working on it/i.test(ntxt) && /writing a plan/.test(ntxt) && await page.locator('#is #is-next-box button').count() === 0,
+   'news stop while Claude reads the record: nothing is asked of you');
+await page.evaluate(() => { window.db.status = window.__beforeNews.status; window.db.media = window.__beforeNews.media; });
 // A failed Generate while current videos are on file (founder, 2026-11-07, EPA methane story: an error in a green tile):
 // one action box, red, at the top; Media review adds no box of its own.
 await page.evaluate(() => {

@@ -272,6 +272,24 @@ create table if not exists public.impact_story_line_notes (
   check (kind = 'withdraw' or note is not null)
 );
 create index if not exists impact_story_line_notes_story on public.impact_story_line_notes (story_id, id);
+
+-- News the latest-development check found that the founder marked "Not about this story" (Tab 17, 2026-11-07: "there
+-- are no buttons to give me options"). event_key = md5("<source>|<summary>") of one event of a failed job's result, the
+-- same bytes homesignal-ingest impact/currency.py event_key hashes. The worker gets the keys with the story
+-- (hs_impact_story_job_claim, currency_dismissed) and lists those events as ignored instead of blocking. Append-only.
+create table if not exists public.impact_story_currency_dismissals (
+  id        bigserial primary key,
+  story_id  uuid not null references public.impact_stories(id),
+  event_key text not null check (event_key ~ '^[0-9a-f]{32}$'),
+  source    text,
+  summary   text,
+  job_id    uuid,
+  actor     text not null,
+  at        timestamptz not null default now(),
+  unique (story_id, event_key)
+);
+alter table public.impact_story_currency_dismissals enable row level security;
+revoke all on public.impact_story_currency_dismissals from public, anon, authenticated;
 alter table public.impact_story_line_notes enable row level security;
 revoke all on public.impact_story_line_notes from public, anon, authenticated;
 
@@ -494,6 +512,9 @@ create or replace function public._hs_is_append_only() returns trigger language 
 begin raise exception 'impact story % rows are append-only', tg_table_name using errcode = '42501'; end $$;
 drop trigger if exists impact_story_approvals_append_only on public.impact_story_approvals;
 create trigger impact_story_approvals_append_only before update or delete on public.impact_story_approvals
+  for each row execute function public._hs_is_append_only();
+drop trigger if exists impact_story_currency_dismissals_append_only on public.impact_story_currency_dismissals;
+create trigger impact_story_currency_dismissals_append_only before update or delete on public.impact_story_currency_dismissals
   for each row execute function public._hs_is_append_only();
 drop trigger if exists impact_story_uploads_append_only on public.impact_story_uploads;
 create trigger impact_story_uploads_append_only before update or delete on public.impact_story_uploads
@@ -962,6 +983,7 @@ begin
       'created_at', j.created_at, 'started_at', j.started_at, 'completed_at', j.completed_at,
       'not_started', public._hs_is_not_started(j) is not null,
       'visuals_changed', public._hs_is_visuals_changed(j.kind, j.status, j.result, j.error),
+      'outdated', case when j.status = 'failed' then public._hs_is_outdated_events(j.result) else '[]'::jsonb end,
       'stuck', (j.status in ('queued', 'running') and j.created_at < now() - public._hs_is_stuck_after(j.kind))
                or public._hs_is_not_started(j) is not null) end);
 end $$;
@@ -1902,7 +1924,9 @@ begin
   select * into s from public.impact_stories where id = j.story_id;
   select * into v from public.impact_story_versions where story_id = j.story_id and version = j.base_version;
   return jsonb_build_object('claimed', true, 'id', j.id, 'kind', j.kind, 'input', j.input, 'base_version', j.base_version,
-    'story', jsonb_build_object('id', s.id, 'video_slug', s.video_slug, 'title', s.title, 'pack', s.pack),
+    'story', jsonb_build_object('id', s.id, 'video_slug', s.video_slug, 'title', s.title, 'pack', s.pack,
+               'currency_dismissed', coalesce((select jsonb_agg(d.event_key order by d.event_key)
+                 from public.impact_story_currency_dismissals d where d.story_id = s.id), '[]'::jsonb)),
     'base_body', v.body, 'asset_choices', coalesce(j.input->'asset_choices', '[]'::jsonb));
 end $$;
 
@@ -2319,6 +2343,75 @@ returns jsonb language sql stable security definer set search_path = public as $
      where c->'pending'->>'status' = 'proposed') q
 $$;
 
+-- The newer events a failed job stopped on (its result's latest-development check), each with the key the engine uses.
+create or replace function public._hs_is_outdated_events(p_result jsonb)
+returns jsonb language sql immutable set search_path = public as $$
+  select coalesce(jsonb_agg(jsonb_build_object('key', md5(coalesce(e->>'source', '') || '|' || coalesce(e->>'summary', '')),
+           'source', e->>'source', 'summary', e->>'summary', 'date', e->>'date',
+           'videos', case when jsonb_typeof(e->'videos') = 'array' then e->'videos' else '[]'::jsonb end) order by o), '[]'::jsonb)
+    from jsonb_array_elements(case when jsonb_typeof(p_result->'currency'->'events') = 'array'
+                                   then p_result->'currency'->'events' else '[]'::jsonb end) with ordinality x(e, o)
+$$;
+
+-- "Not about this story": the founder marks news the check found as unrelated (only events this failed job stopped on).
+-- When every event is marked, the job runs again at once; the check then lists them as ignored.
+create or replace function public.hs_impact_story_currency_dismiss(p_job uuid, p_keys text[])
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); j public.impact_story_jobs%rowtype; ev jsonb; x jsonb; k text; left_n int;
+begin
+  select * into j from public.impact_story_jobs where id = p_job for update;
+  if not found then raise exception 'no such job' using errcode = 'P0002'; end if;
+  ev := case when j.status = 'failed' then public._hs_is_outdated_events(j.result) else '[]'::jsonb end;
+  if jsonb_array_length(ev) = 0 then
+    raise exception 'This job did not stop on newer news, so there is nothing to mark.' using errcode = '55000';
+  end if;
+  if coalesce(cardinality(p_keys), 0) = 0 then raise exception 'Choose at least one news item.' using errcode = '22023'; end if;
+  perform 1 from public.impact_stories where id = j.story_id and archived_at is null;
+  if not found then raise exception 'This story is archived. Restore it first.' using errcode = '55000'; end if;
+  foreach k in array p_keys loop
+    select y into x from jsonb_array_elements(ev) y where y->>'key' = k;
+    if x is null then raise exception 'That news item is not one this job stopped on. Reload the page.' using errcode = '22023'; end if;
+    insert into public.impact_story_currency_dismissals (story_id, event_key, source, summary, job_id, actor)
+    values (j.story_id, k, x->>'source', left(x->>'summary', 2000), j.id, e) on conflict (story_id, event_key) do nothing;
+    x := null;
+  end loop;
+  perform public._hs_is_event(j.story_id, 'currency_dismissed', jsonb_build_object('job_id', j.id, 'keys', to_jsonb(p_keys)), e);
+  select count(*) into left_n from jsonb_array_elements(ev) y
+   where not exists (select 1 from public.impact_story_currency_dismissals d where d.story_id = j.story_id and d.event_key = y->>'key');
+  if left_n > 0 then return jsonb_build_object('retried', false, 'remaining', left_n); end if;
+  return public._hs_is_retry(p_job, e) || jsonb_build_object('remaining', 0);
+end $$;
+
+-- "Update the story with this news": one research note naming the news (path main.status, read by the fixer as "every
+-- line that states the status"), then Fix: Claude reads the newest record, adds it to the pack and writes a plan that the
+-- founder confirms. A second press while that note is open or with Claude adds no second note.
+create or replace function public.hs_impact_story_currency_update(p_job uuid)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); j public.impact_story_jobs%rowtype; s public.impact_stories%rowtype; ev jsonb; nt text; nid bigint;
+begin
+  select * into j from public.impact_story_jobs where id = p_job;
+  if not found then raise exception 'no such job' using errcode = 'P0002'; end if;
+  ev := case when j.status = 'failed' then public._hs_is_outdated_events(j.result) else '[]'::jsonb end;
+  if jsonb_array_length(ev) = 0 then
+    raise exception 'This job did not stop on newer news, so there is nothing to update.' using errcode = '55000';
+  end if;
+  select * into s from public.impact_stories where id = j.story_id for update;
+  if s.archived_at is not null then raise exception 'This story is archived. Restore it first.' using errcode = '55000'; end if;
+  select string_agg(format('"%s" (%s; not told in: %s)', left(y->>'summary', 220), coalesce(y->>'source', 'our notices'),
+           coalesce((select string_agg(v, ', ') from jsonb_array_elements_text(y->'videos') v), 'main')), '; ')
+    into nt from jsonb_array_elements(ev) y;
+  nt := left('A source read again shows something newer than the script says: ' || nt, 900) ||
+        ' Read the newest record, add it to the source pack, and update every line that states the status.';
+  select (l->>'id')::bigint into nid from jsonb_array_elements(public._hs_is_line_notes(s.id)) l
+   where l->>'status' in ('open', 'sending') and l->>'path' = 'main.status' limit 1;
+  if nid is null then
+    insert into public.impact_story_line_notes (story_id, version, path, line_text, kind, note, actor)
+    values (s.id, s.current_version, 'main.status', null, 'research', nt, e) returning id into nid;
+    perform public._hs_is_event(s.id, 'line_note', jsonb_build_object('id', nid, 'path', 'main.status', 'research', true, 'from_job', j.id), e);
+  end if;
+  return public.hs_impact_story_fix_start(s.id) || jsonb_build_object('note_id', nid);
+end $$;
+
 -- Save a note on one script line. p_research = true asks the fixer to look up the official documents first.
 create or replace function public.hs_impact_story_line_note(p_story uuid, p_path text, p_line text, p_note text, p_research boolean default false)
 returns jsonb language plpgsql security definer set search_path = public as $$
@@ -2671,7 +2764,7 @@ begin
     'public._hs_is_stuck_after(text)', 'public._hs_is_media(uuid)', 'public._hs_is_not_started(public.impact_story_jobs)',
     'public._hs_is_request(uuid, text, text, boolean, text)', 'public._hs_is_choices(uuid)',
     'public._hs_is_fix_batch(uuid)', 'public._hs_is_fix_eligible(uuid)', 'public._hs_is_auto_fix(uuid, uuid)', 'public._hs_is_fix_dispatch(uuid, text)', 'public._hs_is_fix_checks(uuid)',
-    'public._hs_is_line_notes(uuid)',
+    'public._hs_is_line_notes(uuid)', 'public._hs_is_outdated_events(jsonb)',
     'public._hs_is_choice_key(uuid)', 'public._hs_is_visuals(uuid)', 'public._hs_is_rejections(uuid)', 'public._hs_is_shot_decisions(bigint)',
     'public._hs_is_shot_print(jsonb)', 'public._hs_is_creator_hash(jsonb)', 'public._hs_is_creator_problems(jsonb)',
     'public._hs_is_creator_require(jsonb)', 'public._hs_is_creator_state(uuid)',
@@ -2682,7 +2775,8 @@ begin
     'public.hs_impact_story_catalog()', 'public.hs_impact_story_list()', 'public.hs_impact_story_get(uuid)',
     'public.hs_impact_story_version(uuid, integer)', 'public.hs_impact_story_create(text, text)', 'public.hs_impact_story_duplicate(uuid)',
     'public.hs_impact_story_archive(uuid, text, boolean)', 'public.hs_impact_story_request(uuid, text, text, boolean)',
-    'public.hs_impact_story_job_retry(uuid)', 'public.hs_impact_story_save(uuid, integer, jsonb, text)',
+    'public.hs_impact_story_job_retry(uuid)', 'public.hs_impact_story_currency_dismiss(uuid, _text)', 'public.hs_impact_story_currency_update(uuid)',
+    'public.hs_impact_story_save(uuid, integer, jsonb, text)',
     'public.hs_impact_story_angle(uuid, integer, text, text)', 'public.hs_impact_story_decide(uuid, text, text, integer, text, text)',
     'public.hs_impact_story_section_revision(uuid, integer, text, text)', 'public.hs_impact_story_render(uuid, integer, boolean)',
     'public.hs_impact_story_media_decide(uuid, bigint, text, text, text)', 'public.hs_impact_story_choose_asset(uuid, uuid, text, text)',

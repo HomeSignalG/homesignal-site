@@ -567,6 +567,45 @@ select pg_temp.chk('12z3 a render failed before the code existed is read from th
   and not public._hs_is_visuals_changed('render', 'failed', null, 'The render failed: OSError')
   and not public._hs_is_visuals_changed('visuals', 'failed', '{"code":"visuals_changed"}', null));
 rollback;
+-- 12o1-12o6 (2026-11-07): a render that stopped on newer news offers "Not about this story" and "Update the story".
+begin;
+select public.hs_impact_story_job_claim(pg_temp.id('r1')::uuid);
+select public.hs_impact_story_job_fail(pg_temp.id('r1')::uuid, 'Nothing was rendered: Outdated status: rule 3.15 comments.',
+  '{"blocked":true,"failures":[{"code":"outdated_status"}],"currency":{"state":"stale","events":[
+    {"source":"https://rrc.texas.gov/x","summary":"The proposed amendments to rules 3.15 and 3.58 have been posted for public comment.","videos":["main","short_a"]},
+    {"source":"https://rrc.texas.gov/x","summary":"The RRC will host a hearing on November 20, 2026.","videos":["main"]}]}}'::jsonb);
+select pg_temp.chk('12o1 the page gets each news item with the engine''s key',
+  jsonb_array_length(public._hs_is_status(pg_temp.id('s')::uuid)->'job'->'outdated') = 2
+  and public._hs_is_status(pg_temp.id('s')::uuid)->'job'->'outdated'->0->>'key'
+      = md5('https://rrc.texas.gov/x|The proposed amendments to rules 3.15 and 3.58 have been posted for public comment.'));
+select pg_temp.chk('12o2 a key the job did not stop on is refused',
+  pg_temp.err(format('select public.hs_impact_story_currency_dismiss(%L, %L)', pg_temp.id('r1'), '{' || repeat('0', 32) || '}')) like '22023%');
+select public.hs_impact_story_currency_dismiss(pg_temp.id('r1')::uuid,
+  array[md5('https://rrc.texas.gov/x|The proposed amendments to rules 3.15 and 3.58 have been posted for public comment.')]);
+select pg_temp.chk('12o3 one of two marked: nothing runs yet, the mark is kept',
+  (pg_temp.lastjob()).status = 'failed'
+  and (select count(*) from public.impact_story_currency_dismissals where story_id = pg_temp.id('s')::uuid) = 1);
+select pg_temp.chk('12o4 all marked: the render runs again and the worker gets the keys',
+  (public.hs_impact_story_currency_dismiss(pg_temp.id('r1')::uuid, array[md5('https://rrc.texas.gov/x|The RRC will host a hearing on November 20, 2026.')])->>'retried')::boolean
+  and (pg_temp.lastjob()).status = 'queued'
+  and jsonb_array_length(public.hs_impact_story_job_claim(pg_temp.id('r1')::uuid)->'story'->'currency_dismissed') = 2);
+select pg_temp.chk('12o5 a mark cannot be changed or deleted',
+  pg_temp.err('delete from public.impact_story_currency_dismissals') is not null);
+rollback;
+begin;
+select public.hs_impact_story_job_claim(pg_temp.id('r1')::uuid);
+select public.hs_impact_story_job_fail(pg_temp.id('r1')::uuid, 'Nothing was rendered: Outdated status.',
+  '{"currency":{"events":[{"source":"https://rrc.texas.gov/x","summary":"A hearing on November 20, 2026.","videos":["main"]}]}}'::jsonb);
+select public.hs_impact_story_currency_update(pg_temp.id('r1')::uuid);
+select public.hs_impact_story_currency_update(pg_temp.id('r1')::uuid);
+select pg_temp.chk('12o6 Update the story: one research note naming the news, sent to Fix as a plan',
+  (select count(*) from public.impact_story_line_notes where story_id = pg_temp.id('s')::uuid and path = 'main.status' and kind = 'research'
+     and note like '%A hearing on November 20, 2026.%') = 1
+  and exists (select 1 from public.impact_story_fix_batches where story_id = pg_temp.id('s')::uuid and status = 'plan_queued'
+     and requests::text like '%main.status%'));
+rollback;
+select pg_temp.chk('12o7 a job that did not stop on news has nothing to mark or update',
+  pg_temp.err(format('select public.hs_impact_story_currency_update(%L)', pg_temp.id('r1'))) like '55000%');
 select pg_temp.chk('12f the worker gets the approved body', (public.hs_impact_story_job_claim(pg_temp.id('r1')::uuid)->'base_body'->>'schema') = 'impact-story/2');
 select public.hs_impact_story_job_complete(pg_temp.id('r1')::uuid, jsonb_build_object('assets',
   (select jsonb_agg(x) from jsonb_array_elements(pg_temp.files(pg_temp.id('r1')::uuid)) x where x->>'asset' <> 'thumbnail')));

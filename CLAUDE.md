@@ -6639,3 +6639,17 @@ Titles & thumbnail edits `packaging.thumbnail.subline` (the existing line editor
 Distribution shows, on the Bluesky post, "Action link included · deadline …", "Edited by hand · kept as written" or
 "Leaves out the verified action link", and lists `derived.variants.actions` with Open / Closed / Verified states; Visuals
 shows the thumbnail's sentence and CTA from the manifest. Test: `test/impact-stories.browser.test.mjs` (distribution).
+
+## IMPACT STORIES, TAB 17: A STOP ON NEWER NEWS HAS TWO BUTTONS (2026-11-07)
+
+Founder: "there are no buttons to give me options to do something. build the buttons". A render or Prepare that stopped
+on the latest-development check (engine homesignal-ingest `impact/currency.py`, "Outdated status") showed only Retry,
+which stops the same way. `_hs_is_status.job.outdated` now lists the news items of a failed job's result, each with the
+engine's key (`md5("<source>|<summary>")`, `_hs_is_outdated_events`), and the top box (`outdatedBox`) asks "Is it about
+this story?":
+- **Yes: update the story** → `hs_impact_story_currency_update(job)`: one research line note on path `main.status`
+  naming the news (no second note while one is open or with Claude), then Fix (plan → you confirm → work).
+- **No: not about this story** → `hs_impact_story_currency_dismiss(job, keys)`: only keys that job stopped on; kept in
+  `impact_story_currency_dismissals` (append-only, RLS on, no visitor grants); when every item is marked the job runs
+  again. The claim sends the keys as `story.currency_dismissed`; the engine lists those events as ignored.
+- Tests: `test/impact_stories_pg` 12o1-12o7, `test/impact-stories.browser.test.mjs` ("news stop").
