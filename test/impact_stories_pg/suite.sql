@@ -384,12 +384,40 @@ select pg_temp.chk('12V27c rejecting a shot after Approve all undoes the approva
 select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'thumbnail', 'thumbnail', 'approved');
 select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'main', 'a1-s1', 'new_photo');
 select pg_temp.chk('12V28 Need new photo asks the next Prepare to search for that shot''s subject',
-  pg_temp.vis()->'more_photos_for' = '["oak-trees"]'::jsonb and pg_temp.vis()->>'state' = 'approved');
+  pg_temp.vis()->'more_photos_for' = '["oak-trees"]'::jsonb and pg_temp.vis()->>'state' = 'approved'
+  and pg_temp.vis()->'photo_requests' = '[]'::jsonb);   -- no description: a plain search, not a request
+-- 12V28a (2026-11-06): Need new photo with what the photo should show and why: listed as a request for that shot
+select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'main', 'a1-s1', 'new_photo',
+  E'A photo of Hakeem Jeffries\n\nWhy not this one: the Capitol says nothing about who is running');
+select pg_temp.chk('12V28a a described request is listed for its shot, with the founder''s words',
+  pg_temp.vis()->'photo_requests' = jsonb_build_array(jsonb_build_object('subject_id', 'oak-trees', 'asset', 'main', 'shot_id', 'a1-s1',
+    'note', E'A photo of Hakeem Jeffries\n\nWhy not this one: the Capitol says nothing about who is running'))
+  and pg_temp.vis()->'more_photos_for' = '["oak-trees"]'::jsonb);
 select public.hs_impact_story_visuals_prepare(pg_temp.id('s')::uuid, pg_temp.cur(), true);
-select pg_temp.chk('12V28b the Prepare job carries it', (pg_temp.lastjob()).input->'more_photos_for' = '["oak-trees"]'::jsonb);
+select pg_temp.chk('12V28b the Prepare job carries it', (pg_temp.lastjob()).input->'more_photos_for' = '["oak-trees"]'::jsonb
+  and (pg_temp.lastjob()).input->'photo_requests'->0->>'shot_id' = 'a1-s1'
+  and (pg_temp.lastjob()).input->'photo_requests'->0->>'note' like 'A photo of Hakeem Jeffries%');
 select public.hs_impact_story_job_claim((pg_temp.lastjob()).id);
 select public.hs_impact_story_job_complete((pg_temp.lastjob()).id, jsonb_build_object('manifest', jsonb_set(pg_temp.vman((pg_temp.lastjob()).id), '{assets,main,shots,0,subject_ref}', '"oak-trees"')));
-select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'main', 'a1-s1', 'rejected');
+-- 12V28c (2026-11-07): preparing again before deciding on the new previews does not drop the request
+select pg_temp.chk('12V28c a request lasts across preparations until the shot is decided again',
+  pg_temp.vis()->'photo_requests'->0->>'shot_id' = 'a1-s1'
+  and pg_temp.vis()->'photo_requests'->0->>'note' like 'A photo of Hakeem Jeffries%');
+select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'main', 'a1-s1', 'rejected',
+  'The photo needs to be of jeffries');
+select pg_temp.chk('12V28d a Reject with a note asks for what the note says (founder, 2026-11-07)',
+  pg_temp.vis()->'photo_requests' = jsonb_build_array(jsonb_build_object('subject_id', 'oak-trees', 'asset', 'main', 'shot_id', 'a1-s1',
+    'note', 'The photo needs to be of jeffries')));
+-- 12V28f (Codex, #2665): once another script is approved and before its first previews, no request from the old
+-- script's previews is sent (shot ids can be reused by the new script)
+create temp table v28 as select id, narrative_hash from public.impact_story_visual_manifests;
+alter table public.impact_story_visual_manifests disable trigger user;
+update public.impact_story_visual_manifests set narrative_hash = 'old-script';
+select pg_temp.chk('12V28f requests from previews of another script are not carried',
+  pg_temp.vis()->'photo_requests' = '[]'::jsonb);
+update public.impact_story_visual_manifests m set narrative_hash = v.narrative_hash from v28 v where v.id = m.id;
+alter table public.impact_story_visual_manifests enable trigger user;
+select pg_temp.chk('12V28g restored', pg_temp.vis()->'photo_requests'->0->>'note' = 'The photo needs to be of jeffries');
 select pg_temp.chk('12V29 rejecting a shot that shows a photo rejects the photo; decisions are append-only',
   pg_temp.vis()->'rejected'->0->>'id' = 'oak' and pg_temp.vis()->>'state' = 'stale'
   and jsonb_array_length(pg_temp.vis()->'more_photos_for') = 0
@@ -402,6 +430,7 @@ select public.hs_impact_story_job_claim((pg_temp.lastjob()).id);
 select public.hs_impact_story_job_complete((pg_temp.lastjob()).id, jsonb_build_object('manifest', pg_temp.vman((pg_temp.lastjob()).id)));
 select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'thumbnail', 'thumbnail', 'approved');
 select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'main', 'a1-s1', 'approved');
+select pg_temp.chk('12V28e approving the shot on new previews ends its request', pg_temp.vis()->'photo_requests' = '[]'::jsonb);
 select pg_temp.chk('12V31a nothing is carried onto the previews the decisions were made on',
   jsonb_array_length(pg_temp.vis()->'carried_decisions') = 0);
 select public.hs_impact_story_visuals_prepare(pg_temp.id('s')::uuid, pg_temp.cur(), true);

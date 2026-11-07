@@ -307,9 +307,35 @@ await page.waitForTimeout(120);
 ok(await page.locator('#is [data-act=vshot][data-d=approved]').count() === 0 && await page.locator('#is [data-act=vshot][data-shot=a1-s1][data-d=rejected]').count() >= 1
    && await page.locator('#is [data-act=vshot][data-shot=a1-s1][data-d=new_photo]').count() >= 1,
    'visuals: every shot has Reject, and Need new photo when it is about a subject; approving is per act, not per shot');
+// Need new photo asks what the photo should show and why not this one (founder, 2026-11-06), before saving anything
+const nNew0 = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_impact_story_shot_decide').length);
 await page.locator('#is [data-act=vshot][data-shot=a1-s1][data-d=new_photo]').first().click(); await page.waitForTimeout(60);
-ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_shot_decide' && c[1].p_decision === 'new_photo' && c[1].p_asset === 'main' && c[1].p_shot === 'a1-s1' && c[1].p_manifest_id === 41 && c[1].p_expected_hash === 'a'.repeat(64))),
-   'visuals: Need new photo sends the shot and the previews the page showed');
+ok(await page.locator('#is #is-vask-want').count() === 1 && await page.locator('#is #is-vask-why').count() === 1
+   && await page.evaluate((n) => window.calls.filter((c) => c[0] === 'hs_impact_story_shot_decide').length === n, nNew0),
+   'visuals: Need new photo opens a box asking what the photo should show and why, and saves nothing yet');
+await page.locator('#is [data-act=vaskgo]').click(); await page.waitForTimeout(60);
+ok(/Say what the new photo should show/.test(await page.locator('#is').innerText())
+   && await page.evaluate((n) => window.calls.filter((c) => c[0] === 'hs_impact_story_shot_decide').length === n, nNew0),
+   'visuals: a request with no description is refused in the page');
+await page.locator('#is #is-vask-want').fill('A photo of Hakeem Jeffries');
+await page.locator('#is #is-vask-why').fill('The Capitol says nothing about who is running');
+// a background redraw (previews loading, a job poll) keeps what was typed (Codex, #2665)
+await page.evaluate(() => window.HS.acqImpactStories.load(window.client, document.getElementById('is'))); await page.waitForTimeout(150);
+ok(await page.locator('#is #is-vask-want').inputValue() === 'A photo of Hakeem Jeffries'
+   && await page.locator('#is #is-vask-why').inputValue() === 'The Capitol says nothing about who is running',
+   'visuals: a redraw keeps what was typed in the photo request box');
+await page.locator('#is [data-act=vaskgo]').click(); await page.waitForTimeout(80);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_shot_decide' && c[1].p_decision === 'new_photo' && c[1].p_asset === 'main' && c[1].p_shot === 'a1-s1' && c[1].p_manifest_id === 41 && c[1].p_expected_hash === 'a'.repeat(64)
+     && c[1].p_note === 'A photo of Hakeem Jeffries\n\nWhy not this one: The Capitol says nothing about who is running')),
+   'visuals: Need new photo sends the shot, the previews the page showed, and what the photo should show and why');
+// a request made on older previews is shown on the new ones (it lasts until the shot is approved, founder 2026-11-07)
+await page.evaluate(() => { window.db.visuals.photo_requests = [{ subject_id: 'oak-trees', asset: 'main', shot_id: 'a1-s1', note: 'The photo needs to be of jeffries' }];
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+ok(/You asked for: The photo needs to be of jeffries/.test(await page.locator('#is').innerText()),
+   'visuals: a request carried from earlier previews (a Reject note) shows under its shot');
+await page.evaluate(() => { delete window.db.visuals.photo_requests; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
 // a reject asks in the page, never in a browser pop-up
 await page.evaluate(() => { window.realConfirm = window.confirm; window.realPrompt = window.prompt;
   window.confirm = () => { throw new Error('no confirm pop-up in Visuals'); }; window.prompt = () => { throw new Error('no prompt pop-up in Visuals'); }; });
@@ -319,6 +345,7 @@ ok(await page.locator('#is #is-vask-note').count() === 1 && await page.locator('
    && await page.evaluate(() => document.activeElement && document.activeElement.id === 'is-vask-note')
    && await page.evaluate((n) => window.calls.filter((c) => c[0] === 'hs_impact_story_shot_decide').length === n, nDec0),
    'visuals: Reject opens a note box in the page (focused) and saves nothing yet');
+ok(/What should the photo show instead/.test(await page.locator('#is').innerText()), 'visuals: the Reject box asks what the photo should show instead');
 await page.click('#is [data-act=vaskno]'); await page.waitForTimeout(40);
 ok(await page.locator('#is #is-vask-note').count() === 0 && await page.evaluate((n) => window.calls.filter((c) => c[0] === 'hs_impact_story_shot_decide').length === n, nDec0),
    'visuals: Cancel closes the box and saves nothing');

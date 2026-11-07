@@ -1258,6 +1258,7 @@ declare s public.impact_stories%rowtype; na jsonb := public._hs_is_artifact_stat
         ck jsonb := public._hs_is_choice_key(p_story); m public.impact_story_visual_manifests%rowtype;
         ev public.impact_story_visual_events%rowtype; vj public.impact_story_jobs%rowtype; st text; why text; cur boolean := false;
         nblk int := 0; blocked jsonb; nrej int := 0; sd jsonb := '[]'::jsonb; more jsonb := '[]'::jsonb; ndrawn int := 0;
+        reqs jsonb := '[]'::jsonb;
         carried jsonb := '[]'::jsonb; cur_shots jsonb; cur_id bigint; changed boolean := false;
 begin
   select * into s from public.impact_stories where id = p_story;
@@ -1288,6 +1289,19 @@ begin
            count(*) filter (where d.decision = 'rejected' and d.photo_id is null and d.manifest_hash = m.manifest_hash),
            coalesce(jsonb_agg(distinct d.subject_id) filter (where d.decision = 'new_photo' and d.subject_id is not null), '[]'::jsonb)
       into sd, nrej, more from public._hs_is_shot_decisions(m.id) d;
+    -- What the founder asked a shot to show (founder, 2026-11-06/07): the note on "Need new photo" OR on a Reject. The
+    -- engine searches those words for that shot's subject and puts a photo found for it on that shot. A request lasts
+    -- across preparations: it is the shot's newest decision on ANY previews made from the APPROVED narrative, so preparing again
+    -- before deciding on the new previews never drops it. Approving the shot (on new previews) ends it.
+    select coalesce(jsonb_agg(jsonb_build_object('subject_id', q.subject_id, 'asset', q.asset, 'shot_id', q.shot_id, 'note', q.note)
+                              order by q.asset, q.shot_id), '[]'::jsonb)
+      into reqs
+      from (select distinct on (d.asset, d.shot_id) d.*
+              from public.impact_story_shot_decisions d
+              join public.impact_story_visual_manifests m2 on m2.id = d.manifest_id
+             where m2.story_id = p_story and m2.narrative_hash = na->>'hash' and na->>'state' = 'approved'   -- the approved script only (Codex, #2665)
+             order by d.asset, d.shot_id, d.id desc) q
+     where q.decision in ('new_photo', 'rejected') and q.subject_id is not null and nullif(btrim(q.note), '') is not null;
     -- A shot approved on the previous previews whose picture did not change shows as approved again ("Approved
     -- earlier, same picture"), unless it has a decision of its own on these previews. Shown only; the one "Approve all
     -- visuals" decision is unchanged and is still made on these previews.
@@ -1341,6 +1355,7 @@ begin
     'job', case when vj.id is null then null else jsonb_build_object('id', vj.id, 'status', vj.status, 'created_at', vj.created_at,
       'completed_at', vj.completed_at, 'error', vj.error) end,
     'blocked', blocked, 'rejected', ck->'rejected', 'shot_decisions', sd, 'carried_decisions', carried, 'more_photos_for', more,
+    'photo_requests', reqs,
     'last_decision', case when ev.id is null then null else jsonb_build_object('decision', ev.decision, 'actor', ev.actor,
       'at', ev.at, 'note', ev.note) end);
 end $$;
@@ -1365,7 +1380,8 @@ begin
   return public._hs_is_queue(p_story, 'visuals', jsonb_build_object('scope', 'visuals|' || (na->>'hash') || '|impact-render-3|' || (ck->>'key'),
     'narrative_hash', na->>'hash', 'renderer', 'impact-render-3', 'asset_choices', ck->'choices', 'choices_key', ck->>'key',
     'rejected_photos', ck->'rejected',
-    'more_photos_for', coalesce(public._hs_is_visuals(p_story)->'more_photos_for', '[]'::jsonb)), e, p_new);
+    'more_photos_for', coalesce(public._hs_is_visuals(p_story)->'more_photos_for', '[]'::jsonb),
+    'photo_requests', coalesce(public._hs_is_visuals(p_story)->'photo_requests', '[]'::jsonb)), e, p_new);
 end $$;
 
 -- Approve all visuals: ONE action for the whole set. Re-checks on the server what the page showed: the manifest is the
