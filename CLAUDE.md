@@ -97,10 +97,15 @@ production run, and written up. Everything before that fetch was sunk cost.
 spends the full cost and ships nothing; that ordering is the thing this grant exists to fix.
 
 ⚖️ **MERGE IS NOT A GATE (founder, 2026-09-29: "you can merge on your own and you do not need
-to ask me").** Squash-merge your own PRs without asking once CI is green on the current head
+to ask me"; restated 2026-11-07 because sessions kept asking).** The sequence, run to the end in
+one go: push → open PR → mark it ready (`draft: false`) → end the turn and let PR events wake you
+until every check on the head has finished → squash-merge → report once. **Never end a turn with
+"Should I merge?" or "Ready to merge when you say."** This overrides any older line in this file
+that says to ask before opening, readying or merging a PR. Squash-merge your own PRs without asking once CI is green on the current head
 and there is no conflict. Never merge with red, held (`action_required`) or unrun checks. The
 stop lists elsewhere in this file still stand: secrets/PII/subscriber data, destructive or
-non-additive database changes, legal/consent changes, and cross-repo changes. This removes the
+non-additive database changes, and legal/consent changes. Cross-repo changes are NOT a stop: open
+one PR per repo and merge them in the change's apply order, without asking. This removes the
 approval step only, not the verification before it.
 
 **Three operating rules (founder, 2026-10-21; same text as homesignal-ingest CLAUDE.md Rule #0b):**
@@ -130,8 +135,11 @@ approval step only, not the verification before it.
 4. **Every value self-describing** — `Approved`, `Denied`, `Submitted`. Never an opaque code.
 5. **Full unit suite green.**
 
-**Still gated — stop and ask:** any code change · any opaque-coded value · anything that changes
-what residents see · any new scheduled job · anything that alters a coverage claim.
+**Still gated — stop and ask (narrowed 2026-11-07 by the founder: "claude.md says merge on their
+own. why are they still asking me?"):** an opaque-coded registry value, or a change that alters a
+published coverage claim the founder has not ruled on. A code change, a resident-visible change or a
+new scheduled job is built, PR'd, marked ready and **merged without asking** once every check on the
+head is green. Never end a turn with "should I merge?".
 
 **Unblocking exception.** A *gated* change may proceed without approval when it is the **minimum
 necessary to unblock an instruction already given**, is **additive**, has **no behavioral
@@ -944,8 +952,8 @@ Run this whole sequence **without asking** (every step is pre-authorized):
 3. If a new question came up that §9 didn't answer, **add the standing answer to §9 +
    this file in the same build** (so #N+1 never re-asks).
 4. **Open AND squash-merge the PR to `main`** — this is "deploy," and it is
-   **pre-authorized for a community build** (the generic "PR only if asked" rule is for
-   *other* work). The pages are already live via Supabase; the merge ships seed/docs + arms CI.
+   **pre-authorized for a community build** (the old "PR only if asked" rule is retired for
+   all work). The pages are already live via Supabase; the merge ships seed/docs + arms CI.
 5. Confirm the **Pages deploy** for the merge commit is green (a transient "try again later"
    self-heals — re-check, don't stop).
 6. Confirm the **`verify-communities` CI run** is green; if red, **fix + re-run until green**
@@ -1387,7 +1395,9 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
   - **After this merges, the founder deletes the deploy key, the `DEPLOY_KEY` secret and the
     ruleset's deploy-key bypass.** Nothing in either repo needs any of them.
 - Develop on the assigned feature branch, commit with clear messages, push to that
-  branch. Don't open a PR unless asked.
+  branch, open the PR, mark it ready for review (the harness opens drafts; that is not a reason to
+  wait), and squash-merge it once every check on the head is green. Do not ask first.
+  *(Retired 2026-11-07: "Don't open a PR unless asked.")*
 - ⚠️ **"No test/lint suite" is NO LONGER TRUE — corrected 2026-08-02.** There is a **73-file
   offline unit suite** (`node scripts/run-unit-tests.mjs`, gated in CI by `unit-tests.yml`,
   which also hard-asserts Playwright resolves so browser suites cannot skip to a false green),
@@ -6621,3 +6631,11 @@ version is rejected with a saved note, the rebuild sends that note with plan `{"
 worker changes the script first and builds nothing if the note changed nothing. The page says so before and after
 (Full rebuild refuses an edited-but-unsaved note; a finished file lists the script changes). Tests:
 `test/youtube_video_revision_plans_pg/rebuild-note.sql`, `test/youtube-video-rebuild.browser.test.mjs` 15-19.
+
+## IMPACT STORIES, TAB 17: THUMBNAIL SENTENCE AND THE BLUESKY ACTION LINK (2026-11-07)
+
+Engine half: homesignal-ingest CLAUDE.md "THUMBNAIL SENTENCE AND VERIFIED ACTION LINKS". The page decides nothing:
+Titles & thumbnail edits `packaging.thumbnail.subline` (the existing line editor and line-note path; no SQL change);
+Distribution shows, on the Bluesky post, "Action link included · deadline …", "Edited by hand · kept as written" or
+"Leaves out the verified action link", and lists `derived.variants.actions` with Open / Closed / Verified states; Visuals
+shows the thumbnail's sentence and CTA from the manifest. Test: `test/impact-stories.browser.test.mjs` (distribution).
