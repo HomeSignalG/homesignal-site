@@ -875,6 +875,10 @@ begin
     vs := public._hs_is_visuals(p_story);
     if (m->>'complete')::boolean then stage := 'distribution'; nxt := 'Ready to export. Publishing is not built yet.'; lib := 'ready'; owner := 'done';
     elsif (m->>'current')::boolean then stage := 'media'; nxt := 'Review each video and the thumbnail'; lib := 'needs_review';
+      -- videos that failed the checks are being fixed by the system (_hs_is_auto_fix): nothing to watch yet
+      if (m->'fix_batch'->>'auto')::boolean and m->'fix_batch'->>'status' in ('plan_queued', 'planning', 'planned', 'queued', 'working') then
+        owner := 'working'; nxt := 'Fixing the videos that failed the checks, before you review them…';
+      end if;
     elsif vs->>'state' = 'approved' then stage := 'media'; nxt := 'Render the videos'; lib := 'needs_review';
     else
       stage := 'visuals'; lib := 'needs_review';
@@ -1820,7 +1824,7 @@ end $$;
 create or replace function public.hs_impact_story_job_complete(p_job_id uuid, p_result jsonb)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare j public.impact_story_jobs%rowtype; s public.impact_stories%rowtype; nv int; d jsonb; vman jsonb; pfx text; mid bigint;
-        ac jsonb; nauto int := 0; ck_before text; vkey text;
+        ac jsonb; nauto int := 0; ck_before text; vkey text; af jsonb;
 begin
   select * into j from public.impact_story_jobs where id = p_job_id for update;
   if not found or j.status <> 'running' then
@@ -1874,8 +1878,15 @@ begin
      where id = p_job_id;
     perform public._hs_is_event(j.story_id, 'rendered', jsonb_build_object('job_id', j.id, 'version', j.base_version,
       'files', (select jsonb_agg(a->>'asset') from jsonb_array_elements(p_result->'assets') a)), 'worker');
+    -- videos that failed the checks are fixed (or rendered again) before the founder is asked to watch anything; a
+    -- problem here never undoes the finished render
+    begin
+      af := public._hs_is_auto_fix(j.story_id, j.id);
+    exception when others then
+      perform public._hs_is_event(j.story_id, 'auto_fix_failed', jsonb_build_object('job_id', j.id, 'reason', sqlerrm), 'worker');
+    end;
     perform public._hs_is_followup(s.id, 'worker');   -- a save made during the render is checked now
-    return jsonb_build_object('ok', true, 'files', jsonb_array_length(p_result->'assets'));
+    return jsonb_build_object('ok', true, 'files', jsonb_array_length(p_result->'assets'), 'auto_fix', af);
   end if;
   if j.kind = 'visuals' then
     vman := p_result->'manifest';
@@ -1968,7 +1979,9 @@ returns jsonb language sql stable security definer set search_path = public as $
            'plan', b.plan, 'plan_md5', b.plan_md5, 'planned_at', b.planned_at, 'confirmed_at', b.confirmed_at,
            'requests', jsonb_array_length(b.requests), 'requested_by', b.requested_by, 'requested_at', b.requested_at,
            'claimed_at', b.claimed_at, 'completed_at', b.completed_at, 'attempts', b.attempts, 'summary', b.summary,
-           'next_step', b.next_step, 'outcomes', b.outcomes, 'version_after', b.version_after, 'pr_url', b.pr_url)
+           'next_step', b.next_step, 'outcomes', b.outcomes, 'version_after', b.version_after, 'pr_url', b.pr_url,
+           -- started by the system because a render failed its checks (_hs_is_auto_fix), not by the founder
+           'auto', b.requested_by = 'system:auto-fix')
     from public.impact_story_fix_batches b where b.story_id = p_story order by b.requested_at desc limit 1
 $$;
 
@@ -2264,6 +2277,72 @@ begin
     timeout_milliseconds := 15000);
 end $$;
 
+-- Videos that fail the automatic checks are dealt with before the founder is asked to watch anything (founder,
+-- 2026-11-07: "if you have to fix things, than you should fix before i have to watch"). Called when a render finishes.
+--  * Every failed video only needs the renderer to try again (a technical media check failed, or the renderer did not
+--    draw what was planned): render again, once. A render that was itself such a retry goes to the fixer instead.
+--  * Otherwise: one fix request per failed video, written by the system (actor system:auto-fix, the failed checks named),
+--    sent as a batch. Claude plans it, and impact_fix_batch_plan carries the plan out without waiting for a confirm.
+--    Only these requests are in it: the founder's own notes never ride in an automatic batch.
+-- Nothing is approved here. A fix that changes the script makes a new version, which the founder approves as always.
+-- Never twice for one render (a request already written for a file is not written again), and never while a fix batch
+-- is active (that batch finishes first).
+create or replace function public._hs_is_auto_fix(p_story uuid, p_job uuid)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare m jsonb := public._hs_is_media(p_story); j public.impact_story_jobs%rowtype; f jsonb; bl jsonb; ids bigint[] := '{}';
+        did bigint; reqs jsonb; b public.impact_story_fix_batches%rowtype; q jsonb; lab text;
+begin
+  select * into j from public.impact_story_jobs where id = p_job;
+  if not found or m->>'render_job' is distinct from p_job::text or not coalesce((m->>'current')::boolean, false) then
+    return jsonb_build_object('action', 'none', 'reason', 'not the current render');
+  end if;
+  select coalesce(jsonb_agg(x), '[]'::jsonb) into bl from jsonb_array_elements(m->'files') x
+   where x->>'state' = 'blocked' and x->>'asset' <> 'thumbnail';
+  if jsonb_array_length(bl) = 0 then return jsonb_build_object('action', 'none'); end if;
+  -- rendering again helps only when, for every failed video, the media checks failed or the one problem is the
+  -- renderer not drawing what was planned (the page's renderAgainHelps says the same)
+  if j.input->>'auto_rerender_of' is null and not exists (select 1 from jsonb_array_elements(bl) x
+       where coalesce((x->'qc'->>'ok')::boolean, false)
+         and not (jsonb_array_length(coalesce(x->'qc'->'quality'->'failures', '[]'::jsonb)) > 0
+                  and not exists (select 1 from jsonb_array_elements(x->'qc'->'quality'->'failures') y
+                                   where y->>'code' is distinct from 'render_mismatch'))) then
+    q := public._hs_is_queue(p_story, 'render', j.input || jsonb_build_object('auto_rerender_of', p_job), 'system:auto-fix', true);
+    perform public._hs_is_event(p_story, 'auto_rerender', jsonb_build_object('job_id', p_job, 'new_job', q->>'job_id',
+      'files', (select jsonb_agg(x->>'asset') from jsonb_array_elements(bl) x)), 'system:auto-fix');
+    return jsonb_build_object('action', 'render', 'job', q);
+  end if;
+  if exists (select 1 from public.impact_story_fix_batches where story_id = p_story
+               and status in ('plan_queued', 'planning', 'planned', 'queued', 'working')) then
+    return jsonb_build_object('action', 'none', 'reason', 'a fix batch is already active');
+  end if;
+  for f in select x from jsonb_array_elements(bl) x loop
+    if exists (select 1 from public.impact_story_media_decisions where asset_id = (f->>'id')::bigint and actor = 'system:auto-fix') then
+      continue;
+    end if;
+    select string_agg(distinct l, '; ') into lab from (
+      select y->>'label' l from jsonb_array_elements(coalesce(f->'qc'->'quality'->'failures', '[]'::jsonb)) y
+      union all
+      select c->>'name' from jsonb_array_elements(coalesce(f->'qc'->'checks', '[]'::jsonb)) c where not coalesce((c->>'ok')::boolean, true)) z
+     where l is not null;
+    insert into public.impact_story_media_decisions (story_id, asset_id, decision, note, actor)
+    values (p_story, (f->>'id')::bigint, 'rejected',
+            left('The automatic checks failed on this video' || coalesce(': ' || lab, '') || '. It was not shown for review. '
+                 || 'Fix every failed check in the checks report for this video.', 1000), 'system:auto-fix')
+    returning id into did;
+    ids := ids || did;
+  end loop;
+  if cardinality(ids) = 0 then return jsonb_build_object('action', 'none', 'reason', 'already sent'); end if;
+  select coalesce(jsonb_agg(r), '[]'::jsonb) into reqs from jsonb_array_elements(public._hs_is_fix_eligible(p_story)) r
+   where r->>'kind' = 'media' and (r->>'id')::bigint = any (ids);
+  if jsonb_array_length(reqs) = 0 then return jsonb_build_object('action', 'none', 'reason', 'nothing eligible'); end if;
+  insert into public.impact_story_fix_batches (story_id, requests, requested_by, status)
+  values (p_story, reqs, 'system:auto-fix', 'plan_queued') returning * into b;
+  perform public._hs_is_event(p_story, 'fix_batch_queued', jsonb_build_object('batch', b.id, 'requests', jsonb_array_length(reqs),
+    'phase', 'plan', 'auto', true, 'job_id', p_job), 'system:auto-fix');
+  perform public._hs_is_fix_dispatch(b.id, 'plan');
+  return jsonb_build_object('action', 'fix', 'batch', b.id, 'requests', jsonb_array_length(reqs));
+end $$;
+
 -- The founder's Fix button. Sends every eligible fix request of the story as one batch and starts the PLAN run: Claude
 -- reads the notes and the failed checks and writes what it will change; nothing is edited until the founder confirms
 -- (hs_impact_story_fix_confirm). A second press while the batch is waiting to start, or stalled (claimed over 3 hours
@@ -2417,6 +2496,16 @@ begin
   update public.impact_story_fix_batches set status = 'planned', plan = p_plan, plan_md5 = md5(p_plan::text), planned_at = now(),
          summary = null where id = b.id;
   perform public._hs_is_event(b.story_id, 'fix_plan_ready', jsonb_build_object('batch', b.id, 'plan_md5', md5(p_plan::text)), 'fixer');
+  -- A batch the system started because videos failed their checks (_hs_is_auto_fix) is carried out at once: nobody is
+  -- asked to read a plan for fixes they did not ask for (founder, 2026-11-07). The plan stays on the batch as the record
+  -- of what was done. The founder's own notes are never in such a batch, so their plans still wait for a confirm.
+  if b.requested_by = 'system:auto-fix' then
+    update public.impact_story_fix_batches set status = 'queued', confirmed_at = now(), confirmed_by = 'system:auto-fix',
+           attempts = 0, claimed_at = null where id = b.id;
+    perform public._hs_is_event(b.story_id, 'fix_plan_confirmed', jsonb_build_object('batch', b.id, 'plan_md5', md5(p_plan::text), 'auto', true), 'system:auto-fix');
+    perform public._hs_is_fix_dispatch(b.id, 'work');
+    return jsonb_build_object('ok', true, 'plan_md5', md5(p_plan::text), 'confirmed', true);
+  end if;
   return jsonb_build_object('ok', true, 'plan_md5', md5(p_plan::text));
 end $$;
 
@@ -2476,7 +2565,7 @@ begin
     'public._hs_is_retry(uuid, text)', 'public._hs_is_followup(uuid, text)', 'public._hs_is_append_only()', 'public._hs_is_version_guard()',
     'public._hs_is_stuck_after(text)', 'public._hs_is_media(uuid)', 'public._hs_is_not_started(public.impact_story_jobs)',
     'public._hs_is_request(uuid, text, text, boolean, text)', 'public._hs_is_choices(uuid)',
-    'public._hs_is_fix_batch(uuid)', 'public._hs_is_fix_eligible(uuid)', 'public._hs_is_fix_dispatch(uuid, text)', 'public._hs_is_fix_checks(uuid)',
+    'public._hs_is_fix_batch(uuid)', 'public._hs_is_fix_eligible(uuid)', 'public._hs_is_auto_fix(uuid, uuid)', 'public._hs_is_fix_dispatch(uuid, text)', 'public._hs_is_fix_checks(uuid)',
     'public._hs_is_line_notes(uuid)',
     'public._hs_is_choice_key(uuid)', 'public._hs_is_visuals(uuid)', 'public._hs_is_rejections(uuid)', 'public._hs_is_shot_decisions(bigint)',
     'public._hs_is_shot_print(jsonb)', 'public._hs_is_creator_hash(jsonb)', 'public._hs_is_creator_problems(jsonb)',

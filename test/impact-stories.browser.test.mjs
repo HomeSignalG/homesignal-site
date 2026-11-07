@@ -586,7 +586,23 @@ await page.evaluate((qc) => {
 await page.waitForTimeout(80);
 txt = await page.locator('#is').innerText();
 ok(txt.includes('Main video (16:9)') && txt.includes('Short A (9:16)') && txt.includes('Checks failed') && txt.includes('Render again'), 'media: each file is listed with its own state');
-ok(await page.locator('#is [data-act=mdecide][data-d=approved][data-id="2"]').isDisabled(), 'media: a file that failed its checks cannot be approved');
+ok(await page.locator('#is [data-act=mdecide][data-d=approved][data-id="2"]').count() === 0, 'media: a file that failed its checks has no Approve button');
+ok(await page.locator('#is [data-act=watch][data-path="s1/j9/short_a.mp4"]').count() === 1
+   && await page.locator('#is [data-act=watch][data-path="s1/j9/short_a.mp4"]').textContent() === 'Watch it anyway'
+   && await page.locator('#is details [data-act=watch][data-path="s1/j9/short_a.mp4"]').count() === 1,
+   'media: a video that failed its checks is not offered for watching; "Watch it anyway" sits under Details (founder 2026-11-07)');
+// while the system fixes the failed video (an automatic batch), the page says so and asks nothing of the founder
+await page.evaluate(() => { window.db.media.fix_batch = { auto: true, status: 'working', requests: 1, requested_at: '2026-11-07T01:00:00Z' };
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(80);
+txt = await page.locator('#is').innerText();
+ok(txt.includes('Fixing the videos that failed the checks') && txt.includes('Nothing is needed from you; you review only the fixed version')
+   && txt.includes('Claude is fixing it now; you will review only the fixed version')
+   && await page.locator('#is [data-act=fixform][data-id="2"]').count() === 0
+   && await page.locator('#is [data-act=mdecide][data-d=approved][data-id="1"]').count() === 1,
+   'media: an automatic fix in progress is shown as the engine working; the failed video offers nothing to do, the passing one still can be approved');
+await page.evaluate(() => { delete window.db.media.fix_batch; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(80);
 await page.click('#is [data-act=watch][data-path="s1/j9/main.mp4"]'); await page.waitForTimeout(80);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'download' && c[1] === 'impact-media' && c[2] === 's1/j9/main.mp4'))
    && /^blob:/.test(await page.locator('#is video').getAttribute('src')), 'media: a video is downloaded with the admin session and played from a blob link');
@@ -726,7 +742,7 @@ ok(txt.includes('Visual quality: FAILED') && txt.includes('Too many documents an
    && txt.includes('Real-world pictures') && txt.includes('46%') && txt.includes('checked frame by frame (66 frames)'), 'media: the visual quality report shows failures, actions and metrics against targets');
 ok(txt.includes('stopped before rendering anything') && txt.includes('Missing essential image') && txt.includes('REPRESENTATIVE PHOTO')
    && txt.includes('Latest development check') && !(await page.locator('#is b').allInnerTexts()).some((x) => x.includes('<b>')), 'media: a blocked render names what is missing and the licensed candidates');
-ok(await page.locator('#is [data-act=mdecide][data-d=approved][data-id="2"]').isDisabled(), 'media: a file the visual gate failed cannot be approved');
+ok(await page.locator('#is [data-act=mdecide][data-d=approved][data-id="2"]').count() === 0, 'media: a file the visual gate failed has no Approve button');
 ok(!(await page.locator('#is').innerHTML()).includes('<b>Person'), 'media: candidate text is escaped');
 // founder 2026-11-05: "i pressed request fix, but i do not know what fix is" — the box starts filled in with what failed
 ok(txt.includes('Rendering again will not change it') && txt.includes('already filled in with what failed'), 'media: a failed check says to request a fix, not to render again');
