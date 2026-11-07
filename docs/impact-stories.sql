@@ -839,7 +839,7 @@ create or replace function public._hs_is_status(p_story uuid)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare s public.impact_stories%rowtype; v public.impact_story_versions%rowtype; j public.impact_story_jobs%rowtype;
         arts jsonb := '{}'::jsonb; k text; stage text; nxt text; lib text; all_ok boolean := true; m jsonb; vs jsonb;
-        owner text := 'you'; cs jsonb;
+        owner text := 'you'; cs jsonb; fb jsonb; npend int := 0; nblk int := 0; nunsent int := 0; pend_names text;
 begin
   select * into s from public.impact_stories where id = p_story;
   select * into v from public.impact_story_versions where story_id = p_story and version = s.current_version;
@@ -874,10 +874,41 @@ begin
     m := public._hs_is_media(p_story);
     vs := public._hs_is_visuals(p_story);
     if (m->>'complete')::boolean then stage := 'distribution'; nxt := 'Ready to export. Publishing is not built yet.'; lib := 'ready'; owner := 'done';
-    elsif (m->>'current')::boolean then stage := 'media'; nxt := 'Review each video and the thumbnail'; lib := 'needs_review';
-      -- videos that failed the checks are being fixed by the system (_hs_is_auto_fix): nothing to watch yet
-      if (m->'fix_batch'->>'auto')::boolean and m->'fix_batch'->>'status' in ('plan_queued', 'planning', 'planned', 'queued', 'working') then
+    elsif (m->>'current')::boolean then stage := 'media'; lib := 'needs_review';
+      -- The next step follows what the founder already did here (founder, 2026-11-07: "the update in needs you needs to be
+      -- automatic once i review and complete an action"). It used to say "Review each video and the thumbnail" whatever
+      -- had been approved, rejected or sent, so a finished review looked like nothing had happened.
+      fb := m->'fix_batch';
+      select count(*) filter (where f->>'state' = 'pending'),
+             count(*) filter (where f->>'state' = 'blocked' and f->'last_decision' is null),
+             string_agg(case when f->>'state' = 'pending' then case f->>'asset' when 'main' then 'main video' when 'short_a' then 'Short A'
+                          when 'short_b' then 'Short B' else f->>'asset' end end, ', ')
+        into npend, nblk, pend_names from jsonb_array_elements(coalesce(m->'files', '[]'::jsonb)) f;
+      -- fix requests saved but not sent: a rejection nothing has acted on, in no batch (or in one that was cancelled or failed)
+      select count(*) into nunsent from jsonb_array_elements(coalesce(m->'fix_requests', '[]'::jsonb)) x
+       where x->>'status' = 'open' and coalesce(x->>'note', '') !~* '\mhum(ming)?\M'
+         and (x->'batch' is null or jsonb_typeof(x->'batch') = 'null' or x->'batch'->>'status' in ('cancelled', 'failed'));
+      if (fb->>'auto')::boolean and fb->>'status' in ('plan_queued', 'planning', 'planned', 'queued', 'working') then
+        -- videos that failed the checks are being fixed by the system (_hs_is_auto_fix): nothing to watch yet
         owner := 'working'; nxt := 'Fixing the videos that failed the checks, before you review them…';
+      elsif fb->>'status' = 'planned' then
+        nxt := 'Read Claude''s fix plan in Media review, then press Confirm. Nothing changes until you do.';
+      elsif fb->>'status' in ('plan_queued', 'planning') then
+        owner := 'working'; nxt := 'Claude is reading your fix requests and writing a plan (a few minutes). Nothing changes until you confirm it.';
+      elsif fb->>'status' in ('queued', 'working') then
+        owner := 'working'; nxt := 'Claude is making the fixes you confirmed. When it finishes, this says what to do next.';
+      elsif fb->>'status' = 'needs_you' then
+        nxt := coalesce(fb->>'next_step', 'The fixer needs something from you: see Media review');
+      elsif fb->>'status' = 'stalled' then
+        nxt := 'The fix run stopped before it finished. Press Fix in Media review to send your requests again.';
+      elsif nunsent > 0 then
+        nxt := 'Send your ' || nunsent || ' fix request' || case when nunsent = 1 then '' else 's' end || ' with Fix in Media review';
+      elsif npend > 0 then
+        nxt := 'Review ' || case when npend = 1 then 'the ' else 'these: ' end || pend_names;
+      elsif nblk > 0 then
+        nxt := nblk || ' video' || case when nblk = 1 then '' else 's' end || ' failed the checks. Save a fix request in Media review, then press Fix';
+      else
+        nxt := coalesce(case when fb->>'status' = 'done' then fb->>'next_step' end, 'Review each video and the thumbnail');
       end if;
     elsif vs->>'state' = 'approved' then stage := 'media'; nxt := 'Render the videos'; lib := 'needs_review';
     else
