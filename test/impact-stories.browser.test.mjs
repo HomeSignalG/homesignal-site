@@ -942,6 +942,72 @@ dtxt = await page.locator('#is-next-box').innerText();
 ok(/working on it/i.test(dtxt) && /Nothing is needed from you/.test(dtxt) && await page.locator('#is #is-next-box button').count() === 0,
    'picture drift while the fixer works: the top box says nothing is needed, with no buttons');
 await page.evaluate(() => { window.db.status = window.__beforeDrift.status; window.db.media = window.__beforeDrift.media; });
+// Videos that failed the picture checks (Stratos, 2026-11-06: "i keep getting the same your next step over an over").
+// The step must change something, never "Review each video" again.
+await page.evaluate(() => {
+  window.__beforeBlockedVids = { status: window.db.status, media: window.db.media, job: window.db.job };
+  const base = window.db.status;
+  window.db.job = { id: 'jrx', kind: 'render', status: 'complete', attempts: 1, created_at: '2026-11-04T19:00:00Z', completed_at: '2026-11-04T21:08:04Z' };
+  window.db.status = () => Object.assign(base(), { stage: 'media', owner: 'you', next: 'Review each video and the thumbnail', job: window.db.job });
+  const fl = (asset, failures) => ({ id: { main: 18, short_a: 19, short_b: 20 }[asset], asset, state: 'blocked', hum: false, path: 's1/r/' + asset + '.mp4', width: 1920, height: 1080,
+    bytes: 1e6, preset: 'impact-x', duration_s: 60, why: 'The visual quality gate failed.', stills: [], shots: [], qc: { ok: true, checks: [], quality: { ok: false, failures } } });
+  const F = (code, label, detail, action) => ({ code, label, detail, action, asset: 'x', fixable: true });
+  window.db.media = { render_job: 'r2', current: true, hum: false, version: 2, rendered_at: '2026-11-04T21:08:04Z', complete: false, choices: [],
+    files: [fl('main', [F('slow_pacing', 'A shot holds too long', 'the longest shot holds 19 s (max 16 s).', 'Break long scenes into shorter shots.')]),
+            fl('short_a', [F('render_mismatch', 'The render does not show what was planned', '27% of planned photo frames show no photo.', 'Render again.'),
+                           F('excessive_documents', 'Too many documents and cards', 'cards 29% (max 25%).', 'Show each document only while cited.')]),
+            fl('short_b', [F('render_mismatch', 'The render does not show what was planned', '56% of planned photo frames show no photo.', 'Render again.')]),
+            { id: 17, asset: 'thumbnail', state: 'approved', path: 's1/r/thumbnail.png', width: 1280, height: 720, bytes: 1e6, preset: 'impact-thumb-v1', why: 'Approved.', stills: [], shots: [], qc: { ok: true, checks: [], quality: { ok: true } } }],
+    fix_batch: { id: 'b0', status: 'failed', requests: 3, requested_at: '2026-11-03T23:18:05Z', completed_at: '2026-11-03T23:22:04Z' },
+    fix_requests: [{ id: 6, asset: 'main', note: 'old note', at: '2026-11-03T23:14:23Z', status: 'rerendered', rerendered_at: '2026-11-04T21:08:04Z' }] };
+  location.hash = '#impact=s1&step=media'; window.HS.acqImpactStories._state.data = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(120);
+let kbox = await page.locator('#is-next-box').innerText();
+ok(!/Review each video/i.test(kbox) && /did not pass the picture checks/.test(kbox) && /Rendering again would make the same videos/.test(kbox)
+   && await page.locator('#is #is-next-box .is-btn.primary[data-act=fixblocked]', { hasText: 'Save fix requests for 3 blocked videos' }).count() === 1,
+   'blocked videos: the step is to save fix requests for the 3 blocked videos, never "Review each video" again');
+await page.evaluate(() => { window.calls.length = 0; });
+await page.click('#is #is-next-box [data-act=fixblocked]'); await page.waitForTimeout(80);
+ok(await page.evaluate(() => { const c = window.calls.filter((x) => x[0] === 'hs_impact_story_media_decide');
+     return c.length === 3 && c.every((x) => x[1].p_decision === 'rejected' && /picture|frames|shot|cards/.test(x[1].p_note)) && c.map((x) => x[1].p_asset_id).join() === '18,19,20'; }),
+   'blocked videos: one click saves one filled-in fix request per blocked video, never for the approved thumbnail');
+await page.evaluate(() => {
+  window.db.media.fix_requests = [18, 19, 20].map((i) => ({ id: 100 + i, asset_id: i, asset: 'main', note: 'filled in', at: '2026-11-06T23:30:00Z', status: 'open' }));
+  window.HS.acqImpactStories._state.data = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(120);
+kbox = await page.locator('#is-next-box').innerText();
+ok(/Send your 3 fix requests to Claude/.test(kbox) && await page.locator('#is #is-next-box .is-btn.primary[data-act=fixstart]').count() === 1
+   && await page.locator('#is [data-act=fixstart]').count() === 1,
+   'blocked videos, requests saved: the step is to send them, with one Fix button on the page');
+await page.evaluate(() => {
+  window.db.media.fix_requests = []; window.db.media.files = window.db.media.files.filter((f) => f.asset !== 'main' && f.asset !== 'short_a');
+  window.HS.acqImpactStories._state.data = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(120);
+kbox = await page.locator('#is-next-box').innerText();
+ok(/rendering again can fix it/.test(kbox) && await page.locator('#is #is-next-box .is-btn.primary[data-act=render]').count() === 1,
+   'blocked videos where only the renderer missed: the step is to render again');
+// A plan waiting for you is the one top box; nothing else on the page is a second action box (founder, 2026-11-06:
+// "why is there 2 different green tiles of things to do", "read the plan is supposed to be in the top green tile").
+await page.evaluate(() => {
+  window.db.media.fix_batch = { id: 'b1', status: 'planned', requests: 3, requested_at: '2026-11-06T22:31:00Z', plan: { summary: 'Shorter shots.', requests: [] }, plan_md5: 'x' };
+  window.HS.acqImpactStories._state.data = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(120);
+kbox = await page.locator('#is-next-box').innerText();
+ok(/Your next step/i.test(kbox) && /Read the plan below, then press Confirm/.test(kbox) && await page.locator('#is #is-next-box .is-btn.primary[data-act=readplan]').count() === 1,
+   'plan ready: the top box says to read Claude’s plan and confirm it, with one button');
+ok(await page.locator('#is .is-next-box').count() === 1 && await page.locator('#is .is-btn.primary[data-act=fixblocked]').count() === 0,
+   'plan ready: exactly one action box on the page');
+await page.evaluate(() => { window.db.media.fix_batch = { id: 'b1', status: 'planning', requests: 3, requested_at: '2026-11-06T22:31:00Z' };
+  window.HS.acqImpactStories._state.data = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+kbox = await page.locator('#is-next-box').innerText();
+ok(/Working on it/i.test(kbox) && /writing a plan/.test(kbox) && await page.locator('#is #is-next-box button').count() === 0 && await page.locator('#is .is-next-box').count() === 1,
+   'plan being written: the one box says nothing is needed, with no button');
+await page.evaluate(() => { Object.assign(window.db, window.__beforeBlockedVids); });
 // library: grouped by whose turn it is, stories above Hot Topics, one label per card
 await page.evaluate(() => { location.hash = ''; window.HS.acqImpactStories._state.open = null; window.HS.acqImpactStories._state.data = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
 await page.waitForTimeout(120);
