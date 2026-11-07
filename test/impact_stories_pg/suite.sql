@@ -384,9 +384,19 @@ select pg_temp.chk('12V27c rejecting a shot after Approve all undoes the approva
 select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'thumbnail', 'thumbnail', 'approved');
 select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'main', 'a1-s1', 'new_photo');
 select pg_temp.chk('12V28 Need new photo asks the next Prepare to search for that shot''s subject',
-  pg_temp.vis()->'more_photos_for' = '["oak-trees"]'::jsonb and pg_temp.vis()->>'state' = 'approved');
+  pg_temp.vis()->'more_photos_for' = '["oak-trees"]'::jsonb and pg_temp.vis()->>'state' = 'approved'
+  and pg_temp.vis()->'photo_requests' = '[]'::jsonb);   -- no description: a plain search, not a request
+-- 12V28a (2026-11-06): Need new photo with what the photo should show and why: listed as a request for that shot
+select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'main', 'a1-s1', 'new_photo',
+  E'A photo of Hakeem Jeffries\n\nWhy not this one: the Capitol says nothing about who is running');
+select pg_temp.chk('12V28a a described request is listed for its shot, with the founder''s words',
+  pg_temp.vis()->'photo_requests' = jsonb_build_array(jsonb_build_object('subject_id', 'oak-trees', 'asset', 'main', 'shot_id', 'a1-s1',
+    'note', E'A photo of Hakeem Jeffries\n\nWhy not this one: the Capitol says nothing about who is running'))
+  and pg_temp.vis()->'more_photos_for' = '["oak-trees"]'::jsonb);
 select public.hs_impact_story_visuals_prepare(pg_temp.id('s')::uuid, pg_temp.cur(), true);
-select pg_temp.chk('12V28b the Prepare job carries it', (pg_temp.lastjob()).input->'more_photos_for' = '["oak-trees"]'::jsonb);
+select pg_temp.chk('12V28b the Prepare job carries it', (pg_temp.lastjob()).input->'more_photos_for' = '["oak-trees"]'::jsonb
+  and (pg_temp.lastjob()).input->'photo_requests'->0->>'shot_id' = 'a1-s1'
+  and (pg_temp.lastjob()).input->'photo_requests'->0->>'note' like 'A photo of Hakeem Jeffries%');
 select public.hs_impact_story_job_claim((pg_temp.lastjob()).id);
 select public.hs_impact_story_job_complete((pg_temp.lastjob()).id, jsonb_build_object('manifest', jsonb_set(pg_temp.vman((pg_temp.lastjob()).id), '{assets,main,shots,0,subject_ref}', '"oak-trees"')));
 select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'main', 'a1-s1', 'rejected');
