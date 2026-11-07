@@ -6180,7 +6180,7 @@ stops on an Outdated status and the engine's check named the newer events with k
 `currency.event_key`), the Visuals stop shows **Not about this story — continue preparing**: `hs_impact_story_currency_dismiss`
 records the keys (append-only `impact_story_currency_dismissals`; only a key a failed job of this story reported), then the
 page prepares again. The claim sends `story.currency_dismissed`, and the check lists those events as dismissed instead of
-blocking; anything new still blocks. A stop from before keys existed offers only Prepare again. Apply order: ingest first,
+blocking; anything new still blocks. A stop from before keys existed offers only Prepare again. A render stopped the same way shows **Not about this story — render again** in Media review (keeps the approved pictures). The Visuals stop reads `currency` through `_hs_is_visuals` (added after a self-audit found the first version never passed it; pg 12y0). Apply order: ingest first,
 then `docs/impact-stories.sql`, then the page. Tests: pg 12y1-12y4, `test/impact-stories.browser.test.mjs`.
 
 ## IMPACT STORIES, TAB 17: FAILED VIDEOS ARE FIXED BEFORE YOU WATCH THEM ⚖️ FOUNDER (2026-11-07)
