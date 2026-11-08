@@ -1039,6 +1039,28 @@ ok(/Update the story with this news/.test(ubox) && !/Claude Code session/.test(u
    && await page.locator('#is #is-next-box [data-act=curupdate][data-keys="0123456789abcdef"]').count() === 1,
    'next step: a keyed Outdated status on Prepare also offers "Update the story with this news"');
 await page.evaluate(() => { Object.assign(window.db, window.__beforeBlocked); });
+// Prepare refused because the source records changed after they were checked (House Speaker story, 2026-11-07: three
+// Prepare runs refused in a row while the box offered only Retry and Prepare). The one button is Re-check sources.
+await page.evaluate(() => {
+  window.__beforeSrc = { status: window.db.status };
+  const base = window.db.status;
+  window.db.status = () => Object.assign(base(), { stage: 'visuals', owner: 'you', next: 'Prepare the visuals',
+    job: { id: 'jsc', kind: 'visuals', status: 'failed', attempts: 1, created_at: '2026-11-07T23:36:13Z', completed_at: '2026-11-07T23:39:00Z',
+      error: 'The source records changed since this story was checked. Re-check sources, approve the narrative again, then prepare the visuals. Nothing was made.' } });
+  window.calls = [];
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(80);
+const sctxt = await page.locator('#is-next-box').innerText();
+ok(/re-check them first/i.test(sctxt) && !/Something went wrong/i.test(sctxt)
+   && await page.locator('#is #is-next-box [data-act=retry]').count() === 0
+   && await page.locator('#is #is-next-box [data-act=vprep]').count() === 0
+   && await page.locator('#is #is-next-box .is-btn.primary[data-act=req][data-kind=pack]', { hasText: 'Re-check sources' }).count() === 1,
+   'sources changed: no Retry and no Prepare; Re-check sources is the one button');
+await page.click('#is #is-next-box [data-act=req][data-kind=pack]'); await page.waitForTimeout(120);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_request' && c[1].p_kind === 'pack')),
+   'sources changed: the button asks for a source check');
+await page.evaluate(() => { window.db.status = window.__beforeSrc.status; });
 // A render refused because the pictures no longer match the approved set (founder, 2026-11-06, EPA methane story:
 // "i have no idea if it is fixing requests or i am supposed to press retry"). Retry would fail the same way.
 await page.evaluate(() => {
