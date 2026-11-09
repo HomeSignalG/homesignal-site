@@ -1888,6 +1888,23 @@ contract is shared (`lib/maps-dc-zip-order.js`). DDL of record: `docs/maps-zip-o
   dispatch body carries `maps_order: "true"`. Not applied to production by the session that wrote it.
 - Pinned by `test/maps-zip-order.test.mjs`; the Data Center list's `test/maps-dc-zip-order.test.mjs` passes unchanged.
 
+## 7.04b EVERY DEVELOPMENT-ALERT SUBSCRIBER'S ZIP IS ON THE MAPS POST LIST ⚖️ FOUNDER (2026-11-09)
+
+"when a new subscriber signs up for the development map alerts we need to add their zip code to the bluesky post.
+otherwise they will never get any emails. even if they add an address we need to add their zip code."
+The MAPS email only sends published Bluesky MAPS posts about the subscriber's ZIP, and drafts for chosen ZIPs come from
+`public.maps_zip_order` (All Maps list), so a subscriber whose ZIP is not on it never gets an email (85083 and 64166,
+added by hand 2026-11-09). SQL of record `docs/maps-zip-order-subscriber-zips.sql`.
+- **One rule, `public.maps_zip_order_sync_subscribers()`:** appends at the END of the list every ZIP with an active maps
+  subscriber (`alert_subscription_state`, stream `maps`, `subscribed`) not already on it. The ZIP is the subscription's
+  own ZIP community, so it is the same whatever page the resident signed up from. Append only: the founder's order never
+  changes and nothing is removed.
+- Runs after any write to `user_subscriptions`, after `users.unsubscribed` / `alert_email_consent` / `community_id`
+  changes, at the end of `hs_set_maps_zip_order` (an upload that leaves out a subscriber ZIP gets it appended), and once
+  on apply. The triggers never block a sign-up (a failure is a WARNING).
+- It does not create drafts: "Create + refresh drafts" in All Maps still does that.
+- Test: `test/maps_zip_order_subscribers_pg` (`maps-zip-order-subscribers-suite.yml`; 13 checks, 6 mutations).
+
 ## 7.04 THE DATA CENTER THEME BUTTON CREATES **AND** REFRESHES ⚖️ FOUNDER REQUIREMENT (2026-09-21)
 
 **The Acquisition Dashboard's "Create + refresh drafts" action does both halves: it creates
