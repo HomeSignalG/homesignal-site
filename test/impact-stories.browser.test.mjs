@@ -66,7 +66,7 @@ await page.evaluate(() => {
         version: { version: window.db.version, body: Object.assign(JSON.parse(JSON.stringify(body)), (window.db.extra || {}).body || {}), checked: true, derived,
           validation: { arc: { fear: { ok: true, blocking: [], warnings: [] }, anger: { ok: true, blocking: [] }, motivation: { ok: false, blocking: ['MOTIVATION: none of its counterevidence (cost_none) is spoken.'] } },
             outline: { ok: true, blocking: [] }, short_a: { ok: false, blocking: ['Short A next line 1: promises a link.'] }, main: { ok: true, blocking: [], warnings: [] },
-            narrative: { ok: false, blocking: ['Short A: Short A next line 1: promises a link.'] }, v3: (window.db.extra || {}).v3 } },
+            narrative: { ok: false, blocking: ['Short A: Short A next line 1: promises a link.'] }, v3: (window.db.extra || {}).v3, currency: window.db.cur } },
         versions: [{ version: 7 }, { version: 6 }], approvals: [], jobs: [], events: [{ at: '2026-10-25T10:00:00Z', kind: 'job_failed', actor: 'worker', detail: {} },
           { at: '2026-10-25T11:00:00Z', kind: 'section_revision', actor: 'f@x', detail: { section: 'fear', version: 7, note: 'Name the <floodplain> earlier.' } }] },
       hs_impact_story_version: { version: 6, body: v6 },
@@ -1198,6 +1198,28 @@ kbox = await page.locator('#is-next-box').innerText();
 ok(/Working on it/i.test(kbox) && /writing a plan/.test(kbox) && await page.locator('#is #is-next-box button').count() === 0 && await page.locator('#is .is-next-box').count() === 1,
    'plan being written: the one box says nothing is needed, with no button');
 await page.evaluate(() => { Object.assign(window.db, window.__beforeBlockedVids); });
+// House Speaker story, 2026-11-09 ("i do not understand what it needs from me"): the SCRIPT check found newer news. The top
+// box names the news and offers both answers; "Not about this story" sets it aside and checks the script again.
+await page.evaluate(() => {
+  window.__keep = { job: window.db.job, fb: window.db.media && window.db.media.fix_batch };
+  window.db.job = { id: 'jg', kind: 'generate', status: 'complete', created_at: '2026-11-09T15:11:07Z', completed_at: '2026-11-09T15:13:49Z' };
+  if (window.db.media) window.db.media.fix_batch = null;
+  window.db.cur = { state: 'stale', events: [{ key: '0e7cbefee047fb66', kind: 'new_record_text', date: null, source: 'https://www.newsweek.com/x',
+    text: 'A petition calling on House Democrats not to support Hakeem Jeffries has passed 1 million signatures, according to its creator. ' + 'More words. '.repeat(40) }] };
+  window.calls = []; window.HS.acqImpactStories._state.data = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(120);
+let nbox = await page.locator("#is-next-box").innerText();
+ok(/New news since you approved/i.test(nbox) && nbox.includes('passed 1 million signatures') && nbox.includes('newsweek.com') && nbox.length < 1200
+   && await page.locator('#is #is-next-box [data-act=curupdate][data-keys="0e7cbefee047fb66"]').count() === 1
+   && await page.locator('#is #is-next-box [data-act=cdismiss][data-then=validate][data-keys="0e7cbefee047fb66"]').count() === 1,
+   'script news: the top box names the news (shortened) and offers Update / Not about this story');
+await page.click('#is #is-next-box [data-act=cdismiss]'); await page.waitForTimeout(150);
+ok(await page.evaluate(() => { const n = window.calls.map((c) => c[0]); const i = n.indexOf('hs_impact_story_currency_dismiss'), j = n.indexOf('hs_impact_story_request');
+     const r = window.calls[j]; return i >= 0 && j > i && r[1].p_kind === 'validate' && r[1].p_new === true
+       && JSON.stringify(window.calls[i][1].p_keys) === '["0e7cbefee047fb66"]' && n.indexOf('hs_impact_story_visuals_prepare') < 0 && n.indexOf('hs_impact_story_render') < 0; }),
+   'script news: Not about this story sets it aside, then checks the script again (nothing prepared or rendered)');
+await page.evaluate(() => { window.db.cur = undefined; window.db.job = window.__keep.job; if (window.db.media) window.db.media.fix_batch = window.__keep.fb; });
 // library: grouped by whose turn it is, stories above Hot Topics, one label per card
 await page.evaluate(() => { location.hash = ''; window.HS.acqImpactStories._state.open = null; window.HS.acqImpactStories._state.data = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
 await page.waitForTimeout(120);

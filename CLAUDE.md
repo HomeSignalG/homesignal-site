@@ -6205,6 +6205,12 @@ then `docs/impact-stories.sql`, then the page. Tests: pg 12y1-12y4, `test/impact
   Claude), then Fix (plan → you confirm → work; homesignal-ingest `impact/fixes/FIXES.md` says what that path means). The
   top box of a render stopped this way (`media.blocked`, same job) offers both buttons instead of "Something went wrong /
   Retry". Tests: pg 12x1-12x5, browser "update the story" / "render stopped on keyed newer news".
+- **The script check's news gets the same two buttons (2026-11-09, founder: "i do not understand what it needs from me").**
+  The narrative was "Blocked" by news the generate/validate check found (`version.validation.currency.events`), and the page only
+  said "Fix the script first". Both functions now look keys up through `_hs_is_currency_event` (a failed job's result, else the
+  current version's check), and "Your next step" names the news with **Update the story with this news** and **Not about this
+  story** (sets it aside, then requests a `validate` job). Applied 2026-11-09 (migration
+  `impact_story_currency_event_from_script_check`, bodies md5-equal to the file). Tests: pg 12w1-12w3, browser "script news".
 
 ## IMPACT STORIES, TAB 17: FAILED VIDEOS ARE FIXED BEFORE YOU WATCH THEM ⚖️ FOUNDER (2026-11-07)
 
