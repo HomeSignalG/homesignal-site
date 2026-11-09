@@ -232,5 +232,24 @@ ok(M.enrichRadiusMi({ radius_used: null }, 3) === 3,
     'restore is keyed on registry id — a new facility does not inherit a neighbor');
 }
 
+// ── "No Violation Identified" is recorded per statute, and nothing else counts (2026-11-09) ──
+{
+  // Values as ECHO get_qid returned them for ZIP 84302 on 2026-11-09.
+  const e = M.interpretEcho({ CWAComplianceStatus: 'No Violation Identified', CAAComplianceStatus: '', RCRAComplianceStatus: 'No Violation Identified', SDWAComplianceStatus: 'Not Applicable' });
+  ok(JSON.stringify(e.no_violation) === '["CWA","RCRA"]' && e.in_violation.length === 0 && typeof e.current_as_of === 'string',
+    'interpretEcho lists only the statutes ECHO says "No Violation Identified"', JSON.stringify(e));
+  const t = M.interpretEcho({ CWAComplianceStatus: 'Terminated Permit', CAAComplianceStatus: 'Not Applicable' });
+  ok(t.no_violation.length === 0, 'Terminated Permit / Not Applicable / blank are not "no violation"', JSON.stringify(t));
+  const v = M.interpretEcho({ CWAComplianceStatus: 'Violation Identified' });
+  ok(v.no_violation.length === 0 && v.in_violation.includes('CWA'), 'a violation is never also a no-violation');
+  const sites = fac('110000000001');
+  const stored = M.storedEpaByRegistryId([{ registry_id: '110000000001', env: { epa: { in_violation: [], no_violation: ['CWA'], current_as_of: '2026-10-01' } } }]);
+  const echoFail = { attempted: true, ok: false, reason: 'http_503', matched: 0, query_rows: 0, query_rows_reported: null, duration_ms: 2 };
+  const cwaOk = { attempted: true, ok: true, reason: null, matched: 0, query_rows: 0, query_rows_reported: 0, duration_ms: 3 };
+  M.preserveStoredEnv(sites, stored, echoFail, cwaOk);
+  ok(JSON.stringify(sites[0].env.epa.no_violation) === '["CWA"]' && sites[0].env.epa.current_as_of === '2026-10-01',
+    'a failed ECHO call keeps the earlier statute list WITH its own earlier date');
+}
+
 console.log(fails === 0 ? '\nALL PASS — echo-cwa-health' : `\n${fails} FAILURE(S) — echo-cwa-health`);
 process.exit(fails === 0 ? 0 : 1);

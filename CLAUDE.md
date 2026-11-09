@@ -3604,11 +3604,34 @@ connector `"scope":"legacy"`.
   failed read, a ZIP with no boundary. Never infer completeness from a count, `= 40`, or `facilities_refreshed_at`.
   ⚠️ On a REFUSED write the collector keeps the stored facilities but takes the new `counts` keys, so a later failed
   read drops the marker (reads as unverified, never as complete). Keeping it there is a collector change.
+  → **PARKED, NOT APPLIED: `docs/dev-refresh-collect-facility-inventory.sql`** (one helper
+  `dev_facility_read_untrusted`, verbatim the old `facilities_unavailable` expression; when true, keep the stored
+  facility count AND coverage, hold `facilities_refreshed_at`). Collector md5 `b17263cc…` → `bd775733…`.
+- **What the count may claim — `docs/zip-facility-inventory.sql` (PARKED, NOT APPLIED).**
+  `public.zip_facility_inventory_state` is the one decision: `complete` (marker, latest refresh ok; 0 = verified
+  empty) · `complete_as_of` (marker, latest refresh failed: complete as of `last_success_at`) · `not_complete` (no
+  marker: radius-era list or no boundary read has ever completed) · `not_measured` (no boundary / no report).
+  `zip_mode_report_sites` (Map 1) gains `facility_inventory`; `zip_facility_inventory(zip)` serves the ZIP page strip.
+  `HS.facilityInventory` (lib/templates.js) presents it: only `complete` prints a plain total; `not_complete` prints
+  "N+ · not a complete count" or a dash; the empty-page "we checked the EPA registry and found nothing" sentence
+  needs a complete zero. An unread inventory is never a total. Reports carry no EPA facilities (development only).
+  Apply order: both SQL files, then the page. Proof: `test/dev_collect_inventory_pg` (engine response → live
+  collector → reader; production's code fails exactly the 3 defect cases first), `facility-inventory-suite.yml`.
 - **Termination:** a circle answering ≥ 1,000 rows (`FRS_TILE_ROW_CEILING`, the largest answer seen) is split; full at
   the 0.25 mi floor ⇒ `saturated`, refused there ⇒ `process_limit`, more than 64 requests ⇒ `request_limit`, past the
   45 s overlay deadline ⇒ `deadline`. All four are `ok:false` with no rows.
-- **Retries always wait** (2 s, then 5 s, or a longer Retry-After capped at 10 s), with or without a deadline; each
+- **Retries always wait** (2 s, then 5 s, or the full Retry-After when longer; a Retry-After that does not fit in the remaining 45 s stops the read as `deadline`), with or without a deadline; each
   attempt counts toward the 64. `frsAt` no longer reads a missing Retry-After header as 0 s (it did, for both modes).
+  ⚠️ Address mode's ladder (`frsFacilities`, epa-frs.ts) still caps Retry-After at 10 s (`FRS_RETRY_AFTER_CAP_MS`);
+  unchanged here.
+- **"No violations" needs EPA's own answer (2026-11-09).** `interpretEcho` stores `env.epa.no_violation`, the
+  statutes ECHO lists as "No Violation Identified" for that facility. `HS.fac.noViolationLine` (lib/templates.js) is
+  the one rule, used by Map 1 and the ZIP/facility pages: it needs `current_as_of`, a non-empty `no_violation`,
+  nothing in violation, no SNC, no non-compliant quarters, and drops CWA when its permit is not tracked. It names the
+  laws and the date. A permit status or tracking flag alone, a missing/failed/capped/out-of-range ECHO lookup, or a
+  statute ECHO left blank / "Not Applicable" / "Terminated Permit" is UNKNOWN: no sentence. Measured before: a 3%
+  sample had 5 facilities showing the old line, 4 with no ECHO compliance match. Stored lists without
+  `no_violation` show no clean line until their next refresh. Test: `test/map1-epa-clean-record.test.mjs`.
 - **Still radius-based and NOT part of this change:** the permit connectors while `ZIP_SCOPE_BOUNDS_MODE` is off (their own
   runbook, `docs/zip-scope-bounds-runbook.md`, gates enabling it).
 - Tests: `test/epa-zip-boundary.test.mjs`, `epa-zip-boundary.handler.test.ts` (real FRS answers saved 2026-11-09,

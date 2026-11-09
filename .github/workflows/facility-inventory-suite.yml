@@ -1,0 +1,46 @@
+name: facility-inventory-suite
+
+# ZIP facility inventory, end to end on a DISPOSABLE PostGIS: engine response -> the live dev_refresh_collect (rebuilt and
+# fingerprinted to production's md5 b17263cc...) -> development_reports -> zip_mode_report_sites / zip_facility_inventory.
+# Every case first runs on production's code (CONTROL: exactly 3 known defects), then docs/dev-refresh-collect-facility-
+# inventory.sql and docs/zip-facility-inventory.sql are applied, re-applied as no-ops, and reversed. No production secret.
+on:
+  pull_request:
+    paths:
+      - 'docs/dev-refresh-collect-*.sql'
+      - 'docs/zip-facility-inventory.sql'
+      - 'docs/zip-membership-canonical.sql'
+      - 'test/dev_collect_inventory_pg/**'
+      - 'test/dev_collect_harness/**'
+      - 'test/zip_membership_pg/fixture_schema.sql'
+      - '.github/workflows/facility-inventory-suite.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      pg:
+        image: postgis/postgis:16-3.4
+        env: { POSTGRES_PASSWORD: pw, POSTGRES_DB: facility_inventory_disposable }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 3s --health-timeout 3s --health-retries 20
+    env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: pw, PGDATABASE: facility_inventory_disposable }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any production credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then echo "ABORT: disposable container only"; exit 1; fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Inventory cases, before and after
+        run: |
+          set -o pipefail
+          psql -X -c 'select 1' >/dev/null
+          bash test/dev_collect_inventory_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/inv.log
+          grep -q '^dev-collect-inventory: all checks passed' /tmp/inv.log

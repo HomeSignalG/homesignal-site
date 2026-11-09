@@ -50,7 +50,6 @@ export const FRS_TILE_MIN_RADIUS_MI = 0.25;
 export const FRS_TILE_ROW_CEILING = 1000;
 /** Upper bound on FRS requests for one ZIP (tiles + retries). Exceeding it fails the ZIP (ok:false). */
 export const FRS_ZIP_MAX_REQUESTS = 64;
-const RETRY_AFTER_CAP_MS = 10000;
 const realSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export type ZipFrsReason = "transient" | "deadline" | "schema" | "process_limit" | "saturated" | "request_limit";
@@ -162,12 +161,18 @@ export async function frsZipCoverage(
       failures.push(`${c.radiusMi}:${a.schema ? "schema" : a.why ?? "unknown"}`);
       if (a.schema) return fail("schema");
       if (attempt === 2) return fail("transient");
-      // Always wait before a retry (with or without a deadline): at least the fixed backoff, longer
-      // when FRS asks for it (Retry-After, capped). A 429 is FRS saying slow down; an immediate retry
-      // is the wrong answer to it. The wait and the retry both count against this ZIP's budget.
+      // Always wait before a retry (with or without a deadline): at least the fixed backoff, and the
+      // FULL Retry-After when FRS asks for longer. A server-requested wait is never shortened. When it
+      // does not fit in what is left of this read's deadline, the read stops here (ok:false
+      // "deadline", recorded as retry_after_exceeds_budget) and the stored layer is kept; the next
+      // refresh tries again. Each retry counts toward this ZIP's request budget.
       const backoff = FRS_RETRY_BACKOFF_MS[attempt] ?? FRS_RETRY_BACKOFF_MS[FRS_RETRY_BACKOFF_MS.length - 1];
-      const wait = Math.max(backoff, a.retryAfterS !== undefined ? Math.min(a.retryAfterS * 1000, RETRY_AFTER_CAP_MS) : 0);
-      if (opts.deadlineAt !== undefined && opts.deadlineAt - now() - wait <= 0) return fail("deadline");
+      const asked = a.retryAfterS !== undefined ? a.retryAfterS * 1000 : 0;
+      const wait = Math.max(backoff, asked);
+      if (opts.deadlineAt !== undefined && opts.deadlineAt - now() - wait <= 0) {
+        if (asked > backoff) failures.push(`retry_after_exceeds_budget:${a.retryAfterS}`);
+        return fail("deadline");
+      }
       await sleep(wait);
     }
     if (!answered) return fail("transient");

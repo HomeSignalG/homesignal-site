@@ -227,6 +227,8 @@ const base = await zipRun({ zip: "85083", lat: P83lat, lng: P83lng });
   const n = await zipRun({ zip: "99902", lat: 40.0, lng: -100.0 });
   ok("5a. no boundary ⇒ ok:false reason no_boundary", n.epa.ok === false && n.epa.reason === "no_boundary", JSON.stringify(n.epa));
   ok("5b. ...and EPA is never asked for a radius around the point", n.calls.length === 0, JSON.stringify(n.calls));
+  ok("5b2. ...and the counts carry NO coverage marker (never complete)",
+    !("facilities_coverage" in ((n.j.counts ?? {}) as Record<string, unknown>)), JSON.stringify(n.j.counts));
   const none = await zipRun({ zip: "99902" });
   ok("5c. no boundary AND no point ⇒ an explicit 422, not a guessed point", none.status === 422, none.text.slice(0, 160));
 }
@@ -268,6 +270,8 @@ const base = await zipRun({ zip: "85083", lat: P83lat, lng: P83lng });
     JSON.stringify(d.epa));
   ok("8g. the name filter still drops non-industrial rows (relevance rule unchanged)", !d.ids.some((id) => DENSE_NONQUAL.includes(id)));
   ok("8h. it took more than one circle, and stayed within the request bound", d.calls.length > 1 && d.calls.length <= 64, `${d.calls.length} calls`);
+  ok("8i. a complete boundary read marks the stored counts: facilities_coverage = zip_boundary_v1",
+    counts.facilities_coverage === "zip_boundary_v1", JSON.stringify(counts));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

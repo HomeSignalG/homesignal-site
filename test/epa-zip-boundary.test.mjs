@@ -133,7 +133,18 @@ const box = FIX.bounds['85083'];
   const hdr = (v) => ({ status: 429, ok: false, headers: { get: (k) => (k === 'retry-after' ? v : null) }, text: async () => '{}' });
   const asked = async () => { m++; return m === 1 ? hdr('8') : m === 2 ? hdr('60') : res(200, { Results: { FRSFacility: [] } }); };
   await Z.frsZipCoverage(box, asked, { sleep: async (ms) => { w2.push(ms); } });
-  ok(JSON.stringify(w2) === '[8000,10000]', '2W2. Retry-After is honoured when longer than the backoff, and capped at 10 s', JSON.stringify(w2));
+  ok(JSON.stringify(w2) === '[8000,60000]', '2W2. Retry-After is honoured in full when longer than the backoff (60 s waits 60 s, never shortened to 10 s)', JSON.stringify(w2));
+  // Retry-After longer than what is left of the deadline: no wait is taken, the read stops as deadline.
+  let t4 = 0; const w4 = []; let k = 0;
+  const longAsk = async () => { k++; t4 += 100; return hdr('30'); };
+  const d4 = await Z.frsZipCoverage(box, longAsk, { now: () => t4, deadlineAt: 20000, sleep: async (ms) => { w4.push(ms); t4 += ms; } });
+  ok(!d4.ok && d4.reason === 'deadline' && w4.length === 0 && k === 1 && d4.failures.includes('retry_after_exceeds_budget:30'),
+    '2W4. Retry-After 30 s with 20 s left: the read stops at once (no shortened wait, no retry) and records why', JSON.stringify({ w4, k, f: d4.failures }));
+  // Retry-After of 15 s that fits in the remaining budget is waited in full, then the retry is made.
+  let t5 = 0; const w5 = []; let j = 0;
+  const fits = async () => { j++; t5 += 100; return j === 1 ? hdr('15') : res(200, { Results: { FRSFacility: [] } }); };
+  const d5 = await Z.frsZipCoverage(box, fits, { now: () => t5, deadlineAt: 45000, sleep: async (ms) => { w5.push(ms); t5 += ms; } });
+  ok(d5.ok && JSON.stringify(w5) === '[15000]', '2W5. Retry-After 15 s with 45 s left: waits the full 15 s, then retries', JSON.stringify(w5));
   let t = 0; const w3 = [];
   const d = await Z.frsZipCoverage(box, async () => { t += 100; return res(429, {}); }, { now: () => t, deadlineAt: 3000, sleep: async (ms) => { w3.push(ms); t += ms; } });
   ok(!d.ok && d.reason === 'deadline' && JSON.stringify(w3) === '[2000]', '2W3. a wait that would pass the deadline is not taken; the read ends as deadline', JSON.stringify({ w3, reason: d.reason }));
