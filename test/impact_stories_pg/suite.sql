@@ -621,6 +621,27 @@ select pg_temp.chk('12x5 visitors cannot call it',
   not has_function_privilege('anon', 'public.hs_impact_story_currency_update(uuid, text[])', 'execute')
   and has_function_privilege('authenticated', 'public.hs_impact_story_currency_update(uuid, text[])', 'execute'));
 rollback;
+-- 12w1-12w3 (2026-11-09, House Speaker story): the SCRIPT check (the current version's validation.currency) reported the
+-- news; both answers accept its key, a key from an older version is refused, and Update writes the same note.
+begin;
+update public.impact_story_versions set validation = coalesce(validation, '{}'::jsonb) || '{"currency":{"state":"stale","events":[{"key":"0e7cbefee047fb66","kind":"new_record_text","text":"A petition has passed 1 million signatures","source":"https://www.newsweek.com/x"}]}}'::jsonb
+ where story_id = pg_temp.id('s')::uuid and version = pg_temp.cur();
+update public.impact_story_versions set validation = coalesce(validation, '{}'::jsonb) || '{"currency":{"events":[{"key":"1111111111111111","text":"old"}]}}'::jsonb
+ where story_id = pg_temp.id('s')::uuid and version < pg_temp.cur();
+select pg_temp.chk('12w1 a key only an older version reported is refused',
+  pg_temp.err(format('select public.hs_impact_story_currency_dismiss(%L, array[''1111111111111111''])', pg_temp.id('s'))) like '22023%'
+  and not has_function_privilege('authenticated', 'public._hs_is_currency_event(uuid, text)', 'execute'));
+select public.hs_impact_story_currency_update(pg_temp.id('s')::uuid, array['0e7cbefee047fb66']);
+select pg_temp.chk('12w2 Update accepts the script check''s key: one note naming the news, and Fix starts',
+  (select count(*) from public.impact_story_line_notes where story_id = pg_temp.id('s')::uuid and path = 'main.status'
+     and note like '%passed 1 million signatures%' and note like '%newsweek.com%') = 1
+  and exists (select 1 from public.impact_story_fix_batches where story_id = pg_temp.id('s')::uuid));
+select public.hs_impact_story_currency_dismiss(pg_temp.id('s')::uuid, array['0e7cbefee047fb66']);
+select pg_temp.chk('12w3 Not about this story accepts it too, with no job id, and it rides on the next claim',
+  (select count(*) from public.impact_story_currency_dismissals where event_key = '0e7cbefee047fb66' and job_id is null
+     and event->>'source' = 'https://www.newsweek.com/x' and event->>'summary' like '%1 million signatures%') = 1
+  and public._hs_is_currency_dismissed(pg_temp.id('s')::uuid) ? '0e7cbefee047fb66');
+rollback;
 select pg_temp.chk('12f the worker gets the approved body', (public.hs_impact_story_job_claim(pg_temp.id('r1')::uuid)->'base_body'->>'schema') = 'impact-story/2');
 select public.hs_impact_story_job_complete(pg_temp.id('r1')::uuid, jsonb_build_object('assets',
   (select jsonb_agg(x) from jsonb_array_elements(pg_temp.files(pg_temp.id('r1')::uuid)) x where x->>'asset' <> 'thumbnail')));

@@ -1777,8 +1777,28 @@ returns jsonb language sql stable security definer set search_path = public as $
      where story_id = p_story order by event_key, id desc) d where decision = 'dismissed';
 $$;
 
+-- One newer event a check of this story reported, by key: the newest failed job that reported it (Prepare or render
+-- stopped on it), else the current version's own script check (validation.currency, written by generate / analyze /
+-- validate). The second source exists because the script check also blocks approval on newer news (House Speaker story,
+-- 2026-11-09: the narrative was "Blocked" on a petition passing 1 million signatures and no button could answer it).
+create or replace function public._hs_is_currency_event(p_story uuid, p_key text)
+returns table (event jsonb, job_id uuid) language sql stable security definer set search_path = public as $$
+  select e.x, e.jid from (
+    select x, j.id as jid, 0 as src, j.created_at as at
+      from public.impact_story_jobs j, jsonb_array_elements(coalesce(j.result->'currency'->'events', '[]'::jsonb)) x
+     where j.story_id = p_story and j.status = 'failed' and x->>'key' = p_key
+    union all
+    select x, null::uuid, 1, null::timestamptz
+      from public.impact_stories s
+      join public.impact_story_versions v on v.story_id = s.id and v.version = s.current_version,
+           jsonb_array_elements(coalesce(v.validation->'currency'->'events', '[]'::jsonb)) x
+     where s.id = p_story and x->>'key' = p_key
+  ) e order by e.src, e.at desc nulls last limit 1;
+$$;
+revoke all on function public._hs_is_currency_event(uuid, text) from public, anon, authenticated;
+
 -- "Not about this story — continue": set aside newer events the check reported, then the page prepares again. Each key
--- must be one a failed job of this story reported in its latest-development check (result.currency.events[].key).
+-- must be one a check of this story reported (_hs_is_currency_event: a failed job, or the current version's script check).
 create or replace function public.hs_impact_story_currency_dismiss(p_story uuid, p_keys text[])
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare e text := public._hs_is_admin(); k text; ev jsonb; jid uuid; n int := 0;
@@ -1788,15 +1808,12 @@ begin
   if coalesce(cardinality(p_keys), 0) = 0 then raise exception 'Nothing to set aside.' using errcode = '22023'; end if;
   if cardinality(p_keys) > 50 then raise exception 'Too many at once.' using errcode = '22023'; end if;
   foreach k in array (select array_agg(distinct x) from unnest(p_keys) x) loop
-    select x, j.id into ev, jid
-      from public.impact_story_jobs j, jsonb_array_elements(coalesce(j.result->'currency'->'events', '[]'::jsonb)) x
-     where j.story_id = p_story and j.status = 'failed' and x->>'key' = k
-     order by j.created_at desc limit 1;
+    select c.event, c.job_id into ev, jid from public._hs_is_currency_event(p_story, k) c;
     if ev is null then
       raise exception 'That update was not reported by a check of this story.' using errcode = '22023';
     end if;
     insert into public.impact_story_currency_dismissals (story_id, event_key, decision, event, job_id, actor)
-    values (p_story, k, 'dismissed', jsonb_build_object('summary', left(ev->>'summary', 400), 'source', ev->>'source',
+    values (p_story, k, 'dismissed', jsonb_build_object('summary', left(coalesce(ev->>'summary', ev->>'text'), 400), 'source', ev->>'source',
                                                        'kind', ev->>'kind'), jid, e);
     n := n + 1;
   end loop;
@@ -1821,10 +1838,7 @@ begin
   if cardinality(p_keys) > 50 then raise exception 'Too many at once.' using errcode = '22023'; end if;
   foreach k in array (select array_agg(distinct x order by x) from unnest(p_keys) x) loop
     ev := null;
-    select x into ev
-      from public.impact_story_jobs j, jsonb_array_elements(coalesce(j.result->'currency'->'events', '[]'::jsonb)) x
-     where j.story_id = p_story and j.status = 'failed' and x->>'key' = k
-     order by j.created_at desc limit 1;
+    select c.event into ev from public._hs_is_currency_event(p_story, k) c;
     if ev is null then
       raise exception 'That update was not reported by a check of this story.' using errcode = '22023';
     end if;
