@@ -3622,10 +3622,11 @@ connector `"scope":"legacy"`.
   failed read, a ZIP with no boundary. Never infer completeness from a count, `= 40`, or `facilities_refreshed_at`.
   ⚠️ On a REFUSED write the collector keeps the stored facilities but takes the new `counts` keys, so a later failed
   read drops the marker (reads as unverified, never as complete). Keeping it there is a collector change.
-  → **PARKED, NOT APPLIED: `docs/dev-refresh-collect-facility-inventory.sql`** (one helper
+  → **APPLIED 2026-11-09 21:07Z: `docs/dev-refresh-collect-facility-inventory.sql`** (one helper
   `dev_facility_read_untrusted`, verbatim the old `facilities_unavailable` expression; when true, keep the stored
   facility count AND coverage, hold `facilities_refreshed_at`). Collector md5 `b17263cc…` → `bd775733…`.
-- **What the count may claim — `docs/zip-facility-inventory.sql` (PARKED, NOT APPLIED).**
+- **What the count may claim — `docs/zip-facility-inventory.sql` (APPLIED 2026-11-09, migration `20261109210857`; live
+  `zip_mode_report_sites` md5 `751f297c…`, collector `bd775733…`; first collector run after, 21:10Z, succeeded).**
   `public.zip_facility_inventory_state` is the one decision: `complete` (marker, latest refresh ok; 0 = verified
   empty) · `complete_as_of` (marker, latest refresh failed: complete as of `last_success_at`) · `not_complete` (no
   marker: radius-era list or no boundary read has ever completed) · `not_measured` (no boundary / no report).
@@ -3633,7 +3634,8 @@ connector `"scope":"legacy"`.
   `HS.facilityInventory` (lib/templates.js) presents it: only `complete` prints a plain total; `not_complete` prints
   "N+ · not a complete count" or a dash; the empty-page "we checked the EPA registry and found nothing" sentence
   needs a complete zero. An unread inventory is never a total. Reports carry no EPA facilities (development only).
-  Apply order: both SQL files, then the page. Proof: `test/dev_collect_inventory_pg` (engine response → live
+  Applied in that order; PR #2736 merged after (`9e992121`). Until `get-address-report` is deployed, no ZIP carries the
+  marker, so every ZIP reads `not_complete` (measured 2026-11-09 on 85083, 84302, 78617; 01004 `not_measured`). Proof: `test/dev_collect_inventory_pg` (engine response → live
   collector → reader; production's code fails exactly the 3 defect cases first), `facility-inventory-suite.yml`.
 - **Termination:** a circle answering ≥ 1,000 rows (`FRS_TILE_ROW_CEILING`, the largest answer seen) is split; full at
   the 0.25 mi floor ⇒ `saturated`, refused there ⇒ `process_limit`, more than 64 requests ⇒ `request_limit`, past the

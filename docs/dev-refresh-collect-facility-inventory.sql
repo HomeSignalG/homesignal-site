@@ -1,6 +1,6 @@
 -- ============================================================================
 -- dev_refresh_collect — KEEP THE INVENTORY'S COVERAGE AND ITS DATE THROUGH A FAILED REFRESH
--- (SQL OF RECORD; PARKED, NOT APPLIED. Founder review required: homesignal-site PR #2736.)
+-- (SQL OF RECORD; APPLIED 2026-11-09 on the founder's go, before homesignal-site PR #2736 merged.)
 -- ============================================================================
 -- WHY (2026-11-09). The ZIP-boundary EPA read (get-address-report, sources/epa-frs-zip.ts) sends
 -- counts.facilities_coverage = "zip_boundary_v1" when, and only when, it covered the whole ZIP boundary and every
