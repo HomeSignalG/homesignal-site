@@ -63,7 +63,10 @@
 // that address — never an assumed check.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { frsFacilities, frsStartRung } from "./sources/epa-frs.ts";
+import { frsFacilities } from "./sources/epa-frs.ts";
+import { circumCircle, frsZipCoverage, MAX_ZIP_FACILITIES, pickZipFacilities } from "./sources/epa-frs-zip.ts";
+import type { ZipBounds } from "./sources/scope-box.ts";
+import type { MembershipFn } from "./sources/scope-members.ts";
 import {
   echoEnrich,
   cwaPermitEnrich,
@@ -342,8 +345,66 @@ type FacilityPlane = { sites: Record<string, unknown>[]; epa: Record<string, unk
 // facility rows and renders the count as UNKNOWN. `sites: []` here is an absence of an answer,
 // never an answer of zero — the empty array plus `ok:false` is exactly the shape a 429 already
 // produces, which is why no downstream consumer needs to learn a new state.
-function facilitiesUnavailable(reason: "deadline" | "error"): FacilityPlane {
+function facilitiesUnavailable(reason: "deadline" | "error" | "no_boundary" | "membership"): FacilityPlane {
   return { sites: [], epa: { ok: false, radius_used: null, reason, attempts: 0, raw_rows: 0, pre_cap: 0, kept: 0 } };
+}
+// ONE definition of an FRS row as a facility site, shared by address mode and ZIP mode. Returns null
+// for a row with no usable point or one the existing name filter drops (unchanged here). `e`/`n` are
+// relative to the report anchor.
+type FrsSite = Record<string, unknown> & { lat: number; lng: number; e: number; n: number };
+function frsRowToSite(rr: Record<string, unknown>, anchorLat: number, anchorLng: number): FrsSite | null {
+  const lat = Number(rr.Latitude83 ?? rr.FacLat), lng = Number(rr.Longitude83 ?? rr.FacLong);
+  if (!isFinite(lat) || !isFinite(lng)) return null;
+  const name = String(rr.FacilityName ?? rr.FacName ?? "Facility").trim();
+  if (!looksIndustrial(name)) return null;
+  const [e, n] = toEN(anchorLat, anchorLng, lat, lng);
+  const rid = String(rr.RegistryId ?? rr.RegistryID ?? "").trim();
+  // NO LIFECYCLE IS EMITTED HERE (2026-09-24). A site's `type` is its lifecycle stage
+  // (proposed | approved | built), and this used to stamp `type: "built"` on EVERY FRS
+  // row. FRS returns no lifecycle field at all — registration is not operation — so that
+  // value was manufactured, and it became "Operating" on Map 1, the ZIP page and the
+  // facility detail page. Omitted rather than guessed: the canonical lifecycle contract
+  // (lib/map.js trackerSiteItem → statusTier) resolves a record with no lifecycle evidence
+  // to `unknown`. Nothing else reads a facility element's `type` (checked: app_source_key,
+  // dev_sites_deduped, the facility insert in app_refresh_zip, and the DC geography views).
+  return { label: name, e, n, lat, lng, scope: "point", layer: classifyLayer(name), registry_id: rid, src: rid ? `EPA FRS · registry ${rid}` : "EPA FRS", record_url: rid ? `https://echo.epa.gov/detailed-facility-report?fid=${rid}` : "" };
+}
+// ZIP MODE (2026-11-09): the facility plane covers the WHOLE ZIP polygon (sources/epa-frs-zip.ts).
+// No stored point, radius, or cap decides inclusion: circles cover the polygon's box, every circle
+// must answer, the ZIP polygon decides membership, and only then is the storage cap applied. No
+// boundary ⇒ ok:false ("no_boundary"): the stored layer is kept and the count shows unknown. It
+// never falls back to a radius around a point.
+async function facilitySitesForZip(
+  bounds: ZipBounds | null,
+  member: MembershipFn,
+  anchorLat: number,
+  anchorLng: number,
+  deadlineAt?: number,
+): Promise<FacilityPlane> {
+  if (!bounds) return facilitiesUnavailable("no_boundary");
+  const out = await frsZipCoverage(bounds, undefined, { deadlineAt });
+  const cover = circumCircle(bounds);
+  const base = { mode: "zip_boundary", attempts: out.attempts, failures: out.failures, tiles: out.tiles, cover_radius_mi: out.cover_radius_mi, raw_rows: out.raw_rows };
+  if (!out.ok) return { sites: [], epa: { ok: false, radius_used: null, reason: out.reason, ...base, pre_cap: 0, kept: 0 } };
+  let pick;
+  try {
+    pick = await pickZipFacilities(out.rows, (r) => frsRowToSite(r, anchorLat, anchorLng), member, cover);
+  } catch (e) {
+    console.warn(`[epa-zip] membership failed: ${(e as Error).message}`);
+    return { sites: [], epa: { ok: false, radius_used: null, reason: "membership", ...base, pre_cap: 0, kept: 0 } };
+  }
+  return {
+    sites: pick.kept as Record<string, unknown>[],
+    epa: {
+      ok: true, radius_used: null, reason: null, ...base,
+      unique_rows: out.rows.length, candidates: pick.candidates, members: pick.members,
+      outside_excluded: pick.outside, unresolved_excluded: pick.unresolved,
+      // `pre_cap` keeps its meaning (count before the cap); `over_cap` > 0 means the stored list
+      // is not the whole in-ZIP inventory, and says so instead of presenting it as complete.
+      pre_cap: pick.members, kept: pick.kept.length, cap: MAX_ZIP_FACILITIES, over_cap: pick.over_cap,
+      complete: pick.over_cap === 0,
+    },
+  };
 }
 async function facilitySites(
   homeLat: number,
@@ -357,23 +418,11 @@ async function facilitySites(
   const keepRows = (rows: Record<string, unknown>[]) => {
     const kept: Record<string, unknown>[] = [];
     for (const rr of rows) {
-      const lat = Number(rr.Latitude83 ?? rr.FacLat), lng = Number(rr.Longitude83 ?? rr.FacLong);
-      if (!isFinite(lat) || !isFinite(lng)) continue;
-      const name = String(rr.FacilityName ?? rr.FacName ?? "Facility").trim();
-      if (!looksIndustrial(name)) continue;
-      const [e, n] = toEN(homeLat, homeLng, lat, lng);
-      const d = Math.hypot(e, n);
+      const site = frsRowToSite(rr, homeLat, homeLng);
+      if (!site) continue;
+      const d = Math.hypot(site.e, site.n);
       if (d > radiusMi + 0.05) continue;
-      const rid = String(rr.RegistryId ?? rr.RegistryID ?? "").trim();
-      // NO LIFECYCLE IS EMITTED HERE (2026-09-24). A site's `type` is its lifecycle stage
-      // (proposed | approved | built), and this used to stamp `type: "built"` on EVERY FRS
-      // row. FRS returns no lifecycle field at all — registration is not operation — so that
-      // value was manufactured, and it became "Operating" on Map 1, the ZIP page and the
-      // facility detail page. Omitted rather than guessed: the canonical lifecycle contract
-      // (lib/map.js trackerSiteItem → statusTier) resolves a record with no lifecycle evidence
-      // to `unknown`. Nothing else reads a facility element's `type` (checked: app_source_key,
-      // dev_sites_deduped, the facility insert in app_refresh_zip, and the DC geography views).
-      kept.push({ label: name, e, n, lat, lng, _d: d, scope: "point", layer: classifyLayer(name), registry_id: rid, src: rid ? `EPA FRS · registry ${rid}` : "EPA FRS", record_url: rid ? `https://echo.epa.gov/detailed-facility-report?fid=${rid}` : "" });
+      kept.push({ ...site, _d: d });
     }
     kept.sort((a, b) => (a._d as number) - (b._d as number));
     return kept;
@@ -648,17 +697,25 @@ async function handleRequest(req: Request): Promise<Response> {
   if (body.zip !== undefined && body.zip !== null && String(body.zip).trim() !== "") {
     const zip = String(body.zip).trim();
     if (!/^\d{5}$/.test(zip)) return json({ error: "zip must be 5 digits" }, 400, cors);
+    const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+    // The ZIP's canonical polygon box (sources/zip-bounds.ts over geo.zcta_boundary), read for EVERY
+    // ZIP request: the EPA facility plane covers the whole polygon with it (facilitySitesForZip).
+    // Null when the ZIP has no boundary; the EPA plane then reports "no_boundary" rather than
+    // searching a radius. The permit connectors still take it only under their own rollout policy below.
+    const zipGeo = await zipScopeBounds(supabase, zip);
+    if (!zipGeo.bounds) console.warn(`[epa-zip] ${zip}: no ZIP boundary — EPA facility plane unavailable (${zipGeo.reason})`);
+    // The report anchor (positions of area items, e/n offsets). A ZIP request needs NO address: when no
+    // point is passed it is the pinned centroid, else the centre of the ZIP's own boundary box. Neither
+    // decides which EPA facilities belong to the ZIP.
     let clat = Number(body.lat), clng = Number(body.lng);
     if (!isFinite(clat) || !isFinite(clng)) {
-      const c = ZCTA_CENTROIDS[zip];
-      if (!c) return json({ error: `no pinned centroid for ZIP ${zip}; pass {zip,lat,lng}` }, 422, cors);
+      const c = ZCTA_CENTROIDS[zip] ?? (zipGeo.bounds ? [circumCircle(zipGeo.bounds).lat, circumCircle(zipGeo.bounds).lng] as [number, number] : undefined);
+      if (!c) return json({ error: `no pinned centroid and no ZIP boundary for ${zip}; pass {zip,lat,lng}` }, 422, cors);
       [clat, clng] = c;
     }
     const zipRadius = Math.min(Math.max(Number(body.radius_mi) || ZIP_RADIUS_MI, 0.5), MAX_RADIUS_MI);
-    // The refresh passes `frs_start_mi` (public.dev_frs_start_mi): the ladder rung this ZIP's stored,
-    // capped facility list fits inside. Anything that is not a smaller rung of the ladder is ignored.
-    const frsStart = frsStartRung(body.frs_start_mi, zipRadius);
-    const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+    // `frs_start_mi` (sent by the refresh) applied to the old single-circle EPA search and is not read in
+    // ZIP mode any more: the boundary coverage below does not start from a radius.
     const communityIds = await resolveCommunityIds(supabase, zip);
     // Polygon bounding box of this ZIP for the radius-scoped connectors (sources/scope-box.ts).
     // Fail-safe: null ⇒ the legacy centroid scope, i.e. what ran before this read existed.
@@ -669,7 +726,7 @@ async function handleRequest(req: Request): Promise<Response> {
     // body is read, because this endpoint is reachable with the public anon key.
     const policy = scopePolicy((k) => Deno.env.get(k), zip);
     // Fail-safe: null bounds ⇒ the legacy centroid scope, i.e. what ran before this read existed.
-    const scope = policy.on ? await zipScopeBounds(supabase, zip) : { bounds: null, reason: policy.why };
+    const scope = policy.on ? zipGeo : { bounds: null, reason: policy.why };
     // Widened-only records are tested against the canonical polygon through ONE batch RPC; the box is
     // never used without it (sources/scope-members.ts).
     const zipMembers = zipMembershipRpc(supabase, zip);
@@ -680,7 +737,7 @@ async function handleRequest(req: Request): Promise<Response> {
     // row); the EPA overlay can only ever degrade to "unavailable".
     const planes = await resolvePlanes<Record<string, unknown>[], FacilityPlane>({
       core: () => devSites(supabase, clat, clng, communityIds),
-      overlay: (deadlineAt) => facilitySites(clat, clng, zipRadius, deadlineAt, frsStart),
+      overlay: (deadlineAt) => facilitySitesForZip(zipGeo.bounds, zipMembers, clat, clng, deadlineAt),
       overlayUnavailable: facilitiesUnavailable,
     });
     const devRaw = planes.core;
@@ -691,7 +748,14 @@ async function handleRequest(req: Request): Promise<Response> {
     // a wider circle than the facilities being matched). Failed calls restore
     // last-known-good env.epa from development_reports before the refresh writes.
     const { echo, cwa } = await enrichFacilityEnv(
-      supabase, facRaw, clat, clng, enrichRadiusMi(facResult.epa, zipRadius), zip,
+      // ECHO / CWA are radius queries joined to facilities by registry id: ask around the circle that
+      // covers the ZIP's box (the engine caps it at ECHO_MAX_RADIUS_MI), not around the stored point.
+      // (the cast only restates the parameter's own type: the untyped client's generics are the
+      // repo-wide pre-existing `deno check` mismatch, not something this call changes)
+      supabase as unknown as Parameters<typeof enrichFacilityEnv>[0], facRaw,
+      zipGeo.bounds ? circumCircle(zipGeo.bounds).lat : clat,
+      zipGeo.bounds ? circumCircle(zipGeo.bounds).lng : clng,
+      zipGeo.bounds ? circumCircle(zipGeo.bounds).radiusMi : enrichRadiusMi(facResult.epa, zipRadius), zip,
     );
     // TX TDLR/TABS enrichment (v16, additive — runbook §1). Coverage-gated inside
     // tabsForZip(): the source never runs for a non-TX ZIP. Separate query keeps
@@ -952,7 +1016,7 @@ async function handleRequest(req: Request): Promise<Response> {
     const envEpa = fac.filter((s) => (s.env as { epa?: unknown } | undefined)?.epa).length;
     const envTceq = fac.filter((s) => (s.env as { tceq?: unknown } | undefined)?.tceq).length;
     // TABS records are development filings → counts.development, never counts.facilities.
-    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, epa: facResult.epa, echo, cwa, counts: { facilities: fac.length, proposed: proposedRecords.length, proposed_active: proposedActiveRecords.length, proposed_decided: decidedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, tabs_quarantined: tabs.quarantined, socrata_reports: socrata.reports, arcgis_reports: arcgis.reports, ckan_reports: ckan.reports, csv_reports: csv.reports, carto_reports: carto.reports, env_records: { epa_matched: envEpa, tceq_matched: tceqStats.matched, tceq_dataset: tceq.dataset ?? null, tceq_entities: tceq.entities.length, tceq_quarantined: tceq.quarantined }, note: "ZIP-wide view centered on the ZIP centroid (not a home). Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Environmental records (EPA ECHO federal + TCEQ Central Registry state) are geo-matched to each facility. Not for resale.", sites }, 200, cors);
+    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, epa: facResult.epa, echo, cwa, counts: { facilities: fac.length, proposed: proposedRecords.length, proposed_active: proposedActiveRecords.length, proposed_decided: decidedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, tabs_quarantined: tabs.quarantined, socrata_reports: socrata.reports, arcgis_reports: arcgis.reports, ckan_reports: ckan.reports, csv_reports: csv.reports, carto_reports: carto.reports, env_records: { epa_matched: envEpa, tceq_matched: tceqStats.matched, tceq_dataset: tceq.dataset ?? null, tceq_entities: tceq.entities.length, tceq_quarantined: tceq.quarantined }, note: "ZIP-wide view (not a home). Development items are jurisdiction-level (scope=area); facilities (scope=point) are the EPA-registered facilities inside the ZIP boundary. Environmental records (EPA ECHO federal + TCEQ Central Registry state) are geo-matched to each facility. Not for resale.", sites }, 200, cors);
   }
 
   const address = (body.address || "").trim();

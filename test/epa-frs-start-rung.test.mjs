@@ -91,8 +91,11 @@ ok(JSON.stringify(frsRadii(3)) === '[3,2,1.5,1,0.5,0.25]', '1i. the ladder itsel
 // ── 4. index.ts wiring ────────────────────────────────────────────────────────────────────────
 {
   const src = readFileSync(join(FN, 'index.ts'), 'utf8');
-  ok(/const frsStart = frsStartRung\(body\.frs_start_mi, zipRadius\);/.test(src), '4a. ZIP mode reads frs_start_mi through frsStartRung');
-  ok(/facilitySites\(clat, clng, zipRadius, deadlineAt, frsStart\)/.test(src), '4b. ZIP mode passes the hint to facilitySites');
+  // SUPERSEDED 2026-11-09: ZIP mode no longer searches one circle around the stored point, so the
+  // start-rung hint has nothing to apply to there (test/epa-zip-boundary.test.mjs). The ladder and its
+  // hint stay as they were for any caller of facilitySites.
+  ok(!/frsStartRung\(body\.frs_start_mi/.test(src), '4a. ZIP mode no longer reads frs_start_mi (the boundary coverage does not start from a radius)');
+  ok(/facilitySitesForZip\(zipGeo\.bounds, zipMembers, clat, clng, deadlineAt\)/.test(src), '4b. ZIP mode uses the boundary coverage, not the radius ladder');
   ok(/facilitySites\(lat, lng, radiusMi, deadlineAt\)/.test(src), '4c. address mode takes no hint');
   ok(/outcome\.ok && kept\.length < MAX_FACILITIES\) \|\| outcome\.reason === "partial_scope"/.test(src),
     '4d. a hinted answer short of the cap, or a smaller-circle zero, runs the full ladder');

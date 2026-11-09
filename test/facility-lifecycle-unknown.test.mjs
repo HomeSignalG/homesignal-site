@@ -204,7 +204,11 @@ ok(hdr.length > 50 && !/>Operating</.test(hdr) && !/status active/.test(hdr) && 
   '7g facility detail: no literal "Operating", no operating colour class; the pill prints the stored status in the shared vocabulary');
 ok(!/An existing regulated facility/.test(DEV), '7h facility detail no longer calls the facility "existing"');
 const PRODUCER = read('supabase/functions/get-address-report/index.ts');
-const push = code(PRODUCER).match(/kept\.push\(\{ label: name,[^\n]*\}\);/);
+// 2026-11-09: the FRS row → site literal moved into ONE shared helper (frsRowToSite), used by address
+// mode and the ZIP-boundary plane alike; every emitted facility still comes out of this literal.
+const push = code(PRODUCER).match(/return \{ label: name,[^\n]*\};/);
+ok((code(PRODUCER).match(/\{ label: name, e, n, lat, lng,/g) || []).length === 1,
+  '7i0 exactly one FRS-site literal in the producer (no second copy that could carry a lifecycle)');
 ok(push && !/\btype:/.test(push[0]) && /registry_id: rid/.test(push[0]) && /layer: classifyLayer\(name\)/.test(push[0]),
   '7i the producer emits the FRS element with its identity fields and NO lifecycle `type`', push && push[0].slice(0, 120));
 

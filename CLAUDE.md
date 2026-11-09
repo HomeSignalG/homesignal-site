@@ -3559,6 +3559,7 @@ Measured on production 2026-09-22, every canonical ZIP, no sampling:
     retrieved (around the ZIP centre). A facility inside a very large ZIP but beyond that
     retrieval is not served — an omission, never a wrong placement. The ZIP community page's
     facility section (`app_projects`) is still radius context and is not Map 1.
+    ⬆️ **Closed for EPA by §7.08a (2026-11-09):** ZIP-mode retrieval now covers the whole boundary.
 - ⚖️ **DEVELOPMENT POINTS IN `development_reports` ARE CANDIDATES, NOT MEMBERS — never drop them
   at the row.** They feed N5 (`n5_expected_input` reads `app_projects`, built from these rows), and
   N5 unions candidates from every report — that is what finds a record inside a large ZIP but
@@ -3577,6 +3578,28 @@ Measured on production 2026-09-22, every canonical ZIP, no sampling:
   inside-far / outside-near / boundary / far points; centroid-radius, national-bypass,
   Type-scoped and facility-bypass mutations must each FAIL it). The earlier 26-check version, which also covered the
   reverted trigger, passed 26/26 against production inside a rolled-back transaction.
+
+## 7.08a ZIP-MODE EPA RETRIEVAL COVERS THE WHOLE ZIP BOUNDARY (2026-11-09) — BUILT, NOT DEPLOYED
+
+Found by the Phoenix 85083 audit. **Not a regression: the EPA plane never had boundary retrieval.** Since #113 (2026-07-04)
+`get-address-report` ZIP mode asked EPA FRS for one 3-mile circle around `development_reports.home_lat/lng` (a pinned ZIP
+centre from the state seeds, never an address), cut rows beyond 3 mi, kept the nearest 40, and only at READ time
+(`zip_mode_report_sites`, #1312) tested them against the ZIP. The polygon-bbox scope (#1794) was wired into the permit
+connectors only and ships OFF (`ZIP_SCOPE_BOUNDS_MODE`); measured 2026-11-09: 200 of 200 recent ZIP responses report every
+connector `"scope":"legacy"`.
+- **Now:** `sources/epa-frs-zip.ts` covers the ZIP's polygon box with FRS circles (a refused circle splits into four, never
+  shrinks in place), every circle must answer or the plane is `ok:false`, rows are de-duplicated by RegistryId, the ZIP
+  polygon (`zip_scope_members`, the same boundary-inclusive predicate Map 1 serves) decides inclusion, and only then the
+  storage cap (`MAX_ZIP_FACILITIES` 250, `over_cap` reported). No boundary ⇒ `ok:false reason no_boundary` (stored layer
+  kept, count unknown), never a radius. A ZIP request with no point uses the boundary box centre as its anchor.
+  `frs_start_mi` is ignored in ZIP mode. ECHO/CWA enrichment asks around the covering circle (capped at 5 mi).
+  Address mode (`facilitySites(lat, lng, radiusMi)`) is unchanged; the FRS row → site literal is one helper, `frsRowToSite`.
+- **Scope measured 2026-11-09:** 8,108 of 12,038 ZIPs with a boundary have part of it more than 3 mi from the stored point;
+  706 have no boundary. Arizona sample: 2,286 of 4,327 stored facility entries (53%) lie outside their own ZIP.
+- **Still radius-based and NOT part of this change:** the permit connectors while `ZIP_SCOPE_BOUNDS_MODE` is off (their own
+  runbook, `docs/zip-scope-bounds-runbook.md`, gates enabling it).
+- Tests: `test/epa-zip-boundary.test.mjs`, `epa-zip-boundary.handler.test.ts` (real FRS answers saved 2026-11-09,
+  `test/fixtures/epa-zip-boundary/`).
 
 ## 7.11 THE CANONICAL DEVELOPMENT TYPE LIVES IN `lib/project-type.js` — ONE CLASSIFIER, NO MAP RUNTIME (2026-09-24)
 

@@ -92,6 +92,8 @@ jobs:
           run_helper "supabase/functions/geocode-address/geocode-address.test.ts" "geocode-address"
           # the SHIPPED handler under Deno: rollout is server-policy only (no request-body control)
           run_helper "${FN_DIR}/zip-scope.handler.test.ts" "zip-scope-handler" "--allow-env --allow-read"
+          # the SHIPPED handler under Deno: the EPA facility plane covers the WHOLE ZIP boundary (saved FRS fixtures)
+          run_helper "${FN_DIR}/epa-zip-boundary.handler.test.ts" "epa-zip-boundary-handler" "--allow-env --allow-read"
 
       - name: Type-check the new geocoder helper (strict, must be clean)
         run: |
