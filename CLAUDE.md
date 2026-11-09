@@ -1921,7 +1921,22 @@ added by hand 2026-11-09). SQL of record `docs/maps-zip-order-subscriber-zips.sq
   changes, at the end of `hs_set_maps_zip_order` (an upload that leaves out a subscriber ZIP gets it appended), and once
   on apply. The triggers never block a sign-up (a failure is a WARNING).
 - It does not create drafts: "Create + refresh drafts" in All Maps still does that.
-- Test: `test/maps_zip_order_subscribers_pg` (`maps-zip-order-subscribers-suite.yml`; 13 checks, 6 mutations).
+- Test: `test/maps_zip_order_subscribers_pg` (`maps-zip-order-subscribers-suite.yml`; 15 checks incl. S00a/S00b, which
+  pin the fixture's resolver view and list table to production's fingerprints; 6 mutations; `replay_guard.sh`).
+- **Audit follow-ups (same day, founder "all"):**
+  - ⛔ **`docs/maps-zip-order.sql` still carries the OLD `hs_set_maps_zip_order`** (drops subscriber ZIPs). It now runs as
+    one transaction and REFUSES, changing nothing, when `maps_zip_order_sync_subscribers()` exists. On a fresh database it
+    applies as before (old body md5 `7eca7b45…`); apply the subscriber file after it.
+  - **The hourly monitor pages** (`maps_subscriber_zips`, `docs/maps-subscriber-zips-monitor.sql`, a splice of
+    `pipeline_health_tick()`): fewer than 2 rule triggers, a subscriber ZIP missing from the list, or a ZIP whose non-test
+    maps subscriber has waited over 7 days with no published, un-withdrawn MAPS post (so no email). Test-only ZIPs (every
+    subscriber `referral_source = 'admin_test'`) are counted, never paged. Test: `test/maps_subscriber_zips_monitor_pg`.
+    Measured 2026-11-09: 68 ZIPs, 65 test-only, 97702 posted, 85083 and 64166 inside the 7 days.
+  - **Map 1 offers the sign-up after an address search too**, for the ZIP the geocoder names, only when that ZIP has its
+    own ZIP page (`HS.data.zipCommunity`), with the line "This address is in ZIP <zip>." (`body.addrzip`,
+    `offerZipEmailForAddress`). Before, the button was ZIP-mode only, so an address searcher could not sign up at all.
+    Browser test `test/maps-zip-email.browser.test.mjs` §5.
+  - The two 85083/64166 identities created 2026-11-09 14:41:49Z are an `admin_test` account, not new residents.
 
 ## 7.04 THE DATA CENTER THEME BUTTON CREATES **AND** REFRESHES ⚖️ FOUNDER REQUIREMENT (2026-09-21)
 

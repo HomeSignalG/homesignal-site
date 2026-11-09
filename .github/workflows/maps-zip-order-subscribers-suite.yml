@@ -6,12 +6,14 @@ on:
   pull_request:
     paths:
       - 'docs/maps-zip-order-subscriber-zips.sql'
+      - 'docs/maps-zip-order.sql'
       - 'test/maps_zip_order_subscribers_pg/**'
       - '.github/workflows/maps-zip-order-subscribers-suite.yml'
   push:
     branches: [main]
     paths:
       - 'docs/maps-zip-order-subscriber-zips.sql'
+      - 'docs/maps-zip-order.sql'
       - 'test/maps_zip_order_subscribers_pg/**'
       - '.github/workflows/maps-zip-order-subscribers-suite.yml'
   workflow_dispatch: {}
