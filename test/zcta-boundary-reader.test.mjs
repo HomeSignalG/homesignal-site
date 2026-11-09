@@ -109,21 +109,12 @@ ok(!/grant\s+usage\s+on\s+schema\s+geo/i.test(ddl),
   (ddlRaw.match(/.{0,60}usage on schema geo.{0,60}/i) || [])[0]);
 ok(/revoke all on function public\.app_zcta_boundary\(text\) from public;/.test(ddl),
   '4b EXECUTE is revoked from PUBLIC first');
-ok(/grant execute on function public\.app_zcta_boundary\(text\) to authenticated, service_role;/.test(ddl),
-  '4c ...then granted to authenticated and service_role');
-ok(!/grant[\s\S]{0,80}to\s+anon\b/.test(ddl) && !/to anon, authenticated/.test(ddl),
-  '4d ...and NEVER GRANTED to anon: ZIP context visualization is the authenticated A-022 '
-  + 'posture, and the public ZIP document is the protected acquisition surface');
-// 4e EXISTS BECAUSE 4d WAS TRUE AND NOT ENOUGH. This project's default privileges grant
-// `anon` EXECUTE on new functions in schema public, so after the first deploy — which
-// revoked PUBLIC and granted only authenticated/service_role — the live
-// has_function_privilege('anon', …) was STILL TRUE. `PUBLIC` is the pseudo-role every role
-// inherits; `anon` is a NAMED role holding its own grant, and revoking one does not touch
-// the other. A file that never grants anon is not a file that leaves anon without the
-// grant, and only the database can tell you which you have.
-ok(/revoke all on function public\.app_zcta_boundary\(text\) from anon;/.test(ddl),
-  '4e ...and anon is revoked EXPLICITLY, not merely left ungranted — default privileges '
-  + 'hand it EXECUTE otherwise');
+// ⚖️ INVERTED 2026-11-09 (founder): every visitor, signed in or not, sees the ZIP outline,
+// so anon is now GRANTED EXECUTE. The schema grant (4a) stays forbidden.
+ok(/grant execute on function public\.app_zcta_boundary\(text\) to anon, authenticated, service_role;/.test(ddl),
+  '4c ...then granted to anon, authenticated and service_role');
+ok(!/revoke all on function public\.app_zcta_boundary\(text\) from anon;/.test(ddl),
+  '4d ...and anon is no longer revoked (a replay of this file must not take the outline away)');
 
 // ── §5 THE READER'S ONE CALLER IS MAP 1'S EMBED MODE ───────────────────────────────────
 // INVERTED TWICE, and the second inversion is the point. These first asserted the reader had
@@ -166,8 +157,8 @@ ok(/frame-src 'self'/.test(read('community.html')) && /frame-src \\'self\\'/.tes
   + 'public-byte change this work leaves behind');
 ok(/rpc\("app_zcta_boundary", \{ p_zip: zip \}\)/.test(m1js),
   '5d the reader is called by name, with a ZIP, from homesignalmap.html');
-// 2026-10-02: the ZIP page embed is shown to every visitor (founder). The READER is still
-// authenticated-only (§4d), so a signed-out visitor's embed draws no outline.
+// 2026-10-02: the ZIP page embed is shown to every visitor (founder). Since 2026-11-09 the
+// READER is open to anon too (§4c), so a signed-out visitor's embed draws the outline.
 ok(/var zipContextMap =/.test(cpjs) && /homesignalmap\.html\?embed=1/.test(cpjs),
   '5e ...reached only through the Map 1 embed the ZIP page renders');
 ok(!/app_zcta_boundary/.test(cpjs) && !/HS\.buildLive/.test(cpjs),
