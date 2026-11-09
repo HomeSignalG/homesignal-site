@@ -426,12 +426,18 @@ jobs:
           # PROJECT PAGES (plan step 12): every project document written is advertised, only those.
           pwritten = sorted('/' + os.path.relpath(r, '_site').replace(os.sep, '/') + '/'
                             for r, _, fs in os.walk('_site/project') if 'index.html' in fs)
-          projs = re.findall(r'<loc>https://[^/<]+(/project/[a-z0-9-]+/[a-z0-9-]+/)</loc>', sm)
+          # Project pages are a FAMILY_ONLY family (2026-11-09): listed in sitemaps/project.xml (declared in
+          # robots.txt), never in sitemap.xml, which would otherwise pass the 50,000-URL limit.
+          sys.path.insert(0, 'scripts')
+          from gen_zip_pages import sitemap_locs, FAMILY_ONLY
+          assert not re.search(r'<loc>[^<]*/project/', sm), 'project URLs leaked into sitemap.xml'
+          projs = [re.sub(r'^https://[^/]+', '', u) for u in sitemap_locs('_site', 'sitemaps/project.xml')]
           assert pwritten == man['project_pages'], 'project documents != manifest project_pages'
-          assert sorted(projs) == man['project_pages'], 'sitemap project URLs != project pages written'
-          assert len(projs) == len(set(projs)), 'duplicate project URL in the sitemap'
+          assert sorted(projs) == man['project_pages'], 'project sitemap URLs != project pages written'
+          assert len(projs) == len(set(projs)), 'duplicate project URL in the project sitemap'
           assert pwritten, 'no project pages written'
-          print(f"project pages reconciled: {len(pwritten)} documents == sitemap {len(projs)}")
+          print(f"project pages reconciled: {len(pwritten)} documents == sitemaps/project.xml {len(projs)} "
+                f"({man['family_sitemap_files']['project']} file(s))")
           # GUIDE PAGES (plan step 13): a fixed, small set; every one written is advertised.
           gwritten = sorted('/' + os.path.relpath(r, '_site').replace(os.sep, '/') + '/'
                             for r, _, fs in os.walk('_site/guides') if 'index.html' in fs)
@@ -443,18 +449,18 @@ jobs:
           print(f"guide pages reconciled: {len(gwritten)} documents == sitemap {len(guides)}")
           # FAMILY SITEMAPS (plan step 14): each family is exactly its own set, and together
           # they cover exactly the generated URLs sitemap.xml advertises.
-          main_gen = set(re.findall(r'<loc>https://[^/<]+(/(?:community|city|project|guides)/[^<]+)</loc>', sm))
+          main_gen = set(re.findall(r'<loc>https://[^/<]+(/(?:community|city|guides)/[^<]+)</loc>', sm))
           fam_union = set()
           expect = {'zip': None, 'zip-alerts': None, 'zip-development': None, 'city': man['city_pages'],
                     'project': man['project_pages'], 'guide': man['guide_pages']}
           for name, want in expect.items():
-              fx = open(f'_site/sitemaps/{name}.xml', encoding='utf-8').read()
-              locs = re.findall(r'<loc>https://[^/<]+([^<]+)</loc>', fx)
+              locs = [re.sub(r'^https://[^/]+', '', u) for u in sitemap_locs('_site', f'sitemaps/{name}.xml')]
               assert len(locs) == len(set(locs)) == man['family_sitemaps'][name], f'{name} count'
               if want is not None:
                   assert sorted(locs) == want, f'{name} sitemap != its pages'
-              assert set(locs) <= main_gen, f'{name} advertises a URL sitemap.xml does not'
-              fam_union |= set(locs)
+              if name not in FAMILY_ONLY:
+                  assert set(locs) <= main_gen, f'{name} advertises a URL sitemap.xml does not'
+                  fam_union |= set(locs)
           assert fam_union == main_gen, 'family sitemaps do not cover sitemap.xml exactly'
           print("family sitemaps reconciled:", man['family_sitemaps'])
           # FOCUS-AREA SITEMAPS (data/seo-focus-areas.json): a subset view of sitemap.xml, listed

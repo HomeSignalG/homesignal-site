@@ -104,6 +104,7 @@ function gen(docs, { baseline = null, now = '2026-09-28T00:00:00', extra = [] } 
     o.stateText = readFileSync(join(out, 'sitemaps', 'page-state.json'), 'utf8');
     o.state = JSON.parse(o.stateText);
     o.sitemap = readFileSync(join(out, 'sitemap.xml'), 'utf8');
+    o.projectSitemap = readFileSync(join(out, 'sitemaps', 'project.xml'), 'utf8');
   }
   return o;
 }
@@ -300,7 +301,7 @@ ok(v0.status === 0 && v0.delta.seed && v0.delta.submit.length === 0,
    'Y3 a baseline from another semantic_version is incomparable: reseed, notify nothing');
 
 // project lastmod keeps its existing authority (changed_on) and is stable across no-op builds
-const projLm = lastmodOf(sD.sitemap, projPath);
+const projLm = lastmodOf(sD.projectSitemap, projPath);   // project pages are in sitemaps/project.xml only
 ok(projLm === undefined || projLm === null || /^\d{4}-\d{2}-\d{2}$/.test(projLm),
    `P1 project-page lastmod stays on its own changed_on authority (${projLm})`);
 
