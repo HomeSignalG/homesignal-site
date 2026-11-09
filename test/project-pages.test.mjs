@@ -124,9 +124,13 @@ ok(man.project_pages.length === nProjects, `the manifest lists all ${nProjects} 
 ok(JSON.stringify(man.project_pages) === JSON.stringify(Object.keys(docs.projectsDoc.projects)
   .map((k) => expectedPath('town-permits', docs.projectsDoc.projects[k].case, k)).sort()),
    'every page is at the documented URL');
-const smProj = [...sm.matchAll(/<loc>https:\/\/jodytracks\.com(\/project\/[^<]+)<\/loc>/g)].map((m) => m[1]).sort();
-ok(JSON.stringify(smProj) === JSON.stringify(man.project_pages), 'the sitemap advertises exactly the project pages');
-ok(man.sitemap_project_urls === nProjects, 'the manifest reconciles the sitemap count');
+// Project pages are listed only in sitemaps/project.xml (FAMILY_ONLY, 2026-11-09): sitemap.xml would
+// otherwise pass the 50,000-URL limit.
+const famProjXml = readFileSync(join(out, 'sitemaps', 'project.xml'), 'utf8');
+const smProj = [...famProjXml.matchAll(/<loc>https:\/\/jodytracks\.com(\/project\/[^<]+)<\/loc>/g)].map((m) => m[1]).sort();
+ok(JSON.stringify(smProj) === JSON.stringify(man.project_pages), 'the project sitemap advertises exactly the project pages');
+ok(!sm.includes('/project/'), 'sitemap.xml lists no project page (they are in sitemaps/project.xml)');
+ok(man.sitemap_project_urls === nProjects, 'the manifest reconciles the project sitemap count');
 const pg1 = read(out, p1);
 ok(/<meta name="robots" content="index, follow">/.test(pg1), 'a project page is indexable');
 ok(pg1.includes(`<link rel="canonical" href="https://jodytracks.com${p1}">`), 'and self-canonical');
@@ -210,7 +214,9 @@ ok([...pg1.matchAll(/<script[\s>][^>]*>/gi)].map((m) => m[0]).join() === '<scrip
      list.includes('<link rel="canonical" href="https://jodytracks.com/community/01002/projects/">'),
      'the list is index-eligible (index-all policy) and canonical to itself');
   const smk = readFileSync(join(b.out, 'sitemap.xml'), 'utf8');
-  ok(!smk.includes('/projects/') && smk.includes(po), 'the list is in no sitemap; the kept page is');
+  const fpk = readFileSync(join(b.out, 'sitemaps', 'project.xml'), 'utf8');
+  ok(!smk.includes('/projects/') && !smk.includes(po) && fpk.includes(po),
+     'the list is not in sitemap.xml; the kept page is in the project sitemap');
   const zk = readFileSync(join(b.out, 'community', '01002', 'index.html'), 'utf8');
   ok(/<nav class="zproj" aria-label="Projects on record"><a href="\/community\/01002\/projects\/">All \d+ projects on record in 01002<\/a><\/nav>/.test(zk),
      'the ZIP page links to its project list');
@@ -276,9 +282,9 @@ ok([...pg1.matchAll(/<script[\s>][^>]*>/gi)].map((m) => m[0]).join() === '<scrip
   const lm = (xml, path) => (xml.match(new RegExp(`<loc>https://jodytracks\\.com${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}</loc>\\n    <lastmod>([^<]+)</lastmod>`)) || [])[1];
   const sm2 = readFileSync(join(b.out, 'sitemap.xml'), 'utf8');
   const fam2 = readFileSync(join(b.out, 'sitemaps', 'project.xml'), 'utf8');
-  ok(lm(sm2, p1) === '2026-09-20' && lm(fam2, p1) === '2026-09-20',
-     'the sitemaps give a project the day its facts last changed');
-  ok(lm(sm2, pathOf('https://permits.example.gov/r/2')) === '2026-09-28',
+  ok(lm(fam2, p1) === '2026-09-20' && lm(sm2, p1) === undefined,
+     'the project sitemap gives a project the day its facts last changed (sitemap.xml does not list it)');
+  ok(lm(fam2, pathOf('https://permits.example.gov/r/2')) === '2026-09-28',
      'a record without changed_on falls back to the plane day');
   ok(!/<loc>https:\/\/jodytracks\.com\/community\/[^<]+<\/loc>\n    <lastmod>/.test(sm2),
      'ZIP pages carry no lastmod (no honest per-page change date exists for them yet)');
@@ -452,8 +458,9 @@ print("LOADED")`;
   ok(fam['zip-development'].includes('/community/01002/') && !fam['zip-alerts'].includes('/community/01002/'),
      'a Rule-D-only ZIP is in the development family and not the alerts family');
   const mainGen = new Set([...sm.matchAll(/<loc>https:\/\/jodytracks\.com(\/(?:community|city|project|guides)\/[^<]+)<\/loc>/g)].map((m) => m[1]));
-  // project-list is the one family that is NOT in sitemap.xml (the flat master would pass 50,000 URLs).
-  const union = new Set(Object.entries(fam).filter(([k]) => k !== 'project-list').flatMap(([, v]) => v));
+  // project and project-list are the FAMILY_ONLY families: NOT in sitemap.xml (the flat master would pass 50,000 URLs).
+  const union = new Set(Object.entries(fam).filter(([k]) => k !== 'project-list' && k !== 'project').flatMap(([, v]) => v));
+  ok(fam.project.every((u) => !mainGen.has(u)), 'no project page is in sitemap.xml');
   ok(Array.isArray(fam['project-list']) && fam['project-list'].every((u) => /^\/community\/\d{5}\/projects\/$/.test(u)) &&
      fam['project-list'].includes('/community/01002/projects/'), 'the project-list family lists every ZIP project list page'); 
   ok(union.size === mainGen.size && [...union].every((u) => mainGen.has(u)),
