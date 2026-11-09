@@ -1,6 +1,6 @@
 -- ============================================================================
 -- ZIP FACILITY INVENTORY STATE — what a ZIP page may say about its EPA facility count
--- (SQL OF RECORD; PARKED, NOT APPLIED. Founder review required: homesignal-site PR #2736.)
+-- (SQL OF RECORD; APPLIED 2026-11-09 on the founder's go, before homesignal-site PR #2736 merged.)
 -- ============================================================================
 -- WHY (2026-11-09). The facility count on Map 1 and on the ZIP page has been shown as a plain total whenever the latest
 -- EPA read did not fail. But most stored facility lists came from the old ZIP search (one 3-mile circle around a stored
