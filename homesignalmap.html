@@ -927,8 +927,8 @@
 
       <div class="grid band">
         <div class="card read">
-          <div class="band-h t-built">Completed (agency record)</div>
-          <div class="band-s">Permits and cases the agency marked complete. Agency completion does not confirm a building is occupied or a business is open. Data centers here are listed as operating by their source.</div>
+          <div class="band-h t-built" id="builtHead">Completed (agency record)</div>
+          <div class="band-s" id="builtSub">Permits and cases the agency marked complete. Agency completion does not confirm a building is occupied or a business is open.</div>
           <div id="builtList"></div>
         </div>
         <div class="card read">
@@ -1000,7 +1000,7 @@
     filing, or a state or federal registry entry.</p>
   <h3>What you can see</h3>
   <ul>
-    <li><strong>Status:</strong> completed (agency record), approved, or proposed, plus records whose lifecycle the source does not state. An agency marking a permit or case complete does not confirm that a building is occupied or a business is open.</li>
+    <li><strong>Status:</strong> completed (agency record) or, for data centers, listed as operating by their source; approved; or proposed, plus records whose lifecycle the source does not state. An agency marking a permit or case complete does not confirm that a building is occupied or a business is open.</li>
     <li><strong>Project type:</strong> data centers, industrial, residential, roads and infrastructure, commercial,
       civic and public, and other projects.</li>
     <li><strong>Regulatory records:</strong> EPA-registered facilities and similar registry entries, shown as a separate
@@ -1087,7 +1087,10 @@ HS.onReady(function(){
   // array omitted `unknown`, so records the source gives no lifecycle for rendered in a
   // colour the legend never explained. The facility row is excluded here (facilities get
   // their own shape-legend row, not a lifecycle chip).
-  var TRACKER_LABELS = { operating:"Completed (agency record)", approved:"Approved", proposed:"Proposed",
+  // The "operating" bucket holds two claims (agency completion, and a source's own operating listing
+  // of a data center), and a chip or legend colour covers every pin in it, so its label must be true
+  // of both. The band heading below names only what its list holds (builtBandText).
+  var TRACKER_LABELS = { operating:"Completed or listed as operating", approved:"Approved", proposed:"Proposed",
                          unknown:"Lifecycle unknown" };
   var LEGEND = (HS.STATUS_LEGEND_ROWS || []).filter(function(r){ return r.key !== "facility"; })
     .map(function(r){
@@ -1506,6 +1509,18 @@ HS.onReady(function(){
     return (st === "operating" || st === "built") && !!(HS.isSourceOwnRecord && HS.isSourceOwnRecord(s));
   }
   function stageWord(s){ return ownOperating(s) ? "Operating (source listing)" : (STAGE_WORD[stageOf(s)] || "Official record"); }
+  // The band heading and subtitle state only what the rows beneath them are. Agency-completed records
+  // keep "Completed (agency record)"; a band holding a source's own operating listings says so.
+  // WORDING ONLY: which rows are in the band is decided by bucketOf, unchanged.
+  function builtBandText(rows){
+    var own = rows.filter(ownOperating).length, agency = rows.length - own;
+    var NOT_OPEN = "Agency completion does not confirm a building is occupied or a business is open.";
+    var CLAIM = "A source's operating listing is that source's claim; Jody does not verify it.";
+    if(own && agency) return { h: "Completed or listed as operating",
+      s: "Permits and cases the agency marked complete, and data centers their source lists as operating. " + NOT_OPEN + " " + CLAIM };
+    if(own) return { h: "Operating (source listing)", s: "Data centers their source lists as operating. " + CLAIM };
+    return { h: "Completed (agency record)", s: "Permits and cases the agency marked complete. " + NOT_OPEN };
+  }
   // The one popup/subheader label for any record. EPA FRS facility → the physical-facility line;
   // everything else → its lifecycle stage. Named + exposed (window.__HS_KIND) so verify-development
   // can assert, live, that the label a resident sees agrees with the dot's colour — the regression
@@ -3034,7 +3049,10 @@ HS.onReady(function(){
     // Civic notices have no lifecycle stage and only a synthetic (jurisdiction-wide) position, so
     // they are not plotted as development dots — the map shows genuine development + facilities only.
     drawMap(data, sites.filter(function(s){ return !isCivic(s); }));
-    listInto("builtList", builtRows, "No completed agency records in Jody for this area. This does not mean nothing operates here.");
+    var bt = builtBandText(builtRows);
+    if($("builtHead")) $("builtHead").textContent = bt.h;
+    if($("builtSub")) $("builtSub").textContent = bt.s;
+    listInto("builtList", builtRows, "No completed agency records or source-listed operating data centers in Jody for this area. This does not mean nothing operates here.");
     listInto("unknownList", unknownRows, "Nothing on record here without a stated lifecycle.");
     listInto("apprList", appr, "Nothing approved on record right now.");
     // STATE CLEANUP SITES — their own band, shown only when this view holds one.
