@@ -5626,7 +5626,12 @@ HS.onReady(function(){
     if(!window.HS || !HS.sb || !HS.boundaryFC) return;
     if(!BOUNDARY_ZIP) return;
     zip = BOUNDARY_ZIP;
-    HS.sb().rpc("app_zcta_boundary", { p_zip: zip }).then(function(r){
+    // The outline is decoration on top of the map: a missing client (HS.sb() returns null
+    // before supabase-js loads) or a throw must never stop the ZIP itself from loading.
+    var sb = null;
+    try { sb = HS.sb(); } catch(e) { sb = null; }
+    if(!sb || typeof sb.rpc !== "function") return;
+    sb.rpc("app_zcta_boundary", { p_zip: zip }).then(function(r){
       if(r.error || !r.data) return;
       var payload = r.data;
       if(payload.status !== "boundary_complete") return;   // not_measured -> Map 1's own framing stands

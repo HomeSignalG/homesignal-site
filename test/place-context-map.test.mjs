@@ -189,7 +189,7 @@ ok(!/1\.5/.test(boot), '8f the Dashboard\'s decorative 1.5 appears nowhere in th
 // This section used to pin the outline to the EMBED branch only. Now loadZip() draws it on
 // every ZIP map (full page and embed), and an address search draws its own ZIP's outline.
 const zboot = m1.slice(m1.indexOf('function paintZipBoundary'), m1.indexOf('function boot()'));
-ok(/rpc\("app_zcta_boundary", \{ p_zip: zip \}\)/.test(zboot),
+ok(/\.rpc\("app_zcta_boundary", \{ p_zip: zip \}\)/.test(zboot),
   '9a the map reads the boundary through the SECURITY DEFINER function, by name, with a ZIP');
 ok(!/geo\.zcta_boundary/.test(m1),
   '9b ...never geo.zcta_boundary directly — the browser roles have no USAGE on that schema');
