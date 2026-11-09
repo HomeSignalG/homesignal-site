@@ -2498,12 +2498,12 @@ HS.onReady(function(){
 
   function loadZip(zip){
     ZIP_MODE = true; ZIP_CODE = zip; HOME_ANCHOR = true;
-    paintZipBoundary(zip);                  // the ZIP's real outline, on every view of every ZIP map
     // HOME_ANCHOR is TRUE here and does NOT mean "there is a home" - it means area items
     // anchor at the report centroid. There is no geocoded HOME on a ZIP page, so the
     // HOME-specific control stays hidden.
     document.body.classList.remove("hashome");
     var token = ++REQ_SEQ;                  // same stale-response guard as address mode
+    paintZipBoundary(zip);                  // the ZIP's real outline, on every view of every ZIP map
     N5_NOTE = "";                           // ZIP mode never carries an address-radius note
     ZIP_AUTH = null;                        // cleared until this ZIP's authoritative read lands
     syncRadiusStops();
