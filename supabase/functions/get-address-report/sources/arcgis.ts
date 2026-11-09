@@ -217,6 +217,16 @@ export interface ArcgisRegistryEntry {
    *  as `lat_col BETWEEN ymin AND ymax AND lng_col BETWEEN xmin AND xmax`. Rows still
    *  place by their OWN column coordinates (column_map.lat/lng); nothing is guessed. */
   spatial_latlng_cols?: { lat: string; lng: string };
+  /** ATTRIBUTE-BBOX tables only. Some publishers leave Latitude/Longitude BLANK on new records
+   *  for weeks (Scottsdale: every permit issued from 2026-10-07 on, measured 2026-11-09). The
+   *  envelope in WHERE can never match a blank coordinate, so those records were silently never
+   *  read. With this set, one more read fetches the last N days citywide (same WHERE, no
+   *  envelope, no `IS NULL` test: Scottsdale's firewall refuses that wording), keeps only rows
+   *  whose coordinate columns are blank, geocodes their street address through the shared
+   *  builder and fence, and keeps a row only if the geocoded point falls inside this ZIP's scope
+   *  — the same envelope (or polygon membership) a published point must satisfy. Such a record
+   *  is placed with geo_precision "address", never "point". Absent ⇒ unchanged. */
+  coordless_geocode_days?: number;
   /** A geometry-less table whose publisher states each record's point as ONE text column
    *  "(lat, lng)" (e.g. Douglas County CO's All_Permits LOCATION, "(39.537744, -104.965045)").
    *  Read only when column_map.lat/lng gave no point; a value that does not parse as exactly
@@ -272,6 +282,8 @@ export interface ArcgisRunReport {
    *  Polygon exclusions are `outside_excluded` here — they are CORRECT, not a loss, and are never
    *  a quarantine or a truncation. */
   scope_membership?: ScopeMetrics;
+  /** Present only for entries with coordless_geocode_days. */
+  coordless_geocode?: CoordlessCounts;
   /** The completion receipt for this ZIP x source (sources/scope-receipt.ts). Absent when the fetch failed. */
   scope_receipt?: ScopeReceipt;
   /** Records that took an identity_aliases_file alias key (<id>#<OBJECTID>) this run. Absent for entries without the option. */
@@ -282,7 +294,14 @@ export interface ArcgisRunReport {
  *  records than this report contains. Silent truncation is the dangerous shape: a capped result and
  *  a complete one are indistinguishable apart from the count, so a truncated page reads as "we have
  *  everything". (2026-08-02 hardening — see QUEUE.md "the 20,000 is a SILENT CAP".) */
-interface FetchMeta { truncated: boolean; cap: number; widened?: boolean; metrics?: ScopeMetrics }
+interface FetchMeta { truncated: boolean; cap: number; widened?: boolean; metrics?: ScopeMetrics; coordless?: CoordlessCounts }
+
+/** What the coordless_geocode_days read did, for the run report. */
+export interface CoordlessCounts { scanned: number; blank: number; no_address: number; geocode_failed: number; fence_rejected: number; outside_scope: number; kept: number; scan_capped: boolean }
+/** Rows the coordless read may scan per ZIP. Scottsdale publishes ~30 records a month in total. */
+const COORDLESS_SCAN_CAP = 3000;
+/** Marker on a row whose point came from geocoding its address (normalizeRow reads it). */
+const COORDLESS_GEO_KEY = "__coordless_geocode";
 
 export interface ArcgisDeps {
   fetch: typeof fetch;
@@ -479,6 +498,7 @@ async function runEntry(
   if (widenedRan) report.scope_membership = metrics;
   report.fetched = rows.length;
   if (fetchMeta.widened) report.scope_widened = true;
+  if (fetchMeta.coordless) report.coordless_geocode = fetchMeta.coordless;
   // A capped fetch is INCOMPLETE and must say so. Surfaced twice on purpose: a machine-readable
   // field, and a quarantine note so it appears wherever quarantines are already read.
   if (fetchMeta.truncated) {
@@ -599,7 +619,15 @@ async function normalizeRow(
   let geoPrecision: NormalizedRecord["geo_precision"];
   let scope: "point" | "area";
   const geoQuality: Partial<NormalizedRecord> = {};
-  if (lat != null && lng != null) {
+  const coordless = row[COORDLESS_GEO_KEY] as { lat: number; lng: number; match_type?: string; matched_address?: string | null; geocode_source?: string; needs_review?: boolean } | undefined;
+  if (coordless) {
+    // Placed by geocoding its own address in fetchCoordless (already fenced and scoped there).
+    lat = coordless.lat; lng = coordless.lng; geoPrecision = "address"; scope = "point";
+    if (coordless.match_type) geoQuality.match_type = coordless.match_type;
+    if (coordless.matched_address) geoQuality.matched_address = coordless.matched_address;
+    if (coordless.geocode_source) geoQuality.geocode_source = coordless.geocode_source;
+    if (coordless.needs_review !== undefined) geoQuality.needs_review = coordless.needs_review;
+  } else if (lat != null && lng != null) {
     geoPrecision = "point"; scope = "point";
   } else if (address && deps.geocode) {
     // OPT-IN per registry entry (`geocode_assemble`). OFF ⇒ byte-identical to the prior
@@ -947,10 +975,88 @@ async function fetchRows(
     if (page.exceededTransferLimit === false) break;
     if (page.exceededTransferLimit !== true && feats.length < pageSize) break;
   }
+  if (attrCols && env && deps.geocode && (entry.coordless_geocode_days ?? 0) > 0 && out.length <= maxRows) {
+    for (const r of await fetchCoordless(entry, zip, zipCol, deps, attrCols, env, meta, m, pageSize)) out.push(r);
+  }
   // The cap bound the fetch iff we actually SAW a row beyond it.
   meta.truncated = out.length > maxRows;
   meta.cap = maxRows;
   return out.slice(0, maxRows);
+}
+
+/** coordless_geocode_days: read the recent rows citywide, keep the ones the publisher left
+ *  without coordinates, place each by geocoding its address, keep it only inside this ZIP's
+ *  scope. See the entry field for why. */
+async function fetchCoordless(
+  entry: ArcgisRegistryEntry, zip: string, zipCol: string, deps: ArcgisDeps,
+  attrCols: { lat: string; lng: string }, env: { xmin: number; ymin: number; xmax: number; ymax: number },
+  meta: FetchMeta, m: ScopeMetrics | null, pageSize: number,
+): Promise<Record<string, unknown>[]> {
+  const c: CoordlessCounts = { scanned: 0, blank: 0, no_address: 0, geocode_failed: 0, fence_rejected: 0, outside_scope: 0, kept: 0, scan_capped: false };
+  meta.coordless = c;
+  const dateCol = firstCol(entry.column_map.file_date) || entry.incremental_field;
+  if (!dateCol) return [];
+  const days = Math.min(entry.coordless_geocode_days as number, entry.recency_days && entry.recency_days > 0 ? entry.recency_days : Infinity);
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+  const where = `${buildWhere(entry, zip, zipCol)} AND ${dateCol} >= DATE '${cutoff}'`;
+  const cm = entry.column_map;
+  const kept: Record<string, unknown>[] = [];
+  let offset = 0;
+  while (c.scanned < COORDLESS_SCAN_CAP) {
+    const url = new URL(`${entry.service_url.replace(/\/$/, "")}/query`);
+    url.searchParams.set("where", where);
+    url.searchParams.set("outFields", entry.out_fields?.length ? entry.out_fields.join(",") : "*");
+    url.searchParams.set("returnGeometry", "false");
+    url.searchParams.set("resultOffset", String(offset));
+    url.searchParams.set("resultRecordCount", String(pageSize));
+    url.searchParams.set("orderByFields", `${dateCol} DESC`);
+    url.searchParams.set("f", "json");
+    const page = await getWithBackoff(url.toString(), deps, entry.http1_only === true) as {
+      features?: ArcgisFeature[]; exceededTransferLimit?: boolean; error?: { message?: string };
+    };
+    if (page?.error) throw new Error(`ArcGIS error: ${page.error.message ?? "unknown"}`);
+    const feats = Array.isArray(page?.features) ? page.features : [];
+    if (feats.length === 0) break;
+    const items: { row: Record<string, unknown>; cls: RowClass }[] = [];
+    for (const f of feats) {
+      c.scanned++;
+      const row = { ...(f.attributes ?? {}) } as Record<string, unknown>;
+      // A row that carries both coordinates was already offered to the envelope read above.
+      if (numOrNull(row[attrCols.lat]) != null && numOrNull(row[attrCols.lng]) != null) continue;
+      c.blank++;
+      const address = valOrNull(readCol(row, cm.address));
+      if (!address) { c.no_address++; continue; }
+      // No report ZIP: the record's ZIP is unknown, and stamping this page's ZIP on the geocoder
+      // input would pull every address toward this page.
+      const gi = buildGeocodeInput({ rawAddress: address, jurisdiction: entry.jurisdiction, state: entry.coverage[0]?.state, zipColValue: valOrNull(readCol(row, cm.zip)), reportZip: null });
+      const g = await deps.geocode!(gi.input);
+      if (!g) { c.geocode_failed++; continue; }
+      const verdict = fenceGeocode(g, gi.filedZip, deps.zipCentroid);
+      await noteFenceOutcome(deps.noteFence, gi.input, verdict);
+      if (!verdict.ok) { c.fence_rejected++; continue; }
+      row[attrCols.lat] = g.lat; row[attrCols.lng] = g.lng;
+      row[COORDLESS_GEO_KEY] = { lat: g.lat, lng: g.lng, match_type: g.match_type, matched_address: g.matched_address, geocode_source: g.geocode_source, needs_review: g.needs_review };
+      if (m && deps.zipMembers && deps.zipCentroid) {
+        items.push({ row, cls: featureScopeClass({} as ArcgisFeature, row, null, deps.zipCentroid, entry.spatial_zip_radius_mi as number, attrCols) });
+      } else if (g.lat >= env.ymin && g.lat <= env.ymax && g.lng >= env.xmin && g.lng <= env.xmax) {
+        items.push({ row, cls: { cls: "legacy" } });
+      } else { c.outside_scope++; }
+    }
+    if (m && deps.zipMembers) {
+      const before = items.length;
+      const ins = await keepMembers(items, (x) => x.cls, deps.zipMembers, m, (x) => { x.row[SCOPE_ORIGIN_KEY] = SCOPE_ORIGIN_MEMBER; });
+      c.outside_scope += before - ins.length;
+      for (const it of ins) kept.push(it.row);
+    } else {
+      for (const it of items) kept.push(it.row);
+    }
+    offset += feats.length;
+    if (page.exceededTransferLimit === false) break;
+    if (page.exceededTransferLimit !== true && feats.length < pageSize) break;
+  }
+  if (c.scanned >= COORDLESS_SCAN_CAP) c.scan_capped = true;
+  c.kept = kept.length;
+  return kept;
 }
 
 /** ZIP filter (mandatory) AND'd with an optional recency window (ArcGIS DATE literal). */

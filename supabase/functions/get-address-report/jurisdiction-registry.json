@@ -3416,6 +3416,7 @@
         ]
       },
       "spatial_zip_radius_mi": 3,
+      "coordless_geocode_days": 120,
       "spatial_latlng_cols": {
         "lat": "Latitude",
         "lng": "Longitude"
