@@ -53,7 +53,19 @@ export const FRS_ZIP_MAX_REQUESTS = 64;
 const RETRY_AFTER_CAP_MS = 10000;
 const realSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-export type ZipFrsReason = "transient" | "deadline" | "schema" | "process_limit" | "request_limit";
+export type ZipFrsReason = "transient" | "deadline" | "schema" | "process_limit" | "saturated" | "request_limit";
+
+/**
+ * Stored in development_reports.counts.facilities_coverage when, and only when, this read covered the
+ * whole ZIP boundary and every circle answered (epa.ok, mode zip_boundary, complete). The collector
+ * stores the engine's counts object as sent on an accepted EPA write, so this needs no SQL change.
+ * Its ABSENCE means the stored facility list is not known to be complete: a radius-era list, a failed
+ * read, or a ZIP with no boundary. Never inferred from a count or a timestamp.
+ */
+export const ZIP_FACILITY_COVERAGE = "zip_boundary_v1";
+export function facilityCoverage(epa: Record<string, unknown>): string | null {
+  return epa.ok === true && epa.mode === "zip_boundary" && epa.complete === true ? ZIP_FACILITY_COVERAGE : null;
+}
 
 export interface ZipFrsOutcome {
   ok: boolean;
@@ -150,20 +162,22 @@ export async function frsZipCoverage(
       failures.push(`${c.radiusMi}:${a.schema ? "schema" : a.why ?? "unknown"}`);
       if (a.schema) return fail("schema");
       if (attempt === 2) return fail("transient");
-      if (opts.deadlineAt !== undefined) {
-        const wait = a.retryAfterS !== undefined
-          ? Math.min(a.retryAfterS * 1000, RETRY_AFTER_CAP_MS)
-          : FRS_RETRY_BACKOFF_MS[attempt] ?? FRS_RETRY_BACKOFF_MS[FRS_RETRY_BACKOFF_MS.length - 1];
-        if (opts.deadlineAt - now() - wait <= 0) return fail("deadline");
-        await sleep(wait);
-      }
+      // Always wait before a retry (with or without a deadline): at least the fixed backoff, longer
+      // when FRS asks for it (Retry-After, capped). A 429 is FRS saying slow down; an immediate retry
+      // is the wrong answer to it. The wait and the retry both count against this ZIP's budget.
+      const backoff = FRS_RETRY_BACKOFF_MS[attempt] ?? FRS_RETRY_BACKOFF_MS[FRS_RETRY_BACKOFF_MS.length - 1];
+      const wait = Math.max(backoff, a.retryAfterS !== undefined ? Math.min(a.retryAfterS * 1000, RETRY_AFTER_CAP_MS) : 0);
+      if (opts.deadlineAt !== undefined && opts.deadlineAt - now() - wait <= 0) return fail("deadline");
+      await sleep(wait);
     }
     if (!answered) return fail("transient");
     const atCeiling = !answered.tooBig && answered.rows.length >= FRS_TILE_ROW_CEILING;
     if (answered.tooBig || atCeiling) {
       failures.push(`${c.radiusMi}:${atCeiling ? "row_ceiling" : "process_limit"}`);
       // Four quarters, each circle about half this one. A circle already at the floor cannot be split.
-      if (c.radiusMi / 2 < FRS_TILE_MIN_RADIUS_MI) return fail("process_limit");
+      // A circle at the floor that is still refused or still full cannot be resolved: the ZIP fails
+      // (ok:false). A saturated answer is NEVER returned as complete.
+      if (c.radiusMi / 2 < FRS_TILE_MIN_RADIUS_MI) return fail(atCeiling ? "saturated" : "process_limit");
       queue.push(...splitBox(box));
       continue;
     }

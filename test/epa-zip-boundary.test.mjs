@@ -91,6 +91,62 @@ const box = FIX.bounds['85083'];
   ok(below.ok && below.tiles === 1 && below.rows.length === Z.FRS_TILE_ROW_CEILING - 1, '2j. 999 rows is a complete answer (one circle)');
 }
 
+// ── 2T. termination: saturation, coincident points, the floor, the budget, waits ───────────
+{
+  const full = Array.from({ length: Z.FRS_TILE_ROW_CEILING }, (_, i) => ({ RegistryId: `S${i}` }));
+  // Every circle, at every size, answers full: repeated saturated children must END, as a failure.
+  let n = 0;
+  const sat = await Z.frsZipCoverage(box, async () => { n++; return res(200, { Results: { FRSFacility: full } }); }, noSleep);
+  ok(!sat.ok && sat.rows.length === 0 && ['saturated', 'request_limit'].includes(sat.reason) && n <= Z.FRS_ZIP_MAX_REQUESTS,
+    '2T1. circles that stay saturated at every split end as ok:false with no rows (never "complete")', JSON.stringify({ n, reason: sat.reason }));
+  // 1,000 facilities at ONE coincident point: the circle holding that point stays full down to the floor.
+  const pt = { lat: (box.ymin + box.ymax) / 2, lng: (box.xmin + box.xmax) / 2 };
+  const coincident = async (u) => {
+    const p = new URL(u).searchParams;
+    const d = Z.milesBetween(Number(p.get('latitude83')), Number(p.get('longitude83')), pt.lat, pt.lng);
+    return res(200, { Results: { FRSFacility: d <= Number(p.get('search_radius')) ? full : [] } });
+  };
+  const big = await Z.frsZipCoverage(box, coincident, { ...noSleep, maxRequests: 10000 });
+  ok(!big.ok && big.reason === 'saturated' && big.rows.length === 0,
+    '2T2. 1,000 records at one point: splitting reaches the minimum circle and fails as "saturated", never complete', JSON.stringify({ reason: big.reason, attempts: big.attempts }));
+  // The minimum circle: a small box whose first circle is already at the floor cannot be split.
+  const tiny = { xmin: -90, ymin: 35, xmax: -89.997, ymax: 35.002 };
+  ok(Z.circumCircle(tiny).radiusMi / 2 < Z.FRS_TILE_MIN_RADIUS_MI, '2T3a. (setup) the tiny box\'s first circle is at the floor');
+  const t1 = await Z.frsZipCoverage(tiny, async () => res(200, { Results: { FRSFacility: full } }), noSleep);
+  ok(!t1.ok && t1.reason === 'saturated' && t1.attempts === 1, '2T3. a full answer at the minimum circle fails at once as "saturated"');
+  const t2 = await Z.frsZipCoverage(tiny, async () => res(200, { Results: { Error: {} } }), noSleep);
+  ok(!t2.ok && t2.reason === 'process_limit' && t2.attempts === 1, '2T4. a refusal at the minimum circle fails at once as "process_limit"');
+  // The request budget: refusals that would need more circles than the budget end as request_limit, no rows.
+  let calls = 0;
+  const refuse = async (u) => { calls++; return Number(new URL(u).searchParams.get('search_radius')) > 0.6 ? res(200, { Results: { Error: {} } }) : res(200, { Results: { FRSFacility: [{ RegistryId: `R${calls}` }] } }); };
+  const rl = await Z.frsZipCoverage(box, refuse, { ...noSleep, maxRequests: 12 });
+  ok(!rl.ok && rl.reason === 'request_limit' && rl.rows.length === 0 && calls === 12, '2T5. running out of the request budget ends as ok:false request_limit with no rows (rows already fetched are dropped)', JSON.stringify({ calls, reason: rl.reason }));
+}
+{
+  // Waits: a retry always waits, with or without a deadline; a 429 without Retry-After waits the backoff.
+  const waits = [];
+  let n = 0;
+  const flaky = async () => { n++; return n < 3 ? res(429, {}) : res(200, { Results: { FRSFacility: [] } }); };
+  const o = await Z.frsZipCoverage(box, flaky, { sleep: async (ms) => { waits.push(ms); } });
+  ok(o.ok && JSON.stringify(waits) === '[2000,5000]', '2W1. no deadline: two 429s without Retry-After wait 2 s then 5 s (never an immediate retry)', JSON.stringify(waits));
+  const w2 = []; let m = 0;
+  const hdr = (v) => ({ status: 429, ok: false, headers: { get: (k) => (k === 'retry-after' ? v : null) }, text: async () => '{}' });
+  const asked = async () => { m++; return m === 1 ? hdr('8') : m === 2 ? hdr('60') : res(200, { Results: { FRSFacility: [] } }); };
+  await Z.frsZipCoverage(box, asked, { sleep: async (ms) => { w2.push(ms); } });
+  ok(JSON.stringify(w2) === '[8000,10000]', '2W2. Retry-After is honoured when longer than the backoff, and capped at 10 s', JSON.stringify(w2));
+  let t = 0; const w3 = [];
+  const d = await Z.frsZipCoverage(box, async () => { t += 100; return res(429, {}); }, { now: () => t, deadlineAt: 3000, sleep: async (ms) => { w3.push(ms); t += ms; } });
+  ok(!d.ok && d.reason === 'deadline' && JSON.stringify(w3) === '[2000]', '2W3. a wait that would pass the deadline is not taken; the read ends as deadline', JSON.stringify({ w3, reason: d.reason }));
+}
+// ── 2C. the stored coverage marker ────────────────────────────────────────────────────────
+{
+  ok(Z.facilityCoverage({ ok: true, mode: 'zip_boundary', complete: true }) === Z.ZIP_FACILITY_COVERAGE, '2C1. a complete boundary read is marked');
+  ok(Z.facilityCoverage({ ok: false, mode: 'zip_boundary', complete: true }) === null, '2C2. a failed read is not marked');
+  ok(Z.facilityCoverage({ ok: true, radius_used: 3 }) === null, '2C3. a radius read (address-mode shape, or the old ZIP mode) is not marked');
+  ok(Z.facilityCoverage({ ok: true, mode: 'zip_boundary', complete: false }) === null, '2C4. an incomplete selection is not marked');
+  ok(Z.facilityCoverage({ ok: true, mode: 'zip_boundary', complete: true, kept: 0 }) === Z.ZIP_FACILITY_COVERAGE, '2C5. a complete read that found nothing is marked (a verified empty)');
+}
+
 // ── 3. selection: the boundary decides, and EVERY member is kept (no count cap) ─────────────
 {
   const center = { lat: 0, lng: 0 };
@@ -135,6 +191,10 @@ const box = FIX.bounds['85083'];
   ok(/const zipGeo = await zipScopeBounds\(supabase, zip\);/.test(src) && /const scope = policy\.on \? zipGeo :/.test(src),
     '4d. the boundary is read once per ZIP request; the permit scope still follows its own rollout policy');
   ok(/if \(!bounds\) return facilitiesUnavailable\("no_boundary"\);/.test(src), '4e. no boundary ⇒ ok:false, never a radius fallback');
+  ok(/const facCoverage = facilityCoverage\(facResult\.epa\);/.test(src) && /counts: \{ facilities: fac\.length, \.\.\.\(facCoverage \? \{ facilities_coverage: facCoverage \} : \{\}\),/.test(src),
+    '4f. ZIP mode puts the coverage marker in counts only when the read was complete');
+  const frs = readFileSync(join(FN, 'sources/epa-frs.ts'), 'utf8');
+  ok(/raw != null && String\(raw\)\.trim\(\) !== ""/.test(frs), '4g. a missing Retry-After header is not read as 0 seconds');
 }
 
 if (fails) { console.log(`\n${fails} failed`); process.exit(1); }

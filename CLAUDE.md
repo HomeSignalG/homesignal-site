@@ -3598,6 +3598,17 @@ connector `"scope":"legacy"`.
   Address mode (`facilitySites(lat, lng, radiusMi)`) is unchanged; the FRS row → site literal is one helper, `frsRowToSite`.
 - **Scope measured 2026-11-09:** 8,108 of 12,038 ZIPs with a boundary have part of it more than 3 mi from the stored point;
   706 have no boundary. Arizona sample: 2,286 of 4,327 stored facility entries (53%) lie outside their own ZIP.
+- **A complete read is marked; nothing else is.** `counts.facilities_coverage = "zip_boundary_v1"` is sent only when
+  `epa.ok`, `mode zip_boundary` and `complete` (`facilityCoverage`). The collector stores `counts` as sent on an
+  accepted EPA write, so no SQL change was needed. Its absence means "not known to be complete": a radius-era list, a
+  failed read, a ZIP with no boundary. Never infer completeness from a count, `= 40`, or `facilities_refreshed_at`.
+  ⚠️ On a REFUSED write the collector keeps the stored facilities but takes the new `counts` keys, so a later failed
+  read drops the marker (reads as unverified, never as complete). Keeping it there is a collector change.
+- **Termination:** a circle answering ≥ 1,000 rows (`FRS_TILE_ROW_CEILING`, the largest answer seen) is split; full at
+  the 0.25 mi floor ⇒ `saturated`, refused there ⇒ `process_limit`, more than 64 requests ⇒ `request_limit`, past the
+  45 s overlay deadline ⇒ `deadline`. All four are `ok:false` with no rows.
+- **Retries always wait** (2 s, then 5 s, or a longer Retry-After capped at 10 s), with or without a deadline; each
+  attempt counts toward the 64. `frsAt` no longer reads a missing Retry-After header as 0 s (it did, for both modes).
 - **Still radius-based and NOT part of this change:** the permit connectors while `ZIP_SCOPE_BOUNDS_MODE` is off (their own
   runbook, `docs/zip-scope-bounds-runbook.md`, gates enabling it).
 - Tests: `test/epa-zip-boundary.test.mjs`, `epa-zip-boundary.handler.test.ts` (real FRS answers saved 2026-11-09,
