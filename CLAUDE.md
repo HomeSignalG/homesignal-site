@@ -3589,8 +3589,10 @@ connectors only and ships OFF (`ZIP_SCOPE_BOUNDS_MODE`); measured 2026-11-09: 20
 connector `"scope":"legacy"`.
 - **Now:** `sources/epa-frs-zip.ts` covers the ZIP's polygon box with FRS circles (a refused circle splits into four, never
   shrinks in place), every circle must answer or the plane is `ok:false`, rows are de-duplicated by RegistryId, the ZIP
-  polygon (`zip_scope_members`, the same boundary-inclusive predicate Map 1 serves) decides inclusion, and only then the
-  storage cap (`MAX_ZIP_FACILITIES` 250, `over_cap` reported). No boundary ⇒ `ok:false reason no_boundary` (stored layer
+  polygon (`zip_scope_members`, the same boundary-inclusive predicate Map 1 serves) decides inclusion, and EVERY member is
+  kept. ⛔ **No count cap.** A 250 cap shipped in the first version of this change; it was a guess, not an EPA, storage or
+  display limit, and was removed (founder, 2026-11-09). EPA's own per-ZIP totals for a random 80 of the 2,550 ZIPs stuck
+  at the old 40 cap: 37 over 250, max 1,265 (raw totals, before the name filter and the boundary). No boundary ⇒ `ok:false reason no_boundary` (stored layer
   kept, count unknown), never a radius. A ZIP request with no point uses the boundary box centre as its anchor.
   `frs_start_mi` is ignored in ZIP mode. ECHO/CWA enrichment asks around the covering circle (capped at 5 mi).
   Address mode (`facilitySites(lat, lng, radiusMi)`) is unchanged; the FRS row → site literal is one helper, `frsRowToSite`.

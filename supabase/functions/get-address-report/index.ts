@@ -64,7 +64,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { frsFacilities } from "./sources/epa-frs.ts";
-import { circumCircle, frsZipCoverage, MAX_ZIP_FACILITIES, pickZipFacilities } from "./sources/epa-frs-zip.ts";
+import { circumCircle, frsZipCoverage, pickZipFacilities } from "./sources/epa-frs-zip.ts";
 import type { ZipBounds } from "./sources/scope-box.ts";
 import type { MembershipFn } from "./sources/scope-members.ts";
 import {
@@ -371,7 +371,7 @@ function frsRowToSite(rr: Record<string, unknown>, anchorLat: number, anchorLng:
 }
 // ZIP MODE (2026-11-09): the facility plane covers the WHOLE ZIP polygon (sources/epa-frs-zip.ts).
 // No stored point, radius, or cap decides inclusion: circles cover the polygon's box, every circle
-// must answer, the ZIP polygon decides membership, and only then is the storage cap applied. No
+// must answer, the ZIP polygon decides membership, and every member is kept (no count cap). No
 // boundary ⇒ ok:false ("no_boundary"): the stored layer is kept and the count shows unknown. It
 // never falls back to a radius around a point.
 async function facilitySitesForZip(
@@ -399,10 +399,9 @@ async function facilitySitesForZip(
       ok: true, radius_used: null, reason: null, ...base,
       unique_rows: out.rows.length, candidates: pick.candidates, members: pick.members,
       outside_excluded: pick.outside, unresolved_excluded: pick.unresolved,
-      // `pre_cap` keeps its meaning (count before the cap); `over_cap` > 0 means the stored list
-      // is not the whole in-ZIP inventory, and says so instead of presenting it as complete.
-      pre_cap: pick.members, kept: pick.kept.length, cap: MAX_ZIP_FACILITIES, over_cap: pick.over_cap,
-      complete: pick.over_cap === 0,
+      // No count cap in ZIP mode: kept === members, the whole in-ZIP inventory. `pre_cap` keeps the
+      // field the collector and health views already read, with the same value.
+      pre_cap: pick.members, kept: pick.kept.length, complete: pick.kept.length === pick.members,
     },
   };
 }

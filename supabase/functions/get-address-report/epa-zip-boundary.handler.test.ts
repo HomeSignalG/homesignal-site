@@ -36,6 +36,8 @@ const POLYS: Record<string, MultiPoly> = {
   "85083": FIX.polygons["85083"].coordinates,
   "64166": FIX.polygons["64166"].coordinates,
   // Synthetic MULTIPART ZIP: two separate squares about 6 miles apart.
+  // Synthetic DENSE ZIP: a 0.06° square (~4 x 3 mi) holding 320 qualifying facilities (no count cap).
+  "99903": [[[[-90.03, 35.00], [-89.97, 35.00], [-89.97, 35.06], [-90.03, 35.06], [-90.03, 35.00]]]],
   "99901": [
     [[[-100.10, 40.00], [-100.08, 40.00], [-100.08, 40.02], [-100.10, 40.02], [-100.10, 40.00]]],
     [[[-99.99, 40.00], [-99.97, 40.00], [-99.97, 40.02], [-99.99, 40.02], [-99.99, 40.00]]],
@@ -47,6 +49,8 @@ const boxOf = (mp: MultiPoly) => {
 };
 const BOUNDS: Record<string, { xmin: number; ymin: number; xmax: number; ymax: number }> = {
   "85083": FIX.bounds["85083"], "64166": FIX.bounds["64166"], "99901": boxOf(POLYS["99901"]),
+  // The dense ZIP's box is wider than its polygon so outside rows sit inside the retrieval area.
+  "99903": { xmin: -90.05, ymin: 35.00, xmax: -89.95, ymax: 35.06 },
 };
 
 // ── the saved FRS rows (union of every saved response) + synthetic rows for 99901 ───────────
@@ -57,6 +61,21 @@ const synth = (id: string, name: string, lat: number, lng: number) =>
 synth("SYN-WEST", "WEST ISLAND STEEL MILL", 40.01, -100.09);     // inside part 1
 synth("SYN-EAST", "EAST ISLAND CONCRETE PLANT", 40.01, -99.98);  // inside part 2
 synth("SYN-GAP", "MIDDLE GAP ASPHALT PLANT", 40.01, -100.03);    // between the parts: outside
+// 99903: 320 qualifying facilities on a 20 x 16 grid inside the square, 60 outside it (inside the box,
+// both flanks), and 40 inside it that the existing name filter drops (a store is not industrial).
+const DENSE_IN: string[] = [], DENSE_OUT: string[] = [], DENSE_NONQUAL: string[] = [];
+for (let i = 0; i < 320; i++) {
+  const id = `DENSE-IN-${String(i).padStart(3, "0")}`; DENSE_IN.push(id);
+  synth(id, `DENSE MANUFACTURING PLANT ${i}`, 35.002 + Math.floor(i / 20) * 0.0036, -90.028 + (i % 20) * 0.0029);
+}
+for (let i = 0; i < 60; i++) {
+  const id = `DENSE-OUT-${String(i).padStart(2, "0")}`; DENSE_OUT.push(id);
+  synth(id, `OUTSIDE CHEMICAL PLANT ${i}`, 35.003 + Math.floor(i / 2) * 0.0018, i % 2 ? -89.955 : -90.045);
+}
+for (let i = 0; i < 40; i++) {
+  const id = `DENSE-STORE-${String(i).padStart(2, "0")}`; DENSE_NONQUAL.push(id);
+  synth(id, `CORNER STORE ${i}`, 35.004 + i * 0.0013, -90.0);
+}
 
 // ── stubs ───────────────────────────────────────────────────────────────────────────────────
 Deno.env.set("SUPABASE_URL", "https://stub.supabase.test");
@@ -229,6 +248,26 @@ const base = await zipRun({ zip: "85083", lat: P83lat, lng: P83lng });
   const coverMembers = FIX.responses.zip64166_cover.filter((r: Row) => r.verdict_64166 === "member").map((r: Row) => r.RegistryId).sort();
   ok("7c. live 2026-11-09: the boundary circle and the old 3-mile circle hold the same 7 in-ZIP registrations",
     JSON.stringify(coverMembers) === JSON.stringify(members) && members.length === 7, `${coverMembers.length} vs ${members.length}`);
+}
+
+// ── 8. NO COUNT CAP: more than 250 qualifying in-ZIP facilities are all retained ─────────────
+{
+  frsMode = { tooBigAbove: 1.0 }; // force tiling, so overlapping circles also exercise de-duplication
+  const d = await zipRun({ zip: "99903" });
+  frsMode = {};
+  const counts = (d.j.counts ?? {}) as Record<string, unknown>;
+  ok("8a. 200 and ok:true for the dense ZIP", d.status === 200 && d.epa.ok === true, JSON.stringify(d.epa));
+  ok("8b. all 320 qualifying in-ZIP facilities are in the report, each once",
+    d.ids.length === 320 && new Set(d.ids).size === 320 && JSON.stringify(d.ids) === JSON.stringify([...DENSE_IN].sort()),
+    `${d.ids.length} ids`);
+  ok("8c. counts.facilities is the full inventory (320), not a capped number", counts.facilities === 320, JSON.stringify(counts));
+  ok("8d. epa reports members = kept = 320 and complete", d.epa.members === 320 && d.epa.kept === 320 && d.epa.complete === true,
+    JSON.stringify(d.epa));
+  ok("8e. no field reports a cap or an over-cap remainder", !("cap" in d.epa) && !("over_cap" in d.epa), JSON.stringify(d.epa));
+  ok("8f. the 60 outside the polygon are excluded and counted", d.epa.outside_excluded === 60 && !d.ids.some((id) => DENSE_OUT.includes(id)),
+    JSON.stringify(d.epa));
+  ok("8g. the name filter still drops non-industrial rows (relevance rule unchanged)", !d.ids.some((id) => DENSE_NONQUAL.includes(id)));
+  ok("8h. it took more than one circle, and stayed within the request bound", d.calls.length > 1 && d.calls.length <= 64, `${d.calls.length} calls`);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

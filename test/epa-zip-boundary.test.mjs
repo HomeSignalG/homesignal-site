@@ -76,18 +76,41 @@ const box = FIX.bounds['85083'];
   ok(z.ok && z.rows.length === 0 && z.tiles === 1, '2h. a covering circle that answers empty is an authoritative zero for the whole ZIP');
 }
 
-// ── 3. selection: boundary FIRST, cap second ──────────────────────────────────────────────
+{
+  // A circle answering exactly at the row ceiling is split, never trusted as complete.
+  const seen = [];
+  const full = Array.from({ length: Z.FRS_TILE_ROW_CEILING }, (_, i) => ({ RegistryId: `C${i}` }));
+  const fetch = async (u) => {
+    const r = Number(new URL(u).searchParams.get('search_radius')); seen.push(r);
+    return r > 2.5 ? res(200, { Results: { FRSFacility: full } }) : res(200, { Results: { FRSFacility: [{ RegistryId: `Q${seen.length}` }] } });
+  };
+  const o = await Z.frsZipCoverage(box, fetch, noSleep);
+  ok(o.ok && o.tiles === 4 && seen.length === 5 && o.failures.some((f) => f.endsWith(':row_ceiling')) && !o.rows.some((r) => r.RegistryId === 'C0'),
+    '2i. a circle answering 1,000 rows is split into quarters; its possibly-cut answer is not kept', JSON.stringify({ seen, f: o.failures }));
+  const below = await Z.frsZipCoverage(box, async () => res(200, { Results: { FRSFacility: full.slice(1) } }), noSleep);
+  ok(below.ok && below.tiles === 1 && below.rows.length === Z.FRS_TILE_ROW_CEILING - 1, '2j. 999 rows is a complete answer (one circle)');
+}
+
+// ── 3. selection: the boundary decides, and EVERY member is kept (no count cap) ─────────────
 {
   const center = { lat: 0, lng: 0 };
-  // 300 outside rows right at the centre, 20 in-ZIP rows farther out. A cap of 10.
+  // 300 outside rows right at the centre, 20 in-ZIP rows farther out.
   const rows = [];
   for (let i = 0; i < 300; i++) rows.push({ id: `out${i}`, lat: 0.0001 * i, lng: 0 });
   for (let i = 0; i < 20; i++) rows.push({ id: `in${i}`, lat: 0.05, lng: 0.001 * i });
   const calls = [];
   const member = async (pts) => { calls.push(pts.length); return pts.map(([la]) => (la >= 0.05 ? 'member' : 'outside')); };
-  const p = await Z.pickZipFacilities(rows, (r) => ({ ...r }), member, center, 10);
-  ok(p.kept.length === 10 && p.kept.every((s) => s.id.startsWith('in')), '3a. outside rows never consume the cap (all 10 kept are in-ZIP)', p.kept.map((s) => s.id).join(','));
-  ok(p.members === 20 && p.outside === 300 && p.over_cap === 10, '3b. the over-cap count says the stored list is not the whole inventory', JSON.stringify(p));
+  const p = await Z.pickZipFacilities(rows, (r) => ({ ...r }), member, center);
+  ok(p.kept.length === 20 && p.kept.every((s) => s.id.startsWith('in')), '3a. all 20 in-ZIP rows kept; no outside row kept', p.kept.map((s) => s.id).join(','));
+  ok(p.members === 20 && p.outside === 300 && !('over_cap' in p), '3b. counts are exact and nothing reports a cap', JSON.stringify(p));
+  ok(!('MAX_ZIP_FACILITIES' in Z), '3b2. the module exports no facility count cap');
+  // More than 250 qualifying in-ZIP rows (and outside rows mixed in): every one is kept.
+  const dense = [];
+  for (let i = 0; i < 1000; i++) dense.push({ id: `d${i}`, lat: 0.05 + i * 1e-5, lng: 0 });
+  for (let i = 0; i < 400; i++) dense.push({ id: `o${i}`, lat: 0.01, lng: i * 1e-5 });
+  const dp = await Z.pickZipFacilities(dense, (r) => ({ ...r }), async (pts) => pts.map(([la]) => (la >= 0.05 ? 'member' : 'outside')), center);
+  ok(dp.kept.length === 1000 && dp.members === 1000 && new Set(dp.kept.map((s) => s.id)).size === 1000 && dp.outside === 400,
+    '3b3. 1,000 qualifying in-ZIP rows: all 1,000 kept and counted', JSON.stringify({ kept: dp.kept.length, members: dp.members, outside: dp.outside }));
   ok(calls.length === 1 && calls[0] === 320, '3c. one membership call for 320 points');
   const big = [];
   for (let i = 0; i < 1201; i++) big.push({ id: i, lat: 1, lng: 1 });
@@ -97,7 +120,7 @@ const box = FIX.bounds['85083'];
   let threw = false;
   try { await Z.pickZipFacilities(rows, (r) => r, async (pts) => pts.slice(1).map(() => 'member'), center); } catch { threw = true; }
   ok(threw, '3e. a short membership answer throws (the engine turns it into ok:false)');
-  const q = await Z.pickZipFacilities(rows, (r) => (r.id === 'in3' ? null : r), member, center, 100);
+  const q = await Z.pickZipFacilities(rows, (r) => (r.id === 'in3' ? null : r), member, center);
   ok(q.members === 19 && q.unresolved === 0, '3f. the caller\'s own filter drops a row before the boundary test, not after');
   const u = await Z.pickZipFacilities([{ lat: 1, lng: 1 }], (r) => r, async () => ['not_measured'], center);
   ok(u.kept.length === 0 && u.unresolved === 1, '3g. an unresolved verdict is excluded and counted, nothing invented');

@@ -22,8 +22,8 @@
 //     the count shows as unknown.
 //   * Rows from overlapping circles are de-duplicated by FRS RegistryId.
 //   * Final inclusion is the ZIP polygon (public.zip_scope_members → geo.zip_point_membership_in, the same
-//     boundary-inclusive predicate Map 1 serves through). The cap is applied AFTER membership, so an
-//     outside row can never take an in-ZIP row's place.
+//     boundary-inclusive predicate Map 1 serves through). Every in-ZIP facility is kept: there is no
+//     count cap. Nothing outside the ZIP is kept, and nothing inside it is dropped for space.
 //   * The stored ZIP point is not used here at all: it neither centres the search nor decides inclusion.
 //
 // Address mode (a user's address + radius) does not use this module and is unchanged.
@@ -41,10 +41,15 @@ type FetchLike = (input: string, init?: unknown) => Promise<Response>;
 
 /** A circle no smaller than this is ever requested; a refusal below it fails the ZIP (ok:false). */
 export const FRS_TILE_MIN_RADIUS_MI = 0.25;
+/**
+ * A circle that answers with this many rows or more is treated as possibly cut short and is split, never
+ * trusted as complete. FRS's process limit refuses large circles, but the largest ok answer seen in
+ * production (479 refresh responses, 2026-11-09) was exactly 1,000 rows, so an answer at 1,000 cannot be
+ * told apart from a silent cut. Splitting costs requests, never coverage.
+ */
+export const FRS_TILE_ROW_CEILING = 1000;
 /** Upper bound on FRS requests for one ZIP (tiles + retries). Exceeding it fails the ZIP (ok:false). */
 export const FRS_ZIP_MAX_REQUESTS = 64;
-/** In-ZIP facilities stored per ZIP. Applied AFTER boundary membership; exceeding it is reported. */
-export const MAX_ZIP_FACILITIES = 250;
 const RETRY_AFTER_CAP_MS = 10000;
 const realSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -154,8 +159,9 @@ export async function frsZipCoverage(
       }
     }
     if (!answered) return fail("transient");
-    if (answered.tooBig) {
-      failures.push(`${c.radiusMi}:process_limit`);
+    const atCeiling = !answered.tooBig && answered.rows.length >= FRS_TILE_ROW_CEILING;
+    if (answered.tooBig || atCeiling) {
+      failures.push(`${c.radiusMi}:${atCeiling ? "row_ceiling" : "process_limit"}`);
       // Four quarters, each circle about half this one. A circle already at the floor cannot be split.
       if (c.radiusMi / 2 < FRS_TILE_MIN_RADIUS_MI) return fail("process_limit");
       queue.push(...splitBox(box));
@@ -179,12 +185,11 @@ export interface ZipFacilityPick<T> {
   outside: number;
   /** not_measured / no_coordinates verdicts — excluded, nothing invented */
   unresolved: number;
-  /** in-ZIP facilities beyond MAX_ZIP_FACILITIES (0 when the stored list is the whole inventory) */
-  over_cap: number;
 }
 
 /**
- * Final inclusion by the ZIP polygon, THEN the cap. `toSite` turns an FRS row into a site (or null to drop
+ * Final inclusion by the ZIP polygon. EVERY member is kept: there is no storage cap (2026-11-09; the
+ * 250 cap this replaced was a guess, never an EPA or storage limit, and measured ZIPs exceed it). `toSite` turns an FRS row into a site (or null to drop
  * it for a non-geographic reason, e.g. the engine's existing name filter); `member` is the boundary test.
  * Throws when the membership answer is missing or malformed — the caller turns that into ok:false.
  */
@@ -193,7 +198,6 @@ export async function pickZipFacilities<T extends { lat: number; lng: number }>(
   toSite: (r: Record<string, unknown>) => T | null,
   member: MembershipFn,
   center: { lat: number; lng: number },
-  cap: number = MAX_ZIP_FACILITIES,
 ): Promise<ZipFacilityPick<T>> {
   const cands: T[] = [];
   for (const r of rows) {
@@ -217,11 +221,10 @@ export async function pickZipFacilities<T extends { lat: number; lng: number }>(
   // Deterministic order, nearest the box centre first; only a display/storage order, never inclusion.
   inZip.sort((a, b) => milesBetween(center.lat, center.lng, a.lat, a.lng) - milesBetween(center.lat, center.lng, b.lat, b.lng));
   return {
-    kept: inZip.slice(0, cap),
+    kept: inZip,
     candidates: cands.length,
     members: inZip.length,
     outside,
     unresolved,
-    over_cap: Math.max(0, inZip.length - cap),
   };
 }
