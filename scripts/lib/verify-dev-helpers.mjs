@@ -26,7 +26,7 @@ export function validRecordUrl(u) {
 //
 // RECOGNISED, i.e. values the shipped resolver maps to a legended bucket:
 export const LIFECYCLE_BUCKETS = new Set([
-  'built', 'operating',   // → Operating now
+  'built', 'operating',   // → Completed (agency record)
   'approved',             // → Approved
   'proposed',             // → Proposed
   'unknown', 'onfile',    // → Lifecycle unknown ('onfile' is the retained legacy read alias)

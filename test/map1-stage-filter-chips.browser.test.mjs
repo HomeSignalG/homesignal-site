@@ -182,7 +182,9 @@ const C0 = await chips();
 ok(C0.length === 4, '0: the row is four Stage chips', C0.map(c => c.id).join(','));
 ok(C0.map(c => c.id).join(',') === 'operating_now,approved,proposed,lifecycle_unknown',
   '0: stable status IDS, in lifecycle order', C0.map(c => c.id).join(','));
-ok(C0.map(c => c.label).join(' | ') === 'Operating now | Approved | Proposed | Lifecycle unknown',
+// 2026-11-09 (founder): the first chip reads "Completed (agency record)" — an agency marking a permit
+// complete does not verify occupancy or operation. Its stable id stays 'operating_now' (shared links).
+ok(C0.map(c => c.label).join(' | ') === 'Completed (agency record) | Approved | Proposed | Lifecycle unknown',
   '0: the four founder-specified labels', C0.map(c => c.label).join(' | '));
 ok(C0.every(c => c.checked), '0: DEFAULT — all four are checked');
 // THE LIST HOME (founder decision, 2026-09-24): records are listed in the band their lifecycle
@@ -197,7 +199,7 @@ ok(bands0.unknownHead === 'Lifecycle unknown', '0L: the Lifecycle unknown band r
 ok(/Herndon Parkway Utility Corridor/.test(bands0.unknown) && !/Herndon Parkway Utility Corridor/.test(bands0.built),
   '0L: a development record with no stated lifecycle is listed under Lifecycle unknown', JSON.stringify(bands0).slice(0, 300));
 ok(/Innovation Center Substation/.test(bands0.built) && !/Innovation Center Substation/.test(bands0.unknown),
-  '0L: Operating now lists the record whose own source states Operating');
+  '0L: Completed (agency record) lists the record whose own source states Operating');
 ok((await pins()) === 4, '0: ...and all four lifecycle categories are on the map', await pins());
 ok(!(await emptyNote()).shown, '0: no empty-state note while anything is selected');
 
@@ -221,7 +223,7 @@ ok(grp.help === 'How to read the map: Shape = project type · Color = status · 
               + 'Purple R = regulatory record.',
   '1: the group is programmatically described by the one map key', grp.help);
 // The accessible name states INCLUSION in words, so the state never rests on the tick alone.
-ok(C0[0].name === 'Operating now status, shown on map',
+ok(C0[0].name === 'Completed (agency record) status, shown on map',
   '1: accessible name says what checked MEANS', C0[0].name);
 
 // ── 2. UNCHECKING ONE STAGE REMOVES ONLY THAT STAGE ─────────────────────────────────

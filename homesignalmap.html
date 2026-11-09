@@ -927,8 +927,8 @@
 
       <div class="grid band">
         <div class="card read">
-          <div class="band-h t-built">Operating now</div>
-          <div class="band-s">Completed construction filings, standing today</div>
+          <div class="band-h t-built">Completed (agency record)</div>
+          <div class="band-s">Permits and cases the agency marked complete. Agency completion does not confirm a building is occupied or a business is open. Data centers here are listed as operating by their source.</div>
           <div id="builtList"></div>
         </div>
         <div class="card read">
@@ -1000,7 +1000,7 @@
     filing, or a state or federal registry entry.</p>
   <h3>What you can see</h3>
   <ul>
-    <li><strong>Status:</strong> operating now, approved, or proposed, plus records whose lifecycle the source does not state.</li>
+    <li><strong>Status:</strong> completed (agency record), approved, or proposed, plus records whose lifecycle the source does not state. An agency marking a permit or case complete does not confirm that a building is occupied or a business is open.</li>
     <li><strong>Project type:</strong> data centers, industrial, residential, roads and infrastructure, commercial,
       civic and public, and other projects.</li>
     <li><strong>Regulatory records:</strong> EPA-registered facilities and similar registry entries, shown as a separate
@@ -1087,7 +1087,7 @@ HS.onReady(function(){
   // array omitted `unknown`, so records the source gives no lifecycle for rendered in a
   // colour the legend never explained. The facility row is excluded here (facilities get
   // their own shape-legend row, not a lifecycle chip).
-  var TRACKER_LABELS = { operating:"Operating now", approved:"Approved", proposed:"Proposed",
+  var TRACKER_LABELS = { operating:"Completed (agency record)", approved:"Approved", proposed:"Proposed",
                          unknown:"Lifecycle unknown" };
   var LEGEND = (HS.STATUS_LEGEND_ROWS || []).filter(function(r){ return r.key !== "facility"; })
     .map(function(r){
@@ -1491,12 +1491,21 @@ HS.onReady(function(){
   //     BEFORE stageWord (facilityType names the kind; kindLabel appends the resolver's lifecycle
   //     label — "Lifecycle unknown" when no source states one, never an asserted "operating now").
   var STAGE_WORD = { proposed:"Proposed / hearing", approved:"Approved / permitted",
-                     operating:"Recorded / operating", built:"Built / operating" };
+                     operating:"Completed (agency record)", built:"Completed (agency record)" };
   // The SITE rides along with its type (2026-09-24): bucketOf(type) alone rebuilt a bare
   // {type} with no registry_id, so a cached EPA element's manufactured type='built' was read as
   // operating in the marker title while the pin (which passes the site) read unknown.
   function stageOf(s){ return (s && typeof s.bucket==="string" && s.bucket) ? s.bucket : bucketOf(s && s.type, s); }
-  function stageWord(s){ return STAGE_WORD[stageOf(s)] || "Official record"; }
+  // WORDING (2026-11-09): the operating bucket holds two different claims. A permit or case the agency
+  // marked complete says nothing about occupancy or a business opening, so it reads "Completed (agency
+  // record)". A national data-centre record (HS.isSourceOwnRecord) is its source's own listing of a
+  // facility as operating, so it keeps that claim and names whose it is. Words only: bucket, colour and
+  // membership are unchanged.
+  function ownOperating(s){
+    var st = stageOf(s);
+    return (st === "operating" || st === "built") && !!(HS.isSourceOwnRecord && HS.isSourceOwnRecord(s));
+  }
+  function stageWord(s){ return ownOperating(s) ? "Operating (source listing)" : (STAGE_WORD[stageOf(s)] || "Official record"); }
   // The one popup/subheader label for any record. EPA FRS facility → the physical-facility line;
   // everything else → its lifecycle stage. Named + exposed (window.__HS_KIND) so verify-development
   // can assert, live, that the label a resident sees agrees with the dot's colour — the regression
@@ -1550,12 +1559,12 @@ HS.onReady(function(){
   // record's lifecycle bucket (the dot COLOUR) and the resolver's category label (the pin
   // SHAPE), so the sentence can never disagree with the symbol.
   var MARKER_TITLE_STAGE = { proposed:"Proposed", approved:"Approved",
-                             operating:"Operating", built:"Operating" };
+                             operating:"Completed", built:"Completed" };
   function markerTitle(s, mk){
     if(HS.isStateCleanup && HS.isStateCleanup(s)) return HS.stateCleanupTitle(s);
     if(HS.isWaterRight && HS.isWaterRight(s)) return HS.waterRightTitle(s);
     var type = (mk && mk.legendLabel) ? String(mk.legendLabel).toLowerCase() : "project";
-    var stage = MARKER_TITLE_STAGE[stageOf(s)];
+    var stage = ownOperating(s) ? "Operating (source listing)" : MARKER_TITLE_STAGE[stageOf(s)];
     // An unknown lifecycle says so in words rather than borrowing a stage it does not have —
     // the same honesty the grey "Lifecycle unknown" chip carries in the legend.
     // STATUS IS NEVER COLOUR ALONE — and a DECISION is never the pin alone either. A
@@ -3025,7 +3034,7 @@ HS.onReady(function(){
     // Civic notices have no lifecycle stage and only a synthetic (jurisdiction-wide) position, so
     // they are not plotted as development dots — the map shows genuine development + facilities only.
     drawMap(data, sites.filter(function(s){ return !isCivic(s); }));
-    listInto("builtList", builtRows, "Nothing recorded as operating right now.");
+    listInto("builtList", builtRows, "No completed agency records in Jody for this area. This does not mean nothing operates here.");
     listInto("unknownList", unknownRows, "Nothing on record here without a stated lifecycle.");
     listInto("apprList", appr, "Nothing approved on record right now.");
     // STATE CLEANUP SITES — their own band, shown only when this view holds one.
