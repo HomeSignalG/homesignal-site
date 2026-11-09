@@ -2270,6 +2270,9 @@ HS.onReady(function(){
   function run(address){
     leaveLanding();
     // A real address search leaves ZIP mode: now we DO drop the "this address" pin.
+    // A radius change re-runs the same address and keeps its outline; anything else clears
+    // the old ZIP's outline until the geocoder says which ZIP this address is in.
+    if(ZIP_MODE || address !== CUR_ADDRESS) paintZipBoundary(null);
     ZIP_MODE = false; HOME_ANCHOR = false; ZIP_FRAME = null;
     // ...and it leaves the ZIP PLACE with it. This is the only in-page Place transition in
     // the app (every other navigation is a full document load, which resets the declaration
@@ -2337,6 +2340,8 @@ HS.onReady(function(){
         window.__HS_LOOKUP_LOGGED = address;
         HS.logEvent("property_lookup", { zip_code: m.zip || null });
       }
+      // The searched address's ZIP gets its outline on every view (the geocoder's own ZIP).
+      if(m.zip && String(m.zip).slice(0,5) !== BOUNDARY_ZIP) paintZipBoundary(String(m.zip).slice(0,5));
       // HOME is the geocoder's exact returned point, used verbatim as the RPC input.
       var home = { lat: m.lat, lng: m.lng };
       paintMap1PlaceHeading('address', m.matchedAddress || address);
@@ -2498,6 +2503,7 @@ HS.onReady(function(){
     // HOME-specific control stays hidden.
     document.body.classList.remove("hashome");
     var token = ++REQ_SEQ;                  // same stale-response guard as address mode
+    paintZipBoundary(zip);                  // the ZIP's real outline, on every view of every ZIP map
     N5_NOTE = "";                           // ZIP mode never carries an address-radius note
     ZIP_AUTH = null;                        // cleared until this ZIP's authoritative read lands
     syncRadiusStops();
@@ -3080,12 +3086,12 @@ HS.onReady(function(){
     if(window.HS && HS.mountSourceFreshness){
       HS.mountSourceFreshness($("srcFresh"), { zip: ZIP_MODE ? ZIP_CODE : null, ids: HS.sourceFreshnessIds(sites) });
     }
-    // EMBED ZIP ONLY. Hooked at the END of render because render OWNS the camera: every
-    // pass does `map.setView(...)`, so a fit applied from the RPC's own callback would be
-    // overwritten by the next render, and a fit applied before the first render would find
-    // `map` still null. Called here, the boundary is drawn and fitted after the view is set,
-    // on every pass, and it is a no-op until both the polygon and the map exist.
-    applyEmbedBoundary();
+    // Hooked at the END of render because render OWNS the camera and clears the layers:
+    // every pass does `map.setView(...)`, so a fit applied from the RPC's own callback would
+    // be overwritten by the next render, and one applied before the first render would find
+    // `map` still null. Called here, the outline is drawn (and, in the embed, fitted) after
+    // the view is set, on every pass, and it is a no-op until the polygon and a map exist.
+    drawZipBoundary();
   }
 
   function cleanupAgencies(list){
@@ -3093,15 +3099,75 @@ HS.onReady(function(){
     list.forEach(function(s){ var a = (s.cleanup && s.cleanup.agency) || "the state"; if(!seen[a]){ seen[a]=1; out.push(a + "\u2019s"); } });
     return out.join(" and ");
   }
-  // The polygon, once read, and the layer currently drawn from it.
-  var EMBED_BOUNDARY = null, EMBED_BOUNDARY_LAYER = null;
-  function applyEmbedBoundary(){
-    if(!EMBED_BOUNDARY || !map || !window.L) return;
-    if(EMBED_BOUNDARY_LAYER){ try { map.removeLayer(EMBED_BOUNDARY_LAYER); } catch(e){} }
-    EMBED_BOUNDARY_LAYER = L.geoJSON(EMBED_BOUNDARY.fc, { style: { color:"#157a49", weight:2,
-      opacity:0.9, fill:true, fillColor:"#157a49", fillOpacity:0.06 } }).addTo(map);
-    var b = EMBED_BOUNDARY.bounds;
-    map.fitBounds([[b.south, b.west], [b.north, b.east]], { padding:[24,24] });
+  // The polygon, once read, and the layers currently drawn from it. ONE outline, drawn on
+  // every view: the 2D map, the satellite view (MapLibre or its Leaflet fallback) and the
+  // 3D aerial. BOUNDARY_ZIP is the ZIP being looked at: the route ZIP in ZIP mode, the
+  // geocoder's ZIP for a searched address (founder, 2026-11-09: "any time a zip code is
+  // entered … an address with a zip code or just a zip code").
+  var IS_EMBED = document.documentElement.classList.contains("hs-embed");
+  var BOUNDARY_ZIP = null;
+  var ZIP_BOUNDARY = null, ZIP_BOUNDARY_LAYER = null, ZIP_BOUNDARY_GL_LAYER = null;
+  var ZIP_LINE = { color:"#157a49", weight:2.5, opacity:0.9, fill:true, fillColor:"#157a49", fillOpacity:0.06,
+                   interactive:false };
+  var ZIP_LINE_SAT = { color:"#facc15", weight:3, opacity:0.95, fill:false, interactive:false };   // reads on imagery
+  function zipBoundaryLive(){ return !!(ZIP_BOUNDARY && BOUNDARY_ZIP && ZIP_BOUNDARY.zip === BOUNDARY_ZIP); }
+  function drawZipBoundary(){
+    var live = zipBoundaryLive();
+    // 2D map
+    if(map && window.L){
+      if(ZIP_BOUNDARY_LAYER){ try { map.removeLayer(ZIP_BOUNDARY_LAYER); } catch(e){} ZIP_BOUNDARY_LAYER = null; }
+      if(live){
+        ZIP_BOUNDARY_LAYER = L.geoJSON(ZIP_BOUNDARY.fc, { style: ZIP_LINE, interactive:false }).addTo(map);
+        try { ZIP_BOUNDARY_LAYER.bringToBack(); } catch(e){}
+        if(IS_EMBED && ZIP_MODE){
+          var b = ZIP_BOUNDARY.bounds;
+          map.fitBounds([[b.south, b.west], [b.north, b.east]], { padding:[24,24] });
+        }
+      }
+    }
+    drawGLZipBoundary();
+    draw3DZipBoundary();
+    try { if(window.__HS_VERIFY) window.__HS_VERIFY.zipBoundary = live ? ZIP_BOUNDARY.zip : null; } catch(e){}
+  }
+  // Satellite view. MapLibre: one geojson source + line layer added on load; the raster
+  // fallback (Leaflet on imagery) gets its own layer.
+  function drawGLZipBoundary(){
+    if(!GL.inited) return;
+    var live = zipBoundaryLive();
+    if(GL.soft){
+      if(!GL.mapL) return;
+      if(ZIP_BOUNDARY_GL_LAYER){ try { GL.mapL.removeLayer(ZIP_BOUNDARY_GL_LAYER); } catch(e){} ZIP_BOUNDARY_GL_LAYER = null; }
+      if(live) ZIP_BOUNDARY_GL_LAYER = L.geoJSON(ZIP_BOUNDARY.fc, { style: ZIP_LINE_SAT, interactive:false }).addTo(GL.mapL);
+      return;
+    }
+    if(!GL.map) return;
+    try{
+      var src = GL.map.getSource("zipline");
+      if(src) src.setData(live ? ZIP_BOUNDARY.fc : { type:"FeatureCollection", features:[] });
+    }catch(e){}
+  }
+  // 3D aerial: the outline traced on the ground, in the same scene coordinates the buildings
+  // use (x = mi(e), z = mi(-n), origin sceneOrigin(): ZIP_FRAME in ZIP mode, HOME for an
+  // address). Without an origin nothing is drawn.
+  function draw3DZipBoundary(){
+    if(!V3.inited || !V3.zipGrp || !window.THREE) return;
+    var G = V3.zipGrp; while(G.children.length) G.remove(G.children[0]);
+    var origin = sceneOrigin();
+    if(!zipBoundaryLive() || !homePointOK(origin)) return;
+    var mat = new THREE.LineBasicMaterial({ color:0x157a49, transparent:true, opacity:0.95 });
+    (ZIP_BOUNDARY.fc.features || []).forEach(function(f){
+      var g = f && f.geometry; if(!g) return;
+      var polys = g.type === "Polygon" ? [g.coordinates] : (g.type === "MultiPolygon" ? g.coordinates : []);
+      polys.forEach(function(poly){ (poly || []).forEach(function(ring){
+        var pts = [];
+        (ring || []).forEach(function(c){
+          var en = llToEN(c[1], c[0], origin);
+          if(en[0] == null) return;
+          pts.push(new THREE.Vector3(mi(en[0]), 1.2, mi(-en[1])));
+        });
+        if(pts.length > 1) G.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat));
+      }); });
+    });
   }
 
   // Reflect the active radius in the #radSel button row (used both on manual clicks and when
@@ -4120,6 +4186,7 @@ HS.onReady(function(){
     // home at the origin — rebuilt by updateHome3D() after an address search. ZIP
     // mode has no HOME, so this group stays empty.
     V3.homeGrp=new THREE.Group();sc.add(V3.homeGrp);
+    V3.zipGrp=new THREE.Group();sc.add(V3.zipGrp);   // this ZIP's outline, draw3DZipBoundary()
     V3.facil=new THREE.Group();sc.add(V3.facil);V3.proposed=[];V3.rise=1;
     V3.sc=sc;V3.cam=cam;V3.rn=rn;V3.yaw=0.7;V3.pitch=0.82;V3.dist=mi(2.1);V3.auto=true;V3.inited=true;V3.lost=false;
     // A LOST CONTEXT IS THE BLACK PANEL ARRIVING AFTER A SUCCESSFUL START. Measured on the
@@ -4267,7 +4334,7 @@ HS.onReady(function(){
     // above the threshold we drop them and let hover/click reveal each building instead.
     var showLabels = nLabelable <= 12;
     set3DFrame(maxD);
-    updateHome3D();drawRings();
+    updateHome3D();drawRings();draw3DZipBoundary();
     // scale fog to the framed extent so the rings + facilities stay crisp
     if(V3.sc&&V3.sc.fog){ V3.sc.fog.near=mi(V3.frameExt)*0.9; V3.sc.fog.far=mi(V3.frameExt)*5+300; }
     var G=V3.facil;while(G.children.length)G.remove(G.children[0]);V3.proposed=[];V3.pickable=[];
@@ -4499,7 +4566,9 @@ HS.onReady(function(){
       GL.map.addSource("radius",{ type:"geojson", data:{ type:"FeatureCollection", features:[] } });
       GL.map.addLayer({ id:"radius-fill", type:"fill", source:"radius", paint:{ "fill-color":"#2dd4bf", "fill-opacity":0.07 } });
       GL.map.addLayer({ id:"radius-line", type:"line", source:"radius", paint:{ "line-color":"#13b8a6", "line-width":2, "line-opacity":0.8 } });
-      GL.inited=true; buildGLMarkers(); glFrameView();
+      GL.map.addSource("zipline",{ type:"geojson", data:{ type:"FeatureCollection", features:[] } });
+      GL.map.addLayer({ id:"zipline", type:"line", source:"zipline", paint:{ "line-color":"#facc15", "line-width":3, "line-opacity":0.95 } });
+      GL.inited=true; buildGLMarkers(); glFrameView(); drawGLZipBoundary();
       // Grace period, then judge ONCE. Long enough that a slow connection is not called a
       // failure; short enough that nobody sits in front of a dark rectangle.
       setTimeout(function(){
@@ -4569,7 +4638,9 @@ HS.onReady(function(){
       attribution:"© Esri, Maxar, Earthstar Geographics", maxZoom:19
     }).addTo(GL.mapL);
     GL.inited=true;
+    ZIP_BOUNDARY_GL_LAYER=null;
     buildGLRasterMarkers();
+    drawGLZipBoundary();
     glFrameView();
     setTimeout(function(){ try{ GL.mapL.invalidateSize(); }catch(e){} }, 40);
     mapMsg();
@@ -5503,6 +5574,10 @@ HS.onReady(function(){
     // Address mode, minus the geocode and minus the report engine (see below).
     ZIP_MODE = false; HOME_ANCHOR = false; ZIP_FRAME = null;
     CUR_ADDRESS = "";
+    // The host page names the address's ZIP as ?outline= (not ?zip=, which would make this a
+    // ZIP embed). Only the outline is drawn from it; the records are still the radius.
+    var _ez = new URL(window.location.href).searchParams.get("outline");
+    paintZipBoundary(_ez && /^\d{5}$/.test(_ez) ? _ez : null);
     CUR_RADIUS = radius;                    // pinned; #radSel is hidden, so nothing can rewrite it
     setRadiusButton(radius); syncRadiusStops();
     document.body.classList.remove("zipmode");
@@ -5534,25 +5609,38 @@ HS.onReady(function(){
     });
   }
 
-  // EMBED ZIP ONLY: draw and fit this ZIP's real ZCTA outline over Map 1's own ZIP view.
-  // Read through public.app_zcta_boundary (SECURITY DEFINER); geo.zcta_boundary is not
-  // readable from a browser and must not be. The polygon is the AREA the Place page is
-  // about, which is why it belongs on a Place embed and not on the full Development page —
-  // ZIP_FRAME, computed from the records' own extent, is deliberately left as it is there.
+  // EVERY ZIP MAP draws this ZIP's real ZCTA outline (founder, 2026-11-09: "put it on every
+  // map a zip boundary line") — the full page and the embed, on the 2D map, the satellite view
+  // and the 3D aerial. Read through public.app_zcta_boundary (SECURITY DEFINER);
+  // geo.zcta_boundary is not readable from a browser and must not be. Only the EMBED re-frames
+  // the camera to the outline; the full page keeps ZIP_FRAME, computed from the records' own
+  // extent, and only draws the line.
   //
   // NOT MEASURED MEANS NOT DRAWN. Map 1's existing ZIP framing stays exactly as it is; no
   // circle, no envelope, no bbox of project points stands in for a boundary we do not have.
-  function paintEmbedZipBoundary(zip){
+  // The outline is keyed to its ZIP, so a late answer for a ZIP the page has left is dropped.
+  function paintZipBoundary(zip){
+    BOUNDARY_ZIP = (zip && /^\d{5}$/.test(String(zip))) ? String(zip) : null;
+    ZIP_BOUNDARY = null;
+    drawZipBoundary();                                     // clear any previous ZIP's line
     if(!window.HS || !HS.sb || !HS.boundaryFC) return;
-    HS.sb().rpc("app_zcta_boundary", { p_zip: zip }).then(function(r){
+    if(!BOUNDARY_ZIP) return;
+    zip = BOUNDARY_ZIP;
+    // The outline is decoration on top of the map: a missing client (HS.sb() returns null
+    // before supabase-js loads) or a throw must never stop the ZIP itself from loading.
+    var sb = null;
+    try { sb = HS.sb(); } catch(e) { sb = null; }
+    if(!sb || typeof sb.rpc !== "function") return;
+    sb.rpc("app_zcta_boundary", { p_zip: zip }).then(function(r){
       if(r.error || !r.data) return;
       var payload = r.data;
       if(payload.status !== "boundary_complete") return;   // not_measured -> Map 1's own framing stands
       var fc = HS.boundaryFC(payload.geometry);
       var b = fc ? HS.boundaryBounds(fc) : null;
       if(!fc || !b) return;                                // a non-area geometry is not a boundary
-      EMBED_BOUNDARY = { fc: fc, bounds: b };
-      applyEmbedBoundary();                                // in case render already ran
+      if(BOUNDARY_ZIP !== zip) return;                     // the page moved on to another place
+      ZIP_BOUNDARY = { zip: zip, fc: fc, bounds: b };
+      drawZipBoundary();                                   // in case render already ran
     }).catch(function(){});
   }
 
@@ -5566,8 +5654,7 @@ HS.onReady(function(){
       if(ez && /^\d{5}$/.test(ez)){
         if(window.HS && HS.state) HS.state.zip = ez;
         if(window.HS && HS.declareRouteZipPlace) HS.declareRouteZipPlace(ez);
-        loadZip(ez);                       // Map 1's own ZIP mode, unchanged
-        paintEmbedZipBoundary(ez);         // plus the real ZCTA outline, embed only
+        loadZip(ez);                       // Map 1's own ZIP mode (it draws the ZIP outline too)
         return;                            // no loadDevTracker: the tracker is hidden here
       }
       var elat = parseFloat(u.searchParams.get("lat")), elng = parseFloat(u.searchParams.get("lng"));

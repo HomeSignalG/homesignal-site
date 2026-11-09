@@ -1870,6 +1870,24 @@ legal/framing change not covered by the one-time sign-off.
   *(2026-10-22: `sitemap.yml` is deleted, and the build drops these `homesignalmap.html?zip=` URLs
   from the served sitemap anyway (`gen_zip_pages.py::reconcile_sitemap`). See §5.)*
 
+## 7.03 EVERY MAP 1 VIEW DRAWS THE ZIP OUTLINE, FOR EVERY VISITOR ⚖️ FOUNDER (2026-11-09)
+
+"put it on every map a zip boundary line"; "any time a zip code is entered and someone is viewing … a non signed user …
+an address with a zip code or just a zip code it needs a boundary map." Before this the outline was drawn only in the ZIP
+embed (`paintEmbedZipBoundary`) and only for signed-in visitors.
+- **One reader, one drawer** in `homesignalmap.html`: `paintZipBoundary(zip)` reads `public.app_zcta_boundary` and
+  `drawZipBoundary()` draws it on the 2D map, the satellite view (MapLibre layer `zipline`, or the Leaflet imagery fallback)
+  and the 3D aerial (`V3.zipGrp`). `BOUNDARY_ZIP` is the ZIP being looked at: `loadZip()` (full page and embed), the
+  geocoder's ZIP after an address search, and `?outline=<zip>` on the address embed (`property.html` passes the saved
+  address's ZIP; not `?zip=`, which would make it a ZIP embed). A late answer for a ZIP the page left is dropped.
+- Only the ZIP embed re-frames the camera to the outline; the full page keeps `ZIP_FRAME`. No Census area
+  (`not_measured`) draws nothing, never a circle.
+- **anon has EXECUTE on `app_zcta_boundary`** (migration `app_zcta_boundary_grant_anon_20261109`, read back
+  `anon=X`; `docs/app-zcta-boundary.sql` updated). `geo` USAGE stays forbidden (anon_geo false).
+- `lib/community-page.js` ~line 484 still says the outline needs a session: stale comment, left untouched so the
+  file's cache key does not move. Tests: `test/map1-zip-outline.browser.test.mjs`, `place-context-map` §9,
+  `zcta-boundary-reader` §4.
+
 ## 7.04a THE MAPS (ALL THEMES) ZIP LIST IS A SECOND, INDEPENDENT LIST (2026-10-15)
 
 The Acquisition Dashboard's POST ZIP ORDER panel now exists in two scopes that share ONE code path (`ZO_SCOPES` in

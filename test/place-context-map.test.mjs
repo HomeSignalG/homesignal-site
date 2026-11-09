@@ -183,10 +183,14 @@ ok(/n5Radius\(home, radius\)/.test(boot) && /HS\.n5SitesFrom\(rows, projects, ho
 ok(/CUR_RADIUS = radius;/.test(boot), '8e CUR_RADIUS is pinned to the URL\'s radius');
 ok(!/1\.5/.test(boot), '8f the Dashboard\'s decorative 1.5 appears nowhere in the embed boot');
 
-// ── §9 embed ZIP: the real ZCTA polygon, and nothing in its place ───────────────────────
-const zboot = m1.slice(m1.indexOf('function paintEmbedZipBoundary'), m1.indexOf('function boot()'));
-ok(/rpc\("app_zcta_boundary", \{ p_zip: zip \}\)/.test(zboot),
-  '9a the embed reads the boundary through the SECURITY DEFINER function, by name, with a ZIP');
+// ── §9 every ZIP map: the real ZCTA polygon, and nothing in its place ───────────────────
+// ⚖️ INVERTED 2026-11-09 (founder: "put it on every map a zip boundary line"; "any time a zip
+// code is entered and someone is viewing ... a non signed user ... it needs a boundary map").
+// This section used to pin the outline to the EMBED branch only. Now loadZip() draws it on
+// every ZIP map (full page and embed), and an address search draws its own ZIP's outline.
+const zboot = m1.slice(m1.indexOf('function paintZipBoundary'), m1.indexOf('function boot()'));
+ok(/\.rpc\("app_zcta_boundary", \{ p_zip: zip \}\)/.test(zboot),
+  '9a the map reads the boundary through the SECURITY DEFINER function, by name, with a ZIP');
 ok(!/geo\.zcta_boundary/.test(m1),
   '9b ...never geo.zcta_boundary directly — the browser roles have no USAGE on that schema');
 ok(/payload\.status !== "boundary_complete"\) return/.test(zboot),
@@ -194,23 +198,20 @@ ok(/payload\.status !== "boundary_complete"\) return/.test(zboot),
 ok(!/L\.circle|ST_Buffer|ST_MakeEnvelope|fitItems/.test(zboot),
   '9d ...no circle, no envelope, no bbox of project points stands in for a boundary we do not have',
   (zboot.match(/L\.circle|ST_Buffer|ST_MakeEnvelope|fitItems/) || [])[0]);
-// The RPC is embed-only: the full Development page must not newly start calling it.
-// ⚠️ COUNTING THE RPC NAME MEASURED THE WRONG THING. It stays at one however many times the
-// WRAPPER is called, so adding paintEmbedZipBoundary(z) to the non-embed ZIP boot passed. The
-// question is where the FUNCTION is invoked, so pin the call sites: one definition, one call,
-// and that call inside the embed branch.
-const bootFn = m1.slice(m1.indexOf('(function boot(){'));
-const embedBranch = bootFn.slice(bootFn.indexOf('embed'), bootFn.indexOf('var a = u.searchParams.get("addr")'));
-const paintCalls = (m1.match(/paintEmbedZipBoundary\(/g) || []).length;
-ok(paintCalls === 2, '9e paintEmbedZipBoundary has exactly ONE definition and ONE call site (found '
-  + paintCalls + ' occurrences)');
-ok(/paintEmbedZipBoundary\(ez\);/.test(embedBranch),
-  '9e2 ...and that call is inside the embed branch');
-ok(!/paintEmbedZipBoundary/.test(bootFn.slice(bootFn.indexOf('var a = u.searchParams.get("addr")'))),
-  '9e3 ...so the non-embed ?zip= / ?addr= paths gain no new read',
-  (bootFn.slice(bootFn.indexOf('var a = u.searchParams')).match(/.{0,70}paintEmbedZipBoundary.{0,30}/) || [])[0]);
+const loadZipFn = m1.slice(m1.indexOf('function loadZip(zip){'), m1.indexOf('function loadZip(zip){') + 400);
+ok(/paintZipBoundary\(zip\);/.test(loadZipFn),
+  '9e loadZip() draws the outline, so EVERY ZIP map (full page and embed) gets it');
+const runFn = m1.slice(m1.indexOf('function run(address){'), m1.indexOf('function run(address){') + 6000);
+ok(/paintZipBoundary\(String\(m\.zip\)\.slice\(0,5\)\)/.test(runFn),
+  '9e2 an address search draws the geocoder\'s own ZIP outline');
+ok(/BOUNDARY_ZIP !== zip\) return/.test(zboot),
+  '9e3 a late outline for a ZIP the page has left is dropped');
 const callsBoundary = (m1.match(/app_zcta_boundary/g) || []).length;
 ok(callsBoundary === 1, '9e4 ...and the RPC name itself appears once (found ' + callsBoundary + ')');
+ok(/IS_EMBED && ZIP_MODE/.test(m1),
+  '9e5 only the ZIP embed re-frames the camera to the outline; the full page keeps ZIP_FRAME');
+ok(/addSource\("zipline"/.test(m1) && /function draw3DZipBoundary/.test(m1) && /drawGLZipBoundary\(\)/.test(m1),
+  '9e6 the satellite view and the 3D aerial draw the same outline');
 ok(/if\(u\.searchParams\.get\("embed"\) === "1"\)\{/.test(m1),
   '9f the embed branch is entered only for embed=1');
 
@@ -228,7 +229,7 @@ ok(/<div class="radsel" id="radSel">/.test(m1Raw) && /<form class="search" id="f
 ok(/HS\.boundaryFC = function/.test(mapJs) && /HS\.boundaryBounds = function/.test(mapJs),
   '11a lib/map.js still exposes the boundary helpers');
 ok(/HS\.boundaryFC\(payload\.geometry\)/.test(zboot),
-  '11b ...and Map 1\'s embed is what consumes them now');
+  '11b ...and Map 1 is what consumes them now');
 ok(!/\bboundary:/.test(prop) && !/fitBoundary/.test(prop) && !/\bboundary:/.test(cp) && !/fitBoundary/.test(cp),
   '11c neither Place host passes boundary/fitBoundary — neither draws anything');
 

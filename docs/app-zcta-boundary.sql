@@ -88,9 +88,15 @@ comment on schema geo is
 -- grant, and revoking the first does not touch the second. The offline test asserted the
 -- FILE contained no `to anon` grant, which was true and irrelevant: nothing in this file
 -- granted it. Only asking the database found it.
+--
+-- ⚖️ SUPERSEDED 2026-11-09 BY THE FOUNDER: "any time a zip code is entered and someone is
+-- viewing ... a non signed user ... it needs a boundary map." Every Map 1 view now draws the
+-- ZIP outline for every visitor, so anon gets EXECUTE. The text above is the dated record of
+-- the earlier authenticated-only posture. Census ZCTA polygons are public data. The schema
+-- grant below stays forbidden: anon reaches ONE ZIP's outline through this definer function,
+-- never the geo schema.
 revoke all on function public.app_zcta_boundary(text) from public;
-revoke all on function public.app_zcta_boundary(text) from anon;
-grant execute on function public.app_zcta_boundary(text) to authenticated, service_role;
+grant execute on function public.app_zcta_boundary(text) to anon, authenticated, service_role;
 
 -- NOTE, deliberately NOT executed here: `grant usage on schema geo` appears nowhere in this
 -- file and must never be added. The definer function reads geo as its owner; granting the
