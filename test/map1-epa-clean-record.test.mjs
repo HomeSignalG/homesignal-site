@@ -1,4 +1,4 @@
-// MAP 1 MUST NOT CLAIM A CLEAN EPA RECORD WITHOUT COMPLIANCE TRACKING.
+// MAP 1 AND THE ZIP PAGE CLAIM A CLEAN EPA RECORD ONLY ON EPA'S OWN "NO VIOLATION IDENTIFIED" (2026-11-09).
 //
 // WHY THIS FILE EXISTS. homesignalmap.html's envSignals used to print
 // "no recorded EPA violations" for any FRS facility that lacked a stronger
@@ -79,86 +79,67 @@ const site = (over) => Object.assign({
 }, over);
 
 const texts = (s) => envSignals(s).map((g) => g.text);
-const hasClean = (s) => texts(s).some((t) => /no recorded EPA violations/i.test(t));
+const CLEAN_RE = /no current violation|no recorded EPA violations/i;
+const hasClean = (s) => texts(s).some((t) => CLEAN_RE.test(t));
+// An ECHO compliance match for this facility, as interpretEcho stores it.
+const echo = (over) => Object.assign({ in_violation: [], no_violation: ['CWA', 'CAA'], current_as_of: '2026-11-09' }, over);
 
-ok(typeof envSignals === 'function' && typeof HS.fac.interpret === 'function',
-  'control — extracted envSignals and loaded HS.fac.interpret');
+ok(typeof envSignals === 'function' && typeof HS.fac.noViolationLine === 'function',
+  'control — extracted envSignals and loaded HS.fac.noViolationLine');
+ok(/HS\.fac\.noViolationLine\(epa\)/.test(pageSrc) && !/interp\.tracking\s*===\s*true/.test(pageSrc),
+  'Map 1 asks the one shared rule; tracking alone no longer decides');
+ok(!/no recorded EPA violations \(compliance tracking on\)/.test(pageSrc + readFileSync(join(root, 'lib/templates.js'), 'utf8')),
+  'the tracking-only sentence is gone from both surfaces');
 
-ok(/HS\.fac\.interpret/.test(pageSrc) && /interp\.tracking\s*===\s*true/.test(pageSrc),
-  'Map 1 asks HS.fac.interpret for tracking, same rule as the ZIP page');
+// ── unknown: no sentence ─────────────────────────────────────────────────────
+ok(!hasClean(site({})), 'FRS id only (ECHO failed / not queried) is NOT a clean record', texts(site({})));
+ok(!hasClean(site({ env: { link_type: 'geo_matched' } })), 'geo_matched with no epa block is NOT a clean record');
+ok(!hasClean(site({ env: { epa: { in_violation: [], permit_status: 'Effective', compliance_tracking_on: true } } })),
+  'CWA permit Effective + tracking on, but no ECHO compliance match (beyond the 500-row / 5-mile lookup) is NOT a clean record');
+ok(!hasClean(site({ env: { epa: { in_violation: [] } } })), 'an ECHO block with no date and no statute status is NOT a clean record');
+ok(!hasClean(site({ env: { epa: echo({ no_violation: [] }) } })),
+  'ECHO matched but listed no statute as "No Violation Identified" (blank / Not Applicable / Terminated) is NOT a clean record');
+ok(!hasClean(site({ env: { epa: echo({ current_as_of: undefined }) } })), 'a statute list with no date is NOT a clean record');
+ok(!hasClean(site({ env: { epa: echo({ no_violation: ['CWA'], compliance_tracking_on: false, permit_status: 'Terminated' }) } })),
+  'a Clean Water Act "no violation" on a permit EPA no longer tracks is NOT a clean record');
+ok(!hasClean(site({ env: { epa: echo({ snc: true }) } })), 'significant non-compliance suppresses the clean line');
+ok(!hasClean(site({ env: { epa: echo({ quarters_nc: 2 }) } })), 'quarters out of compliance suppress the clean line');
+ok(!hasClean(site({ env: { epa: echo({ in_violation: ['CWA'] }) } })), 'an open violation suppresses the clean line');
+ok(!hasClean(site({ tceq_rn: 'RN123', env: { tceq: { programs: ['AIRNSR'] } } })), 'TCEQ-only does not invent an EPA clean line');
 
-ok(!/out\.push\(lv>0 \? \{ text: lv\+" recorded violation"/.test(pageSrc),
-  'the unguarded FRS-id fallback (false clean line) is gone');
-
-// ── the cases the audit named ────────────────────────────────────────────────
-ok(!hasClean(site({})),
-  'FRS id only (ECHO failed / no env) is NOT a clean record',
-  texts(site({})));
-
-ok(!hasClean(site({ env: { link_type: 'geo_matched' } })),
-  'geo_matched with no epa block is NOT a clean record');
-
-ok(!hasClean(site({ env: { epa: { in_violation: [] } } })),
-  'ECHO answered but tracking unknown is NOT a clean record');
-
-ok(!hasClean(site({
-  env: { epa: { in_violation: [], permit_status: 'Terminated', compliance_tracking_on: false } },
-})),
-  'Terminated / tracking off is NOT a clean record');
-
-ok(!hasClean(site({
-  env: { epa: { in_violation: [], permits: [{ npdes_id: 'TX000', status: 'Denied' }] } },
-})),
-  'CWA-only unknown status (Denied) is NOT a clean record');
-
-ok(!hasClean(site({ tceq_rn: 'RN123', env: { tceq: { programs: ['AIRNSR'] } } })),
-  'TCEQ-only does not invent an EPA clean line');
-
+// ── known: the sentence names the laws and the date ──────────────────────────
 {
-  const s = site({
-    env: { epa: { in_violation: [], permit_status: 'Effective', compliance_tracking_on: true } },
-  });
-  ok(hasClean(s),
-    'tracking ON + no violations IS the clean line',
-    texts(s));
-  ok(texts(s).some((t) => /compliance tracking on/.test(t)),
-    'the clean line names that tracking is on — same words as HS.fac.signals');
+  const t = texts(site({ env: { epa: echo({}) } }));
+  ok(t.length === 1 && t[0] === 'EPA lists no current violation under the Clean Water Act and Clean Air Act (ECHO, checked Nov 9, 2026)',
+    'an ECHO "No Violation Identified" match is the clean line, naming the laws and the date', t);
+  const one = texts(site({ env: { epa: echo({ no_violation: ['RCRA'], current_as_of: '2026-03-02' }) } }));
+  ok(one[0] === 'EPA lists no current violation under the hazardous-waste law (RCRA) (ECHO, checked Mar 2, 2026)',
+    'only the laws ECHO cleared are named', one);
+  const drop = texts(site({ env: { epa: echo({ no_violation: ['CWA', 'RCRA'], compliance_tracking_on: false }) } }));
+  ok(drop[0] && /hazardous-waste law/.test(drop[0]) && !/Clean Water/.test(drop[0]),
+    'a tracking-off CWA permit drops only the Clean Water Act from the sentence', drop);
 }
-
 {
   const s = site({ viol: 2 });
-  ok(texts(s).join(' ').includes('2 recorded violations'),
-    'legacy viol>0 still surfaces as recorded violations',
-    texts(s));
+  ok(texts(s).join(' ').includes('2 recorded violations'), 'legacy viol>0 still surfaces as recorded violations', texts(s));
   ok(!hasClean(s), 'a viol count never also claims a clean record');
 }
 
-{
-  const s = site({
-    env: { epa: { in_violation: ['CWA'], action_year: '2024', permit_status: 'Effective', compliance_tracking_on: true } },
-  });
-  ok(texts(s).some((t) => /open water violation/.test(t)),
-    'an open violation is the headline, not the clean line',
-    texts(s));
-  ok(!hasClean(s), 'open violations suppress the clean line');
-}
-
-// ── parity with the ZIP page for the clean-line decision ─────────────────────
+// ── parity with the ZIP page / dossier (HS.fac.signals) ──────────────────────
 const cases = [
+  { epa: echo({}) },
+  { epa: echo({ no_violation: [] }) },
+  { epa: echo({ current_as_of: null }) },
   { epa: { in_violation: [], permit_status: 'Effective', compliance_tracking_on: true } },
-  { epa: { in_violation: [], permit_status: 'Expired', compliance_tracking_on: true } },
-  { epa: { in_violation: [], permit_status: 'Terminated', compliance_tracking_on: false } },
-  { epa: { in_violation: [], permit_status: 'Pending', compliance_tracking_on: false } },
+  { epa: echo({ no_violation: ['CWA'], compliance_tracking_on: false }) },
+  { epa: echo({ in_violation: ['CAA'] }) },
   { epa: { in_violation: [] } },
-  { epa: { in_violation: ['CAA'], permit_status: 'Effective', compliance_tracking_on: true } },
   {},
 ];
 for (const fenv of cases) {
-  const zipClean = HS.fac.signals(fenv).some((g) => /no recorded EPA violations/i.test(g.text));
+  const zipClean = HS.fac.signals(fenv).some((g) => CLEAN_RE.test(g.text));
   const mapClean = hasClean(site({ env: fenv }));
-  ok(zipClean === mapClean,
-    `parity — ZIP page and Map 1 agree on clean-line for ${JSON.stringify(fenv.epa || {})}`,
-    `zip=${zipClean} map=${mapClean}`);
+  ok(zipClean === mapClean, `parity — ZIP page and Map 1 agree on clean-line for ${JSON.stringify(fenv.epa || {})}`, `zip=${zipClean} map=${mapClean}`);
 }
 
 if (prevWindow === undefined) delete g.window; else g.window = prevWindow;

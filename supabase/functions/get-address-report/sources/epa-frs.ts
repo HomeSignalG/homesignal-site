@@ -182,7 +182,9 @@ export async function frsAt(
     // fall through to JSON.parse and become a schema miss or, before that, a silent zero.
     // 5xx and 429 remain transient (retried); 403/404 remain not-a-zero.
     if (r.status !== 200) {
-      const ra = Number((r as { headers?: { get?: (k: string) => string | null } }).headers?.get?.("retry-after"));
+      // No header is not "0 s" (Number(null) is 0): only a present, numeric Retry-After counts.
+      const raw = (r as { headers?: { get?: (k: string) => string | null } }).headers?.get?.("retry-after");
+      const ra = raw != null && String(raw).trim() !== "" ? Number(raw) : NaN;
       return { ...TRANSIENT, why: String(r.status), ...(Number.isFinite(ra) && ra >= 0 ? { retryAfterS: ra } : {}) };
     }
     const text = await r.text();

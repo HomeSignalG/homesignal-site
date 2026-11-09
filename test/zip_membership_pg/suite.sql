@@ -209,6 +209,33 @@ select 'T6f the read writes nothing: the stored row is byte-identical to what wa
        d.sites = w.sites, null
   from public.development_reports d join _zm_want w on w.zip = d.zip, _zm_cfg c where d.zip = c.zip_with;
 
+-- ── 5. NO COUNT CAP ON THE STORED INVENTORY (2026-11-09). 320 qualifying in-ZIP facilities (a grid inside
+--    the square, clear of the notch) plus 280 outside rows (in the notch) are stored on the ZIP's report;
+--    the read must serve all 320 and count them, with nothing dropped for space and nothing outside served.
+update public.development_reports d set sites = (
+  select jsonb_agg(x) from (
+    select jsonb_build_object('scope','point','label', format('dense %s', i), 'layer','industrial',
+             'registry_id', format('2%011s', i), 'record_url', format('https://example.test/d/%s', i),
+             'lat', (40.02 + (i / 20) * 0.0095)::text, 'lng', (-99.98 + (i % 20) * 0.0075)::text) x
+      from generate_series(0, 319) i
+    union all
+    select jsonb_build_object('scope','point','label', format('notch %s', i), 'layer','industrial',
+             'registry_id', format('3%011s', i), 'record_url', format('https://example.test/o/%s', i),
+             'lat', (40.185 + (i / 28) * 0.003)::text, 'lng', (-99.81 + (i % 28) * 0.0072)::text)
+      from generate_series(0, 279) i) s)
+  from _zm_cfg c where d.zip = c.zip_with;
+create temp table if not exists _zm_dense (j jsonb);
+truncate _zm_dense;
+insert into _zm_dense select public.zip_mode_report_sites(c.zip_with) from _zm_cfg c;
+insert into _zm_result(check_name, pass, detail)
+select 'T7 no count cap: all 320 in-ZIP facilities are served and counted; the 280 outside are not',
+       (select count(*) from jsonb_array_elements(j->'sites') e where e->>'label' like 'dense %') = 320
+   and (select count(distinct e->>'registry_id') from jsonb_array_elements(j->'sites') e where e->>'label' like 'dense %') = 320
+   and not exists (select 1 from jsonb_array_elements(j->'sites') e where e->>'label' like 'notch %')
+   and (j->'facility_counts'->>'member')::int = 320 and (j->'facility_counts'->>'outside')::int = 280,
+       format('served=%s counts=%s', (select count(*) from jsonb_array_elements(j->'sites') e where e->>'scope' = 'point'), j->>'facility_counts')
+  from _zm_dense;
+
 -- A check that evaluates to NULL is a FAILURE, never a silent non-answer (a bool_and over
 -- absent stamps is NULL — measured: that is how the Fix-28-only mutation first slipped a check).
 select check_name, coalesce(pass, false) as pass, detail from _zm_result order by n;

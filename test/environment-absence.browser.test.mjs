@@ -108,6 +108,8 @@ window.supabase = { createClient: function () {
   return { from: function(t){ return q(t); },
            rpc: function(n, a){
              if (n === 'app_projects_for_zip') return Promise.resolve({ data: D['rpc_' + (a && a.p_kind)] || [], error: null });
+             // docs/zip-facility-inventory.sql: a complete boundary inventory holding the one facility row.
+             if (n === 'zip_facility_inventory') return Promise.resolve({ data: { state: 'complete', member_count: (D.rpc_facility || []).length, latest_refresh: 'ok' }, error: null });
              return Promise.resolve({ data: null, error: null }); },
            auth: { getSession: function(){ return Promise.resolve({ data: { session: null } }); },
                    onAuthStateChange: function(){ return { data: { subscription: { unsubscribe: function(){} } } }; } } };

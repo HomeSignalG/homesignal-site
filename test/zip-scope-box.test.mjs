@@ -207,7 +207,10 @@ console.log('\n5) wiring');
   ok(/zipScopeBounds\(supabase, zip\)/.test(zipMode), 'ZIP mode reads the bounds once through zipScopeBounds');
   ok(!/scope_bounds|scopeBounds/.test(idx), 'the request body has NO scope flag at all (public endpoint: callers cannot steer the rollout)');
   ok(/scopePolicy\(\(k\) => Deno\.env\.get\(k\), zip\)/.test(zipMode), 'rollout decided by server env policy (scopePolicy over Deno.env) only');
-  ok(/policy\.on \? await zipScopeBounds\(supabase, zip\) : \{ bounds: null/.test(zipMode), 'policy OFF ⇒ no bounds read, legacy scope, zero extra queries');
+  // 2026-11-09: the boundary box is read once per ZIP request for the EPA facility plane (whole-ZIP
+  // coverage); the PERMIT connectors still receive it only when the rollout policy is on.
+  ok(/const zipGeo = await zipScopeBounds\(supabase, zip\);/.test(zipMode) && /policy\.on \? zipGeo : \{ bounds: null/.test(zipMode),
+    'policy OFF ⇒ permit connectors keep the legacy scope (the one bounds read serves the EPA plane)');
   ok(!/zipBounds/.test(idx.slice(idx.indexOf('── ZIP MODE ──') + 40000)), 'ADDRESS mode never receives zipBounds (the property radius is untouched)');
   const okRpc = (data, error = null) => ({ rpc: async () => ({ data, error }) });
   const r1 = await zb.zipScopeBounds(okRpc([{ xmin: -97.4, ymin: 33.0, xmax: -97.2, ymax: 33.2 }]), '76247');
