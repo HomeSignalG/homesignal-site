@@ -3577,6 +3577,7 @@ Measured on production 2026-09-22, every canonical ZIP, no sampling:
     retrieved (around the ZIP centre). A facility inside a very large ZIP but beyond that
     retrieval is not served — an omission, never a wrong placement. The ZIP community page's
     facility section (`app_projects`) is still radius context and is not Map 1.
+    ⬆️ **Closed for EPA by §7.08a (2026-11-09):** ZIP-mode retrieval now covers the whole boundary.
 - ⚖️ **DEVELOPMENT POINTS IN `development_reports` ARE CANDIDATES, NOT MEMBERS — never drop them
   at the row.** They feed N5 (`n5_expected_input` reads `app_projects`, built from these rows), and
   N5 unions candidates from every report — that is what finds a record inside a large ZIP but
@@ -3595,6 +3596,66 @@ Measured on production 2026-09-22, every canonical ZIP, no sampling:
   inside-far / outside-near / boundary / far points; centroid-radius, national-bypass,
   Type-scoped and facility-bypass mutations must each FAIL it). The earlier 26-check version, which also covered the
   reverted trigger, passed 26/26 against production inside a rolled-back transaction.
+
+## 7.08a ZIP-MODE EPA RETRIEVAL COVERS THE WHOLE ZIP BOUNDARY (2026-11-09) — BUILT, NOT DEPLOYED
+
+Found by the Phoenix 85083 audit. **Not a regression: the EPA plane never had boundary retrieval.** Since #113 (2026-07-04)
+`get-address-report` ZIP mode asked EPA FRS for one 3-mile circle around `development_reports.home_lat/lng` (a pinned ZIP
+centre from the state seeds, never an address), cut rows beyond 3 mi, kept the nearest 40, and only at READ time
+(`zip_mode_report_sites`, #1312) tested them against the ZIP. The polygon-bbox scope (#1794) was wired into the permit
+connectors only and ships OFF (`ZIP_SCOPE_BOUNDS_MODE`); measured 2026-11-09: 200 of 200 recent ZIP responses report every
+connector `"scope":"legacy"`.
+- **Now:** `sources/epa-frs-zip.ts` covers the ZIP's polygon box with FRS circles (a refused circle splits into four, never
+  shrinks in place), every circle must answer or the plane is `ok:false`, rows are de-duplicated by RegistryId, the ZIP
+  polygon (`zip_scope_members`, the same boundary-inclusive predicate Map 1 serves) decides inclusion, and EVERY member is
+  kept. ⛔ **No count cap.** A 250 cap shipped in the first version of this change; it was a guess, not an EPA, storage or
+  display limit, and was removed (founder, 2026-11-09). EPA's own per-ZIP totals for a random 80 of the 2,550 ZIPs stuck
+  at the old 40 cap: 37 over 250, max 1,265 (raw totals, before the name filter and the boundary). No boundary ⇒ `ok:false reason no_boundary` (stored layer
+  kept, count unknown), never a radius. A ZIP request with no point uses the boundary box centre as its anchor.
+  `frs_start_mi` is ignored in ZIP mode. ECHO/CWA enrichment asks around the covering circle (capped at 5 mi).
+  Address mode (`facilitySites(lat, lng, radiusMi)`) is unchanged; the FRS row → site literal is one helper, `frsRowToSite`.
+- **Scope measured 2026-11-09:** 8,108 of 12,038 ZIPs with a boundary have part of it more than 3 mi from the stored point;
+  706 have no boundary. Arizona sample: 2,286 of 4,327 stored facility entries (53%) lie outside their own ZIP.
+- **A complete read is marked; nothing else is.** `counts.facilities_coverage = "zip_boundary_v1"` is sent only when
+  `epa.ok`, `mode zip_boundary` and `complete` (`facilityCoverage`). The collector stores `counts` as sent on an
+  accepted EPA write, so no SQL change was needed. Its absence means "not known to be complete": a radius-era list, a
+  failed read, a ZIP with no boundary. Never infer completeness from a count, `= 40`, or `facilities_refreshed_at`.
+  ⚠️ On a REFUSED write the collector keeps the stored facilities but takes the new `counts` keys, so a later failed
+  read drops the marker (reads as unverified, never as complete). Keeping it there is a collector change.
+  → **APPLIED 2026-11-09 21:07Z: `docs/dev-refresh-collect-facility-inventory.sql`** (one helper
+  `dev_facility_read_untrusted`, verbatim the old `facilities_unavailable` expression; when true, keep the stored
+  facility count AND coverage, hold `facilities_refreshed_at`). Collector md5 `b17263cc…` → `bd775733…`.
+- **What the count may claim — `docs/zip-facility-inventory.sql` (APPLIED 2026-11-09, migration `20261109210857`; live
+  `zip_mode_report_sites` md5 `751f297c…`, collector `bd775733…`; first collector run after, 21:10Z, succeeded).**
+  `public.zip_facility_inventory_state` is the one decision: `complete` (marker, latest refresh ok; 0 = verified
+  empty) · `complete_as_of` (marker, latest refresh failed: complete as of `last_success_at`) · `not_complete` (no
+  marker: radius-era list or no boundary read has ever completed) · `not_measured` (no boundary / no report).
+  `zip_mode_report_sites` (Map 1) gains `facility_inventory`; `zip_facility_inventory(zip)` serves the ZIP page strip.
+  `HS.facilityInventory` (lib/templates.js) presents it: only `complete` prints a plain total; `not_complete` prints
+  "N+ · not a complete count" or a dash; the empty-page "we checked the EPA registry and found nothing" sentence
+  needs a complete zero. An unread inventory is never a total. Reports carry no EPA facilities (development only).
+  Applied in that order; PR #2736 merged after (`9e992121`). Until `get-address-report` is deployed, no ZIP carries the
+  marker, so every ZIP reads `not_complete` (measured 2026-11-09 on 85083, 84302, 78617; 01004 `not_measured`). Proof: `test/dev_collect_inventory_pg` (engine response → live
+  collector → reader; production's code fails exactly the 3 defect cases first), `facility-inventory-suite.yml`.
+- **Termination:** a circle answering ≥ 1,000 rows (`FRS_TILE_ROW_CEILING`, the largest answer seen) is split; full at
+  the 0.25 mi floor ⇒ `saturated`, refused there ⇒ `process_limit`, more than 64 requests ⇒ `request_limit`, past the
+  45 s overlay deadline ⇒ `deadline`. All four are `ok:false` with no rows.
+- **Retries always wait** (2 s, then 5 s, or the full Retry-After when longer; a Retry-After that does not fit in the remaining 45 s stops the read as `deadline`), with or without a deadline; each
+  attempt counts toward the 64. `frsAt` no longer reads a missing Retry-After header as 0 s (it did, for both modes).
+  ⚠️ Address mode's ladder (`frsFacilities`, epa-frs.ts) still caps Retry-After at 10 s (`FRS_RETRY_AFTER_CAP_MS`);
+  unchanged here.
+- **"No violations" needs EPA's own answer (2026-11-09).** `interpretEcho` stores `env.epa.no_violation`, the
+  statutes ECHO lists as "No Violation Identified" for that facility. `HS.fac.noViolationLine` (lib/templates.js) is
+  the one rule, used by Map 1 and the ZIP/facility pages: it needs `current_as_of`, a non-empty `no_violation`,
+  nothing in violation, no SNC, no non-compliant quarters, and drops CWA when its permit is not tracked. It names the
+  laws and the date. A permit status or tracking flag alone, a missing/failed/capped/out-of-range ECHO lookup, or a
+  statute ECHO left blank / "Not Applicable" / "Terminated Permit" is UNKNOWN: no sentence. Measured before: a 3%
+  sample had 5 facilities showing the old line, 4 with no ECHO compliance match. Stored lists without
+  `no_violation` show no clean line until their next refresh. Test: `test/map1-epa-clean-record.test.mjs`.
+- **Still radius-based and NOT part of this change:** the permit connectors while `ZIP_SCOPE_BOUNDS_MODE` is off (their own
+  runbook, `docs/zip-scope-bounds-runbook.md`, gates enabling it).
+- Tests: `test/epa-zip-boundary.test.mjs`, `epa-zip-boundary.handler.test.ts` (real FRS answers saved 2026-11-09,
+  `test/fixtures/epa-zip-boundary/`).
 
 ## 7.11 THE CANONICAL DEVELOPMENT TYPE LIVES IN `lib/project-type.js` — ONE CLASSIFIER, NO MAP RUNTIME (2026-09-24)
 

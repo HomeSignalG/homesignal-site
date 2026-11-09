@@ -30,8 +30,13 @@ if (!/FAC_UNAVAILABLE\s*=\s*ZIP_MODE\s*&&\s*!!data\.facUnavailable/.test(src)) {
 // NOTE stays keyed on FAC_UNAVAILABLE alone, pinned above.)
 // (2026-10-23: a stored count above zero, confirmed on the day the facility clock holds, shows
 // with that date instead — HS.facilityCount, pinned behaviourally at the end of this file.)
-if (!/\$\("cFac"\)\.textContent\s*=\s*FAC_CONFIRMED_ON \? _facN\s*:\s*\(FAC_UNAVAILABLE \|\| FAC_UNMEASURED\)\s*\?\s*"\\u2014"/.test(src)) {
+// (2026-11-09: in ZIP mode the tile is the facility INVENTORY's answer first — HS.facilityInventory, from the state
+// docs/zip-facility-inventory.sql decides — and the outage logic below stays for address mode and an unread state.)
+if (!/\$\("cFac"\)\.textContent\s*=\s*FAC_INVENTORY \? FAC_INVENTORY\.tile\s*:\s*FAC_CONFIRMED_ON \? _facN\s*:\s*\(FAC_UNAVAILABLE \|\| FAC_UNMEASURED\)\s*\?\s*"\\u2014"/.test(src)) {
   failures.push('#cFac does not render an em-dash when the EPA read failed and no confirmed count exists');
+}
+if (!/FAC_INVENTORY = \(ZIP_MODE && !FAC_UNMEASURED && HS\.facilityInventory\)/.test(src)) {
+  failures.push('Map 1 ZIP mode does not present the facility count through HS.facilityInventory');
 }
 if (!/facConfirmedAt\s*:\s*row\.facilities_refreshed_at/.test(src)
     || !/select=[^"]*facilities_refreshed_at/.test(src)) {

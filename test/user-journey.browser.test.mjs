@@ -86,6 +86,8 @@ ZIP_AUTH['84334'] = { zip: '84334', mode: 'development', status: 'boundary_compl
   projects: [], markers: [] };
 const ZIP_ROW = {
   '78617': [{ zip: '78617', home_lat: 30.1745, home_lng: -97.6134, counts: { facilities: 1 },
+    // A complete boundary inventory (docs/zip-facility-inventory.sql): the counter prints a plain total.
+    facility_inventory: { state: 'complete', coverage: 'zip_boundary_v1', latest_refresh: 'ok', member_count: 1 },
     refreshed_at: '2026-09-01T00:00:00Z', paywall: false, facilities_unavailable: false,
     sites: [{ scope: 'point', label: 'ZIP FACILITY', registry_id: '110000555555',
               url: 'https://echo.epa.gov/y', lat: 30.1750, lng: -97.6140, e: 0.05, n: 0.03 }] }],
@@ -564,8 +566,13 @@ await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeo
 await page.waitForTimeout(700);
 c = await chrome();
 info('facilities-only ZIP 84334', { covNote: c.covNote, kFac: c.kFac });
-ok(/Nearby EPA-registered facilities are shown for additional local context/i.test(c.covNote || ''),
-  '11a the facilities-only note is the truthful contextual wording', c.covNote);
+// 84334's reply carries no facility_inventory, which is what production sends until
+// docs/zip-facility-inventory.sql is applied, so the count is not presented as a complete total.
+const zc84334 = await page.evaluate(() => (document.getElementById('cFac')||{}).textContent);
+ok(/^Not a complete count: these are the EPA-registered facilities found inside this ZIP so far\./.test(c.covNote || ''),
+  '11a the note says the facility count is not complete', c.covNote);
+ok(/not a complete count$/i.test((c.kFac || '').trim()) && /^\d+\+$/.test((zc84334 || '').trim()),
+  '11a2 ...and the counter shows N+, labelled not a complete count', { kFac: c.kFac, fac: zc84334 });
 ok(!/Showing EPA-registered facilities for this ZIP/i.test(c.covNote || ''),
   '11b the false whole-ZIP sentence is gone', c.covNote);
 ok(!WHOLE_ZIP_FACILITY_CLAIM.test(c.covNote || ''),
