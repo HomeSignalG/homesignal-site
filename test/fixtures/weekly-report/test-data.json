@@ -1,0 +1,36 @@
+{
+ "schema": "weekly-candidates/0.2",
+ "run": "TEST-RUN-1",
+ "_note": "TEST DATA — not real discovery output. Hand-written for test/weekly-report.browser.test.mjs; every place, source and picture here is made up.",
+ "stories": [
+  {
+   "schema": "weekly-candidates/0.2",
+   "story": "t-rezone",
+   "title": "TEST: County weighs a data center rezoning",
+   "needs": [
+    {
+     "id": "n1", "need": "farmland near the site", "background_only": false, "considered": 3, "not_found": null,
+     "shown": [
+      {"id": "aaa111aaa111", "class": "B", "title": "TEST farmland photo", "description": "TEST fields by a county road",
+       "source": "TEST Commons", "page_url": "https://example.test/file/aaa", "rights": "available",
+       "rights_evidence": "TEST: CC BY 4.0 stated on the file page", "credit": "TEST Photographer, CC BY 4.0",
+       "original_w": 4000, "original_h": 2250, "review": []},
+      {"id": "bbb222bbb222", "class": "C", "title": "TEST water tower <img src=x onerror=alert(1)>", "description": "TEST tower",
+       "source": "TEST Openverse", "page_url": "javascript:alert(1)", "rights": "needs_confirmation",
+       "rights_evidence": "TEST: licence field empty", "credit": null, "original_w": null, "original_h": null,
+       "review": ["location not stated by the source"]}
+     ]
+    },
+    {"id": "n2", "need": "a hearing room", "background_only": false, "considered": 0,
+     "not_found": "TEST: no picture matched", "shown": []}
+   ],
+   "story_pages": [
+    {"page": "https://example.test/news/article", "note": "TEST",
+     "lead_image": {"id": "ccc333ccc333", "class": "A", "title": "TEST publisher lead image", "image_alt": "TEST alt",
+      "site_name": "TEST News", "rights": "terms_not_reviewed", "rights_evidence": "TEST: terms page not read",
+      "review": [], "original_w": 1200, "original_h": 800}}
+   ],
+   "errors": ["TEST openverse: HTTP 503"]
+  }
+ ]
+}
