@@ -56,6 +56,11 @@ begin
       ('public.hs_video_youtube_url_set(text,text)',
        $o$foreach k in array array['final', 'short1', 'short2'] loop$o$,
        $n$foreach k in array array['final', 'short1', 'short2', 'thumbnail'] loop$n$),
+      -- added 2026-11-10: a main video the channel sync links released only the three video items, so a thumbnail
+      -- approved before its YouTube link existed stayed held for missing_youtube_url (EPA methane hearing, Nov 9).
+      ('public.video_youtube_link_attach(text)',
+       $o$foreach k in array array['final', 'short1', 'short2'] loop$o$,
+       $n$foreach k in array array['final', 'short1', 'short2', 'thumbnail'] loop$n$),
       ('public.hs_video_jobs_list()',
        $o$(values ('final', 1), ('short1', 2), ('short2', 3)) as k(key, ord)$o$,
        $n$(values ('final', 1), ('short1', 2), ('short2', 3), ('thumbnail', 4)) as k(key, ord)$n$),
@@ -64,6 +69,9 @@ begin
        $n$if p_key in ('final', 'short1', 'short2', 'thumbnail') and to_regprocedure('public.video_bsky_sync(text,text)') is not null then$n$)
     ) v(fn, old_s, new_s)
   loop
+    if to_regprocedure(s.fn) is null and s.fn = 'public.video_youtube_link_attach(text)' then
+      continue;   -- belongs to docs/youtube-channel-sync.sql; a database without the channel sync has nothing to release
+    end if;
     if to_regprocedure(s.fn) is null then
       raise exception 'video-bluesky-thumbnail: % does not exist', s.fn;
     end if;
@@ -97,6 +105,11 @@ begin
                        'public.hs_youtube_video_file_decide(text,text,text,text)'::regprocedure)
          and position('''thumbnail''' in p.prosrc) > 0) <> 7 then
     raise exception 'video-bluesky-thumbnail: not every item list names the thumbnail';
+  end if;
+  if to_regprocedure('public.video_youtube_link_attach(text)') is not null
+     and position('''thumbnail''' in (select prosrc from pg_proc
+           where oid = to_regprocedure('public.video_youtube_link_attach(text)'))) = 0 then
+    raise exception 'video-bluesky-thumbnail: the channel sync does not release a held thumbnail';
   end if;
   if pg_get_constraintdef((select oid from pg_constraint where conrelid = 'public.video_bluesky_jobs'::regclass
                             and conname = 'video_bluesky_jobs_file_key_check')) not like '%thumbnail%' then
