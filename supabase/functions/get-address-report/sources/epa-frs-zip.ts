@@ -80,11 +80,27 @@ export interface ZipFrsOutcome {
   cover_radius_mi: number;
   /** rows returned before de-duplication across overlapping circles */
   raw_rows: number;
-  /** DIAGNOSTIC ONLY: thrown-error details for failed attempts, at most DIAG_MAX, never read by a decision. */
+  /** DIAGNOSTIC ONLY: fixed-value details of thrown errors, at most DIAG_MAX entries and DIAG_MAX_BYTES bytes; never read by a decision. */
   diag?: ZipFrsDiag[];
 }
 export type ZipFrsDiag = FrsErrorDiag & { attempt: number; since_prev_ms: number | null };
+/** At most this many entries per ZIP read; later thrown errors are not recorded (their attempt numbers show the gap). */
 export const DIAG_MAX = 8;
+/** The diag array, serialized as JSON and encoded as UTF-8, never exceeds this many bytes. Enforced, not estimated. */
+export const DIAG_MAX_BYTES = 1024;
+const utf8 = new TextEncoder();
+/** UTF-8 byte length of a value's JSON serialization (what the response body and the database actually store). */
+export function jsonBytes(v: unknown): number { return utf8.encode(JSON.stringify(v)).length; }
+/**
+ * Append an entry only if the array stays within DIAG_MAX entries and DIAG_MAX_BYTES bytes once serialized.
+ * Returns whether it was kept. Pure: decides nothing else.
+ */
+export function pushDiag(list: ZipFrsDiag[], entry: ZipFrsDiag): boolean {
+  if (list.length >= DIAG_MAX) return false;
+  if (jsonBytes([...list, entry]) > DIAG_MAX_BYTES) return false;
+  list.push(entry);
+  return true;
+}
 
 export interface ZipFrsOptions {
   deadlineAt?: number;
@@ -165,9 +181,7 @@ export async function frsZipCoverage(
       // Diagnostic timing reads its own clock, never opts.now: an injected clock sees exactly the reads it saw before.
       const started = Date.now();
       const a = await frsAt(c.lat, c.lng, c.radiusMi, fetchImpl, timeoutMs);
-      if (a.diag && diag.length < DIAG_MAX) {
-        diag.push({ ...a.diag, attempt: attempts, since_prev_ms: lastEnd === null ? null : Math.round(started - lastEnd) });
-      }
+      if (a.diag) pushDiag(diag, { ...a.diag, attempt: attempts, since_prev_ms: lastEnd === null ? null : Math.round(started - lastEnd) });
       lastEnd = Date.now();
       if (a.ok || a.tooBig) { answered = a; break; }
       failures.push(`${c.radiusMi}:${a.schema ? "schema" : a.why ?? "unknown"}`);
