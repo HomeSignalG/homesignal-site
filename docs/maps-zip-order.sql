@@ -20,7 +20,24 @@
 --
 -- Idempotent and executable; replaying it reproduces the intended state. RLS on, anon revoked,
 -- founder-only, exactly like the Data Center list.
+--
+-- ⛔ SUPERSEDED FOR hs_set_maps_zip_order (2026-11-09). The definition of that function below is
+-- the OLD one. The live one also appends every development-alert subscriber's ZIP after the
+-- founder's list: docs/maps-zip-order-subscriber-zips.sql. Replaying this file over it would
+-- silently drop that rule, so this file now runs as ONE transaction and REFUSES (changing
+-- nothing) when public.maps_zip_order_sync_subscribers() exists. On a fresh database it applies
+-- as before; apply docs/maps-zip-order-subscriber-zips.sql after it.
 -- ============================================================================
+
+begin;
+
+do $guard$
+begin
+  if to_regprocedure('public.maps_zip_order_sync_subscribers()') is not null then
+    raise exception 'docs/maps-zip-order.sql is superseded here: it would replace hs_set_maps_zip_order with the version that drops subscriber ZIPs. Nothing was changed. The live definition is docs/maps-zip-order-subscriber-zips.sql.';
+  end if;
+end
+$guard$;
 
 create table if not exists public.maps_zip_order (
   founder_position integer not null,
@@ -298,3 +315,4 @@ revoke all on function public.hs_maps_generation_status() from public, anon;
 grant execute on function public.hs_request_maps_generation() to authenticated;
 grant execute on function public.hs_maps_generation_status() to authenticated;
 
+commit;

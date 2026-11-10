@@ -148,14 +148,18 @@
   .search-err{font-size:12.5px;color:var(--violation);margin-top:6px}
 
   /* "What is changing in my zip code?" — the email sign-up for this ZIP's Bluesky MAPS
-     posts (founder, 2026-09-25). ZIP mode only: an address search is about a home, not a
-     ZIP, and zipmode is the class the page already uses to say which one it is showing.
+     posts (founder, 2026-09-25). ZIP mode shows it for the ZIP on screen. An address search
+     shows it too, for the ZIP the address is in (body.addrzip, set only once the geocoder has
+     named a ZIP that has a ZIP page; founder 2026-11-09: "even if they add an address we need
+     to add their zip code"), with a line saying which ZIP that is.
      It lives inside .head, so the Place-page embed hides it with the rest of the hero. */
   /* No width cap: the consent line (~660px at 12.5px) fits on ONE line on desktop (founder,
      2026-09-26). The old 640px cap wrapped "anytime." onto a second line. It still wraps
      where the screen is narrower than the sentence, so a phone never scrolls sideways. */
   .zip-email{display:none;margin:16px 0 4px}
-  body.zipmode .zip-email{display:block}
+  body.zipmode .zip-email,body.addrzip .zip-email{display:block}
+  .zip-email-for{font-size:13.5px;color:var(--ink);margin:0 0 8px}
+  .zip-email-for:empty{display:none}
   .zip-email-btn{min-height:44px;padding:11px 18px;border:0;border-radius:11px;
     background:var(--green);color:#fff;font-family:var(--font);font-size:15px;font-weight:700;
     cursor:pointer}
@@ -769,6 +773,7 @@
            The note is filled from HS.MAPS_CONSENT_COPY, the SAME string the sign-up records
            as its consent audit trail, so what is shown is what is stored. -->
       <div class="zip-email" id="zipEmail" data-zip="">
+        <div class="zip-email-for" id="zipEmailFor"></div>
         <button type="button" class="zip-email-btn" id="zipEmailBtn">Sign up for emails on what is changing in this zip code</button>
         <div class="zip-email-note" id="zipEmailNote"></div>
         <div class="zip-email-msg" id="zipEmailMsg" role="status" aria-live="polite"></div>
@@ -2305,6 +2310,7 @@ HS.onReady(function(){
     // the old ZIP's outline until the geocoder says which ZIP this address is in.
     if(ZIP_MODE || address !== CUR_ADDRESS) paintZipBoundary(null);
     ZIP_MODE = false; HOME_ANCHOR = false; ZIP_FRAME = null;
+    document.body.classList.remove("addrzip");     // offered again once the geocoder names this address's ZIP
     // ...and it leaves the ZIP PLACE with it. This is the only in-page Place transition in
     // the app (every other navigation is a full document load, which resets the declaration
     // to nothing), so a ZIP declared at boot must be retired HERE or it would outlive the
@@ -2373,6 +2379,8 @@ HS.onReady(function(){
       }
       // The searched address's ZIP gets its outline on every view (the geocoder's own ZIP).
       if(m.zip && String(m.zip).slice(0,5) !== BOUNDARY_ZIP) paintZipBoundary(String(m.zip).slice(0,5));
+      // ...and the development-email sign-up for that ZIP (founder, 2026-11-09).
+      offerZipEmailForAddress(m.zip ? String(m.zip).slice(0,5) : null, token);
       // HOME is the geocoder's exact returned point, used verbatim as the RPC input.
       var home = { lat: m.lat, lng: m.lng };
       paintMap1PlaceHeading('address', m.matchedAddress || address);
@@ -2498,10 +2506,11 @@ HS.onReady(function(){
     btn.classList.toggle("on", !!on);
     btn.textContent = on ? "✓ You're signed up" : ZIP_EMAIL_LABEL;
   }
-  function paintZipEmail(zip){
+  function paintZipEmail(zip, forLine){
     var box = $("zipEmail"), btn = $("zipEmailBtn"), note = $("zipEmailNote"), msg = $("zipEmailMsg");
     if(!box || !btn || !window.HS || !HS.mapsZipEmailSignup) return;
     box.dataset.zip = zip;
+    if($("zipEmailFor")) $("zipEmailFor").textContent = forLine || "";
     if(note) note.textContent = HS.MAPS_CONSENT_COPY || "";
     if(msg) msg.textContent = "";
     setZipEmailSubscribed(false);
@@ -2527,8 +2536,22 @@ HS.onReady(function(){
     }
   }
 
+  // An address search offers the same sign-up for the ZIP the address is in. Shown only once
+  // the geocoder has named a 5-digit ZIP that has its own ZIP page (HS.data.zipCommunity, the
+  // same lookup the sign-up files on), and only if the page is still on this search (`token`).
+  function offerZipEmailForAddress(zip, token){
+    document.body.classList.remove("addrzip");
+    if(!/^\d{5}$/.test(zip || "") || !window.HS || !HS.data || typeof HS.data.zipCommunity !== "function") return;
+    Promise.resolve(HS.data.zipCommunity(zip)).then(function(zc){
+      if(!zc || !currentReq(token) || ZIP_MODE) return;
+      paintZipEmail(zip, "This address is in ZIP " + zip + ".");
+      document.body.classList.add("addrzip");
+    }, function(){ /* no ZIP page known: no sign-up offered for this address */ });
+  }
+
   function loadZip(zip){
     ZIP_MODE = true; ZIP_CODE = zip; HOME_ANCHOR = true;
+    document.body.classList.remove("addrzip");
     // HOME_ANCHOR is TRUE here and does NOT mean "there is a home" - it means area items
     // anchor at the report centroid. There is no geocoded HOME on a ZIP page, so the
     // HOME-specific control stays hidden.

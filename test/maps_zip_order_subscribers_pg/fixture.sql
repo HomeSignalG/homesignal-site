@@ -1,5 +1,5 @@
 -- Minimal live shape for docs/maps-zip-order-subscriber-zips.sql (read from production
--- 2026-11-09): communities, users, user_subscriptions, the canonical resolver view
+-- 2026-11-09; suite.sql S00 checks the view and the list table against production's fingerprints): communities, users, user_subscriptions, the canonical resolver view
 -- alert_subscription_state (pg_get_viewdef, verbatim logic), maps_zip_order, auth.jwt().
 do $$ begin
   if not exists (select 1 from pg_roles where rolname='anon') then create role anon; end if;
@@ -21,8 +21,10 @@ create view public.alert_subscription_state with (security_invoker = true) as
           and (s.origin = 'explicit')) as subscribed, s.sort_order
   from public.users u join public.user_subscriptions s
     on s.user_id = u.id and s.community_id = u.community_id;
-create table public.maps_zip_order (founder_position integer primary key, zip text not null unique,
+create table public.maps_zip_order (founder_position integer not null constraint maps_zip_order_pkey primary key, zip text not null,
   uploaded_at timestamptz not null default now(),
+  constraint maps_zip_order_position_positive check (founder_position >= 1),
+  constraint maps_zip_order_zip_unique unique (zip),
   constraint maps_zip_order_zip_format check (zip ~ '^[0-9]{5}$'));
 insert into public.communities (id, level, zip_codes) values
  ('00000000-0000-0000-0000-000000085083','zip','{85083}'),

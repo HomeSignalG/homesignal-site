@@ -1,5 +1,15 @@
 -- Each line: <id>|<t/f>. t = pass.
 \set ON_ERROR_STOP 1
+-- S00: the fixture IS production for what the rule reads (fingerprints read from production 2026-11-09).
+select 'S00a the resolver view is production''s (viewdef md5 df44a9bd...)|' ||
+  (md5(pg_get_viewdef('public.alert_subscription_state'::regclass, true)) = 'df44a9bdfdb7d4e03f747e98c645f769')::text;
+select 'S00b the list table has production''s columns and constraints|' ||
+  ((select string_agg(attname||':'||format_type(atttypid,atttypmod), ',' order by attnum) from pg_attribute
+     where attrelid='public.maps_zip_order'::regclass and attnum>0 and not attisdropped)
+    = 'founder_position:integer,zip:text,uploaded_at:timestamp with time zone'
+   and (select string_agg(conname||'='||pg_get_constraintdef(oid), ' ; ' order by conname collate "C") from pg_constraint
+     where conrelid='public.maps_zip_order'::regclass)
+    = 'maps_zip_order_pkey=PRIMARY KEY (founder_position) ; maps_zip_order_position_positive=CHECK ((founder_position >= 1)) ; maps_zip_order_zip_format=CHECK ((zip ~ ''^[0-9]{5}$''::text)) ; maps_zip_order_zip_unique=UNIQUE (zip)')::text;
 select 'S01 backfill added the active subscriber 97702 at the end|' ||
   ((select founder_position from maps_zip_order where zip='97702') = 3)::text;
 select 'S02 unsubscribed 84336 not added|' || (not exists (select 1 from maps_zip_order where zip='84336'))::text;

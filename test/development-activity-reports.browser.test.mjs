@@ -989,7 +989,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   const popState = () => page.evaluate(() => ({ open: !document.getElementById('share-pop').hidden, body: !document.getElementById('share-pop-body').hidden, link: document.getElementById('share-pop-link').value,
     focus: document.activeElement && document.activeElement.id, role: document.getElementById('share-pop').getAttribute('role'), modal: document.getElementById('share-pop').getAttribute('aria-modal'),
     msg: document.getElementById('share-pop-msg').textContent, msgErr: document.getElementById('share-pop-msg').classList.contains('err'), note: document.getElementById('share-pop-note').textContent,
-    hrefs: [...document.querySelectorAll('#share-pop a')].map((a) => a.getAttribute('href')), html: document.getElementById('share-pop').innerHTML, native: !document.getElementById('share-pop-native').hidden,
+    hrefs: [...document.querySelectorAll('#share-pop-grid a')].map((a) => a.getAttribute('href')), html: document.getElementById('share-pop').innerHTML, icons: [...document.querySelectorAll('#share-pop-grid .sopt')].map((b) => b.textContent.trim()),
     opener: document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute('data-da-action') }));
   const addrTyped = await page.$eval('#addr', (e) => e.value);
   const c0 = createCount();
@@ -1000,10 +1000,10 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
     '9o the report\'s Share button opens a popup that made ONE client link and shows it, with focus on Copy', { c0, now: createCount(), pop: { ...pop, html: undefined } });
   const lastCreate = shareCalls.filter((c) => c.body.action === 'create').pop();
   ok(Object.keys(lastCreate.body).sort().join() === 'action,report_id', '9o2 the popup\'s create request names the report and nothing else (no address, no label)');
-  const decoded = pop.hrefs.map((h) => decodeURIComponent((h.split('body=')[1] || h.split('text=')[1] || '')));
-  ok(pop.hrefs.length === 3 && /^sms:/.test(pop.hrefs[0]) && /^mailto:/.test(pop.hrefs[1]) && /^https:\/\/wa\.me\//.test(pop.hrefs[2]) && decoded.every((d) => d.indexOf(pop.link) > -1),
-    '9o3 it offers Text message, Email and WhatsApp, each carrying the same client link', pop.hrefs);
-  ok(!/facebook|twitter|reddit|linkedin|bsky|nextdoor/i.test(pop.html + pop.hrefs.join(' ')) && !decoded.join(' ').includes(addrTyped.split(',')[0]), '9o4 no public network is offered, and the message names no street address');
+  const siteTargets = await page.evaluate(() => window.HS.SHARE_TARGETS.map((t) => t.ic + t.t));
+  ok(pop.icons.length === 12 && pop.icons.join('|') === siteTargets.join('|'), '9o3 the popup shows the site\'s own 12 Share icons, in the site\'s order', pop.icons);
+  ok(pop.hrefs.length === 10 && pop.hrefs.every((h) => h.includes(encodeURIComponent(pop.link))) && !pop.hrefs.join(' ').includes(encodeURIComponent(addrTyped.split(',')[0])),
+    '9o4 every icon link carries the same client link, and the message names no street address', pop.hrefs);
   ok(/Anyone who has it can read this report/.test(pop.note) && /only this once/.test(pop.note), '9o5 the popup says anyone with the link can read the report and that the link is shown once', pop.note);
   // copy
   await page.evaluate(() => { window.__copied = null; Object.defineProperty(navigator, 'clipboard', { value: { writeText: (t) => { window.__copied = t; return Promise.resolve(); } }, configurable: true }); });
@@ -1022,14 +1022,11 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   await page.click('.da-rv-act[data-da-action="share"]');
   const again = await popState();
   ok(again.open && again.body && again.link === pop.link && createCount() === c0 + 1, '9o9 pressing Share again shows the same link and makes no second one', { c0, now: createCount() });
-  // the phone's own share sheet is offered only where the browser has one
-  ok(again.native === false, '9o10 without a share sheet in the browser the Share\u2026 button is not offered');
-  await page.keyboard.press('Escape');
-  await page.evaluate(() => { window.__shared = null; navigator.share = function (d) { window.__shared = d; return Promise.resolve(); }; });
-  await page.click('.da-rv-act[data-da-action="share"]');
-  await page.click('#share-pop-native');
-  const shared = await page.evaluate(() => window.__shared);
-  ok(shared && shared.url === pop.link && !JSON.stringify(shared).includes(addrTyped.split(',')[0]) && (await popState()).native, '9o11 with a share sheet in the browser, Share\u2026 hands it the client link and no address');
+  // the grid's Copy link icon copies the client link too
+  await page.evaluate(() => { window.__copied = null; });
+  await page.click('#share-pop-grid [data-hs-copy]');
+  await page.waitForFunction(() => window.__copied, null, { timeout: 4000 }).catch(() => {});
+  ok(again.open && (await page.evaluate(() => window.__copied)) === pop.link, '9o10 the Copy link icon copies exactly the client link');
   // Close button and a click on the dimmed background both close it
   await page.click('#share-pop-close');
   const closed = await popState();
@@ -1135,7 +1132,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   await page.waitForFunction(() => !document.getElementById('share-pop-body').hidden, null, { timeout: 8000 }).catch(() => {});
   const ph = await page.evaluate(() => {
     const box = document.querySelector('#share-pop .box').getBoundingClientRect();
-    const ctl = [...document.querySelectorAll('#share-pop button, #share-pop a.go')].filter((e) => e.getClientRects().length).map((e) => { const r = e.getBoundingClientRect(); return { id: e.id, h: Math.round(r.height), inside: r.left >= -0.5 && r.right <= innerWidth + 0.5 }; });
+    const ctl = [...document.querySelectorAll('#share-pop button, #share-pop a.go, #share-pop a.sopt')].filter((e) => e.getClientRects().length).map((e) => { const r = e.getBoundingClientRect(); return { id: e.id, h: Math.round(r.height), inside: r.left >= -0.5 && r.right <= innerWidth + 0.5 }; });
     return { box: { l: Math.round(box.left), r: Math.round(box.right), t: Math.round(box.top), b: Math.round(box.bottom) }, vw: innerWidth, vh: innerHeight, ctl, side: document.documentElement.scrollWidth - document.documentElement.clientWidth };
   });
   ok(ph.box.l >= 0 && ph.box.r <= ph.vw + 0.5 && ph.box.t >= 0 && ph.box.b <= ph.vh + 0.5 && ph.box.b >= ph.vh - 2 && ph.side <= 0 && ph.ctl.length >= 5 && ph.ctl.every((c) => c.inside && c.h >= 40),
