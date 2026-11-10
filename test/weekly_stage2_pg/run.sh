@@ -44,7 +44,7 @@ MUT=(
  "rubric-total-ungated|s.replace(\"  if total < 21 then probs := probs || ('total ' || total || '/28 is below 21'); end if;\n\",\"\")"
  "rubric-factual-3-ok|s.replace(\"if (p_rubric ->> 'factual_discipline')::integer <> 4 then\",\"if (p_rubric ->> 'factual_discipline')::integer < 3 then\")"
  "rubric-hook-ungated|s.replace(\"foreach k in array array['hook_conflict', 'emotional_force', 'argument_coherence'] loop\",\"foreach k in array array['emotional_force', 'argument_coherence'] loop\")"
- "approval-not-version-bound|s.replace(\"approved := exists (select 1 from public.weekly_script_approvals a where a.script_id = v.id and a.body_sha256 = v.body_sha256);\",\"approved := exists (select 1 from public.weekly_script_approvals a join public.weekly_scripts x on x.id = a.script_id where x.stage = v.stage and x.topic = v.topic);\")"
+ "approval-not-version-bound|s.replace(\"approved := exists (select 1 from public.weekly_script_approvals a where a.script_id = v.id and a.body_sha256 = v.body_sha256\n\",\"approved := exists (select 1 from public.weekly_script_approvals a join public.weekly_scripts x on x.id = a.script_id where x.stage = v.stage and x.topic = v.topic\n\")"
  "superseded-approvable|s.replace(\"  if (st ->> 'superseded')::boolean then raise exception 'a newer version exists; review that one' using errcode = '22023'; end if;\n  if (st ->> 'outdated')\",\"  if (st ->> 'outdated')\")"
  "dependency-change-ignored|s.replace(\"    if (d ->> 'superseded')::boolean then outdated := true;\",\"    if false then outdated := true;\")"
  "selection-change-ignored|s.replace(\"if sel is distinct from v.selected_index then outdated := true;\",\"if false then outdated := true;\")"
@@ -55,6 +55,13 @@ MUT=(
  "rewrite-overwrites-original|s.replace(\"    update public.weekly_corrections set after_text = newtext, result_script_id = sid where id = (r.input ->> 'review_id')::uuid;\",\"    update public.weekly_corrections set after_text = newtext, result_script_id = sid where id = (r.input ->> 'review_id')::uuid;\n    update public.weekly_scripts set body = p_payload -> 'body' where id = (r.input ->> 'parent_id')::uuid;\")"
  "contradiction-without-findings|s.replace(\"  constraint weekly_corrections_contradicted_ck check (decision <> 'quote_contradicted' or cardinality(finding_ids) > 0)\",\"  constraint weekly_corrections_contradicted_ck check (true)\")"
  "review-refilled|s.replace(\"  if old.decision <> 'rewrite' or old.result_script_id is not null or\",\"  if old.decision <> 'rewrite' or\")"
+ "title-editorial-grants-evidence|s.replace(\"    when exists (select 1 from public.weekly_script_approvals a where a.script_id = v.id and a.body_sha256 = v.body_sha256\n                 and a.approval_kind = 'evidence') then 'cleared'\",\"    when exists (select 1 from public.weekly_script_approvals a where a.script_id = v.id and a.body_sha256 = v.body_sha256) then 'cleared'\")"
+ "title-publication-without-evidence|s.replace(\"  if st ->> 'evidence_review' <> 'cleared' then raise exception 'the evidence review is not cleared' using errcode = '22023'; end if;\n\",\"\")"
+ "title-check-any-text|s.replace(\"  if p_body_sha256 is distinct from (select body_sha256 from public.weekly_scripts where id = (r.input ->> 'version_id')::uuid) then\",\"  if false then\")"
+ "title-approval-not-version-bound|s.replace(\"  select a.selected_index into sel from public.weekly_script_approvals a where a.script_id = v.id and a.body_sha256 = v.body_sha256\n    and a.approval_kind = 'editorial' order by a.approved_at desc, a.id desc limit 1;\n  ev := case\",\"  select a.selected_index into sel from public.weekly_script_approvals a join public.weekly_scripts x on x.id = a.script_id where x.stage = 'title'\n    and a.approval_kind = 'editorial' order by a.approved_at desc, a.id desc limit 1;\n  ev := case\")"
+ "title-outdated-ignored|s.replace(\"    if (st ->> 'outdated')::boolean then raise exception 'outdated: %; check the title against the new script'\",\"    if false then raise exception 'outdated: %; check the title against the new script'\")"
+ "title-concerns-ignored|s.replace(\"    when exists (select 1 from public.weekly_corrections x where x.script_id = v.id and x.decision = 'material_issue') then 'concerns_open'\n\",\"\")"
+ "title-profile-unscoped|s.replace(\"  if not exists (select 1 from public.weekly_editorial_profiles where id = p_profile and scope = 'title') then\",\"  if not exists (select 1 from public.weekly_editorial_profiles where id = p_profile) then\")"
 )
 bad=0
 for m in "${MUT[@]}"; do

@@ -70,6 +70,25 @@ const bot = await T('.ws-bottom');
 ok(bot.includes('Put the conflict first.') && bot.includes('For several years') && bot.includes('Under an EPA proposal') && bot.includes('lesson reusable'), '4i bottom: before and after with the reason, findings and lesson scope');
 ok(bot.includes('Superseded by a newer version') && bot.includes('Not approved') && bot.includes('No decision on this version.'), '4j version history: the new version needs its own approval');
 ok(bot.includes('Audience outcomes: not collected') && bot.includes('No virality or improvement is claimed'), '4k measurement kept apart; no audience or virality claim');
+// title section
+const tsec = await T('#ws-title');
+ok((await T('.ws-title-text')) === '$45B Gift to Oil\u2014At Your Expense', 'T1 the approved title renders exactly, punctuation included');
+ok(tsec.includes('Wording: approved (this version)') && tsec.includes('Fixture approval (a test identity on a disposable database). Not a production approval.') &&
+  !tsec.includes('2026-11-10 '), 'T2 the fixture approval is labelled as fixture data, with no invented time');
+ok(tsec.includes('waiting for a person’s review (not cleared)') && tsec.includes('Publication: not approved') &&
+  (await page.locator('button[data-ws="title-publish"]').isDisabled()), 'T3 editorial approval does not clear evidence or approve publication');
+ok(tsec.includes('Approving the wording does not clear the evidence or approve publication'), 'T4 the three decisions are said to be separate');
+ok(tsec.includes('Why it was selected') && tsec.includes('approved by the founder in a conversation'), 'T5 why it was selected');
+ok(tsec.includes('editorial characterization, not an allegation of a crime') && !/criminal_implication/.test(tsec), 'T6 “gift” is a characterization, not a crime finding');
+const tprofText = await page.locator('.ws-tprof').textContent();
+ok((await page.locator('.ws-tpref').count()) === 7 && tprofText.includes('not part of the approval of this episode’s title') &&
+  tprofText.includes('no future title has to use a dollar amount') && (tprofText.match(/inferred/g) || []).length >= 7, 'T7 seven editable inferred preferences, kept apart from the approval');
+ok(tsec.includes('Candidate history (1 version)') && !/viral/i.test(tsec), 'T8 candidate history; no virality label');
+if (shots) {
+  await page.evaluate(() => document.querySelectorAll('#ws-title details').forEach((d) => { d.open = true; }));
+  await page.locator('#ws-title').screenshot({ path: path.join(shots, 'weekly-title.png') });
+  await page.evaluate(() => document.querySelectorAll('#ws-title details').forEach((d) => { d.open = false; }));
+}
 if (shots) {
   await page.locator('#ws-angles').screenshot({ path: path.join(shots, 'weekly-workbench-angles.png') });
   await page.locator('#ws-scripts').screenshot({ path: path.join(shots, 'weekly-workbench-editor.png') });
@@ -113,6 +132,27 @@ await page.locator('button[data-ws="approve-angle"]').click();
 await page.waitForFunction(() => window.calls.filter((c) => c[0] === 'hs_weekly_version_approve').length >= 2);
 c = (await nCalls()).filter((x) => x[0] === 'hs_weekly_version_approve')[1][1];
 ok(c.p_selected === 0 && c.p_rubric === null, '6f approving an angle sends the selected card');
+const tv = OV.versions.find((v) => v.stage === 'title');
+await page.locator('.ws-tnew').fill('TEST DATA: a different wording');
+await page.locator('button[data-ws="title-edit"]').click();
+await page.waitForFunction(() => window.calls.some((c) => c[0] === 'hs_weekly_title_propose'));
+c = (await nCalls()).find((x) => x[0] === 'hs_weekly_title_propose')[1];
+ok(c.p_parent === tv.id && c.p_candidates[0].title === 'TEST DATA: a different wording' &&
+  JSON.stringify(c.p_candidates[0].input) === JSON.stringify(tv.body.candidates[0].input), 'T9 editing proposes a new version from the approved one');
+await page.locator('button[data-ws="title-evidence"][data-d="concerns"]').click();
+ok((await T('.ws-bad')).includes('Describe the concern'), 'T10 a concern needs a note');
+await page.locator('.ws-treason').fill('TEST DATA: check the beneficiary wording');
+await page.locator('button[data-ws="title-evidence"][data-d="concerns"]').click();
+await page.waitForFunction(() => window.calls.some((c) => c[0] === 'hs_weekly_title_evidence_review'));
+c = (await nCalls()).find((x) => x[0] === 'hs_weekly_title_evidence_review')[1];
+ok(c.p_decision === 'concerns' && c.p_version === tv.id && !(await nCalls()).some((x) => x[0] === 'hs_weekly_title_propose' && x[1].p_candidates[0].title !== 'TEST DATA: a different wording'),
+  'T11 a concern is recorded and never rewrites the title');
+await page.locator('.ws-tprof summary').click();
+await page.locator('.ws-tpref').first().fill('Concrete benefit first, when the findings support one.');
+await page.locator('button[data-ws="title-profile-save"]').click();
+await page.waitForFunction(() => window.calls.some((c) => c[0] === 'hs_weekly_profile_create'));
+c = (await nCalls()).find((x) => x[0] === 'hs_weekly_profile_create')[1];
+ok(c.p_scope === 'title' && c.p_rules.length === 7 && c.p_rules[0].text.startsWith('Concrete benefit first, when') && c.p_rules[0].origin === 'user', 'T12 edited preferences become a new title profile version');
 ok((await nCalls()).every((x) => /^hs_weekly_/.test(x[0])), '6g only hs_weekly_* admin functions are called');
 // a refused call is shown
 await page.evaluate(() => { window.client.rpc = (n) => Promise.resolve(n === 'hs_weekly_overview' ? { data: window.fixture, error: null } : { data: null, error: { message: 'outdated: the outline it was written from has a newer version' } }); });

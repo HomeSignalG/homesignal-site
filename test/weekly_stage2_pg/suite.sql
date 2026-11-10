@@ -295,6 +295,114 @@ select (public.hs_weekly_version_approve(:'s4', null, :'good'::jsonb, true, 'TES
 reset role;
 select 'R09|' || (:'s4cur' = 'true' and (select rubric = :'good'::jsonb and high_risk_ack and body_sha256 =
   (select body_sha256 from public.weekly_scripts where id = :'s4') from public.weekly_script_approvals where script_id = :'s4'));
+-- TITLES. The Air title wording was approved by the founder in a conversation; here it is TEST DATA approved by the
+-- test identity on a disposable database, which is never a production approval.
+\set air '[{"title":"$45B Gift to Oil—At Your Expense","rationale":"FIXTURE: approved in a conversation, not a dashboard action","input":{"headline_amount":"$45B","amount_meaning":"TEST DATA: an estimate, not a payment","beneficiary_label":"oil and gas industry","benefit_frame":"TEST","public_cost_frame":"TEST","public_cost_basis":"TEST","policy_status":"proposed","supporting_claim_ids":["air-estimate-scope@1","air-proposal-status@1"],"selected_angle_id":"0","profile_version":1}}]'
+\set okchecks '{"ok":true,"label":"title checks passed","certifies_accuracy":false,"needs_research":false,"problems":[],"candidates":[{"title":"$45B Gift to Oil—At Your Expense","flags":[],"warnings":[]}]}'
+set role authenticated;
+select set_config('test.jwt', :'admin', false);
+select public.hs_weekly_profile_create('[{"text":"Concrete benefit first when the story supports one","origin":"inferred"},{"text":"Declarative wording by default","origin":"inferred"}]'::jsonb, 'title') as tprof \gset
+select 'T00|' || pg_temp.raises(format('select public.hs_weekly_title_propose(%L::uuid, %L::jsonb, %L::uuid)', :'s4', :'air', :'prof'), '22023');
+select public.hs_weekly_title_propose(:'s4', :'air'::jsonb, :'tprof') as tp1 \gset
+reset role;
+select ((:'tp1')::jsonb ->> 'title_version') as t1, ((:'tp1')::jsonb ->> 'run_id') as tc1 \gset
+select 'T01|' || ((select version from public.weekly_editorial_profiles where id = :'tprof') = 1
+  and (select scope from public.weekly_editorial_profiles where id = :'tprof') = 'title'
+  and (select kind = 'human_reviewed' and run_id is null and depends_on = :'s4'::uuid and profile_id = :'tprof'::uuid from public.weekly_scripts where id = :'t1')
+  and (select kind from public.weekly_runs where id = :'tc1') = 'title_check');
+-- the exact wording, punctuation included
+select 'T02|' || ((select body -> 'candidates' -> 0 ->> 'title' from public.weekly_scripts where id = :'t1') = '$45B Gift to Oil' || chr(8212) || 'At Your Expense');
+select 'T03|' || (select st ->> 'approved' = 'false' and st ->> 'evidence_review' = 'not_checked' and st ->> 'publication' = 'not_approved'
+  from (select public.weekly_version_status(:'t1') st) x);
+-- editorial approval of the wording grants neither evidence clearance nor publication
+set role authenticated;
+select set_config('test.jwt', :'admin', false);
+select 'T04|' || pg_temp.raises(format('select public.hs_weekly_version_approve(%L::uuid)', :'t1'), '22023');
+select public.hs_weekly_title_decide(:'t1', 0, 'approved', 'TEST DATA: wording approved') as td1 \gset
+select 'T05|' || (((:'td1')::jsonb ->> 'current') = 'true' and ((:'td1')::jsonb ->> 'evidence_review') = 'not_checked'
+  and ((:'td1')::jsonb ->> 'publication') = 'not_approved'
+  and pg_temp.raises(format('select public.hs_weekly_title_evidence_review(%L::uuid, %L)', :'t1', 'cleared'), '22023')
+  and pg_temp.raises(format('select public.hs_weekly_title_publication_approve(%L::uuid)', :'t1'), '22023'));
+reset role;
+-- mechanical title checks attach to the exact text they read
+select body_sha256 as t1sha from public.weekly_scripts where id = :'t1' \gset
+set role service_role;
+select 'T06|' || ((public.weekly_run_claim(:'tc1') -> 'title_version' -> 'body' -> 'candidates' -> 0 ->> 'title') like '$45B Gift to Oil%');
+select 'T06b|' || pg_temp.raises(format('select public.weekly_title_check_record(%L::uuid, %L, %L::jsonb)', :'tc1', repeat('0', 64), :'okchecks'), '22023');
+select public.weekly_title_check_record(:'tc1', :'t1sha', :'okchecks'::jsonb);
+reset role;
+select 'T07|' || ((public.weekly_version_status(:'t1') ->> 'evidence_review') = 'ready_for_review');
+set role authenticated;
+select set_config('test.jwt', :'admin', false);
+select public.hs_weekly_title_evidence_review(:'t1', 'cleared', 'TEST DATA: amount, beneficiary and status read correctly') as te1 \gset
+select public.hs_weekly_title_publication_approve(:'t1', 'TEST DATA') as tpub \gset
+reset role;
+select 'T08|' || (((:'te1')::jsonb ->> 'evidence_review') = 'cleared' and ((:'tpub')::jsonb ->> 'publication') = 'approved'
+  and (select array_agg(approval_kind order by id) = array['editorial', 'evidence', 'publication'] from public.weekly_script_approvals where script_id = :'t1'));
+-- editing the wording makes a new version that needs every approval again; the old decisions stay in the history
+set role authenticated;
+select set_config('test.jwt', :'admin', false);
+select (public.hs_weekly_title_propose(:'s4', jsonb_set(:'air'::jsonb, '{0,title}', '"$45B Gift to Oil, Paid by You"'), :'tprof', :'t1') ->> 'title_version') as t2 \gset
+reset role;
+select 'T09|' || ((public.weekly_version_status(:'t1') ->> 'superseded') = 'true' and (public.weekly_version_status(:'t1') ->> 'publication') = 'approved'
+  and (public.weekly_version_status(:'t2') ->> 'approved') = 'false' and (public.weekly_version_status(:'t2') ->> 'evidence_review') = 'not_checked'
+  and (public.weekly_version_status(:'t2') ->> 'publication') = 'not_approved'
+  and (public.weekly_version_status(:'t2') ->> 'selected_index') is null
+  and (select body -> 'candidates' -> 0 ->> 'title' from public.weekly_scripts where id = :'t1') like '$45B Gift to Oil%At Your Expense');
+-- an evidence concern is a visible flag; the title is never rewritten
+set role authenticated;
+select set_config('test.jwt', :'admin', false);
+select public.hs_weekly_title_decide(:'t2', 0, 'approved');
+select public.hs_weekly_title_evidence_review(:'t2', 'concerns', 'TEST DATA: "paid by you" needs a cost basis') as tc2 \gset
+reset role;
+select 'T10|' || (((:'tc2')::jsonb ->> 'evidence_review') = 'concerns_open'
+  and (select body -> 'candidates' -> 0 ->> 'title' from public.weekly_scripts where id = :'t2') = '$45B Gift to Oil, Paid by You'
+  and (select count(*) from public.weekly_scripts where stage = 'title') = 2);
+-- candidate history: a rejection keeps the candidate and its reason
+set role authenticated;
+select set_config('test.jwt', :'admin', false);
+select (public.hs_weekly_title_propose(:'s4', :'air'::jsonb || jsonb_set(:'air'::jsonb, '{0,title}', '"TEST DATA: a rejected candidate"'), :'tprof', :'t2') ->> 'title_version') as t3 \gset
+select public.hs_weekly_title_decide(:'t3', 1, 'rejected', 'TEST DATA: weaker stake');
+select 'T11|' || pg_temp.raises(format('select public.hs_weekly_title_decide(%L::uuid, 1, %L)', :'t3', 'rejected'), '23514');
+-- generated candidates need an approved title profile
+select 'T12|' || pg_temp.raises(format('select public.hs_weekly_titles_request(%L::uuid, %L::uuid)', :'s4', :'tprof'), '22023');
+select public.hs_weekly_profile_approve(:'tprof');
+select (public.hs_weekly_titles_request(:'s4', :'tprof') ->> 'run_id') as rt \gset
+reset role;
+select 'T11b|' || (select decision = 'rejected' and reason = 'TEST DATA: weaker stake' and before_text = 'TEST DATA: a rejected candidate'
+  from public.weekly_corrections where script_id = :'t3' and segment_index = 1);
+set role service_role;
+select 'T13|' || ((public.weekly_run_claim(:'rt') ->> 'profile_version') = '1');
+select public.weekly_script_record(:'rt', jsonb_build_object('provider', 'claude-plan', 'prompt_sha256', repeat('8', 64),
+  'checks', :'okchecks'::jsonb, 'body', jsonb_build_object('candidates', (:'air'::jsonb || :'air'::jsonb) || jsonb_set(:'air'::jsonb, '{0,title}', '"TEST DATA three"')))) as tg \gset
+reset role;
+select 'T14|' || (select stage = 'title' and kind = 'ai_draft' and depends_on = :'s4'::uuid and jsonb_array_length(body -> 'candidates') = 3
+  from public.weekly_scripts where id = :'tg');
+-- a changed script keeps the title's history but the title must be checked against the new script
+set role authenticated;
+select set_config('test.jwt', :'admin', false);
+select (public.hs_weekly_passage_review(:'s4', 1, 'rewrite', 'TEST DATA: tighten', 'tighten', array['air-proposal-status@1']) ->> 'run_id') as run7 \gset
+reset role;
+select jsonb_set(body, '{segments,1,text}', '"TEST: Proposed, not final, for now."')::text as s5body from public.weekly_scripts where id = :'s4' \gset
+set role service_role;
+select public.weekly_run_claim(:'run7') is not null as c8 \gset
+select public.weekly_script_record(:'run7', jsonb_build_object('provider', 'claude-plan', 'prompt_sha256', repeat('9', 64),
+  'body', :'s5body'::jsonb,
+  'checks', '{"ok":true,"material_issues":[],"high_risk":[]}'::jsonb, 'lessons_included', jsonb_build_array(:'les'))) as s5 \gset
+reset role;
+select 'T15|' || ((public.weekly_version_status(:'t3') ->> 'outdated') = 'true'
+  and (public.weekly_version_status(:'t3') ->> 'outdated_reason') like '%newer version%'
+  and (public.weekly_version_status(:'t1') ->> 'publication') = 'approved');
+set role authenticated;
+select set_config('test.jwt', :'admin', false);
+select 'T16|' || pg_temp.raises(format('select public.hs_weekly_title_decide(%L::uuid, 0, %L)', :'t3', 'approved'), '22023');
+select (public.hs_weekly_title_refit(:'t3', :'s5') ->> 'title_version') as t4 \gset
+reset role;
+select 'T17|' || ((select depends_on = :'s5'::uuid and parent_id = :'t3'::uuid and body -> 'candidates' = (select body -> 'candidates' from public.weekly_scripts where id = :'t3')
+  from public.weekly_scripts where id = :'t4')
+  and (public.weekly_version_status(:'t4') ->> 'approved') = 'false' and (public.weekly_version_status(:'t4') ->> 'outdated') = 'false'
+  and (public.weekly_version_status(:'t4') ->> 'selected_index') is null);
+
 set role authenticated;
 select set_config('test.jwt', :'admin', false);
 -- DEPENDENCIES: selecting a different angle card makes the outline AND the script outdated; history stays
@@ -327,10 +435,10 @@ set role authenticated;
 select set_config('test.jwt', :'admin', false);
 select public.hs_weekly_overview('Air Quality') -> 'measurement' as meas \gset
 select 'M01|' || (((:'meas')::jsonb -> 'audience' ->> 'status') = 'not_collected'
-  and ((:'meas')::jsonb -> 'mechanical' ->> 'script_versions') = '4'
+  and ((:'meas')::jsonb -> 'mechanical' ->> 'script_versions') = '5'
   and ((:'meas')::jsonb -> 'human' ->> 'approvals') = '1'
   and ((:'meas')::jsonb -> 'human' -> 'rubric_totals') = '[22]'::jsonb
-  and ((:'meas')::jsonb -> 'editing' ->> 'rewrites') = '2'
+  and ((:'meas')::jsonb -> 'editing' ->> 'rewrites') = '3'
   and (public.hs_weekly_overview('Air Quality') -> 'rubric' ->> 'label') like 'Provisional%');
 reset role;
 
@@ -380,8 +488,11 @@ select 'W26|' || (position('TEST includable quote' in :'ex') > 0 and position('T
 -- W27 costs: plan work carries no amount; extra usage is off unless a person records it on
 select 'W27|' || pg_temp.raises($q$insert into public.weekly_cost_entries (category, cost_type, scope, amount_usd) values ('writing', 'no_incremental_api_charge', 'report', 1)$q$, '23514');
 select 'W27b|' || ((select count(*) from public.weekly_cost_entries where category = 'writing' and cost_type = 'no_incremental_api_charge')
-    = (select count(*) from public.weekly_scripts)
-  and (select count(*) from public.weekly_cost_entries where category = 'verification') = (select count(*) from public.weekly_scripts)
+    = (select count(*) from public.weekly_scripts where run_id is not null)
+  and (select count(*) from public.weekly_cost_entries where category = 'verification' and cost_type = 'no_incremental_api_charge')
+    = (select count(*) from public.weekly_scripts where run_id is not null)
+  and (select count(*) from public.weekly_cost_entries where category = 'verification' and cost_type = 'runner_minutes')
+    = (select count(*) from public.weekly_runs where kind = 'title_check' and status = 'done')
   and not exists (select 1 from public.weekly_cost_entries where cost_type = 'no_incremental_api_charge' and amount_usd is not null));
 set role authenticated;
 select set_config('test.jwt', :'admin', false);

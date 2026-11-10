@@ -153,6 +153,16 @@
    "scope": "local",
    "statement": "TEST DATA: Residents near oil and gas sites could lose an early warning about large methane releases.",
    "uncertainty": "TEST DATA: depends on how often reports led to action"
+  },
+  {
+   "claim_id": "air-cost-estimate@1",
+   "qualifiers": [
+    "estimated"
+   ],
+   "quotes": [],
+   "scope": "federal",
+   "statement": "TEST DATA: EPA estimates the proposal would reduce oil and gas industry compliance costs by about $45 billion over its analysis period.",
+   "uncertainty": "TEST DATA: an agency estimate over many years, not a payment"
   }
  ],
  "note": "TEST DATA from homesignal-ingest tests/weekly_workbench_demo.py --json",
@@ -165,5 +175,85 @@
   "lesson_scope": "reusable",
   "reason": "The conflict arrives after more than 50 words of background, so a listener does not yet know why it matters.",
   "segment_index": 0
+ },
+ "title": {
+  "candidates": [
+   {
+    "input": {
+     "amount_meaning": "EPA's estimate of reduced industry compliance costs over its analysis period, not a cash payment",
+     "beneficiary_label": "oil and gas industry",
+     "benefit_frame": "lower compliance costs for the industry",
+     "headline_amount": "$45B",
+     "policy_status": "proposed",
+     "profile_version": 1,
+     "public_cost_basis": "air-warning-effect@1",
+     "public_cost_frame": "residents near sites could lose an early warning",
+     "selected_angle_id": "angle-0",
+     "supporting_claim_ids": [
+      "air-cost-estimate@1",
+      "air-warning-effect@1",
+      "air-proposal-status@1"
+     ]
+    },
+    "rationale": "FIXTURE: wording approved by the founder in a conversation; not a dashboard approval, not evidence clearance.",
+    "title": "$45B Gift to Oil—At Your Expense"
+   }
+  ],
+  "checks": {
+   "candidates": [
+    {
+     "characterizations": [
+      {
+       "basis": "supported",
+       "kind": "editorial characterization, not an allegation of a crime",
+       "term": "gift"
+      }
+     ],
+     "characters": 32,
+     "flags": [],
+     "needs_research": false,
+     "problems": [],
+     "title": "$45B Gift to Oil—At Your Expense",
+     "warnings": [],
+     "words": 7
+    }
+   ],
+   "certifies_accuracy": false,
+   "disclaimer": "Mechanical title checks; not evidence clearance. A person's evidence review decides.",
+   "label": "title checks passed",
+   "needs_research": false,
+   "ok": true,
+   "problems": []
+  },
+  "profile": [
+   {
+    "origin": "inferred",
+    "text": "Concrete benefit first when the story supports one."
+   },
+   {
+    "origin": "inferred",
+    "text": "Name the beneficiary."
+   },
+   {
+    "origin": "inferred",
+    "text": "Plain language."
+   },
+   {
+    "origin": "inferred",
+    "text": "Short two-part contrast."
+   },
+   {
+    "origin": "inferred",
+    "text": "Direct public stake."
+   },
+   {
+    "origin": "inferred",
+    "text": "Forceful editorial characterization."
+   },
+   {
+    "origin": "inferred",
+    "text": "Declarative wording by default."
+   }
+  ]
  }
 }

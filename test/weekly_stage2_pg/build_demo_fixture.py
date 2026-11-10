@@ -91,6 +91,21 @@ def sql(e):
         "select public.weekly_script_record(:'rw', jsonb_build_object('provider','claude-plan','prompt_sha256',repeat('6',64),'checks',%s,'body',%s));"
         % (lit(e["after_checks"]), lit(e["after_body"])),
         "reset role;",
+        # the Air title: wording approved IN A CONVERSATION, recorded here by the test identity as fixture data only;
+        # its mechanical checks are recorded; the evidence review and publication are left undone.
+        "select (v ->> 'id') as s2 from jsonb_array_elements(public.hs_weekly_overview('Air Quality') -> 'versions') v"
+        " where v ->> 'stage' = 'script' and not (v -> 'status' ->> 'superseded')::boolean \\gset",
+        "set role authenticated;",
+        "select public.hs_weekly_profile_create(%s, 'title') as tpf \\gset" % lit(e["title"]["profile"]),
+        "select (public.hs_weekly_title_propose(:'s2', %s, :'tpf') ->> 'run_id') as tcr \\gset" % lit(e["title"]["candidates"]),
+        "select (v ->> 'id') as t1 from jsonb_array_elements(public.hs_weekly_overview('Air Quality') -> 'versions') v where v ->> 'stage' = 'title' \\gset",
+        "select public.hs_weekly_title_decide(:'t1', 0, 'approved', 'FIXTURE: approved by the founder in a conversation on 2026-11-10; not a dashboard action');",
+        "reset role;",
+        "select body_sha256 as tsha from public.weekly_scripts where id = :'t1' \\gset",
+        "set role service_role;",
+        "select public.weekly_run_claim(:'tcr') is not null as c \\gset",
+        "select public.weekly_title_check_record(:'tcr', :'tsha', %s);" % lit(e["title"]["checks"]),
+        "reset role;",
         "select set_config('test.jwt', %s, false);" % ("'" + ADMIN + "'"),
         "\\pset tuples_only on", "\\pset format unaligned",
         "select public.hs_weekly_overview('Air Quality')::text;"])

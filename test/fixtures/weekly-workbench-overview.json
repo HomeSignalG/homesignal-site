@@ -20,9 +20,24 @@
  ],
  "findings": [
   {
-   "finding_key": "air-program-background",
+   "finding_key": "air-cost-estimate",
    "human_decision": "approved",
    "id": "id-04",
+   "is_latest": true,
+   "kind": "ai_draft",
+   "qualifiers": [
+    "estimated"
+   ],
+   "scope": "federal",
+   "sources": [],
+   "statement": "TEST DATA: EPA estimates the proposal would reduce oil and gas industry compliance costs by about $45 billion over its analysis period.",
+   "uncertainty": "TEST DATA: an agency estimate over many years, not a payment",
+   "version": 1
+  },
+  {
+   "finding_key": "air-program-background",
+   "human_decision": "approved",
+   "id": "id-05",
    "is_latest": true,
    "kind": "ai_draft",
    "qualifiers": [],
@@ -35,7 +50,7 @@
   {
    "finding_key": "air-proposal-status",
    "human_decision": "approved",
-   "id": "id-05",
+   "id": "id-06",
    "is_latest": true,
    "kind": "ai_draft",
    "qualifiers": [
@@ -63,7 +78,7 @@
   {
    "finding_key": "air-third-party-reports",
    "human_decision": "approved",
-   "id": "id-06",
+   "id": "id-07",
    "is_latest": true,
    "kind": "ai_draft",
    "qualifiers": [
@@ -91,7 +106,7 @@
   {
    "finding_key": "air-warning-effect",
    "human_decision": "approved",
-   "id": "id-07",
+   "id": "id-08",
    "is_latest": true,
    "kind": "ai_draft",
    "qualifiers": [
@@ -107,8 +122,8 @@
  "lessons": [],
  "library_versions": [
   {
-   "findings": 4,
-   "id": "id-08",
+   "findings": 5,
+   "id": "id-09",
    "n": 1,
    "sealed": true
   }
@@ -134,18 +149,55 @@
  "profiles": [
   {
    "approved": true,
-   "id": "id-09",
+   "id": "id-10",
    "rules": [
     "Keep qualifications and uncertainty.",
     "Attribute forecasts; distinguish proposed changes from final rules."
    ],
+   "scope": "script",
+   "version": 1
+  },
+  {
+   "approved": false,
+   "id": "id-11",
+   "rules": [
+    {
+     "origin": "inferred",
+     "text": "Concrete benefit first when the story supports one."
+    },
+    {
+     "origin": "inferred",
+     "text": "Name the beneficiary."
+    },
+    {
+     "origin": "inferred",
+     "text": "Plain language."
+    },
+    {
+     "origin": "inferred",
+     "text": "Short two-part contrast."
+    },
+    {
+     "origin": "inferred",
+     "text": "Direct public stake."
+    },
+    {
+     "origin": "inferred",
+     "text": "Forceful editorial characterization."
+    },
+    {
+     "origin": "inferred",
+     "text": "Declarative wording by default."
+    }
+   ],
+   "scope": "title",
    "version": 1
   }
  ],
  "requests": [
   {
    "created_at": "2026-11-10T12:02:00Z",
-   "id": "id-10",
+   "id": "id-12",
    "request_text": "TEST DATA: research the October 2026 EPA proposal (fixture)"
   }
  ],
@@ -172,35 +224,42 @@
   {
    "created_at": "2026-11-10T12:03:00Z",
    "error": null,
-   "id": "id-11",
-   "kind": "rewrite",
+   "id": "id-13",
+   "kind": "title_check",
    "status": "done"
   },
   {
    "created_at": "2026-11-10T12:04:00Z",
    "error": null,
-   "id": "id-12",
-   "kind": "script",
+   "id": "id-14",
+   "kind": "rewrite",
    "status": "done"
   },
   {
    "created_at": "2026-11-10T12:05:00Z",
    "error": null,
-   "id": "id-13",
-   "kind": "outline",
+   "id": "id-15",
+   "kind": "script",
    "status": "done"
   },
   {
    "created_at": "2026-11-10T12:06:00Z",
    "error": null,
-   "id": "id-14",
-   "kind": "angles",
+   "id": "id-16",
+   "kind": "outline",
    "status": "done"
   },
   {
    "created_at": "2026-11-10T12:07:00Z",
    "error": null,
-   "id": "id-15",
+   "id": "id-17",
+   "kind": "angles",
+   "status": "done"
+  },
+  {
+   "created_at": "2026-11-10T12:08:00Z",
+   "error": null,
+   "id": "id-18",
    "kind": "research_ingest",
    "status": "done"
   }
@@ -210,10 +269,11 @@
   {
    "approvals": [
     {
-     "approved_at": "2026-11-10T12:08:00Z",
+     "approved_at": "2026-11-10T12:09:00Z",
      "approved_by": "founder@test.invalid",
-     "body_sha256": "8b531fb9282ab073e0213a1eb332b34f3090ac85382bcaca568be5bf233abce9",
+     "body_sha256": "00cd716d838ae7d5764419c998f2fd1c3d4c304e53d56d7fb1d72c251f58812a",
      "high_risk_ack": false,
+     "kind": "editorial",
      "note": "TEST DATA: lead with the residents",
      "rubric": null,
      "selected_index": 0,
@@ -232,7 +292,8 @@
        "air-proposal-status@1",
        "air-third-party-reports@1",
        "air-program-background@1",
-       "air-warning-effect@1"
+       "air-warning-effect@1",
+       "air-cost-estimate@1"
       ],
       "opening": "TEST DATA: A warning system for large leaks could go quiet.",
       "public_stakes": "TEST DATA: residents near sites could lose an early warning.",
@@ -248,7 +309,8 @@
        "air-proposal-status@1",
        "air-third-party-reports@1",
        "air-program-background@1",
-       "air-warning-effect@1"
+       "air-warning-effect@1",
+       "air-cost-estimate@1"
       ],
       "opening": "TEST DATA: Who tells EPA about a methane plume?",
       "public_stakes": "TEST DATA: who reports a large release, and who hears about it.",
@@ -264,7 +326,8 @@
        "air-proposal-status@1",
        "air-third-party-reports@1",
        "air-program-background@1",
-       "air-warning-effect@1"
+       "air-warning-effect@1",
+       "air-cost-estimate@1"
       ],
       "opening": "TEST DATA: The figure is not a payment.",
       "public_stakes": "TEST DATA: what the $45 billion figure is and is not.",
@@ -272,21 +335,21 @@
      }
     ]
    },
-   "body_sha256": "8b531fb9282ab073e0213a1eb332b34f3090ac85382bcaca568be5bf233abce9",
+   "body_sha256": "00cd716d838ae7d5764419c998f2fd1c3d4c304e53d56d7fb1d72c251f58812a",
    "checks": {
     "certifies_accuracy": false,
     "label": "mechanical checks passed",
     "ok": true
    },
-   "created_at": "2026-11-10T12:09:00Z",
+   "created_at": "2026-11-10T12:10:00Z",
    "depends_on": null,
-   "id": "id-16",
+   "id": "id-19",
    "lesson_uses": [],
    "lessons_included": [],
-   "library_version_id": "id-08",
+   "library_version_id": "id-09",
    "model": null,
    "parent_id": null,
-   "profile_id": "id-09",
+   "profile_id": "id-10",
    "provider": "claude-plan",
    "selected_index": null,
    "stage": "angles",
@@ -294,7 +357,7 @@
     "approved": true,
     "approved_earlier_version": false,
     "current": true,
-    "id": "id-16",
+    "id": "id-19",
     "outdated": false,
     "outdated_reason": null,
     "stage": "angles",
@@ -304,10 +367,11 @@
   {
    "approvals": [
     {
-     "approved_at": "2026-11-10T12:10:00Z",
+     "approved_at": "2026-11-10T12:11:00Z",
      "approved_by": "founder@test.invalid",
      "body_sha256": "b4f3235bdef49e4a8b92b1180c2116117e999d4c824363211596a6379b61044f",
      "high_risk_ack": false,
+     "kind": "editorial",
      "note": null,
      "rubric": null,
      "selected_index": null,
@@ -346,15 +410,15 @@
     "label": "mechanical checks passed",
     "ok": true
    },
-   "created_at": "2026-11-10T12:11:00Z",
-   "depends_on": "id-16",
-   "id": "id-17",
+   "created_at": "2026-11-10T12:12:00Z",
+   "depends_on": "id-19",
+   "id": "id-20",
    "lesson_uses": [],
    "lessons_included": [],
-   "library_version_id": "id-08",
+   "library_version_id": "id-09",
    "model": null,
    "parent_id": null,
-   "profile_id": "id-09",
+   "profile_id": "id-10",
    "provider": "claude-plan",
    "selected_index": 0,
    "stage": "outline",
@@ -362,7 +426,7 @@
     "approved": true,
     "approved_earlier_version": false,
     "current": true,
-    "id": "id-17",
+    "id": "id-20",
     "outdated": false,
     "outdated_reason": null,
     "stage": "outline",
@@ -431,15 +495,15 @@
     },
     "words": 106
    },
-   "created_at": "2026-11-10T12:12:00Z",
-   "depends_on": "id-17",
+   "created_at": "2026-11-10T12:13:00Z",
+   "depends_on": "id-20",
    "id": "id-03",
    "lesson_uses": [],
    "lessons_included": [],
-   "library_version_id": "id-08",
+   "library_version_id": "id-09",
    "model": null,
    "parent_id": null,
-   "profile_id": "id-09",
+   "profile_id": "id-10",
    "provider": "claude-plan",
    "selected_index": 0,
    "stage": "script",
@@ -509,15 +573,15 @@
     },
     "words": 92
    },
-   "created_at": "2026-11-10T12:13:00Z",
-   "depends_on": "id-17",
+   "created_at": "2026-11-10T12:14:00Z",
+   "depends_on": "id-20",
    "id": "id-02",
    "lesson_uses": [],
    "lessons_included": [],
-   "library_version_id": "id-08",
+   "library_version_id": "id-09",
    "model": null,
    "parent_id": "id-03",
-   "profile_id": "id-09",
+   "profile_id": "id-10",
    "provider": "claude-plan",
    "selected_index": 0,
    "stage": "script",
@@ -530,6 +594,107 @@
     "outdated_reason": null,
     "stage": "script",
     "superseded": false
+   }
+  },
+  {
+   "approvals": [
+    {
+     "approved_at": "2026-11-10T12:15:00Z",
+     "approved_by": "founder@test.invalid",
+     "body_sha256": "507988658f22e7a96b06ef9f23d46637841710cdb5a1fecca0bf40907bb8d803",
+     "high_risk_ack": false,
+     "kind": "editorial",
+     "note": "FIXTURE: approved by the founder in a conversation on 2026-11-10; not a dashboard action",
+     "rubric": null,
+     "selected_index": 0,
+     "this_version": true
+    }
+   ],
+   "body": {
+    "candidates": [
+     {
+      "input": {
+       "amount_meaning": "EPA's estimate of reduced industry compliance costs over its analysis period, not a cash payment",
+       "beneficiary_label": "oil and gas industry",
+       "benefit_frame": "lower compliance costs for the industry",
+       "headline_amount": "$45B",
+       "policy_status": "proposed",
+       "profile_version": 1,
+       "public_cost_basis": "air-warning-effect@1",
+       "public_cost_frame": "residents near sites could lose an early warning",
+       "selected_angle_id": "angle-0",
+       "supporting_claim_ids": [
+        "air-cost-estimate@1",
+        "air-warning-effect@1",
+        "air-proposal-status@1"
+       ]
+      },
+      "rationale": "FIXTURE: wording approved by the founder in a conversation; not a dashboard approval, not evidence clearance.",
+      "title": "$45B Gift to Oil—At Your Expense"
+     }
+    ],
+    "origin": "person"
+   },
+   "body_sha256": "507988658f22e7a96b06ef9f23d46637841710cdb5a1fecca0bf40907bb8d803",
+   "checks": {
+    "certifies_accuracy": false,
+    "label": "title checks not run yet"
+   },
+   "created_at": "2026-11-10T12:16:00Z",
+   "depends_on": "id-02",
+   "id": "id-21",
+   "lesson_uses": [],
+   "lessons_included": [],
+   "library_version_id": "id-09",
+   "model": null,
+   "parent_id": null,
+   "profile_id": "id-11",
+   "provider": null,
+   "selected_index": null,
+   "stage": "title",
+   "status": {
+    "approved": true,
+    "approved_earlier_version": false,
+    "current": true,
+    "evidence_review": "ready_for_review",
+    "id": "id-21",
+    "outdated": false,
+    "outdated_reason": null,
+    "publication": "not_approved",
+    "script": {
+     "approved": false,
+     "superseded": false
+    },
+    "selected_index": 0,
+    "selected_title": "$45B Gift to Oil—At Your Expense",
+    "stage": "title",
+    "superseded": false,
+    "title_checks": {
+     "candidates": [
+      {
+       "characterizations": [
+        {
+         "basis": "supported",
+         "kind": "editorial characterization, not an allegation of a crime",
+         "term": "gift"
+        }
+       ],
+       "characters": 32,
+       "flags": [],
+       "needs_research": false,
+       "problems": [],
+       "title": "$45B Gift to Oil—At Your Expense",
+       "warnings": [],
+       "words": 7
+      }
+     ],
+     "certifies_accuracy": false,
+     "disclaimer": "Mechanical title checks; not evidence clearance. A person's evidence review decides.",
+     "label": "title checks passed",
+     "needs_research": false,
+     "ok": true,
+     "problems": []
+    }
    }
   }
  ]

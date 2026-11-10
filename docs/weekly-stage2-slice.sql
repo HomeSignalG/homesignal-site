@@ -37,6 +37,11 @@
 --   - Three angle cards may share evidence; a person decides whether they are meaningfully different. Nothing here
 --     requires different categories. A high-risk category or high-risk wording needs supporting findings AND an
 --     explicit acknowledgement at approval; a category label is never permission to accuse.
+--   - TITLES are versions too (stage 'title', written from one script version). Three approvals are kept apart and
+--     none implies another: editorial (the wording, one candidate), evidence review (a person, after the mechanical
+--     title checks on that exact version) and publication (needs both, on a current script). Changed wording is a new
+--     version; a changed script makes the title outdated and it must be checked against the new script (a new
+--     version with the same words). Evidence concerns are flags; nothing ever rewrites a title.
 --   - Quote status: 'in_packet' or 'not_in_packet' come from the machine and are the only values it can set.
 --     'not_found_in_sources_reviewed' and 'contradicted' are reviewer findings (with their reasons / findings). A
 --     quote that is not in the packet is never recorded as either of the other two.
@@ -58,7 +63,7 @@ end $$;
 -- ── run queue ─────────────────────────────────────────────────────────────────────────────────────────────────────
 create table if not exists public.weekly_runs (
   id uuid primary key default gen_random_uuid(),
-  kind text not null check (kind in ('research_ingest', 'angles', 'outline', 'script', 'rewrite')),
+  kind text not null check (kind in ('research_ingest', 'angles', 'outline', 'script', 'rewrite', 'titles', 'title_check')),
   topic text not null,
   status text not null default 'queued' check (status in ('queued', 'running', 'done', 'failed')),
   input jsonb not null default '{}'::jsonb,
@@ -204,10 +209,13 @@ begin
 end $$;
 
 -- ── editorial profile ─────────────────────────────────────────────────────────────────────────────────────────────
+-- scope 'script' (writing rules) or 'title' (title preferences; entries may be {"text", "origin": "inferred" | "user"}).
 create table if not exists public.weekly_editorial_profiles (
   id uuid primary key default gen_random_uuid(),
-  version integer not null unique check (version >= 1),
+  scope text not null default 'script' check (scope in ('script', 'title')),
+  version integer not null check (version >= 1),
   rules jsonb not null check (jsonb_typeof(rules) = 'array' and jsonb_array_length(rules) between 1 and 60),
+  unique (scope, version),
   kind text not null default 'original_analysis' check (kind = 'original_analysis'),
   created_by text not null,
   created_at timestamptz not null default now()
@@ -225,8 +233,8 @@ create table if not exists public.weekly_profile_approvals (
 -- (a rewrite). Every version is written by a run and checked by the engine's mechanical checks.
 create table if not exists public.weekly_scripts (
   id uuid primary key default gen_random_uuid(),
-  run_id uuid not null unique references public.weekly_runs (id),
-  stage text not null default 'script' check (stage in ('angles', 'outline', 'script')),
+  run_id uuid unique references public.weekly_runs (id),
+  stage text not null default 'script' check (stage in ('angles', 'outline', 'script', 'title')),
   parent_id uuid references public.weekly_scripts (id),
   depends_on uuid references public.weekly_scripts (id),
   selected_index integer check (selected_index between 0 and 2),
@@ -235,21 +243,25 @@ create table if not exists public.weekly_scripts (
   library_version_id uuid not null references public.weekly_library_versions (id),
   profile_id uuid not null references public.weekly_editorial_profiles (id),
   lessons_included uuid[] not null default '{}',
-  prompt_sha256 text not null check (prompt_sha256 ~ '^[0-9a-f]{64}$'),
-  provider text not null,
+  prompt_sha256 text check (prompt_sha256 ~ '^[0-9a-f]{64}$'),
+  provider text,
   model text,
   body jsonb not null,
   body_sha256 text generated always as (public.weekly_sha256(body::text)) stored,
   -- Mechanical checks only. They are labelled as such and never certify factual accuracy.
   checks jsonb not null,
-  kind text not null default 'ai_draft' check (kind = 'ai_draft'),
+  kind text not null default 'ai_draft' check (kind in ('ai_draft', 'human_reviewed')),
   created_at timestamptz not null default now(),
   constraint weekly_scripts_shape_ck check (case stage
     when 'script' then jsonb_typeof(body -> 'segments') = 'array'
     when 'outline' then jsonb_typeof(body -> 'beats') = 'array' and jsonb_array_length(body -> 'beats') between 3 and 12
-    when 'angles' then jsonb_typeof(body -> 'angles') = 'array' and jsonb_array_length(body -> 'angles') = 3 end),
+    when 'angles' then jsonb_typeof(body -> 'angles') = 'array' and jsonb_array_length(body -> 'angles') = 3
+    when 'title' then jsonb_typeof(body -> 'candidates') = 'array' and jsonb_array_length(body -> 'candidates') between 1 and 3 end),
   constraint weekly_scripts_lineage_ck check ((stage = 'angles') = (depends_on is null)
-    and (stage = 'angles' or selected_index is not null))
+    and (stage in ('angles', 'title') or selected_index is not null)),
+  -- Only a title may be written by a person (no run); every other version comes from a checked engine run.
+  constraint weekly_scripts_origin_ck check ((run_id is null) = (kind = 'human_reviewed') and (run_id is not null or stage = 'title')
+    and (run_id is null or (prompt_sha256 is not null and provider is not null)))
 );
 -- depends_on must be the previous stage; a parent is an earlier version of the same draft (same stage, same basis).
 create or replace function public.weekly_scripts_lineage_guard() returns trigger language plpgsql as $$
@@ -257,13 +269,19 @@ declare d public.weekly_scripts; p public.weekly_scripts;
 begin
   if new.depends_on is not null then
     select * into d from public.weekly_scripts where id = new.depends_on;
-    if d.stage is distinct from (case new.stage when 'outline' then 'angles' when 'script' then 'outline' end) then
+    if d.stage is distinct from (case new.stage when 'outline' then 'angles' when 'script' then 'outline' when 'title' then 'script' end) then
       raise exception 'a % is written from the previous stage', new.stage using errcode = '22023';
     end if;
   end if;
   if new.parent_id is not null then
     select * into p from public.weekly_scripts where id = new.parent_id;
-    if p.stage <> new.stage or p.depends_on is distinct from new.depends_on or p.selected_index is distinct from new.selected_index then
+    if new.stage = 'title' then
+      -- a title's new version may be written from a newer version of the same script (the script-fit check)
+      if p.stage <> 'title' or (select depends_on from public.weekly_scripts where id = p.depends_on)
+                                is distinct from (select depends_on from public.weekly_scripts where id = new.depends_on) then
+        raise exception 'a new title version is written from the same script lineage' using errcode = '22023';
+      end if;
+    elsif p.stage <> new.stage or p.depends_on is distinct from new.depends_on or p.selected_index is distinct from new.selected_index then
       raise exception 'a new version keeps its stage and basis' using errcode = '22023';
     end if;
   end if;
@@ -274,6 +292,9 @@ create table if not exists public.weekly_script_approvals (
   id bigserial primary key,
   script_id uuid not null references public.weekly_scripts (id),
   body_sha256 text not null,
+  -- editorial: the wording / selection (every stage). evidence: a person cleared a title's evidence after its checks.
+  -- publication: a title approved for publication (needs both). None of the three implies another.
+  approval_kind text not null default 'editorial' check (approval_kind in ('editorial', 'evidence', 'publication')),
   selected_index integer check (selected_index between 0 and 2),
   -- {hook_conflict, human_stakes, emotional_force, argument_coherence, factual_discipline, spoken_clarity, closing}, 0-4.
   rubric jsonb,
@@ -334,23 +355,25 @@ declare v public.weekly_scripts; d jsonb; approved boolean; superseded boolean; 
 begin
   select * into v from public.weekly_scripts where id = p_id;
   if v.id is null then return null; end if;
-  approved := exists (select 1 from public.weekly_script_approvals a where a.script_id = v.id and a.body_sha256 = v.body_sha256);
-  ever := exists (select 1 from public.weekly_script_approvals a where a.script_id = v.id);
+  approved := exists (select 1 from public.weekly_script_approvals a where a.script_id = v.id and a.body_sha256 = v.body_sha256
+                      and a.approval_kind = 'editorial');
+  ever := exists (select 1 from public.weekly_script_approvals a where a.script_id = v.id and a.approval_kind = 'editorial');
   superseded := exists (select 1 from public.weekly_scripts c where c.parent_id = v.id);
   if v.depends_on is not null then
     d := public.weekly_version_status(v.depends_on);
     if (d ->> 'superseded')::boolean then outdated := true; why := 'the ' || (d ->> 'stage') || ' it was written from has a newer version';
-    elsif not (d ->> 'approved')::boolean then outdated := true; why := 'the ' || (d ->> 'stage') || ' it was written from is not approved';
+    elsif not (d ->> 'approved')::boolean and v.stage <> 'title' then outdated := true; why := 'the ' || (d ->> 'stage') || ' it was written from is not approved';
     elsif (d ->> 'outdated')::boolean then outdated := true; why := 'the ' || (d ->> 'stage') || ' it was written from is outdated';
     elsif v.stage = 'outline' then
       select a.selected_index into sel from public.weekly_script_approvals a where a.script_id = v.depends_on
-        order by a.approved_at desc, a.id desc limit 1;
+        and a.approval_kind = 'editorial' order by a.approved_at desc, a.id desc limit 1;
       if sel is distinct from v.selected_index then outdated := true; why := 'a different angle card is now selected'; end if;
     end if;
   end if;
   return jsonb_build_object('id', v.id, 'stage', v.stage, 'approved', approved, 'approved_earlier_version', ever and not approved,
     'superseded', superseded, 'outdated', outdated, 'outdated_reason', why,
-    'current', approved and not superseded and not outdated);
+    'current', approved and not superseded and not outdated)
+    || case when v.stage = 'title' then public.weekly_title_review_status(v.id) else '{}'::jsonb end;
 end $$;
 
 -- ── lessons and their use ─────────────────────────────────────────────────────────────────────────────────────────
@@ -547,12 +570,14 @@ begin
   return jsonb_build_object('library_version_id', v, 'n', nn, 'findings', k);
 end $$;
 
-create or replace function public.hs_weekly_profile_create(p_rules jsonb) returns uuid
+drop function if exists public.hs_weekly_profile_create(jsonb);
+create or replace function public.hs_weekly_profile_create(p_rules jsonb, p_scope text default 'script') returns uuid
 language plpgsql security definer set search_path = public as $$
 declare e text := public._hs_is_admin(); p uuid;
 begin
-  insert into public.weekly_editorial_profiles (version, rules, created_by)
-    values ((select coalesce(max(version), 0) + 1 from public.weekly_editorial_profiles), p_rules, e) returning id into p;
+  insert into public.weekly_editorial_profiles (scope, version, rules, created_by)
+    values (coalesce(p_scope, 'script'), (select coalesce(max(version), 0) + 1 from public.weekly_editorial_profiles
+             where scope = coalesce(p_scope, 'script')), p_rules, e) returning id into p;
   return p;
 end $$;
 
@@ -568,6 +593,176 @@ end $$;
 drop function if exists public.hs_weekly_script_request(uuid, uuid);
 drop function if exists public.hs_weekly_script_approve(uuid);
 drop function if exists public.hs_weekly_correction_save(uuid, integer, text, text);
+
+-- ── titles ───────────────────────────────────────────────────────────────────────────────────────────────────────
+-- The mechanical title checks of a version: its own run's checks, else the newest title_check run done on this exact
+-- body hash. NULL means not checked yet.
+create or replace function public.weekly_title_checks(p_id uuid) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select coalesce(
+    (select v.checks from public.weekly_scripts v where v.id = p_id and v.run_id is not null and v.checks ? 'ok'),
+    (select r.result -> 'checks' from public.weekly_runs r join public.weekly_scripts v on v.id = p_id
+      where r.kind = 'title_check' and r.status = 'done' and r.input ->> 'version_id' = p_id::text
+        and r.result ->> 'body_sha256' = v.body_sha256 order by r.finished_at desc limit 1))
+$$;
+
+-- Evidence review and publication, kept apart from the editorial approval.
+create or replace function public.weekly_title_review_status(p_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v public.weekly_scripts; c jsonb; sel integer; ev text; pub boolean; sc jsonb;
+begin
+  select * into v from public.weekly_scripts where id = p_id and stage = 'title';
+  if v.id is null then return '{}'::jsonb; end if;
+  c := public.weekly_title_checks(v.id);
+  select a.selected_index into sel from public.weekly_script_approvals a where a.script_id = v.id and a.body_sha256 = v.body_sha256
+    and a.approval_kind = 'editorial' order by a.approved_at desc, a.id desc limit 1;
+  ev := case
+    when exists (select 1 from public.weekly_script_approvals a where a.script_id = v.id and a.body_sha256 = v.body_sha256
+                 and a.approval_kind = 'evidence') then 'cleared'
+    when exists (select 1 from public.weekly_corrections x where x.script_id = v.id and x.decision = 'material_issue') then 'concerns_open'
+    when c is null then 'not_checked'
+    when coalesce((c ->> 'ok')::boolean, false) is not true then 'checks_failed'
+    when coalesce((c ->> 'needs_research')::boolean, false) then 'needs_research'
+    else 'ready_for_review' end;
+  pub := exists (select 1 from public.weekly_script_approvals a where a.script_id = v.id and a.body_sha256 = v.body_sha256
+                 and a.approval_kind = 'publication');
+  select jsonb_build_object('approved', exists (select 1 from public.weekly_script_approvals a join public.weekly_scripts d on d.id = a.script_id
+            where d.id = v.depends_on and a.body_sha256 = d.body_sha256 and a.approval_kind = 'editorial'),
+          'superseded', exists (select 1 from public.weekly_scripts n where n.parent_id = v.depends_on)) into sc;
+  return jsonb_build_object('selected_index', sel, 'selected_title', v.body -> 'candidates' -> sel ->> 'title',
+    'evidence_review', ev, 'title_checks', c, 'publication', case when pub then 'approved' else 'not_approved' end,
+    'script', sc);
+end $$;
+
+-- A person proposes title wording (no run). The mechanical title checks run afterwards on this exact version.
+-- p_parent: a new version of an earlier title (changed words, or the same words checked against a newer script).
+create or replace function public.hs_weekly_title_propose(p_script uuid, p_candidates jsonb, p_profile uuid, p_parent uuid default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); sc public.weekly_scripts; t uuid; c jsonb; bad text[]; q jsonb;
+begin
+  select * into sc from public.weekly_scripts where id = p_script and stage = 'script';
+  if sc.id is null then raise exception 'unknown script' using errcode = '22023'; end if;
+  if not exists (select 1 from public.weekly_editorial_profiles where id = p_profile and scope = 'title') then
+    raise exception 'unknown title profile' using errcode = '22023';
+  end if;
+  if jsonb_typeof(p_candidates) <> 'array' or jsonb_array_length(p_candidates) not between 1 and 3 then
+    raise exception 'one to three title candidates' using errcode = '22023';
+  end if;
+  for c in select * from jsonb_array_elements(p_candidates) loop
+    if char_length(btrim(coalesce(c ->> 'title', ''))) not between 1 and 200 then raise exception 'a title is 1 to 200 characters' using errcode = '22023'; end if;
+  end loop;
+  select coalesce(array_agg(distinct x), '{}') into bad from (select jsonb_array_elements_text(coalesce(c2 -> 'input' -> 'supporting_claim_ids', '[]')) x
+    from jsonb_array_elements(p_candidates) c2) t where x <> all (public.weekly_library_claim_ids(sc.library_version_id));
+  if cardinality(bad) > 0 then raise exception 'not in the pinned library: %', array_to_string(bad, ', ') using errcode = '22023'; end if;
+  if p_parent is not null and (public.weekly_version_status(p_parent) ->> 'superseded')::boolean then
+    raise exception 'that title already has a newer version' using errcode = '22023';
+  end if;
+  insert into public.weekly_scripts (stage, parent_id, depends_on, topic, library_version_id, profile_id, body, checks, kind)
+    values ('title', p_parent, sc.id, sc.topic, sc.library_version_id, p_profile, jsonb_build_object('candidates', p_candidates, 'origin', 'person'),
+            jsonb_build_object('label', 'title checks not run yet', 'certifies_accuracy', false), 'human_reviewed')
+    returning id into t;
+  q := public._wk_queue('title_check', sc.topic, jsonb_build_object('version_id', t), e);
+  return jsonb_build_object('title_version', t) || q;
+end $$;
+
+-- The same words, checked against a newer script version (a new title version that needs its own approvals).
+create or replace function public.hs_weekly_title_refit(p_title uuid, p_script uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v public.weekly_scripts;
+begin
+  select * into v from public.weekly_scripts where id = p_title and stage = 'title';
+  if v.id is null then raise exception 'unknown title' using errcode = '22023'; end if;
+  return public.hs_weekly_title_propose(p_script, v.body -> 'candidates', v.profile_id, v.id);
+end $$;
+
+-- Three generated candidates from the selected angle, the pinned research and the title profile (a Claude run).
+create or replace function public.hs_weekly_titles_request(p_script uuid, p_profile uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); sc public.weekly_scripts;
+begin
+  select * into sc from public.weekly_scripts where id = p_script and stage = 'script';
+  if sc.id is null then raise exception 'unknown script' using errcode = '22023'; end if;
+  if not exists (select 1 from public.weekly_editorial_profiles p join public.weekly_profile_approvals a on a.profile_id = p.id
+                 where p.id = p_profile and p.scope = 'title') then
+    raise exception 'the title profile is not approved' using errcode = '22023';
+  end if;
+  return public._wk_queue('titles', sc.topic, jsonb_build_object('library_version_id', sc.library_version_id, 'profile_id', p_profile,
+    'depends_on', sc.id), e);
+end $$;
+
+-- Editorial decision on one candidate. 'approved' approves the WORDING of this exact version only; it never clears
+-- evidence or approves publication. 'rejected' is kept in the candidate history with its reason.
+create or replace function public.hs_weekly_title_decide(p_version uuid, p_index integer, p_decision text, p_reason text default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); v public.weekly_scripts; st jsonb; t text;
+begin
+  select * into v from public.weekly_scripts where id = p_version and stage = 'title';
+  if v.id is null then raise exception 'unknown title' using errcode = '22023'; end if;
+  t := v.body -> 'candidates' -> p_index ->> 'title';
+  if t is null then raise exception 'no such candidate' using errcode = '22023'; end if;
+  st := public.weekly_version_status(v.id);
+  if p_decision = 'approved' then
+    if (st ->> 'superseded')::boolean then raise exception 'a newer version exists; review that one' using errcode = '22023'; end if;
+    if (st ->> 'outdated')::boolean then raise exception 'outdated: %; check the title against the new script', st ->> 'outdated_reason' using errcode = '22023'; end if;
+    insert into public.weekly_script_approvals (script_id, body_sha256, approval_kind, selected_index, note, approved_by)
+      values (v.id, v.body_sha256, 'editorial', p_index, p_reason, e);
+  elsif p_decision = 'rejected' then
+    insert into public.weekly_corrections (script_id, segment_index, decision, reason, before_text, created_by)
+      values (v.id, p_index, 'rejected', p_reason, t, e);
+  else
+    raise exception 'decision must be approved or rejected' using errcode = '22023';
+  end if;
+  return public.weekly_version_status(v.id);
+end $$;
+
+-- Evidence review of the editorially approved candidate. 'cleared' needs passing title checks on this exact version,
+-- no research gap, no open concern, and an acknowledgement when the checks raised flags. 'concerns' records a flag.
+-- Neither one ever changes the title.
+create or replace function public.hs_weekly_title_evidence_review(p_version uuid, p_decision text, p_reason text default null,
+  p_flags_ack boolean default false) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); v public.weekly_scripts; st jsonb; c jsonb;
+begin
+  select * into v from public.weekly_scripts where id = p_version and stage = 'title';
+  if v.id is null then raise exception 'unknown title' using errcode = '22023'; end if;
+  st := public.weekly_version_status(v.id);
+  if (st ->> 'selected_index') is null then raise exception 'approve the wording of one candidate first' using errcode = '22023'; end if;
+  if p_decision = 'concerns' then
+    insert into public.weekly_corrections (script_id, segment_index, decision, reason, before_text, created_by)
+      values (v.id, (st ->> 'selected_index')::integer, 'material_issue', p_reason, st ->> 'selected_title', e);
+    return public.weekly_version_status(v.id);
+  end if;
+  if p_decision <> 'cleared' then raise exception 'decision must be cleared or concerns' using errcode = '22023'; end if;
+  if st ->> 'evidence_review' <> 'ready_for_review' then
+    raise exception 'evidence cannot be cleared: %', st ->> 'evidence_review' using errcode = '22023';
+  end if;
+  c := st -> 'title_checks';
+  if jsonb_array_length(coalesce(c -> 'candidates' -> (st ->> 'selected_index')::integer -> 'flags', '[]')) > 0 and not coalesce(p_flags_ack, false) then
+    raise exception 'the title checks raised flags; acknowledge them to clear' using errcode = '22023';
+  end if;
+  insert into public.weekly_script_approvals (script_id, body_sha256, approval_kind, selected_index, high_risk_ack, note, approved_by)
+    values (v.id, v.body_sha256, 'evidence', (st ->> 'selected_index')::integer, coalesce(p_flags_ack, false), p_reason, e);
+  return public.weekly_version_status(v.id);
+end $$;
+
+-- Publication approval of a title. Needs the editorial approval and the evidence clearance of this exact version,
+-- written from the current approved script. Nothing here publishes.
+create or replace function public.hs_weekly_title_publication_approve(p_version uuid, p_note text default null) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); v public.weekly_scripts; st jsonb;
+begin
+  select * into v from public.weekly_scripts where id = p_version and stage = 'title';
+  if v.id is null then raise exception 'unknown title' using errcode = '22023'; end if;
+  st := public.weekly_version_status(v.id);
+  if not (st ->> 'current')::boolean then raise exception 'the title wording is not the current approved version' using errcode = '22023'; end if;
+  if st ->> 'evidence_review' <> 'cleared' then raise exception 'the evidence review is not cleared' using errcode = '22023'; end if;
+  if not (public.weekly_version_status(v.depends_on) ->> 'current')::boolean then
+    raise exception 'the script it was written from is not the current approved version' using errcode = '22023';
+  end if;
+  insert into public.weekly_script_approvals (script_id, body_sha256, approval_kind, selected_index, note, approved_by)
+    values (v.id, v.body_sha256, 'publication', (st ->> 'selected_index')::integer, p_note, e);
+  return public.weekly_version_status(v.id);
+end $$;
 
 -- Claim ids ("key@version") of the findings pinned in a library version.
 create or replace function public.weekly_library_claim_ids(p_lv uuid) returns text[]
@@ -605,8 +800,8 @@ create or replace function public._wk_queue(p_kind text, p_topic text, p_input j
 language plpgsql security definer set search_path = public as $$
 declare r uuid; sent boolean;
 begin
-  if exists (select 1 from public.weekly_runs where kind in ('angles', 'outline', 'script', 'rewrite') and topic = p_topic
-             and status in ('queued', 'running')) then
+  if p_kind in ('angles', 'outline', 'script', 'rewrite', 'titles') and exists (select 1 from public.weekly_runs
+             where kind in ('angles', 'outline', 'script', 'rewrite', 'titles') and topic = p_topic and status in ('queued', 'running')) then
     raise exception 'a writing run is already running for this topic' using errcode = '55006';
   end if;
   insert into public.weekly_runs (kind, topic, input, requested_by) values (p_kind, p_topic, p_input, p_by) returning id into r;
@@ -650,6 +845,7 @@ begin
   st := public.weekly_version_status(v.id);
   if not (st ->> 'current')::boolean then raise exception 'the angle set is not the current approved version' using errcode = '22023'; end if;
   select a.selected_index into sel from public.weekly_script_approvals a where a.script_id = v.id and a.body_sha256 = v.body_sha256
+    and a.approval_kind = 'editorial'
     order by a.approved_at desc, a.id desc limit 1;
   return public._wk_queue('outline', v.topic, jsonb_build_object('library_version_id', v.library_version_id, 'profile_id', v.profile_id,
     'depends_on', v.id, 'selected_index', sel, 'parent_id', p_parent), e);
@@ -683,6 +879,7 @@ declare e text := public._hs_is_admin(); v public.weekly_scripts; st jsonb; card
 begin
   select * into v from public.weekly_scripts where id = p_version;
   if v.id is null then raise exception 'unknown version' using errcode = '22023'; end if;
+  if v.stage = 'title' then raise exception 'titles are decided with hs_weekly_title_decide' using errcode = '22023'; end if;
   st := public.weekly_version_status(v.id);
   if (st ->> 'superseded')::boolean then raise exception 'a newer version exists; review that one' using errcode = '22023'; end if;
   if (st ->> 'outdated')::boolean then raise exception 'outdated: %', st ->> 'outdated_reason' using errcode = '22023'; end if;
@@ -831,7 +1028,7 @@ begin
     'library_versions', (select coalesce(jsonb_agg(jsonb_build_object('id', v.id, 'n', v.n, 'sealed', v.sealed,
         'findings', (select count(*) from public.weekly_library_version_findings x where x.library_version_id = v.id)) order by v.n), '[]')
         from public.weekly_library_versions v where v.topic = p_topic),
-    'profiles', (select coalesce(jsonb_agg(jsonb_build_object('id', p.id, 'version', p.version, 'rules', p.rules,
+    'profiles', (select coalesce(jsonb_agg(jsonb_build_object('id', p.id, 'scope', p.scope, 'version', p.version, 'rules', p.rules,
         'approved', exists (select 1 from public.weekly_profile_approvals a where a.profile_id = p.id)) order by p.version), '[]')
         from public.weekly_editorial_profiles p),
     'versions', (select coalesce(jsonb_agg(jsonb_build_object('id', s.id, 'stage', s.stage, 'created_at', s.created_at,
@@ -839,7 +1036,7 @@ begin
         'library_version_id', s.library_version_id, 'profile_id', s.profile_id, 'provider', s.provider, 'model', s.model,
         'body', s.body, 'body_sha256', s.body_sha256, 'checks', s.checks, 'lessons_included', s.lessons_included,
         'status', public.weekly_version_status(s.id),
-        'approvals', (select coalesce(jsonb_agg(jsonb_build_object('approved_by', a.approved_by, 'approved_at', a.approved_at,
+        'approvals', (select coalesce(jsonb_agg(jsonb_build_object('kind', a.approval_kind, 'approved_by', a.approved_by, 'approved_at', a.approved_at,
             'body_sha256', a.body_sha256, 'this_version', a.body_sha256 = s.body_sha256, 'selected_index', a.selected_index,
             'rubric', a.rubric, 'high_risk_ack', a.high_risk_ack, 'note', a.note) order by a.approved_at), '[]')
             from public.weekly_script_approvals a where a.script_id = s.id),
@@ -860,7 +1057,7 @@ begin
         'human', (select jsonb_build_object('approvals', count(*), 'rubric_totals', coalesce(jsonb_agg(
                      (select sum(value::integer) from jsonb_each_text(a.rubric))) filter (where a.rubric is not null), '[]'))
                   from public.weekly_script_approvals a join public.weekly_scripts s on s.id = a.script_id
-                  where s.topic = p_topic and s.stage = 'script'),
+                  where s.topic = p_topic and s.stage = 'script' and a.approval_kind = 'editorial'),
         'editing', (select jsonb_build_object('rewrites', count(*) filter (where c.decision = 'rewrite'),
                        'reviews', count(*), 'note', 'Clock time between versions is not active editing time.')
                     from public.weekly_corrections c join public.weekly_scripts s on s.id = c.script_id where s.topic = p_topic),
@@ -907,7 +1104,7 @@ end $$;
 -- ── service functions (the two workflows; service_role only) ──────────────────────────────────────────────────────
 create or replace function public.weekly_run_claim(p_run uuid) returns jsonb
 language plpgsql security definer set search_path = public as $$
-declare r public.weekly_runs; lv public.weekly_library_versions;
+declare r public.weekly_runs; lv public.weekly_library_versions; tv public.weekly_scripts;
 begin
   update public.weekly_runs set status = 'running', started_at = now() where id = p_run and status = 'queued' returning * into r;
   if r.id is null then raise exception 'run is not queued' using errcode = '55000'; end if;
@@ -916,8 +1113,14 @@ begin
       'answer', (select jsonb_build_object('id', a.id, 'raw_text', a.raw_text, 'raw_sha256', a.raw_sha256)
                  from public.weekly_research_answers a where a.id = (r.input ->> 'answer_id')::uuid));
   end if;
+  if r.kind = 'title_check' then
+    select v.* into tv from public.weekly_scripts v where v.id = (r.input ->> 'version_id')::uuid;
+    r.input := r.input || jsonb_build_object('library_version_id', tv.library_version_id, 'profile_id', tv.profile_id, 'depends_on', tv.depends_on);
+  end if;
   select * into lv from public.weekly_library_versions where id = (r.input ->> 'library_version_id')::uuid;
   return jsonb_build_object('run', r.id, 'kind', r.kind, 'mode', r.kind, 'topic', r.topic, 'library_version', lv.n,
+    'title_version', case when r.kind = 'title_check' then jsonb_build_object('id', tv.id, 'body', tv.body, 'body_sha256', tv.body_sha256) end,
+    'script', (select sv.body from public.weekly_scripts sv where sv.id = (r.input ->> 'depends_on')::uuid and sv.stage = 'script'),
     'findings', (select coalesce(jsonb_agg(jsonb_build_object('claim_id', f.finding_key || '@' || f.version, 'statement', f.statement,
         'qualifiers', f.qualifiers, 'uncertainty', f.uncertainty, 'scope', f.scope,
         'quotes', (select coalesce(jsonb_agg(w.quote order by w.created_at) filter (where w.quote is not null), '[]')
@@ -926,8 +1129,13 @@ begin
         from public.weekly_library_version_findings x join public.weekly_findings f on f.id = x.finding_id
         where x.library_version_id = lv.id),
     'profile', (select p.rules from public.weekly_editorial_profiles p where p.id = (r.input ->> 'profile_id')::uuid),
+    'profile_version', (select p.version from public.weekly_editorial_profiles p where p.id = (r.input ->> 'profile_id')::uuid),
     'angle', (select d.body -> 'angles' -> (r.input ->> 'selected_index')::integer from public.weekly_scripts d
               where d.id = (case r.kind when 'outline' then (r.input ->> 'depends_on')::uuid
+                                        when 'titles' then (select o.depends_on from public.weekly_scripts o where o.id =
+                                          (select sv.depends_on from public.weekly_scripts sv where sv.id = (r.input ->> 'depends_on')::uuid))
+                                        when 'title_check' then (select o.depends_on from public.weekly_scripts o where o.id =
+                                          (select sv.depends_on from public.weekly_scripts sv where sv.id = (r.input ->> 'depends_on')::uuid))
                                         else (select o.depends_on from public.weekly_scripts o where o.id = (r.input ->> 'depends_on')::uuid) end)),
     'outline', (select o.body from public.weekly_scripts o where o.id = (r.input ->> 'depends_on')::uuid and o.stage = 'outline'),
     'parent', (select jsonb_build_object('body', ps.body, 'segment_index', (r.input ->> 'segment_index')::integer,
@@ -992,15 +1200,16 @@ language plpgsql security definer set search_path = public as $$
 declare r public.weekly_runs; sid uuid; retrieved uuid[]; included uuid[]; l uuid; asmt jsonb; stg text; lib text[]; bad text[];
         newtext text;
 begin
-  select * into r from public.weekly_runs where id = p_run and kind in ('angles', 'outline', 'script', 'rewrite') and status = 'running';
+  select * into r from public.weekly_runs where id = p_run and kind in ('angles', 'outline', 'script', 'rewrite', 'titles') and status = 'running';
   if r.id is null then raise exception 'run is not a running writing run' using errcode = '55000'; end if;
-  stg := case r.kind when 'rewrite' then 'script' else r.kind end;
+  stg := case r.kind when 'rewrite' then 'script' when 'titles' then 'title' else r.kind end;
   lib := public.weekly_library_claim_ids((r.input ->> 'library_version_id')::uuid);
   -- every finding id a draft names must be pinned in its library version
   select coalesce(array_agg(distinct x), '{}') into bad from (
     select jsonb_array_elements_text(coalesce(a -> 'finding_ids', '[]')) x from jsonb_array_elements(coalesce(p_payload -> 'body' -> 'angles', '[]')) a
     union all select jsonb_array_elements_text(coalesce(b -> 'finding_ids', '[]')) from jsonb_array_elements(coalesce(p_payload -> 'body' -> 'beats', '[]')) b
-    union all select jsonb_array_elements_text(coalesce(g -> 'claim_ids', '[]')) from jsonb_array_elements(coalesce(p_payload -> 'body' -> 'segments', '[]')) g) t
+    union all select jsonb_array_elements_text(coalesce(g -> 'claim_ids', '[]')) from jsonb_array_elements(coalesce(p_payload -> 'body' -> 'segments', '[]')) g
+    union all select jsonb_array_elements_text(coalesce(c -> 'input' -> 'supporting_claim_ids', '[]')) from jsonb_array_elements(coalesce(p_payload -> 'body' -> 'candidates', '[]')) c) t
     where x <> all (lib);
   if cardinality(bad) > 0 then raise exception 'cites findings not in the pinned library: %', array_to_string(bad, ', ') using errcode = '22023'; end if;
   if stg = 'angles' and exists (select 1 from jsonb_array_elements(coalesce(p_payload -> 'body' -> 'angles', '[]')) a
@@ -1039,17 +1248,37 @@ begin
   return sid;
 end $$;
 
+-- The mechanical title checks of one title version (title_check run). Records the checks against the body hash
+-- the run read, so a check never attaches to a different text.
+create or replace function public.weekly_title_check_record(p_run uuid, p_body_sha256 text, p_checks jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare r public.weekly_runs;
+begin
+  select * into r from public.weekly_runs where id = p_run and kind = 'title_check' and status = 'running';
+  if r.id is null then raise exception 'run is not a running title check' using errcode = '55000'; end if;
+  if p_body_sha256 is distinct from (select body_sha256 from public.weekly_scripts where id = (r.input ->> 'version_id')::uuid) then
+    raise exception 'the checks were made on a different text' using errcode = '22023';
+  end if;
+  insert into public.weekly_cost_entries (run_id, category, cost_type, scope, note)
+    values (r.id, 'verification', 'runner_minutes', 'report', 'title checks on a GitHub runner (no AI call)');
+  update public.weekly_runs set status = 'done', finished_at = now(),
+    result = jsonb_build_object('body_sha256', p_body_sha256, 'checks', p_checks) where id = r.id;
+end $$;
+
 -- ── function grants ───────────────────────────────────────────────────────────────────────────────────────────────
 do $$
 declare f text;
 begin
   foreach f in array array['weekly_sha256(text)', 'weekly_append_only()', 'weekly_library_guard()', 'weekly_lesson_use_guard()', '_wk_dispatch(text,uuid)',
     'weekly_scripts_lineage_guard()', 'weekly_corrections_guard()', 'weekly_version_status(uuid)', 'weekly_library_claim_ids(uuid)',
-    'weekly_rubric_problems(jsonb)', '_wk_queue(text,text,jsonb,text)',
+    'weekly_rubric_problems(jsonb)', '_wk_queue(text,text,jsonb,text)', 'weekly_title_checks(uuid)', 'weekly_title_review_status(uuid)',
+    'hs_weekly_title_propose(uuid,jsonb,uuid,uuid)', 'hs_weekly_title_refit(uuid,uuid)', 'hs_weekly_titles_request(uuid,uuid)',
+    'hs_weekly_title_decide(uuid,integer,text,text)', 'hs_weekly_title_evidence_review(uuid,text,text,boolean)',
+    'hs_weekly_title_publication_approve(uuid,text)', 'weekly_title_check_record(uuid,text,jsonb)',
     'hs_weekly_angles_request(uuid,uuid,uuid)', 'hs_weekly_outline_request(uuid,uuid)', 'hs_weekly_version_approve(uuid,integer,jsonb,boolean,text)',
     'hs_weekly_passage_review(uuid,integer,text,text,text,text[],text,text)',
     'hs_weekly_request_research(text,text)', 'hs_weekly_paste_answer(uuid,text)', 'hs_weekly_finding_decide(uuid,text,text)',
-    'hs_weekly_library_seal(text)', 'hs_weekly_profile_create(jsonb)', 'hs_weekly_profile_approve(uuid)',
+    'hs_weekly_library_seal(text)', 'hs_weekly_profile_create(jsonb,text)', 'hs_weekly_profile_approve(uuid)',
     'hs_weekly_script_request(uuid)', 'hs_weekly_correction_save(uuid,integer,text,text,text)',
     'hs_weekly_lesson_propose(uuid,text,jsonb)', 'hs_weekly_lesson_decide(uuid,text)', 'hs_weekly_lesson_use_review(bigint,text,text)',
     'hs_weekly_subscription_record(text,text,numeric,text,boolean)', 'hs_weekly_overview(text)', 'hs_weekly_export(text)',
@@ -1057,16 +1286,19 @@ begin
     execute format('revoke all on function public.%s from public, anon, authenticated', f);
   end loop;
   foreach f in array array['hs_weekly_request_research(text,text)', 'hs_weekly_paste_answer(uuid,text)',
-    'hs_weekly_finding_decide(uuid,text,text)', 'hs_weekly_library_seal(text)', 'hs_weekly_profile_create(jsonb)',
+    'hs_weekly_finding_decide(uuid,text,text)', 'hs_weekly_library_seal(text)', 'hs_weekly_profile_create(jsonb,text)',
     'hs_weekly_profile_approve(uuid)', 'hs_weekly_script_request(uuid)', 'hs_weekly_angles_request(uuid,uuid,uuid)',
     'hs_weekly_outline_request(uuid,uuid)', 'hs_weekly_version_approve(uuid,integer,jsonb,boolean,text)',
-    'hs_weekly_passage_review(uuid,integer,text,text,text,text[],text,text)', 'hs_weekly_correction_save(uuid,integer,text,text,text)', 'hs_weekly_lesson_propose(uuid,text,jsonb)',
+    'hs_weekly_passage_review(uuid,integer,text,text,text,text[],text,text)', 'hs_weekly_correction_save(uuid,integer,text,text,text)',
+    'hs_weekly_title_propose(uuid,jsonb,uuid,uuid)', 'hs_weekly_title_refit(uuid,uuid)', 'hs_weekly_titles_request(uuid,uuid)',
+    'hs_weekly_title_decide(uuid,integer,text,text)', 'hs_weekly_title_evidence_review(uuid,text,text,boolean)',
+    'hs_weekly_title_publication_approve(uuid,text)', 'hs_weekly_lesson_propose(uuid,text,jsonb)',
     'hs_weekly_lesson_decide(uuid,text)', 'hs_weekly_lesson_use_review(bigint,text,text)',
     'hs_weekly_subscription_record(text,text,numeric,text,boolean)', 'hs_weekly_overview(text)', 'hs_weekly_export(text)'] loop
     execute format('grant execute on function public.%s to authenticated', f);
   end loop;
   foreach f in array array['weekly_run_claim(uuid)', 'weekly_run_fail(uuid,text)', 'weekly_research_record(uuid,jsonb)',
-    'weekly_script_record(uuid,jsonb)'] loop
+    'weekly_script_record(uuid,jsonb)', 'weekly_title_check_record(uuid,text,jsonb)'] loop
     execute format('grant execute on function public.%s to service_role', f);
   end loop;
 end $$;
