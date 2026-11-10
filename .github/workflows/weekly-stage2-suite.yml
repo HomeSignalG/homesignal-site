@@ -7,12 +7,14 @@ on:
     paths:
       - 'docs/weekly-stage2-slice.sql'
       - 'test/weekly_stage2_pg/**'
+      - 'test/fixtures/weekly-workbench-*.json'
       - '.github/workflows/weekly-stage2-suite.yml'
   push:
     branches: [main]
     paths:
       - 'docs/weekly-stage2-slice.sql'
       - 'test/weekly_stage2_pg/**'
+      - 'test/fixtures/weekly-workbench-*.json'
       - '.github/workflows/weekly-stage2-suite.yml'
   workflow_dispatch: {}
 

@@ -1,0 +1,169 @@
+{
+ "after_body": {
+  "segments": [
+   {
+    "beat": "collision",
+    "claim_ids": [
+     "air-third-party-reports@1",
+     "air-program-background@1",
+     "air-warning-effect@1",
+     "air-proposal-status@1"
+    ],
+    "story": "air",
+    "text": "Under an EPA proposal, reports of company emissions detected by third parties would stop reaching the agency, and residents near oil and gas sites could lose an early warning about large methane releases, an estimated effect. The change is proposed, not final. The Super Emitter Program behind those reports started in 2024. It is one of several monitoring tools the agency uses, and officials say it can find problems that routine monitoring misses."
+   },
+   {
+    "beat": "landing",
+    "claim_ids": [
+     "air-proposal-status@1"
+    ],
+    "story": "air",
+    "text": "TEST DATA: For now this is a proposal, not a final rule, and residents can still comment on it."
+   }
+  ]
+ },
+ "after_checks": {
+  "ceiling_words": 750,
+  "certifies_accuracy": false,
+  "disclaimer": "Automated checks; not a certification of factual accuracy.",
+  "estimated_seconds_from_words": 37,
+  "high_risk": [],
+  "label": "mechanical checks passed",
+  "material_issues": [],
+  "ok": true,
+  "opening": {
+   "conflict_at_word": 0,
+   "limit": 45,
+   "stake_at_word": 18
+  },
+  "problems": [],
+  "quotes": [],
+  "rewrite": {
+   "action": "conflict_first",
+   "segment_index": 0
+  },
+  "runtime_note": "An estimate from word count, not a measured narration time.",
+  "target_words": 450,
+  "warnings": [],
+  "word_counts": {
+   "notes_and_source_words": 0,
+   "spoken_words": 92
+  },
+  "words": 92
+ },
+ "before_body": {
+  "segments": [
+   {
+    "beat": "collision",
+    "claim_ids": [
+     "air-third-party-reports@1",
+     "air-program-background@1",
+     "air-warning-effect@1",
+     "air-proposal-status@1"
+    ],
+    "story": "air",
+    "text": "For several years the Environmental Protection Agency has run a program that collects reports about large methane releases at oil and gas sites across the country. The Super Emitter Program started in 2024. It is one of several monitoring tools the agency uses, and officials say it can find problems that routine monitoring misses. Under the proposal, reports of company emissions detected by third parties would stop reaching EPA. Residents near these sites could lose an early warning, an estimated effect. The change is proposed, not final."
+   },
+   {
+    "beat": "landing",
+    "claim_ids": [
+     "air-proposal-status@1"
+    ],
+    "story": "air",
+    "text": "TEST DATA: For now this is a proposal, not a final rule, and residents can still comment on it."
+   }
+  ]
+ },
+ "before_checks": {
+  "ceiling_words": 750,
+  "certifies_accuracy": false,
+  "disclaimer": "Automated checks; not a certification of factual accuracy.",
+  "estimated_seconds_from_words": 42,
+  "high_risk": [],
+  "label": "mechanical checks passed",
+  "lesson_assessments": [],
+  "material_issues": [],
+  "ok": true,
+  "opening": {
+   "conflict_at_word": 54,
+   "limit": 45,
+   "stake_at_word": 69
+  },
+  "problems": [],
+  "quotes": [],
+  "runtime_note": "An estimate from word count, not a measured narration time.",
+  "target_words": 450,
+  "warnings": [
+   {
+    "detail": "the conflict starts at word 54 (aim: within 45)",
+    "kind": "automated assessment, not a factual finding",
+    "type": "delayed_conflict"
+   },
+   {
+    "detail": "no public stake named in the first 45 words",
+    "kind": "automated assessment, not a factual finding",
+    "type": "late_public_stake"
+   }
+  ],
+  "word_counts": {
+   "notes_and_source_words": 0,
+   "spoken_words": 106
+  },
+  "words": 106
+ },
+ "findings": [
+  {
+   "claim_id": "air-proposal-status@1",
+   "qualifiers": [
+    "proposed"
+   ],
+   "quotes": [
+    "TEST DATA: this action proposes to amend the rule"
+   ],
+   "scope": "federal",
+   "statement": "TEST DATA: The EPA change is proposed, not final.",
+   "uncertainty": null
+  },
+  {
+   "claim_id": "air-third-party-reports@1",
+   "qualifiers": [
+    "proposed"
+   ],
+   "quotes": [
+    "TEST DATA: notifications from third parties would no longer be submitted to the agency"
+   ],
+   "scope": "federal",
+   "statement": "TEST DATA: Under the proposal, reports of company emissions detected by third parties would stop reaching EPA.",
+   "uncertainty": null
+  },
+  {
+   "claim_id": "air-program-background@1",
+   "qualifiers": [],
+   "quotes": [],
+   "scope": "federal",
+   "statement": "TEST DATA: The Super Emitter Program started in 2024 and is one of several EPA monitoring tools that officials say can find problems routine monitoring misses.",
+   "uncertainty": null
+  },
+  {
+   "claim_id": "air-warning-effect@1",
+   "qualifiers": [
+    "estimated"
+   ],
+   "quotes": [],
+   "scope": "local",
+   "statement": "TEST DATA: Residents near oil and gas sites could lose an early warning about large methane releases.",
+   "uncertainty": "TEST DATA: depends on how often reports led to action"
+  }
+ ],
+ "note": "TEST DATA from homesignal-ingest tests/weekly_workbench_demo.py --json",
+ "review": {
+  "action": "conflict_first",
+  "finding_ids": [
+   "air-third-party-reports@1",
+   "air-warning-effect@1"
+  ],
+  "lesson_scope": "reusable",
+  "reason": "The conflict arrives after more than 50 words of background, so a listener does not yet know why it matters.",
+  "segment_index": 0
+ }
+}

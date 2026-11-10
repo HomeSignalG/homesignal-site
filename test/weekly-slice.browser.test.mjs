@@ -1,38 +1,26 @@
-// Real Chromium: the Tab 20 Stage 2 proof-slice screens (lib/acq-weekly-slice.js) against a STUB client.
-// Every value below is TEST DATA, shaped like public.hs_weekly_overview() in docs/weekly-stage2-slice.sql; none is real
-// research. No request leaves the page. Run: node test/weekly-slice.browser.test.mjs
+// Real Chromium: the Tab 20 Stage 2 slice screens, including the editorial workbench (lib/acq-weekly-slice.js), against a
+// STUB client. The overview is test/fixtures/weekly-workbench-overview.json: the real answer of hs_weekly_overview on a
+// disposable database (built by test/weekly_stage2_pg/build_demo_fixture.py from the "Put the conflict first"
+// demonstration). Every value is TEST DATA. No request leaves the page.
+//   node test/weekly-slice.browser.test.mjs [screenshot-dir]
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const fs = require('node:fs');
+const path = require('node:path');
 let fails = 0;
 const ok = (c, name) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + name); if (!c) fails++; };
 const read = (p) => fs.readFileSync(new URL('../' + p, import.meta.url), 'utf8');
+const shots = process.argv[2] || '';
 const style = read('acquisition.html').match(/<style>[\s\S]*?<\/style>/)[0];
 const HTML = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + style +
   '</head><body><div id="ws"></div><script src="/ws.js"></script></body></html>';
-
-const OV = {
-  topic: 'Air Quality',
-  requests: [{ id: 'q1', request_text: 'x', created_at: '2026-11-10T12:00:00Z' }],
-  runs: [{ id: 'r1', kind: 'research_ingest', status: 'done', error: null }],
-  findings: [
-    { id: 'f1', finding_key: 'air-proposal-status', version: 2, statement: 'TEST: the change is proposed, not final <b>x</b>', qualifiers: ['proposed'],
-      uncertainty: 'TEST', is_latest: true, human_decision: 'pending',
-      sources: [{ url: 'https://example.test/a', publisher: 'TEST Agency', quote_match: 'exact', date_extraction: 'not_stated', published_date: null },
-                { url: 'javascript:alert(1)', publisher: 'TEST bad link', quote_match: 'not_checked', date_extraction: 'unknown', fetch_error: 'refused: scheme' }] },
-    { id: 'f0', finding_key: 'air-proposal-status', version: 1, statement: 'TEST old version', is_latest: false, human_decision: 'approved', sources: [] }],
-  library_versions: [{ id: 'lv1', n: 1, sealed: true, findings: 2 }],
-  profiles: [{ id: 'p1', version: 1, rules: ['TEST rule'], approved: true }],
-  scripts: [{ id: 's1', body: { segments: [{ text: 'TEST spoken line about company emissions detected by third parties.', claim_ids: ['air-proposal-status@1'] }] },
-    checks: { label: 'mechanical checks passed', certifies_accuracy: false }, approved: false,
-    lesson_uses: [{ id: 7, lesson_id: 'l1', retrieved: true, included: true, assessed: 'applied', assessed_by: 'rule', assessment_note: 'avoid_phrase absent', reviewer_decision: 'pending' }] }],
-  lessons: [{ id: 'l1', text: 'Say "company emissions detected by third parties", not "third-party leaks".', test: { type: 'avoid_phrase', value: 'third-party leaks' }, status: 'approved' }],
-  corrections: [{ id: 'c1', script_id: 's0', segment_index: 0, before_text: 'TEST third-party leaks', after_text: 'TEST company emissions detected by third parties' }],
-};
+const OV = JSON.parse(read('test/fixtures/weekly-workbench-overview.json'));
+const scripts = OV.versions.filter((v) => v.stage === 'script');
+const v1 = scripts.find((v) => v.status.superseded), v2 = scripts.find((v) => !v.status.superseded);
 
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 }, deviceScaleFactor: shots ? 2 : 1 });
 const outside = [];
 await ctx.route('**/*', (r) => {
   const u = new URL(r.request().url());
@@ -48,66 +36,98 @@ await page.goto('https://ws.test/');
 await page.evaluate((OV) => {
   window.calls = [];
   window.fixture = OV;
-  window.client = { rpc: (n, a) => { window.calls.push([n, a]); return Promise.resolve(n === 'hs_weekly_overview' ? { data: window.fixture, error: null } : { data: 'ok', error: null }); } };
+  window.client = { rpc: (n, a) => { window.calls.push([n, a]); return Promise.resolve(n === 'hs_weekly_overview' ? { data: window.fixture, error: null } : { data: { ok: true }, error: null }); } };
   return window.HS.acqWeeklySlice.mount(window.client, document.getElementById('ws'));
 }, OV);
-const T = () => page.locator('#ws').innerText();
+const T = (sel) => page.locator(sel || '#ws').innerText();
 let t = await T();
 
-ok(t.includes('Topic: Air Quality') && t.includes('Quality-of-Life Weekly Report: Air') && t.includes('Who Saves, Who Pays?'), '1a the Air topic and working title');
-const req = await page.locator('#ws-reqtext').inputValue();
-ok(req.includes('WEEKLY-ANSWER v1') && req.includes('Super Emitter Program') && req.includes('proposed or final'), '1b the request names the answer format, the subject and the proposed/final rule');
-ok(/Nothing is sent to Perplexity from here/.test(t), '1c the research step is manual');
-// three labels, separate; no "verified"
-ok(t.includes('Quote found (exact)') && t.includes('Publication date not stated') && t.includes('Your decision: pending'), '2a quote match, date and decision are shown separately');
-ok(!/verified/i.test(await page.locator('#ws-findings').innerText()), '2b no finding is labelled verified');
-ok(t.includes('Quote not checked (page not read)') && t.includes('Publication date unknown') && t.includes('refused: scheme'), '2c an unread page says so, and its date stays unknown');
-ok(await page.locator('#ws-findings a[href^="javascript:"]').count() === 0, '2d a javascript: link is not linked');
-ok(await page.locator('#ws-findings b').first().innerText() === 'TEST: the change is proposed, not final <b>x</b>', '2e statements are escaped');
-ok(!t.includes('TEST old version'), '2f only the latest version of a finding is listed for review');
-// scripts
-ok(t.includes('mechanical checks passed') && t.includes('Automated checks; not a certification of factual accuracy.'), '3a checks are labelled mechanical, not a certification');
-const spoken = await page.locator('.ws-spoken').innerText();
-ok(!/air-proposal-status|\[\d+\]|https?:/.test(spoken) && await page.locator('.ws-chip').innerText() === 'air-proposal-status@1', '3b claim IDs sit beside the spoken text, never inside it');
-const uses = await page.locator('.ws-uses').innerText();
-ok(/Retrieved[\s\S]*Included in prompt[\s\S]*Automated assessment[\s\S]*Your review/.test(uses) && /applied \(rule\)/.test(uses) && /pending/.test(uses), '3c the four lesson-use states are separate columns');
-// actions call exactly the admin functions
-await page.locator('button[data-ws="decide"][data-d="approved"]').click();
-await page.locator('.ws-corr').fill('TEST corrected line');
-await page.locator('button[data-ws="correct"]').click();
-await page.locator('.ws-ltext').fill('TEST lesson');
-await page.locator('.ws-lavoid').fill('third-party leaks');
-await page.locator('button[data-ws="lesson"]').click();
-await page.locator('button[data-ws="use"][data-d="confirmed"]').click();
-await page.locator('button[data-ws="draft"]').click();
-await page.locator('#ws-answer').fill('TEST pasted answer');
-await page.locator('button[data-ws="paste"]').click();
-await page.waitForFunction(() => window.calls.filter((c) => c[0] !== 'hs_weekly_overview').length >= 6);
-const calls = await page.evaluate(() => window.calls);
-const names = calls.map((c) => c[0]).filter((n) => n !== 'hs_weekly_overview');
-ok(JSON.stringify(names) === JSON.stringify(['hs_weekly_finding_decide', 'hs_weekly_correction_save', 'hs_weekly_lesson_propose',
-  'hs_weekly_lesson_use_review', 'hs_weekly_script_request', 'hs_weekly_paste_answer']), '4a each button calls its admin function, in order');
-const arg = (n) => calls.find((c) => c[0] === n)[1];
-ok(arg('hs_weekly_finding_decide').p_decision === 'approved' && arg('hs_weekly_finding_decide').p_finding === 'f1', '4b decide sends the finding and the decision');
-ok(arg('hs_weekly_lesson_propose').p_test.type === 'avoid_phrase' && arg('hs_weekly_lesson_propose').p_test.value === 'third-party leaks', '4c a lesson carries its avoid-phrase test');
-ok(arg('hs_weekly_script_request').p_library_version === 'lv1' && arg('hs_weekly_script_request').p_profile === 'p1', '4d a draft is requested from the sealed version and approved profile');
-ok(arg('hs_weekly_lesson_use_review').p_use === 7 && arg('hs_weekly_lesson_use_review').p_decision === 'confirmed', '4e confirming sends the use id');
-ok(calls.every((c) => /^hs_weekly_/.test(c[0])), '4f only hs_weekly_* admin functions are called');
-// refusals and gating
-await page.evaluate(() => { window.fixture = Object.assign({}, window.fixture, { profiles: [{ id: 'p2', version: 1, rules: ['r'], approved: false }] });
-  window.client.rpc('noop', {}); });
-await page.evaluate(() => window.HS.acqWeeklySlice.mount(window.client, document.getElementById('ws')));
-ok(await page.locator('button[data-ws="draft"]').isDisabled(), '5a no draft without an approved profile');
-await page.evaluate(() => { window.client.rpc = (n) => Promise.resolve(n === 'hs_weekly_overview' ? { data: window.fixture, error: null } : { data: null, error: { message: 'not authorized' } }); });
-await page.locator('button[data-ws="decide"][data-d="rejected"]').click();
+ok(t.includes('Topic: Air Quality') && t.includes('Quality-of-Life Weekly Report: Air'), '1a the Air topic and working title');
+ok(/Nothing is sent to Perplexity from here/.test(t), '1b the research step is manual');
+ok(t.includes('Quote found (exact)') && t.includes('Your decision: approved') && !/verified/i.test(await T('#ws-findings')), '1c quote match and decision are separate; nothing says verified');
+// angle cards
+const ang = await T('#ws-angles');
+ok((await page.locator('#ws-angles .ws-card').count()) === 3 && ang.includes('Why it differs') && ang.includes('opens on the mechanism'), '2a three cards, each with why it differs');
+ok(/may share evidence\. You decide whether they are meaningfully different/.test(ang), '2b distinctness is the reviewer’s decision');
+ok(ang.includes('Approved (this version)') && (await page.locator('#ws-angles input[name="ws-angle"]:checked').getAttribute('value')) === '0', '2c the approved selection is shown');
+ok(ang.includes('public_interest') && ang.includes('contradiction') && ang.includes('misleading_framing'), '2d categories may differ but are not required to');
+// outline
+const out = await T('#ws-outline');
+ok(out.includes('collision') && out.includes('landing') && out.includes('a guide, not fixed wording') && out.includes('Approved (this version)'), '3a the outline and its status');
+// editor
+const ed = await T('#ws-scripts');
+ok((await page.locator('.ws-grid .ws-left').count()) === 1 && (await page.locator('.ws-grid .ws-center').count()) === 1 &&
+  (await page.locator('.ws-grid .ws-right').count()) === 1 && (await page.locator('.ws-bottom').count()) === 1, '4a left, center, right and bottom panes');
+ok(ed.includes('Evidence') && ed.includes('Quotes') && ed.includes('Unresolved questions') && ed.includes('how often reports led to action'), '4b left: angle, evidence, quotes, unresolved questions');
+const spoken = await page.locator('.ws-center .ws-spoken').first().innerText();
+ok(spoken.startsWith('Under an EPA proposal') && !/@\d|https?:/.test(spoken) && (await page.locator('.ws-center .ws-seg').first().locator('.ws-chip').count()) === 4, '4c center: version 2 by beat, claim ids beside the spoken text');
+ok((await page.locator('.ws-center .ws-beat').first().innerText()).toLowerCase().startsWith('collision'), '4d passages are labelled by beat');
+ok((await page.locator('.ws-action option').count()) >= 7 && ed.includes('Put the conflict first') && ed.includes('Strengthen the closing'), '4e the seven rewrite actions are offered');
+ok(ed.includes('Quote: not found in the sources reviewed') && ed.includes('Quote: contradicted by evidence'), '4f reviewer quote findings are separate choices');
+ok((await T('.ws-spokenwords')) === String(v2.checks.word_counts.spoken_words) && ed.includes('notes and sources: 0') && ed.includes('No rhythm warnings.'), '4g right: spoken words counted apart; no warnings on version 2');
+ok((await page.locator('.ws-dim').count()) === 7 && ed.includes('Provisional internal criteria, not validated performance benchmarks') && ed.includes('factual discipline = 4'), '4h the seven-dimension rubric and its gates');
+const bot = await T('.ws-bottom');
+ok(bot.includes('Put the conflict first.') && bot.includes('For several years') && bot.includes('Under an EPA proposal') && bot.includes('lesson reusable'), '4i bottom: before and after with the reason, findings and lesson scope');
+ok(bot.includes('Superseded by a newer version') && bot.includes('Not approved') && bot.includes('No decision on this version.'), '4j version history: the new version needs its own approval');
+ok(bot.includes('Audience outcomes: not collected') && bot.includes('No virality or improvement is claimed'), '4k measurement kept apart; no audience or virality claim');
+if (shots) {
+  await page.locator('#ws-angles').screenshot({ path: path.join(shots, 'weekly-workbench-angles.png') });
+  await page.locator('#ws-scripts').screenshot({ path: path.join(shots, 'weekly-workbench-editor.png') });
+  await page.locator('.ws-bottom').screenshot({ path: path.join(shots, 'weekly-workbench-before-after.png') });
+}
+// version 1 (open from history): the weak opening and its warnings; no approval offered on a superseded version
+await page.locator('button[data-ws="open"]').first().click();
+const ed1 = await T('#ws-scripts');
+ok(ed1.includes('delayed_conflict') && ed1.includes('late_public_stake') && ed1.includes('automated assessments, not factual findings'), '5a version 1 shows its rhythm warnings, labelled automated');
+ok((await page.locator('button[data-ws="approve-script"]').count()) === 0 && (await page.locator('button[data-ws="rewrite"]').count()) === 0, '5b a superseded version cannot be approved or rewritten');
+if (shots) await page.locator('#ws-scripts').screenshot({ path: path.join(shots, 'weekly-workbench-version1.png') });
+await page.locator('button[data-ws="open"]').last().click();
+// actions call exactly the admin functions with the right arguments
+const nCalls = async () => (await page.evaluate(() => window.calls)).filter((c) => c[0] !== 'hs_weekly_overview');
+await page.locator('button[data-ws="approve-script"]').click();
+ok((await T('.ws-bad')).includes('Score all seven rubric dimensions'), '6a approval needs all seven scores');
+for (const [d, v] of [['hook_conflict', 3], ['human_stakes', 3], ['emotional_force', 3], ['argument_coherence', 3], ['factual_discipline', 4], ['spoken_clarity', 3], ['closing', 3]])
+  await page.locator('.ws-dim[data-d="' + d + '"]').fill(String(v));
+await page.locator('button[data-ws="approve-script"]').click();
+await page.waitForFunction(() => window.calls.some((c) => c[0] === 'hs_weekly_version_approve'));
+let c = (await nCalls()).find((x) => x[0] === 'hs_weekly_version_approve')[1];
+ok(c.p_version === v2.id && c.p_rubric.factual_discipline === 4 && Object.keys(c.p_rubric).length === 7 && c.p_high_risk_ack === false, '6b approval binds the open version with the rubric');
+await page.locator('button[data-ws="rewrite"]').first().click();
+ok((await T('.ws-bad')).includes('Say why'), '6c a rewrite needs a reason');
+await page.locator('.ws-reason').first().fill('TEST DATA: still slow to the point');
+await page.locator('.ws-action').first().selectOption('tighten');
+await page.locator('.ws-scope').first().selectOption('reusable');
+await page.locator('button[data-ws="rewrite"]').first().click();
+await page.waitForFunction(() => window.calls.some((c) => c[0] === 'hs_weekly_passage_review'));
+c = (await nCalls()).find((x) => x[0] === 'hs_weekly_passage_review')[1];
+ok(c.p_script === v2.id && c.p_decision === 'rewrite' && c.p_action === 'tighten' && c.p_lesson_scope === 'reusable' &&
+  JSON.stringify(c.p_finding_ids) === JSON.stringify(v2.body.segments[0].claim_ids), '6d a rewrite keeps the passage’s findings');
+await page.locator('.ws-review').first().selectOption('quote_contradicted');
+await page.locator('.ws-reason').first().fill('TEST DATA: a later finding contradicts it');
+await page.locator('.ws-fids').first().fill('air-proposal-status@1');
+await page.locator('button[data-ws="review"]').first().click();
+await page.waitForFunction(() => window.calls.filter((c) => c[0] === 'hs_weekly_passage_review').length >= 2);
+c = (await nCalls()).filter((x) => x[0] === 'hs_weekly_passage_review')[1][1];
+ok(c.p_decision === 'quote_contradicted' && c.p_finding_ids[0] === 'air-proposal-status@1', '6e a reviewer quote finding carries its findings');
+await page.locator('button[data-ws="approve-angle"]').click();
+await page.waitForFunction(() => window.calls.filter((c) => c[0] === 'hs_weekly_version_approve').length >= 2);
+c = (await nCalls()).filter((x) => x[0] === 'hs_weekly_version_approve')[1][1];
+ok(c.p_selected === 0 && c.p_rubric === null, '6f approving an angle sends the selected card');
+ok((await nCalls()).every((x) => /^hs_weekly_/.test(x[0])), '6g only hs_weekly_* admin functions are called');
+// a refused call is shown
+await page.evaluate(() => { window.client.rpc = (n) => Promise.resolve(n === 'hs_weekly_overview' ? { data: window.fixture, error: null } : { data: null, error: { message: 'outdated: the outline it was written from has a newer version' } }); });
+for (const [d, v] of [['hook_conflict', 3], ['human_stakes', 3], ['emotional_force', 3], ['argument_coherence', 3], ['factual_discipline', 4], ['spoken_clarity', 3], ['closing', 3]])
+  await page.locator('.ws-dim[data-d="' + d + '"]').fill(String(v));
+await page.locator('button[data-ws="approve-script"]').click();
 await page.waitForSelector('.ws-bad[role="alert"]');
-ok((await page.locator('.ws-bad[role="alert"]').innerText()) === 'not authorized', '5b a refused call is shown, not hidden');
+ok((await T('.ws-bad[role="alert"]')).startsWith('outdated'), '7 a refused approval is shown, not hidden');
 // phone width
 await page.setViewportSize({ width: 390, height: 844 });
 const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-ok(over <= 0, '6 no sideways scroll at 390px (' + over + 'px)');
-ok(outside.length === 0, '7a no request left the page');
-ok(errors.length === 0, '7b no script errors or dialogs' + (errors.length ? ': ' + errors.join(' | ') : ''));
+ok(over <= 0, '8 no sideways scroll at 390px (' + over + 'px)');
+if (shots) await page.locator('#ws-scripts').screenshot({ path: path.join(shots, 'weekly-workbench-phone.png') });
+ok(outside.length === 0, '9a no request left the page');
+ok(errors.length === 0, '9b no script errors or dialogs' + (errors.length ? ': ' + errors.join(' | ') : ''));
 await browser.close();
 console.log(fails ? fails + ' failed' : 'all passed');
 process.exit(fails ? 1 : 0);

@@ -1,0 +1,536 @@
+{
+ "corrections": [
+  {
+   "action": "conflict_first",
+   "after_text": "Under an EPA proposal, reports of company emissions detected by third parties would stop reaching the agency, and residents near oil and gas sites could lose an early warning about large methane releases, an estimated effect. The change is proposed, not final. The Super Emitter Program behind those reports started in 2024. It is one of several monitoring tools the agency uses, and officials say it can find problems that routine monitoring misses.",
+   "before_text": "For several years the Environmental Protection Agency has run a program that collects reports about large methane releases at oil and gas sites across the country. The Super Emitter Program started in 2024. It is one of several monitoring tools the agency uses, and officials say it can find problems that routine monitoring misses. Under the proposal, reports of company emissions detected by third parties would stop reaching EPA. Residents near these sites could lose an early warning, an estimated effect. The change is proposed, not final.",
+   "decision": "rewrite",
+   "finding_ids": [
+    "air-third-party-reports@1",
+    "air-warning-effect@1"
+   ],
+   "id": "id-01",
+   "lesson_scope": "reusable",
+   "note": null,
+   "reason": "The conflict arrives after more than 50 words of background, so a listener does not yet know why it matters.",
+   "result_script_id": "id-02",
+   "script_id": "id-03",
+   "segment_index": 0
+  }
+ ],
+ "findings": [
+  {
+   "finding_key": "air-program-background",
+   "human_decision": "approved",
+   "id": "id-04",
+   "is_latest": true,
+   "kind": "ai_draft",
+   "qualifiers": [],
+   "scope": "federal",
+   "sources": [],
+   "statement": "TEST DATA: The Super Emitter Program started in 2024 and is one of several EPA monitoring tools that officials say can find problems routine monitoring misses.",
+   "uncertainty": null,
+   "version": 1
+  },
+  {
+   "finding_key": "air-proposal-status",
+   "human_decision": "approved",
+   "id": "id-05",
+   "is_latest": true,
+   "kind": "ai_draft",
+   "qualifiers": [
+    "proposed"
+   ],
+   "scope": "federal",
+   "sources": [
+    {
+     "date_extraction": "not_stated",
+     "fetch_error": null,
+     "publication_permission": "to_confirm",
+     "published_date": null,
+     "publisher": "TEST Publisher",
+     "quote": "TEST DATA: this action proposes to amend the rule",
+     "quote_match": "exact",
+     "retrieved_at": "2026-11-10T12:00:00Z",
+     "title": "TEST page",
+     "url": "https://example.test/source-0"
+    }
+   ],
+   "statement": "TEST DATA: The EPA change is proposed, not final.",
+   "uncertainty": null,
+   "version": 1
+  },
+  {
+   "finding_key": "air-third-party-reports",
+   "human_decision": "approved",
+   "id": "id-06",
+   "is_latest": true,
+   "kind": "ai_draft",
+   "qualifiers": [
+    "proposed"
+   ],
+   "scope": "federal",
+   "sources": [
+    {
+     "date_extraction": "not_stated",
+     "fetch_error": null,
+     "publication_permission": "to_confirm",
+     "published_date": null,
+     "publisher": "TEST Publisher",
+     "quote": "TEST DATA: notifications from third parties would no longer be submitted to the agency",
+     "quote_match": "exact",
+     "retrieved_at": "2026-11-10T12:01:00Z",
+     "title": "TEST page",
+     "url": "https://example.test/source-1"
+    }
+   ],
+   "statement": "TEST DATA: Under the proposal, reports of company emissions detected by third parties would stop reaching EPA.",
+   "uncertainty": null,
+   "version": 1
+  },
+  {
+   "finding_key": "air-warning-effect",
+   "human_decision": "approved",
+   "id": "id-07",
+   "is_latest": true,
+   "kind": "ai_draft",
+   "qualifiers": [
+    "estimated"
+   ],
+   "scope": "local",
+   "sources": [],
+   "statement": "TEST DATA: Residents near oil and gas sites could lose an early warning about large methane releases.",
+   "uncertainty": "TEST DATA: depends on how often reports led to action",
+   "version": 1
+  }
+ ],
+ "lessons": [],
+ "library_versions": [
+  {
+   "findings": 4,
+   "id": "id-08",
+   "n": 1,
+   "sealed": true
+  }
+ ],
+ "measurement": {
+  "audience": {
+   "status": "not_collected"
+  },
+  "editing": {
+   "note": "Clock time between versions is not active editing time.",
+   "reviews": 1,
+   "rewrites": 1
+  },
+  "human": {
+   "approvals": 0,
+   "rubric_totals": []
+  },
+  "mechanical": {
+   "checks_passed": 2,
+   "script_versions": 2
+  }
+ },
+ "profiles": [
+  {
+   "approved": true,
+   "id": "id-09",
+   "rules": [
+    "Keep qualifications and uncertainty.",
+    "Attribute forecasts; distinguish proposed changes from final rules."
+   ],
+   "version": 1
+  }
+ ],
+ "requests": [
+  {
+   "created_at": "2026-11-10T12:02:00Z",
+   "id": "id-10",
+   "request_text": "TEST DATA: research the October 2026 EPA proposal (fixture)"
+  }
+ ],
+ "rubric": {
+  "dimensions": [
+   "hook_conflict",
+   "human_stakes",
+   "emotional_force",
+   "argument_coherence",
+   "factual_discipline",
+   "spoken_clarity",
+   "closing"
+  ],
+  "gates": [
+   "total at least 21/28",
+   "factual discipline = 4",
+   "hook, emotional force and coherence each at least 3",
+   "no unresolved material factual issue",
+   "explicit human approval"
+  ],
+  "label": "Provisional internal criteria, not validated performance benchmarks"
+ },
+ "runs": [
+  {
+   "created_at": "2026-11-10T12:03:00Z",
+   "error": null,
+   "id": "id-11",
+   "kind": "rewrite",
+   "status": "done"
+  },
+  {
+   "created_at": "2026-11-10T12:04:00Z",
+   "error": null,
+   "id": "id-12",
+   "kind": "script",
+   "status": "done"
+  },
+  {
+   "created_at": "2026-11-10T12:05:00Z",
+   "error": null,
+   "id": "id-13",
+   "kind": "outline",
+   "status": "done"
+  },
+  {
+   "created_at": "2026-11-10T12:06:00Z",
+   "error": null,
+   "id": "id-14",
+   "kind": "angles",
+   "status": "done"
+  },
+  {
+   "created_at": "2026-11-10T12:07:00Z",
+   "error": null,
+   "id": "id-15",
+   "kind": "research_ingest",
+   "status": "done"
+  }
+ ],
+ "topic": "Air Quality",
+ "versions": [
+  {
+   "approvals": [
+    {
+     "approved_at": "2026-11-10T12:08:00Z",
+     "approved_by": "founder@test.invalid",
+     "body_sha256": "8b531fb9282ab073e0213a1eb332b34f3090ac85382bcaca568be5bf233abce9",
+     "high_risk_ack": false,
+     "note": "TEST DATA: lead with the residents",
+     "rubric": null,
+     "selected_index": 0,
+     "this_version": true
+    }
+   ],
+   "body": {
+    "angles": [
+     {
+      "category": "contradiction",
+      "claim": "TEST DATA: EPA says the proposal keeps methane rules workable.",
+      "context": "TEST DATA: EPA's stated rationale; the change is proposed.",
+      "editorial_position": "TEST DATA: the stated aim and the effect pull apart.",
+      "evidence_limits": "TEST DATA: how often reports led to action is not established.",
+      "finding_ids": [
+       "air-proposal-status@1",
+       "air-third-party-reports@1",
+       "air-program-background@1",
+       "air-warning-effect@1"
+      ],
+      "opening": "TEST DATA: A warning system for large leaks could go quiet.",
+      "public_stakes": "TEST DATA: residents near sites could lose an early warning.",
+      "why_different": "TEST DATA: leads with the residents' warning."
+     },
+     {
+      "category": "public_interest",
+      "claim": "TEST DATA: EPA says the proposal keeps methane rules workable.",
+      "context": "TEST DATA: EPA's stated rationale; the change is proposed.",
+      "editorial_position": "TEST DATA: explain the reporting chain plainly.",
+      "evidence_limits": "TEST DATA: how often reports led to action is not established.",
+      "finding_ids": [
+       "air-proposal-status@1",
+       "air-third-party-reports@1",
+       "air-program-background@1",
+       "air-warning-effect@1"
+      ],
+      "opening": "TEST DATA: Who tells EPA about a methane plume?",
+      "public_stakes": "TEST DATA: who reports a large release, and who hears about it.",
+      "why_different": "TEST DATA: same evidence; opens on the mechanism, not the conflict."
+     },
+     {
+      "category": "misleading_framing",
+      "claim": "TEST DATA: EPA says the proposal keeps methane rules workable.",
+      "context": "TEST DATA: EPA's stated rationale; the change is proposed.",
+      "editorial_position": "TEST DATA: the headline number needs context.",
+      "evidence_limits": "TEST DATA: how often reports led to action is not established.",
+      "finding_ids": [
+       "air-proposal-status@1",
+       "air-third-party-reports@1",
+       "air-program-background@1",
+       "air-warning-effect@1"
+      ],
+      "opening": "TEST DATA: The figure is not a payment.",
+      "public_stakes": "TEST DATA: what the $45 billion figure is and is not.",
+      "why_different": "TEST DATA: same evidence; the money framing comes first."
+     }
+    ]
+   },
+   "body_sha256": "8b531fb9282ab073e0213a1eb332b34f3090ac85382bcaca568be5bf233abce9",
+   "checks": {
+    "certifies_accuracy": false,
+    "label": "mechanical checks passed",
+    "ok": true
+   },
+   "created_at": "2026-11-10T12:09:00Z",
+   "depends_on": null,
+   "id": "id-16",
+   "lesson_uses": [],
+   "lessons_included": [],
+   "library_version_id": "id-08",
+   "model": null,
+   "parent_id": null,
+   "profile_id": "id-09",
+   "provider": "claude-plan",
+   "selected_index": null,
+   "stage": "angles",
+   "status": {
+    "approved": true,
+    "approved_earlier_version": false,
+    "current": true,
+    "id": "id-16",
+    "outdated": false,
+    "outdated_reason": null,
+    "stage": "angles",
+    "superseded": false
+   }
+  },
+  {
+   "approvals": [
+    {
+     "approved_at": "2026-11-10T12:10:00Z",
+     "approved_by": "founder@test.invalid",
+     "body_sha256": "b4f3235bdef49e4a8b92b1180c2116117e999d4c824363211596a6379b61044f",
+     "high_risk_ack": false,
+     "note": null,
+     "rubric": null,
+     "selected_index": null,
+     "this_version": true
+    }
+   ],
+   "body": {
+    "beats": [
+     {
+      "beat": "collision",
+      "finding_ids": [
+       "air-proposal-status@1",
+       "air-warning-effect@1"
+      ],
+      "purpose": "TEST DATA: the proposal and what residents could lose"
+     },
+     {
+      "beat": "mechanism",
+      "finding_ids": [
+       "air-program-background@1"
+      ],
+      "purpose": "TEST DATA: how third-party reports work today"
+     },
+     {
+      "beat": "landing",
+      "finding_ids": [
+       "air-third-party-reports@1"
+      ],
+      "purpose": "TEST DATA: proposed, not final"
+     }
+    ]
+   },
+   "body_sha256": "b4f3235bdef49e4a8b92b1180c2116117e999d4c824363211596a6379b61044f",
+   "checks": {
+    "certifies_accuracy": false,
+    "label": "mechanical checks passed",
+    "ok": true
+   },
+   "created_at": "2026-11-10T12:11:00Z",
+   "depends_on": "id-16",
+   "id": "id-17",
+   "lesson_uses": [],
+   "lessons_included": [],
+   "library_version_id": "id-08",
+   "model": null,
+   "parent_id": null,
+   "profile_id": "id-09",
+   "provider": "claude-plan",
+   "selected_index": 0,
+   "stage": "outline",
+   "status": {
+    "approved": true,
+    "approved_earlier_version": false,
+    "current": true,
+    "id": "id-17",
+    "outdated": false,
+    "outdated_reason": null,
+    "stage": "outline",
+    "superseded": false
+   }
+  },
+  {
+   "approvals": [],
+   "body": {
+    "segments": [
+     {
+      "beat": "collision",
+      "claim_ids": [
+       "air-third-party-reports@1",
+       "air-program-background@1",
+       "air-warning-effect@1",
+       "air-proposal-status@1"
+      ],
+      "story": "air",
+      "text": "For several years the Environmental Protection Agency has run a program that collects reports about large methane releases at oil and gas sites across the country. The Super Emitter Program started in 2024. It is one of several monitoring tools the agency uses, and officials say it can find problems that routine monitoring misses. Under the proposal, reports of company emissions detected by third parties would stop reaching EPA. Residents near these sites could lose an early warning, an estimated effect. The change is proposed, not final."
+     },
+     {
+      "beat": "landing",
+      "claim_ids": [
+       "air-proposal-status@1"
+      ],
+      "story": "air",
+      "text": "TEST DATA: For now this is a proposal, not a final rule, and residents can still comment on it."
+     }
+    ]
+   },
+   "body_sha256": "1cc8e8045872a9842b92923d8d6fc7eb11f0363025992a9fb5349b2f42343a8c",
+   "checks": {
+    "ceiling_words": 750,
+    "certifies_accuracy": false,
+    "disclaimer": "Automated checks; not a certification of factual accuracy.",
+    "estimated_seconds_from_words": 42,
+    "high_risk": [],
+    "label": "mechanical checks passed",
+    "material_issues": [],
+    "ok": true,
+    "opening": {
+     "conflict_at_word": 54,
+     "limit": 45,
+     "stake_at_word": 69
+    },
+    "problems": [],
+    "quotes": [],
+    "runtime_note": "An estimate from word count, not a measured narration time.",
+    "target_words": 450,
+    "warnings": [
+     {
+      "detail": "the conflict starts at word 54 (aim: within 45)",
+      "kind": "automated assessment, not a factual finding",
+      "type": "delayed_conflict"
+     },
+     {
+      "detail": "no public stake named in the first 45 words",
+      "kind": "automated assessment, not a factual finding",
+      "type": "late_public_stake"
+     }
+    ],
+    "word_counts": {
+     "notes_and_source_words": 0,
+     "spoken_words": 106
+    },
+    "words": 106
+   },
+   "created_at": "2026-11-10T12:12:00Z",
+   "depends_on": "id-17",
+   "id": "id-03",
+   "lesson_uses": [],
+   "lessons_included": [],
+   "library_version_id": "id-08",
+   "model": null,
+   "parent_id": null,
+   "profile_id": "id-09",
+   "provider": "claude-plan",
+   "selected_index": 0,
+   "stage": "script",
+   "status": {
+    "approved": false,
+    "approved_earlier_version": false,
+    "current": false,
+    "id": "id-03",
+    "outdated": false,
+    "outdated_reason": null,
+    "stage": "script",
+    "superseded": true
+   }
+  },
+  {
+   "approvals": [],
+   "body": {
+    "segments": [
+     {
+      "beat": "collision",
+      "claim_ids": [
+       "air-third-party-reports@1",
+       "air-program-background@1",
+       "air-warning-effect@1",
+       "air-proposal-status@1"
+      ],
+      "story": "air",
+      "text": "Under an EPA proposal, reports of company emissions detected by third parties would stop reaching the agency, and residents near oil and gas sites could lose an early warning about large methane releases, an estimated effect. The change is proposed, not final. The Super Emitter Program behind those reports started in 2024. It is one of several monitoring tools the agency uses, and officials say it can find problems that routine monitoring misses."
+     },
+     {
+      "beat": "landing",
+      "claim_ids": [
+       "air-proposal-status@1"
+      ],
+      "story": "air",
+      "text": "TEST DATA: For now this is a proposal, not a final rule, and residents can still comment on it."
+     }
+    ]
+   },
+   "body_sha256": "0578e2c30cbd397850e2c475a5e587438c67deef3c940d4c3d64a06787eb99f7",
+   "checks": {
+    "ceiling_words": 750,
+    "certifies_accuracy": false,
+    "disclaimer": "Automated checks; not a certification of factual accuracy.",
+    "estimated_seconds_from_words": 37,
+    "high_risk": [],
+    "label": "mechanical checks passed",
+    "material_issues": [],
+    "ok": true,
+    "opening": {
+     "conflict_at_word": 0,
+     "limit": 45,
+     "stake_at_word": 18
+    },
+    "problems": [],
+    "quotes": [],
+    "rewrite": {
+     "action": "conflict_first",
+     "segment_index": 0
+    },
+    "runtime_note": "An estimate from word count, not a measured narration time.",
+    "target_words": 450,
+    "warnings": [],
+    "word_counts": {
+     "notes_and_source_words": 0,
+     "spoken_words": 92
+    },
+    "words": 92
+   },
+   "created_at": "2026-11-10T12:13:00Z",
+   "depends_on": "id-17",
+   "id": "id-02",
+   "lesson_uses": [],
+   "lessons_included": [],
+   "library_version_id": "id-08",
+   "model": null,
+   "parent_id": "id-03",
+   "profile_id": "id-09",
+   "provider": "claude-plan",
+   "selected_index": 0,
+   "stage": "script",
+   "status": {
+    "approved": false,
+    "approved_earlier_version": false,
+    "current": false,
+    "id": "id-02",
+    "outdated": false,
+    "outdated_reason": null,
+    "stage": "script",
+    "superseded": false
+   }
+  }
+ ]
+}

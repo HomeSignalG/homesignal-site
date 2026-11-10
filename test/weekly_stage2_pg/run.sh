@@ -13,14 +13,19 @@ run_once() {
   P -f "$here/fixture.sql" >/dev/null
   P -f "$1" >/dev/null 2>"$tmp/err" || { cat "$tmp/err" >&2; return 2; }
   P -f "$1" >/dev/null 2>"$tmp/err" || { cat "$tmp/err" >&2; return 2; }
-  psql -X -q -tA -f "$here/suite.sql" 2>"$tmp/suite.err" | grep -E '^W[0-9]' || true
+  psql -X -q -tA -f "$here/suite.sql" 2>"$tmp/suite.err" | grep -E '^[A-Z][0-9]+[a-z]?\|' || true
 }
 out="$(run_once "$SQL")"; echo "$out" | sed 's/^/  /'
 n=$(grep -c '|' <<<"$out" || true); f=$(grep -vc '|true$' <<<"$out" || true)
-expected=$(grep -c "^select 'W" "$here/suite.sql")
+expected=$(grep -cE "^select '[A-Z][0-9]+[a-z]?\|" "$here/suite.sql")
 echo "SHIPPED: $n of $expected checks printed, $f not true"
 [ "$n" -eq "$expected" ] && [ "$f" -eq 0 ] || { cat "$tmp/suite.err" >&2; echo FAIL; exit 1; }
 if grep -q ERROR "$tmp/suite.err"; then cat "$tmp/suite.err" >&2; echo "FAIL: the suite printed an SQL error (a check that errors is not a pass)"; exit 1; fi
+# the workbench screen fixture must be what the prepared SQL produces
+P -c "drop schema if exists public cascade; drop schema if exists auth cascade; drop schema if exists vault cascade;
+      drop schema if exists net cascade; create schema public;" >/dev/null 2>&1
+P -f "$here/fixture.sql" >/dev/null; P -f "$SQL" >/dev/null 2>&1
+python3 "$here/build_demo_fixture.py" --check
 MUT=(
  "findings-not-append-only|s.replace(\"'weekly_research_answers', 'weekly_sources', 'weekly_findings',\n\",\"'weekly_research_answers', 'weekly_sources',\n\",1)"
  "quote-match-approves|s.replace(\"limit 1), 'pending') as human_decision\",\"limit 1), (select case when bool_or(w.quote_match = 'exact') then 'approved' end from public.weekly_finding_sources fs join public.weekly_sources w on w.id = fs.source_id where fs.finding_id = f.id), 'pending') as human_decision\",1)"
@@ -36,6 +41,20 @@ MUT=(
  "dispatch-branch-ref|s.replace(\"'ref', 'main'\",\"'ref', 'claude/x'\")"
  "short-quote-cleared|s.replace(\"publication_permission text not null default 'to_confirm'\",\"publication_permission text not null default 'cleared'\")"
  "plan-cost-amount|s.replace(\"constraint weekly_cost_plan_ck check (cost_type <> 'no_incremental_api_charge' or amount_usd is null)\",\"constraint weekly_cost_plan_ck check (true)\")"
+ "rubric-total-ungated|s.replace(\"  if total < 21 then probs := probs || ('total ' || total || '/28 is below 21'); end if;\n\",\"\")"
+ "rubric-factual-3-ok|s.replace(\"if (p_rubric ->> 'factual_discipline')::integer <> 4 then\",\"if (p_rubric ->> 'factual_discipline')::integer < 3 then\")"
+ "rubric-hook-ungated|s.replace(\"foreach k in array array['hook_conflict', 'emotional_force', 'argument_coherence'] loop\",\"foreach k in array array['emotional_force', 'argument_coherence'] loop\")"
+ "approval-not-version-bound|s.replace(\"approved := exists (select 1 from public.weekly_script_approvals a where a.script_id = v.id and a.body_sha256 = v.body_sha256);\",\"approved := exists (select 1 from public.weekly_script_approvals a join public.weekly_scripts x on x.id = a.script_id where x.stage = v.stage and x.topic = v.topic);\")"
+ "superseded-approvable|s.replace(\"  if (st ->> 'superseded')::boolean then raise exception 'a newer version exists; review that one' using errcode = '22023'; end if;\n  if (st ->> 'outdated')\",\"  if (st ->> 'outdated')\")"
+ "dependency-change-ignored|s.replace(\"    if (d ->> 'superseded')::boolean then outdated := true;\",\"    if false then outdated := true;\")"
+ "selection-change-ignored|s.replace(\"if sel is distinct from v.selected_index then outdated := true;\",\"if false then outdated := true;\")"
+ "material-issue-ignored|s.replace(\"               and c.decision in ('material_issue', 'quote_not_found_in_sources', 'quote_contradicted')) then\",\"               and false) then\")"
+ "high-risk-no-ack|s.replace(\"if card ->> 'category' in ('false_claim', 'knowing_deception', 'improper_influence') and not coalesce(p_high_risk_ack, false) then\",\"if false then\")"
+ "angle-without-evidence|s.replace(\"                                where jsonb_array_length(coalesce(a -> 'finding_ids', '[]')) = 0) then\",\"                                where false) then\")"
+ "local-lesson-allowed|s.replace(\"  if c.lesson_scope <> 'reusable' then raise exception\",\"  if false then raise exception\")"
+ "rewrite-overwrites-original|s.replace(\"    update public.weekly_corrections set after_text = newtext, result_script_id = sid where id = (r.input ->> 'review_id')::uuid;\",\"    update public.weekly_corrections set after_text = newtext, result_script_id = sid where id = (r.input ->> 'review_id')::uuid;\n    update public.weekly_scripts set body = p_payload -> 'body' where id = (r.input ->> 'parent_id')::uuid;\")"
+ "contradiction-without-findings|s.replace(\"  constraint weekly_corrections_contradicted_ck check (decision <> 'quote_contradicted' or cardinality(finding_ids) > 0)\",\"  constraint weekly_corrections_contradicted_ck check (true)\")"
+ "review-refilled|s.replace(\"  if old.decision <> 'rewrite' or old.result_script_id is not null or\",\"  if old.decision <> 'rewrite' or\")"
 )
 bad=0
 for m in "${MUT[@]}"; do

@@ -39,5 +39,12 @@ else {
   const changed = execFileSync('git', ['diff', '--name-only', base], { encoding: 'utf8' }).split('\n').filter(Boolean);
   ok(!changed.some((f) => /acq-weekly-report|acquisition\.html|topics\.js|^test\/weekly-report/.test(f)), '5 no Stage 1 file differs from origin/main (' + changed.length + ' tracked files changed)');
 }
+// 6. workbench wording and vocabulary agree with the prepared SQL
+const acts = [...js.matchAll(/\['([a-z_]+)', '(Put the conflict first|Make the public stake concrete|Replace bureaucratic wording|Tighten the explanation|Strengthen the contrast|Cut repetition|Strengthen the closing)'\]/g)];
+ok(acts.length === 7 && acts.every((m) => sql.includes("'" + m[1] + "'")), '6a the seven rewrite actions match the database vocabulary');
+ok(/Provisional internal criteria, not validated performance benchmarks/.test(js) && /Provisional internal criteria, not validated performance benchmarks/.test(sql), '6b the rubric is labelled provisional in the screen and the database');
+ok(/automated assessments, not factual findings/.test(js), '6c rhythm warnings are labelled automated assessments');
+ok(/Not in this packet/.test(js) && /Quote: not found in the sources reviewed/.test(js) && /Quote: contradicted by evidence/.test(js), '6d the three quote distinctions are worded separately');
+ok(!/\bviral/i.test(js.replace(/No virality or improvement is claimed[^.]*\./g, '')), '6e no virality claim (the only mention is the statement that none is made)');
 console.log(fails ? fails + ' failed' : 'all passed');
 process.exit(fails ? 1 : 0);

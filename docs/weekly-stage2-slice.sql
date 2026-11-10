@@ -5,6 +5,9 @@
 --   2. one script is written by Claude (on the founder's plan) from a SEALED library version and an APPROVED profile;
 --   3. one correction is saved and approved as a lesson;
 --   4. a later script retrieves that lesson, includes it, and its use is assessed and then confirmed by a person.
+--   5. EDITORIAL WORKBENCH: three evidence-backed angle cards -> a person selects one -> a beat outline -> a script ->
+--      passage-level review (a named rewrite action, keeping its findings and qualifications) -> explicit approval of
+--      ONE exact version with the seven-dimension provisional rubric.
 --
 -- Rules this file enforces (test/weekly_stage2_pg proves each one, with mutations):
 --   - Nothing here is readable or writable by anon or authenticated directly: every table has RLS on and no grant.
@@ -24,6 +27,19 @@
 --     by a person as shared overhead. extra_usage_enabled defaults to false and nothing here turns it on.
 --   - Lesson use keeps four states apart: retrieved · included · assessed (rule / model / none) · reviewer decision.
 --     An assessment is automated and is not a reviewer's confirmation.
+--   - Every draft (angle set, outline, script) is an immutable VERSION in weekly_scripts (stage angles | outline |
+--     script). An approval binds one exact version (its body hash). A new version needs its own approval. A version
+--     whose angle set or outline has a newer version, or lost its approval, is OUTDATED and cannot be approved;
+--     earlier approvals stay in the history and are never shown as approval of a newer version.
+--   - Script approval needs the seven-dimension rubric (0-4 each). PROVISIONAL INTERNAL CRITERIA, not validated
+--     performance benchmarks: total >= 21/28, factual discipline = 4, hook, emotional force and coherence each >= 3,
+--     no unresolved material factual issue on that exact version, and the reviewer's explicit approval (this call).
+--   - Three angle cards may share evidence; a person decides whether they are meaningfully different. Nothing here
+--     requires different categories. A high-risk category or high-risk wording needs supporting findings AND an
+--     explicit acknowledgement at approval; a category label is never permission to accuse.
+--   - Quote status: 'in_packet' or 'not_in_packet' come from the machine and are the only values it can set.
+--     'not_found_in_sources_reviewed' and 'contradicted' are reviewer findings (with their reasons / findings). A
+--     quote that is not in the packet is never recorded as either of the other two.
 -- Needs: public._hs_is_admin (docs/impact-stories.sql), public.alert_topic_catalog (docs/alert-subscription-canonical-a1.sql),
 -- vault.decrypted_secrets and net.http_post (Supabase). Idempotent: safe to apply twice.
 
@@ -42,7 +58,7 @@ end $$;
 -- ── run queue ─────────────────────────────────────────────────────────────────────────────────────────────────────
 create table if not exists public.weekly_runs (
   id uuid primary key default gen_random_uuid(),
-  kind text not null check (kind in ('research_ingest', 'script')),
+  kind text not null check (kind in ('research_ingest', 'angles', 'outline', 'script', 'rewrite')),
   topic text not null,
   status text not null default 'queued' check (status in ('queued', 'running', 'done', 'failed')),
   input jsonb not null default '{}'::jsonb,
@@ -203,10 +219,17 @@ create table if not exists public.weekly_profile_approvals (
   approved_at timestamptz not null default now()
 );
 
--- ── scripts, approvals, corrections ───────────────────────────────────────────────────────────────────────────────
+-- ── editorial versions (angle sets, outlines, scripts), approvals, passage reviews ─────────────────────────────────
+-- One row per immutable VERSION. stage says what it is; depends_on names the version it was written from (an outline
+-- from an angle set + selected card; a script from an outline); parent_id names the earlier version of the same draft
+-- (a rewrite). Every version is written by a run and checked by the engine's mechanical checks.
 create table if not exists public.weekly_scripts (
   id uuid primary key default gen_random_uuid(),
   run_id uuid not null unique references public.weekly_runs (id),
+  stage text not null default 'script' check (stage in ('angles', 'outline', 'script')),
+  parent_id uuid references public.weekly_scripts (id),
+  depends_on uuid references public.weekly_scripts (id),
+  selected_index integer check (selected_index between 0 and 2),
   stream text not null default 'news',
   topic text not null,
   library_version_id uuid not null references public.weekly_library_versions (id),
@@ -215,31 +238,120 @@ create table if not exists public.weekly_scripts (
   prompt_sha256 text not null check (prompt_sha256 ~ '^[0-9a-f]{64}$'),
   provider text not null,
   model text,
-  body jsonb not null check (jsonb_typeof(body -> 'segments') = 'array'),
+  body jsonb not null,
   body_sha256 text generated always as (public.weekly_sha256(body::text)) stored,
   -- Mechanical checks only. They are labelled as such and never certify factual accuracy.
   checks jsonb not null,
   kind text not null default 'ai_draft' check (kind = 'ai_draft'),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  constraint weekly_scripts_shape_ck check (case stage
+    when 'script' then jsonb_typeof(body -> 'segments') = 'array'
+    when 'outline' then jsonb_typeof(body -> 'beats') = 'array' and jsonb_array_length(body -> 'beats') between 3 and 12
+    when 'angles' then jsonb_typeof(body -> 'angles') = 'array' and jsonb_array_length(body -> 'angles') = 3 end),
+  constraint weekly_scripts_lineage_ck check ((stage = 'angles') = (depends_on is null)
+    and (stage = 'angles' or selected_index is not null))
 );
+-- depends_on must be the previous stage; a parent is an earlier version of the same draft (same stage, same basis).
+create or replace function public.weekly_scripts_lineage_guard() returns trigger language plpgsql as $$
+declare d public.weekly_scripts; p public.weekly_scripts;
+begin
+  if new.depends_on is not null then
+    select * into d from public.weekly_scripts where id = new.depends_on;
+    if d.stage is distinct from (case new.stage when 'outline' then 'angles' when 'script' then 'outline' end) then
+      raise exception 'a % is written from the previous stage', new.stage using errcode = '22023';
+    end if;
+  end if;
+  if new.parent_id is not null then
+    select * into p from public.weekly_scripts where id = new.parent_id;
+    if p.stage <> new.stage or p.depends_on is distinct from new.depends_on or p.selected_index is distinct from new.selected_index then
+      raise exception 'a new version keeps its stage and basis' using errcode = '22023';
+    end if;
+  end if;
+  return new;
+end $$;
+
 create table if not exists public.weekly_script_approvals (
   id bigserial primary key,
   script_id uuid not null references public.weekly_scripts (id),
   body_sha256 text not null,
+  selected_index integer check (selected_index between 0 and 2),
+  -- {hook_conflict, human_stakes, emotional_force, argument_coherence, factual_discipline, spoken_clarity, closing}, 0-4.
+  rubric jsonb,
+  high_risk_ack boolean not null default false,
+  note text,
   approved_by text not null,
   approved_at timestamptz not null default now()
 );
+-- Passage review. decision:
+--   approved | rejected            a person's verdict on the passage as written
+--   corrected                      the reviewer's own wording (a lesson source; makes no new version)
+--   rewrite                        a named rewrite action; a run writes a NEW version and fills after_text once
+--   material_issue                 an unresolved material factual issue on THIS version (blocks its approval)
+--   quote_not_found_in_sources     reviewer: the quote is not in the sources reviewed (the reason names them)
+--   quote_contradicted             reviewer: evidence contradicts the quote (finding_ids required)
 create table if not exists public.weekly_corrections (
   id uuid primary key default gen_random_uuid(),
   script_id uuid not null references public.weekly_scripts (id),
   segment_index integer not null check (segment_index >= 0),
+  decision text not null default 'corrected' check (decision in ('approved', 'rejected', 'corrected', 'rewrite',
+    'material_issue', 'quote_not_found_in_sources', 'quote_contradicted')),
+  action text check (action in ('conflict_first', 'concrete_stake', 'plain_wording', 'tighten', 'strengthen_contrast',
+    'cut_repetition', 'strengthen_closing')),
+  reason text,
+  finding_ids text[] not null default '{}',
+  lesson_scope text not null default 'local' check (lesson_scope in ('local', 'reusable')),
   before_text text not null,
-  after_text text not null check (char_length(after_text) between 1 and 4000),
+  after_text text check (after_text is null or char_length(after_text) between 1 and 4000),
+  result_script_id uuid references public.weekly_scripts (id),
   note text,
   kind text not null default 'human_reviewed' check (kind = 'human_reviewed'),
   created_by text not null,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  constraint weekly_corrections_action_ck check ((decision = 'rewrite') = (action is not null)),
+  constraint weekly_corrections_after_ck check (decision in ('corrected', 'rewrite') or after_text is null),
+  constraint weekly_corrections_corrected_ck check (decision <> 'corrected' or after_text is not null),
+  constraint weekly_corrections_reason_ck check (decision in ('approved', 'corrected') or char_length(coalesce(reason, '')) >= 3),
+  constraint weekly_corrections_contradicted_ck check (decision <> 'quote_contradicted' or cardinality(finding_ids) > 0)
 );
+-- Corrections are append-only except that a rewrite's result (after_text + result_script_id) is filled once.
+create or replace function public.weekly_corrections_guard() returns trigger language plpgsql as $$
+begin
+  if tg_op = 'DELETE' then raise exception 'passage reviews are never deleted' using errcode = '55000'; end if;
+  if old.decision <> 'rewrite' or old.result_script_id is not null or new.result_script_id is null or new.after_text is null
+     or (to_jsonb(new) - array['after_text', 'result_script_id']) <> (to_jsonb(old) - array['after_text', 'result_script_id']) then
+    raise exception 'only a rewrite result can be filled, once' using errcode = '55000';
+  end if;
+  return new;
+end $$;
+
+-- The one status decision for a version. approved = an approval bound to this exact body hash. superseded = a newer
+-- version of the same draft exists. outdated = what it was written from has a newer version, lost its approval, is
+-- itself outdated, or (for an outline) the selected card is no longer the approved selection.
+create or replace function public.weekly_version_status(p_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v public.weekly_scripts; d jsonb; approved boolean; superseded boolean; outdated boolean := false; why text;
+        sel integer; ever boolean;
+begin
+  select * into v from public.weekly_scripts where id = p_id;
+  if v.id is null then return null; end if;
+  approved := exists (select 1 from public.weekly_script_approvals a where a.script_id = v.id and a.body_sha256 = v.body_sha256);
+  ever := exists (select 1 from public.weekly_script_approvals a where a.script_id = v.id);
+  superseded := exists (select 1 from public.weekly_scripts c where c.parent_id = v.id);
+  if v.depends_on is not null then
+    d := public.weekly_version_status(v.depends_on);
+    if (d ->> 'superseded')::boolean then outdated := true; why := 'the ' || (d ->> 'stage') || ' it was written from has a newer version';
+    elsif not (d ->> 'approved')::boolean then outdated := true; why := 'the ' || (d ->> 'stage') || ' it was written from is not approved';
+    elsif (d ->> 'outdated')::boolean then outdated := true; why := 'the ' || (d ->> 'stage') || ' it was written from is outdated';
+    elsif v.stage = 'outline' then
+      select a.selected_index into sel from public.weekly_script_approvals a where a.script_id = v.depends_on
+        order by a.approved_at desc, a.id desc limit 1;
+      if sel is distinct from v.selected_index then outdated := true; why := 'a different angle card is now selected'; end if;
+    end if;
+  end if;
+  return jsonb_build_object('id', v.id, 'stage', v.stage, 'approved', approved, 'approved_earlier_version', ever and not approved,
+    'superseded', superseded, 'outdated', outdated, 'outdated_reason', why,
+    'current', approved and not superseded and not outdated);
+end $$;
 
 -- ── lessons and their use ─────────────────────────────────────────────────────────────────────────────────────────
 create table if not exists public.weekly_lessons (
@@ -331,7 +443,7 @@ declare t text;
 begin
   foreach t in array array['weekly_research_requests', 'weekly_research_answers', 'weekly_sources', 'weekly_findings',
     'weekly_finding_sources', 'weekly_finding_decisions', 'weekly_editorial_profiles', 'weekly_profile_approvals',
-    'weekly_scripts', 'weekly_script_approvals', 'weekly_corrections', 'weekly_lessons', 'weekly_lesson_decisions',
+    'weekly_scripts', 'weekly_script_approvals', 'weekly_lessons', 'weekly_lesson_decisions',
     'weekly_cost_entries', 'weekly_subscriptions'] loop
     execute format('drop trigger if exists %I_append_only on public.%I', t, t);
     execute format('create trigger %I_append_only before update or delete on public.%I for each row execute function public.weekly_append_only()', t, t);
@@ -356,6 +468,13 @@ create trigger weekly_library_version_findings_guard before insert or update or 
 drop trigger if exists weekly_lesson_uses_guard on public.weekly_lesson_uses;
 create trigger weekly_lesson_uses_guard before update or delete on public.weekly_lesson_uses
   for each row execute function public.weekly_lesson_use_guard();
+drop trigger if exists weekly_corrections_guard on public.weekly_corrections;
+drop trigger if exists weekly_corrections_append_only on public.weekly_corrections;
+create trigger weekly_corrections_guard before update or delete on public.weekly_corrections
+  for each row execute function public.weekly_corrections_guard();
+drop trigger if exists weekly_scripts_lineage_guard on public.weekly_scripts;
+create trigger weekly_scripts_lineage_guard before insert on public.weekly_scripts
+  for each row execute function public.weekly_scripts_lineage_guard();
 
 -- ── dispatch (the two slice workflows only, always ref main) ──────────────────────────────────────────────────────
 create or replace function public._wk_dispatch(p_workflow text, p_run uuid) returns boolean
@@ -446,62 +565,212 @@ begin
   return true;
 end $$;
 
--- Retrieval is decided HERE, once: every approved lesson of the topic at request time. The run records the list, and
--- the record step refuses a script that claims to include a lesson that was not retrieved.
-create or replace function public.hs_weekly_script_request(p_library_version uuid, p_profile uuid) returns jsonb
-language plpgsql security definer set search_path = public as $$
-declare e text := public._hs_is_admin(); lv public.weekly_library_versions; r uuid; lessons uuid[]; sent boolean;
+drop function if exists public.hs_weekly_script_request(uuid, uuid);
+drop function if exists public.hs_weekly_script_approve(uuid);
+drop function if exists public.hs_weekly_correction_save(uuid, integer, text, text);
+
+-- Claim ids ("key@version") of the findings pinned in a library version.
+create or replace function public.weekly_library_claim_ids(p_lv uuid) returns text[]
+language sql stable security definer set search_path = public as $$
+  select coalesce(array_agg(f.finding_key || '@' || f.version), '{}') from public.weekly_library_version_findings x
+    join public.weekly_findings f on f.id = x.finding_id where x.library_version_id = p_lv
+$$;
+
+-- The rubric gate. PROVISIONAL INTERNAL CRITERIA, not validated performance benchmarks. Returns every problem.
+create or replace function public.weekly_rubric_problems(p_rubric jsonb) returns text[]
+language plpgsql immutable as $$
+declare k text; v jsonb; total integer := 0; probs text[] := '{}';
+  dims text[] := array['hook_conflict', 'human_stakes', 'emotional_force', 'argument_coherence', 'factual_discipline',
+                       'spoken_clarity', 'closing'];
 begin
+  if p_rubric is null or jsonb_typeof(p_rubric) <> 'object' then return array['the rubric is missing']; end if;
+  foreach k in array dims loop
+    v := p_rubric -> k;
+    if v is null or jsonb_typeof(v) <> 'number' or (v #>> '{}')::numeric not in (0, 1, 2, 3, 4) then
+      probs := probs || (k || ' must be a whole score from 0 to 4');
+    else total := total + (v #>> '{}')::integer; end if;
+  end loop;
+  if exists (select 1 from jsonb_object_keys(p_rubric) x where x <> all (dims)) then probs := probs || 'the rubric has an unknown dimension'::text; end if;
+  if cardinality(probs) > 0 then return probs; end if;
+  if total < 21 then probs := probs || ('total ' || total || '/28 is below 21'); end if;
+  if (p_rubric ->> 'factual_discipline')::integer <> 4 then probs := probs || 'factual discipline must be 4'::text; end if;
+  foreach k in array array['hook_conflict', 'emotional_force', 'argument_coherence'] loop
+    if (p_rubric ->> k)::integer < 3 then probs := probs || (k || ' must be at least 3'); end if;
+  end loop;
+  return probs;
+end $$;
+
+-- Queue one engine run (angles / outline / script / rewrite) and dispatch it.
+create or replace function public._wk_queue(p_kind text, p_topic text, p_input jsonb, p_by text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare r uuid; sent boolean;
+begin
+  if exists (select 1 from public.weekly_runs where kind in ('angles', 'outline', 'script', 'rewrite') and topic = p_topic
+             and status in ('queued', 'running')) then
+    raise exception 'a writing run is already running for this topic' using errcode = '55006';
+  end if;
+  insert into public.weekly_runs (kind, topic, input, requested_by) values (p_kind, p_topic, p_input, p_by) returning id into r;
+  sent := public._wk_dispatch('weekly-script-run.yml', r);
+  if not sent then
+    update public.weekly_runs set status = 'failed', error = 'not started: the GitHub dispatch credential is missing', finished_at = now() where id = r;
+  end if;
+  return jsonb_build_object('run_id', r, 'dispatched', sent);
+end $$;
+
+-- Step 1: three angle cards from a sealed library version and an approved profile.
+-- p_parent: ask for a NEW VERSION of an existing angle set (the old one becomes superseded; drafts written from it
+-- become outdated).
+create or replace function public.hs_weekly_angles_request(p_library_version uuid, p_profile uuid, p_parent uuid default null) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); lv public.weekly_library_versions;
+begin
+  if p_parent is not null and not exists (select 1 from public.weekly_scripts where id = p_parent and stage = 'angles') then
+    raise exception 'unknown angle set' using errcode = '22023';
+  end if;
   select * into lv from public.weekly_library_versions where id = p_library_version;
   if lv.id is null or not lv.sealed then raise exception 'library version is not sealed' using errcode = '22023'; end if;
   if not exists (select 1 from public.weekly_profile_approvals where profile_id = p_profile) then
     raise exception 'editorial profile is not approved' using errcode = '22023';
   end if;
-  if exists (select 1 from public.weekly_runs where kind = 'script' and topic = lv.topic and status in ('queued', 'running')) then
-    raise exception 'a script run is already running for this topic' using errcode = '55006';
+  return public._wk_queue('angles', lv.topic, jsonb_build_object('library_version_id', lv.id, 'profile_id', p_profile,
+    'parent_id', p_parent), e);
+end $$;
+
+-- Step 2: an outline from the CURRENT approved angle set and its selected card.
+create or replace function public.hs_weekly_outline_request(p_angles uuid, p_parent uuid default null) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); v public.weekly_scripts; st jsonb; sel integer;
+begin
+  if p_parent is not null and not exists (select 1 from public.weekly_scripts where id = p_parent and stage = 'outline'
+                                          and depends_on = p_angles) then
+    raise exception 'the earlier outline was not written from this angle set' using errcode = '22023';
+  end if;
+  select * into v from public.weekly_scripts where id = p_angles and stage = 'angles';
+  if v.id is null then raise exception 'unknown angle set' using errcode = '22023'; end if;
+  st := public.weekly_version_status(v.id);
+  if not (st ->> 'current')::boolean then raise exception 'the angle set is not the current approved version' using errcode = '22023'; end if;
+  select a.selected_index into sel from public.weekly_script_approvals a where a.script_id = v.id and a.body_sha256 = v.body_sha256
+    order by a.approved_at desc, a.id desc limit 1;
+  return public._wk_queue('outline', v.topic, jsonb_build_object('library_version_id', v.library_version_id, 'profile_id', v.profile_id,
+    'depends_on', v.id, 'selected_index', sel, 'parent_id', p_parent), e);
+end $$;
+
+-- Step 3: a script from the CURRENT approved outline. Retrieval is decided HERE, once: every approved lesson of the
+-- topic at request time. The record step refuses a script that claims to include a lesson that was not retrieved.
+create or replace function public.hs_weekly_script_request(p_outline uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); v public.weekly_scripts; lessons uuid[]; q jsonb;
+begin
+  select * into v from public.weekly_scripts where id = p_outline and stage = 'outline';
+  if v.id is null then raise exception 'unknown outline' using errcode = '22023'; end if;
+  if not (public.weekly_version_status(v.id) ->> 'current')::boolean then
+    raise exception 'the outline is not the current approved version' using errcode = '22023';
   end if;
   select coalesce(array_agg(id order by created_at), '{}') into lessons from public.weekly_lesson_state
-    where topic = lv.topic and status = 'approved';
-  insert into public.weekly_runs (kind, topic, input, requested_by)
-    values ('script', lv.topic, jsonb_build_object('library_version_id', lv.id, 'profile_id', p_profile,
-                                                   'lessons_retrieved', to_jsonb(lessons)), e)
-    returning id into r;
-  sent := public._wk_dispatch('weekly-script-run.yml', r);
-  if not sent then
-    update public.weekly_runs set status = 'failed', error = 'not started: the GitHub dispatch credential is missing', finished_at = now() where id = r;
+    where topic = v.topic and status = 'approved';
+  q := public._wk_queue('script', v.topic, jsonb_build_object('library_version_id', v.library_version_id, 'profile_id', v.profile_id,
+    'depends_on', v.id, 'selected_index', v.selected_index, 'lessons_retrieved', to_jsonb(lessons)), e);
+  return q || jsonb_build_object('lessons_retrieved', to_jsonb(lessons));
+end $$;
+
+-- Approve ONE exact version. angles: a selected card (and an acknowledgement when it is a high-risk category).
+-- outline: passing mechanical checks. script: the seven-dimension rubric gate, no unresolved material factual issue on
+-- this version, and an acknowledgement when the checks found high-risk wording.
+create or replace function public.hs_weekly_version_approve(p_version uuid, p_selected integer default null,
+  p_rubric jsonb default null, p_high_risk_ack boolean default false, p_note text default null) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); v public.weekly_scripts; st jsonb; card jsonb; probs text[];
+begin
+  select * into v from public.weekly_scripts where id = p_version;
+  if v.id is null then raise exception 'unknown version' using errcode = '22023'; end if;
+  st := public.weekly_version_status(v.id);
+  if (st ->> 'superseded')::boolean then raise exception 'a newer version exists; review that one' using errcode = '22023'; end if;
+  if (st ->> 'outdated')::boolean then raise exception 'outdated: %', st ->> 'outdated_reason' using errcode = '22023'; end if;
+  if coalesce((v.checks ->> 'ok')::boolean, false) is not true then
+    raise exception 'the mechanical checks did not pass on this version' using errcode = '22023';
   end if;
-  return jsonb_build_object('run_id', r, 'lessons_retrieved', to_jsonb(lessons), 'dispatched', sent);
+  if v.stage = 'angles' then
+    if p_selected is null or p_selected not between 0 and 2 then raise exception 'select one of the three angle cards' using errcode = '22023'; end if;
+    card := v.body -> 'angles' -> p_selected;
+    if card ->> 'category' in ('false_claim', 'knowing_deception', 'improper_influence') and not coalesce(p_high_risk_ack, false) then
+      raise exception 'a high-risk angle needs an explicit acknowledgement that its findings support it' using errcode = '22023';
+    end if;
+    p_rubric := null;
+  elsif v.stage = 'outline' then
+    p_selected := null; p_rubric := null;
+  else
+    p_selected := null;
+    probs := public.weekly_rubric_problems(p_rubric);
+    if cardinality(probs) > 0 then raise exception 'rubric gate: %', array_to_string(probs, '; ') using errcode = '22023'; end if;
+    if jsonb_array_length(coalesce(v.checks -> 'material_issues', '[]')) > 0 then
+      raise exception 'unresolved material factual issue found by the checks' using errcode = '22023';
+    end if;
+    if exists (select 1 from public.weekly_corrections c where c.script_id = v.id
+               and c.decision in ('material_issue', 'quote_not_found_in_sources', 'quote_contradicted')) then
+      raise exception 'unresolved material factual issue recorded on this version' using errcode = '22023';
+    end if;
+    if jsonb_array_length(coalesce(v.checks -> 'high_risk', '[]')) > 0 and not coalesce(p_high_risk_ack, false) then
+      raise exception 'high-risk wording needs an explicit acknowledgement' using errcode = '22023';
+    end if;
+  end if;
+  insert into public.weekly_script_approvals (script_id, body_sha256, selected_index, rubric, high_risk_ack, note, approved_by)
+    values (v.id, v.body_sha256, p_selected, p_rubric, coalesce(p_high_risk_ack, false), p_note, e);
+  return public.weekly_version_status(v.id);
 end $$;
 
-create or replace function public.hs_weekly_script_approve(p_script uuid) returns boolean
+-- A passage review. A 'rewrite' names one action and queues a run that writes a new version of the script; the
+-- original version is unchanged, and the review keeps the before text, reason, findings and lesson scope.
+create or replace function public.hs_weekly_passage_review(p_script uuid, p_segment integer, p_decision text,
+  p_reason text default null, p_action text default null, p_finding_ids text[] default '{}', p_lesson_scope text default 'local',
+  p_after text default null) returns jsonb
 language plpgsql security definer set search_path = public as $$
-declare e text := public._hs_is_admin(); s public.weekly_scripts;
+declare e text := public._hs_is_admin(); v public.weekly_scripts; before text; c uuid; q jsonb := '{}'; bad text[];
 begin
-  select * into s from public.weekly_scripts where id = p_script;
-  if s.id is null then raise exception 'unknown script' using errcode = '22023'; end if;
-  insert into public.weekly_script_approvals (script_id, body_sha256, approved_by) values (s.id, s.body_sha256, e);
-  return true;
-end $$;
-
-create or replace function public.hs_weekly_correction_save(p_script uuid, p_segment integer, p_after text, p_note text default null) returns uuid
-language plpgsql security definer set search_path = public as $$
-declare e text := public._hs_is_admin(); s public.weekly_scripts; before text; c uuid;
-begin
-  select * into s from public.weekly_scripts where id = p_script;
-  if s.id is null then raise exception 'unknown script' using errcode = '22023'; end if;
-  before := s.body -> 'segments' -> p_segment ->> 'text';
+  select * into v from public.weekly_scripts where id = p_script and stage = 'script';
+  if v.id is null then raise exception 'unknown script' using errcode = '22023'; end if;
+  before := v.body -> 'segments' -> p_segment ->> 'text';
   if before is null then raise exception 'no such segment' using errcode = '22023'; end if;
-  insert into public.weekly_corrections (script_id, segment_index, before_text, after_text, note, created_by)
-    values (s.id, p_segment, before, p_after, p_note, e) returning id into c;
-  return c;
+  select coalesce(array_agg(x), '{}') into bad from unnest(coalesce(p_finding_ids, '{}')) x
+    where x <> all (public.weekly_library_claim_ids(v.library_version_id));
+  if cardinality(bad) > 0 then raise exception 'not in the pinned library: %', array_to_string(bad, ', ') using errcode = '22023'; end if;
+  if p_decision = 'rewrite' then
+    if (public.weekly_version_status(v.id) ->> 'superseded')::boolean then
+      raise exception 'a newer version exists; review that one' using errcode = '22023';
+    end if;
+    if (public.weekly_version_status(v.id) ->> 'outdated')::boolean then
+      raise exception 'this script is outdated' using errcode = '22023';
+    end if;
+  end if;
+  insert into public.weekly_corrections (script_id, segment_index, decision, action, reason, finding_ids, lesson_scope,
+                                         before_text, after_text, created_by)
+    values (v.id, p_segment, p_decision, p_action, p_reason, coalesce(p_finding_ids, '{}'), coalesce(p_lesson_scope, 'local'),
+            before, case when p_decision = 'corrected' then p_after end, e) returning id into c;
+  if p_decision = 'rewrite' then
+    q := public._wk_queue('rewrite', v.topic, jsonb_build_object('library_version_id', v.library_version_id, 'profile_id', v.profile_id,
+      'parent_id', v.id, 'depends_on', v.depends_on, 'selected_index', v.selected_index, 'review_id', c,
+      'segment_index', p_segment, 'action', p_action, 'reason', p_reason, 'finding_ids', to_jsonb(coalesce(p_finding_ids, '{}')),
+      'lessons_retrieved', to_jsonb(v.lessons_included)), e);
+  end if;
+  return jsonb_build_object('review_id', c) || q;
 end $$;
 
+-- The reviewer's own wording for a passage (a lesson source). Kept for the Stage 2 lesson loop.
+create or replace function public.hs_weekly_correction_save(p_script uuid, p_segment integer, p_after text, p_note text default null,
+  p_lesson_scope text default 'local') returns uuid
+language plpgsql security definer set search_path = public as $$
+begin
+  return (public.hs_weekly_passage_review(p_script, p_segment, 'corrected', p_note, null, '{}', p_lesson_scope, p_after) ->> 'review_id')::uuid;
+end $$;
+
+-- A lesson comes only from a review a person marked REUSABLE, with a before and an after.
 create or replace function public.hs_weekly_lesson_propose(p_correction uuid, p_text text, p_test jsonb default null) returns uuid
 language plpgsql security definer set search_path = public as $$
 declare e text := public._hs_is_admin(); c public.weekly_corrections; l uuid;
 begin
   select * into c from public.weekly_corrections where id = p_correction;
   if c.id is null then raise exception 'unknown correction' using errcode = '22023'; end if;
+  if c.lesson_scope <> 'reusable' then raise exception 'this review was marked local to this script' using errcode = '22023'; end if;
+  if c.after_text is null then raise exception 'a lesson needs a before and an after' using errcode = '22023'; end if;
   insert into public.weekly_lessons (topic, text, test, correction_id, example_before, example_after, created_by)
     values ((select topic from public.weekly_scripts where id = c.script_id), p_text, p_test, c.id, c.before_text, c.after_text, e)
     returning id into l;
@@ -565,19 +834,44 @@ begin
     'profiles', (select coalesce(jsonb_agg(jsonb_build_object('id', p.id, 'version', p.version, 'rules', p.rules,
         'approved', exists (select 1 from public.weekly_profile_approvals a where a.profile_id = p.id)) order by p.version), '[]')
         from public.weekly_editorial_profiles p),
-    'scripts', (select coalesce(jsonb_agg(jsonb_build_object('id', s.id, 'created_at', s.created_at, 'library_version_id', s.library_version_id,
-        'profile_id', s.profile_id, 'provider', s.provider, 'model', s.model, 'body', s.body, 'checks', s.checks,
-        'lessons_included', s.lessons_included,
-        'approved', exists (select 1 from public.weekly_script_approvals a where a.script_id = s.id and a.body_sha256 = s.body_sha256),
+    'versions', (select coalesce(jsonb_agg(jsonb_build_object('id', s.id, 'stage', s.stage, 'created_at', s.created_at,
+        'parent_id', s.parent_id, 'depends_on', s.depends_on, 'selected_index', s.selected_index,
+        'library_version_id', s.library_version_id, 'profile_id', s.profile_id, 'provider', s.provider, 'model', s.model,
+        'body', s.body, 'body_sha256', s.body_sha256, 'checks', s.checks, 'lessons_included', s.lessons_included,
+        'status', public.weekly_version_status(s.id),
+        'approvals', (select coalesce(jsonb_agg(jsonb_build_object('approved_by', a.approved_by, 'approved_at', a.approved_at,
+            'body_sha256', a.body_sha256, 'this_version', a.body_sha256 = s.body_sha256, 'selected_index', a.selected_index,
+            'rubric', a.rubric, 'high_risk_ack', a.high_risk_ack, 'note', a.note) order by a.approved_at), '[]')
+            from public.weekly_script_approvals a where a.script_id = s.id),
         'lesson_uses', (select coalesce(jsonb_agg(jsonb_build_object('id', u.id, 'lesson_id', u.lesson_id, 'retrieved', u.retrieved,
             'included', u.included, 'assessed', u.assessed, 'assessed_by', u.assessed_by, 'assessment_note', u.assessment_note,
             'reviewer_decision', u.reviewer_decision) order by u.id), '[]') from public.weekly_lesson_uses u where u.script_id = s.id))
         order by s.created_at), '[]') from public.weekly_scripts s where s.topic = p_topic),
+    'rubric', jsonb_build_object('label', 'Provisional internal criteria, not validated performance benchmarks',
+        'dimensions', jsonb_build_array('hook_conflict', 'human_stakes', 'emotional_force', 'argument_coherence',
+                                        'factual_discipline', 'spoken_clarity', 'closing'),
+        'gates', jsonb_build_array('total at least 21/28', 'factual discipline = 4',
+                                   'hook, emotional force and coherence each at least 3', 'no unresolved material factual issue',
+                                   'explicit human approval')),
+    -- Kept apart on purpose: mechanical compliance, human acceptance, editing effort, audience outcomes.
+    'measurement', jsonb_build_object(
+        'mechanical', (select jsonb_build_object('script_versions', count(*), 'checks_passed', count(*) filter (where (s.checks ->> 'ok')::boolean))
+                       from public.weekly_scripts s where s.topic = p_topic and s.stage = 'script'),
+        'human', (select jsonb_build_object('approvals', count(*), 'rubric_totals', coalesce(jsonb_agg(
+                     (select sum(value::integer) from jsonb_each_text(a.rubric))) filter (where a.rubric is not null), '[]'))
+                  from public.weekly_script_approvals a join public.weekly_scripts s on s.id = a.script_id
+                  where s.topic = p_topic and s.stage = 'script'),
+        'editing', (select jsonb_build_object('rewrites', count(*) filter (where c.decision = 'rewrite'),
+                       'reviews', count(*), 'note', 'Clock time between versions is not active editing time.')
+                    from public.weekly_corrections c join public.weekly_scripts s on s.id = c.script_id where s.topic = p_topic),
+        'audience', jsonb_build_object('status', 'not_collected')),
     'lessons', (select coalesce(jsonb_agg(jsonb_build_object('id', l.id, 'text', l.text, 'test', l.test, 'status', l.status,
         'example_before', l.example_before, 'example_after', l.example_after) order by l.created_at), '[]')
         from public.weekly_lesson_state l where l.topic = p_topic),
     'corrections', (select coalesce(jsonb_agg(jsonb_build_object('id', c.id, 'script_id', c.script_id, 'segment_index', c.segment_index,
-        'before_text', c.before_text, 'after_text', c.after_text, 'note', c.note) order by c.created_at), '[]')
+        'decision', c.decision, 'action', c.action, 'reason', c.reason, 'finding_ids', c.finding_ids, 'lesson_scope', c.lesson_scope,
+        'before_text', c.before_text, 'after_text', c.after_text, 'result_script_id', c.result_script_id, 'note', c.note)
+        order by c.created_at), '[]')
         from public.weekly_corrections c join public.weekly_scripts s on s.id = c.script_id where s.topic = p_topic));
 end $$;
 
@@ -623,15 +917,25 @@ begin
                  from public.weekly_research_answers a where a.id = (r.input ->> 'answer_id')::uuid));
   end if;
   select * into lv from public.weekly_library_versions where id = (r.input ->> 'library_version_id')::uuid;
-  return jsonb_build_object('run', r.id, 'kind', r.kind, 'topic', r.topic, 'library_version', lv.n,
+  return jsonb_build_object('run', r.id, 'kind', r.kind, 'mode', r.kind, 'topic', r.topic, 'library_version', lv.n,
     'findings', (select coalesce(jsonb_agg(jsonb_build_object('claim_id', f.finding_key || '@' || f.version, 'statement', f.statement,
-        'qualifiers', f.qualifiers, 'uncertainty', f.uncertainty, 'scope', f.scope) order by f.finding_key), '[]')
+        'qualifiers', f.qualifiers, 'uncertainty', f.uncertainty, 'scope', f.scope,
+        'quotes', (select coalesce(jsonb_agg(w.quote order by w.created_at) filter (where w.quote is not null), '[]')
+                   from public.weekly_finding_sources fs join public.weekly_sources w on w.id = fs.source_id where fs.finding_id = f.id))
+        order by f.finding_key), '[]')
         from public.weekly_library_version_findings x join public.weekly_findings f on f.id = x.finding_id
         where x.library_version_id = lv.id),
     'profile', (select p.rules from public.weekly_editorial_profiles p where p.id = (r.input ->> 'profile_id')::uuid),
+    'angle', (select d.body -> 'angles' -> (r.input ->> 'selected_index')::integer from public.weekly_scripts d
+              where d.id = (case r.kind when 'outline' then (r.input ->> 'depends_on')::uuid
+                                        else (select o.depends_on from public.weekly_scripts o where o.id = (r.input ->> 'depends_on')::uuid) end)),
+    'outline', (select o.body from public.weekly_scripts o where o.id = (r.input ->> 'depends_on')::uuid and o.stage = 'outline'),
+    'parent', (select jsonb_build_object('body', ps.body, 'segment_index', (r.input ->> 'segment_index')::integer,
+                 'action', r.input ->> 'action', 'reason', r.input ->> 'reason', 'finding_ids', r.input -> 'finding_ids')
+               from public.weekly_scripts ps where ps.id = (r.input ->> 'parent_id')::uuid),
     'lessons', (select coalesce(jsonb_agg(jsonb_build_object('id', l.id, 'text', l.text, 'test', l.test,
         'example_before', l.example_before, 'example_after', l.example_after) order by l.created_at), '[]')
-        from public.weekly_lessons l where l.id in (select jsonb_array_elements_text(r.input -> 'lessons_retrieved')::uuid)));
+        from public.weekly_lessons l where l.id in (select jsonb_array_elements_text(coalesce(r.input -> 'lessons_retrieved', '[]'))::uuid)));
 end $$;
 
 create or replace function public.weekly_run_fail(p_run uuid, p_error text) returns void
@@ -679,34 +983,59 @@ begin
   return jsonb_build_object('sources', jsonb_array_length(coalesce(p_payload -> 'sources', '[]')), 'findings', nf);
 end $$;
 
--- payload: {provider, model, prompt_sha256, body:{segments:[...]}, checks:{...}, lessons_included:[uuid],
+-- payload: {provider, model, prompt_sha256, body, checks, lessons_included:[uuid],
 --           lesson_assessments:[{lesson_id, assessed, assessed_by, note}], runner_seconds}
+-- One record step for every writing run (angles / outline / script / rewrite). The run's input decides the stage and
+-- lineage; the payload cannot choose them.
 create or replace function public.weekly_script_record(p_run uuid, p_payload jsonb) returns uuid
 language plpgsql security definer set search_path = public as $$
-declare r public.weekly_runs; sid uuid; retrieved uuid[]; included uuid[]; l uuid; asmt jsonb;
+declare r public.weekly_runs; sid uuid; retrieved uuid[]; included uuid[]; l uuid; asmt jsonb; stg text; lib text[]; bad text[];
+        newtext text;
 begin
-  select * into r from public.weekly_runs where id = p_run and kind = 'script' and status = 'running';
-  if r.id is null then raise exception 'run is not a running script run' using errcode = '55000'; end if;
-  retrieved := coalesce(array(select jsonb_array_elements_text(r.input -> 'lessons_retrieved')::uuid), '{}');
-  included := coalesce(array(select jsonb_array_elements_text(p_payload -> 'lessons_included')::uuid), '{}');
+  select * into r from public.weekly_runs where id = p_run and kind in ('angles', 'outline', 'script', 'rewrite') and status = 'running';
+  if r.id is null then raise exception 'run is not a running writing run' using errcode = '55000'; end if;
+  stg := case r.kind when 'rewrite' then 'script' else r.kind end;
+  lib := public.weekly_library_claim_ids((r.input ->> 'library_version_id')::uuid);
+  -- every finding id a draft names must be pinned in its library version
+  select coalesce(array_agg(distinct x), '{}') into bad from (
+    select jsonb_array_elements_text(coalesce(a -> 'finding_ids', '[]')) x from jsonb_array_elements(coalesce(p_payload -> 'body' -> 'angles', '[]')) a
+    union all select jsonb_array_elements_text(coalesce(b -> 'finding_ids', '[]')) from jsonb_array_elements(coalesce(p_payload -> 'body' -> 'beats', '[]')) b
+    union all select jsonb_array_elements_text(coalesce(g -> 'claim_ids', '[]')) from jsonb_array_elements(coalesce(p_payload -> 'body' -> 'segments', '[]')) g) t
+    where x <> all (lib);
+  if cardinality(bad) > 0 then raise exception 'cites findings not in the pinned library: %', array_to_string(bad, ', ') using errcode = '22023'; end if;
+  if stg = 'angles' and exists (select 1 from jsonb_array_elements(coalesce(p_payload -> 'body' -> 'angles', '[]')) a
+                                where jsonb_array_length(coalesce(a -> 'finding_ids', '[]')) = 0) then
+    raise exception 'every angle card needs supporting findings' using errcode = '22023';
+  end if;
+  retrieved := coalesce(array(select jsonb_array_elements_text(coalesce(r.input -> 'lessons_retrieved', '[]'))::uuid), '{}');
+  included := coalesce(array(select jsonb_array_elements_text(coalesce(p_payload -> 'lessons_included', '[]'))::uuid), '{}');
   if not included <@ retrieved then raise exception 'a lesson was included that was not retrieved' using errcode = '22023'; end if;
-  insert into public.weekly_scripts (run_id, topic, library_version_id, profile_id, lessons_included, prompt_sha256, provider, model, body, checks)
-    values (r.id, r.topic, (r.input ->> 'library_version_id')::uuid, (r.input ->> 'profile_id')::uuid, included,
+  insert into public.weekly_scripts (run_id, stage, parent_id, depends_on, selected_index, topic, library_version_id, profile_id,
+                                     lessons_included, prompt_sha256, provider, model, body, checks)
+    values (r.id, stg, (r.input ->> 'parent_id')::uuid, (r.input ->> 'depends_on')::uuid, (r.input ->> 'selected_index')::integer,
+            r.topic, (r.input ->> 'library_version_id')::uuid, (r.input ->> 'profile_id')::uuid, included,
             p_payload ->> 'prompt_sha256', p_payload ->> 'provider', p_payload ->> 'model', p_payload -> 'body', p_payload -> 'checks')
     returning id into sid;
-  foreach l in array retrieved loop
-    select x into asmt from jsonb_array_elements(coalesce(p_payload -> 'lesson_assessments', '[]')) x where (x ->> 'lesson_id')::uuid = l limit 1;
-    insert into public.weekly_lesson_uses (script_id, lesson_id, retrieved, included, assessed, assessed_by, assessment_note)
-      values (sid, l, true, l = any (included), coalesce(asmt ->> 'assessed', 'not_assessed'), coalesce(asmt ->> 'assessed_by', 'none'),
-              asmt ->> 'note');
-  end loop;
+  if r.kind = 'rewrite' then
+    newtext := p_payload -> 'body' -> 'segments' -> (r.input ->> 'segment_index')::integer ->> 'text';
+    if newtext is null then raise exception 'the rewrite lost the passage it was asked to rewrite' using errcode = '22023'; end if;
+    update public.weekly_corrections set after_text = newtext, result_script_id = sid where id = (r.input ->> 'review_id')::uuid;
+  end if;
+  if stg = 'script' then
+    foreach l in array retrieved loop
+      select x into asmt from jsonb_array_elements(coalesce(p_payload -> 'lesson_assessments', '[]')) x where (x ->> 'lesson_id')::uuid = l limit 1;
+      insert into public.weekly_lesson_uses (script_id, lesson_id, retrieved, included, assessed, assessed_by, assessment_note)
+        values (sid, l, true, l = any (included), coalesce(asmt ->> 'assessed', 'not_assessed'), coalesce(asmt ->> 'assessed_by', 'none'),
+                asmt ->> 'note');
+    end loop;
+  end if;
   insert into public.weekly_cost_entries (run_id, category, cost_type, scope, script_id, note)
     values (r.id, 'writing', 'no_incremental_api_charge', 'report', sid, 'Claude on the founder''s plan'),
            (r.id, 'verification', 'no_incremental_api_charge', 'report', sid, 'mechanical checks and the run audit (no AI call)');
   insert into public.weekly_cost_entries (run_id, category, cost_type, scope, script_id, quantity, unit, note)
     values (r.id, 'writing', 'runner_minutes', 'report', sid, round(coalesce((p_payload ->> 'runner_seconds')::numeric, 0) / 60, 2), 'minutes',
-            'script, audit and check jobs on GitHub runners');
-  update public.weekly_runs set status = 'done', finished_at = now(), result = jsonb_build_object('script_id', sid) where id = r.id;
+            'writing, audit and check jobs on GitHub runners');
+  update public.weekly_runs set status = 'done', finished_at = now(), result = jsonb_build_object('script_id', sid, 'stage', stg) where id = r.id;
   return sid;
 end $$;
 
@@ -715,9 +1044,13 @@ do $$
 declare f text;
 begin
   foreach f in array array['weekly_sha256(text)', 'weekly_append_only()', 'weekly_library_guard()', 'weekly_lesson_use_guard()', '_wk_dispatch(text,uuid)',
+    'weekly_scripts_lineage_guard()', 'weekly_corrections_guard()', 'weekly_version_status(uuid)', 'weekly_library_claim_ids(uuid)',
+    'weekly_rubric_problems(jsonb)', '_wk_queue(text,text,jsonb,text)',
+    'hs_weekly_angles_request(uuid,uuid,uuid)', 'hs_weekly_outline_request(uuid,uuid)', 'hs_weekly_version_approve(uuid,integer,jsonb,boolean,text)',
+    'hs_weekly_passage_review(uuid,integer,text,text,text,text[],text,text)',
     'hs_weekly_request_research(text,text)', 'hs_weekly_paste_answer(uuid,text)', 'hs_weekly_finding_decide(uuid,text,text)',
     'hs_weekly_library_seal(text)', 'hs_weekly_profile_create(jsonb)', 'hs_weekly_profile_approve(uuid)',
-    'hs_weekly_script_request(uuid,uuid)', 'hs_weekly_script_approve(uuid)', 'hs_weekly_correction_save(uuid,integer,text,text)',
+    'hs_weekly_script_request(uuid)', 'hs_weekly_correction_save(uuid,integer,text,text,text)',
     'hs_weekly_lesson_propose(uuid,text,jsonb)', 'hs_weekly_lesson_decide(uuid,text)', 'hs_weekly_lesson_use_review(bigint,text,text)',
     'hs_weekly_subscription_record(text,text,numeric,text,boolean)', 'hs_weekly_overview(text)', 'hs_weekly_export(text)',
     'weekly_run_claim(uuid)', 'weekly_run_fail(uuid,text)', 'weekly_research_record(uuid,jsonb)', 'weekly_script_record(uuid,jsonb)'] loop
@@ -725,8 +1058,9 @@ begin
   end loop;
   foreach f in array array['hs_weekly_request_research(text,text)', 'hs_weekly_paste_answer(uuid,text)',
     'hs_weekly_finding_decide(uuid,text,text)', 'hs_weekly_library_seal(text)', 'hs_weekly_profile_create(jsonb)',
-    'hs_weekly_profile_approve(uuid)', 'hs_weekly_script_request(uuid,uuid)', 'hs_weekly_script_approve(uuid)',
-    'hs_weekly_correction_save(uuid,integer,text,text)', 'hs_weekly_lesson_propose(uuid,text,jsonb)',
+    'hs_weekly_profile_approve(uuid)', 'hs_weekly_script_request(uuid)', 'hs_weekly_angles_request(uuid,uuid,uuid)',
+    'hs_weekly_outline_request(uuid,uuid)', 'hs_weekly_version_approve(uuid,integer,jsonb,boolean,text)',
+    'hs_weekly_passage_review(uuid,integer,text,text,text,text[],text,text)', 'hs_weekly_correction_save(uuid,integer,text,text,text)', 'hs_weekly_lesson_propose(uuid,text,jsonb)',
     'hs_weekly_lesson_decide(uuid,text)', 'hs_weekly_lesson_use_review(bigint,text,text)',
     'hs_weekly_subscription_record(text,text,numeric,text,boolean)', 'hs_weekly_overview(text)', 'hs_weekly_export(text)'] loop
     execute format('grant execute on function public.%s to authenticated', f);
