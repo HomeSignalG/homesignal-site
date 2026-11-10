@@ -1026,9 +1026,9 @@
 <script src="config.js"></script>
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
-<script src="lib/data.js?v=c047cd53"></script>
+<script src="lib/data.js?v=65b0cd6d"></script>
 <script src="lib/topic-prefs.js?v=fe87d99b"></script>
-<script src="lib/templates.js?v=ddc4a550"></script>
+<script src="lib/templates.js?v=6bbb33ed"></script>
 <script src="lib/project-type.js?v=ed9e58be"></script>
 <script src="lib/map.js?v=c2fa4469"></script>
 <script src="lib/residential-qualify.js?v=20260905"></script>
@@ -1388,6 +1388,7 @@ HS.onReady(function(){
   var COUNTY_SOURCES = null;
   var FAC_UNAVAILABLE = false;                     // EPA read failed for this snapshot (count unknown, not 0)
   var FAC_UNMEASURED = false;                      // ZIP-mode facility plane has no membership measurement (count unknown, not 0)
+  var FAC_INVENTORY = null;                        // ZIP mode: HS.facilityInventory's answer for this page (tile, suffix, note)
   var FAC_CONFIRMED_ON = "";                       // EPA did not answer, but the stored count was confirmed on this day (HS.facilityCount)
   // SEO policy — NATIONWIDE SUBSTANCE GATE (founder-approved 2026-07-14, PLAN.md §11
   // threshold c): index a ZIP page only when the materializer stamped
@@ -1905,19 +1906,19 @@ HS.onReady(function(){
       sigs.sort(function(a,b){ return ENV_TONE_RANK[a.tone]-ENV_TONE_RANK[b.tone]; });
       out = out.concat(sigs);
     }
-    // Baseline: a clean EPA record is a positive fact ONLY while compliance tracking is
-    // on — the same rule as HS.fac.signals. An FRS id alone is not a clean record: ECHO
-    // failed, ECHO matched nothing, CWA-only, and tracking-off used to print this line
-    // and made Map 1 disagree with the ZIP page (audit 2026-09-27: 199,409 stored sites).
+    // Baseline: a clean EPA record is a positive fact, so it needs EPA's own "No Violation
+    // Identified" for this facility (HS.fac.noViolationLine, shared with the ZIP page). An FRS id,
+    // a permit status or a tracking flag alone is not one (2026-11-09: a 3% sample had 5 sites
+    // printing the old line, 4 with no ECHO compliance match at all).
     if(frsRid(s) && !out.length){
       var lv = s.viol||0;
       if(lv>0){
         out.push({ text: lv+" recorded violation"+(lv===1?"":"s"), tone:"alert" });
       } else {
-        var interp = (typeof HS!=="undefined" && HS.fac) ? HS.fac.interpret({epa:epa}) : null;
-        if(interp && interp.tracking===true){
-          out.push({ text:"no recorded EPA violations (compliance tracking on)", tone:"ok" });
-        }
+        // The one negative-compliance rule (lib/templates.js HS.fac.noViolationLine): only EPA's own
+        // "No Violation Identified" for this facility, with its date and laws. Anything less is unknown.
+        var clean = (typeof HS!=="undefined" && HS.fac && HS.fac.noViolationLine) ? HS.fac.noViolationLine(epa) : null;
+        if(clean) out.push(clean);
       }
     }
     return out;
@@ -2156,6 +2157,12 @@ HS.onReady(function(){
     // was answering on 08-07 (1,978 of 2,133 came back with facilities) and 08-08 (9,005 of
     // 10,086). Extending the old text to all 1,722 would have traded a false zero for a false
     // explanation. Anything cohort-specific belongs in the flag, not in this string.
+    // ZIP MODE: a facility count that is not a current, complete total says why, in the inventory's own words.
+    if(FAC_INVENTORY && FAC_INVENTORY.note){
+      el.textContent = FAC_INVENTORY.note + " Planning and permit records below are unaffected.";
+      el.style.display = "";
+      return;
+    }
     if(FAC_UNAVAILABLE){
       // 2026-10-23: the old text named one fixed outage date from August,
       // which was false of every page flagged since. It now says only what is true of this page.
@@ -2795,6 +2802,8 @@ HS.onReady(function(){
                    // canonical membership evidence.
                    sites: HS.zipModeSites(rsSites, auth, natlSites, cleanupSites, waterSites),
                    facUnmeasured: facMembers == null,
+                   // What the count may claim (docs/zip-facility-inventory.sql), presented by HS.facilityInventory.
+                   facInventory: (rs && rs.facility_inventory) || null,
                    paywall:!!row.paywall, updated:row.refreshed_at,
                    facUnavailable:!!row.facilities_unavailable,
                    facConfirmedAt:row.facilities_refreshed_at || null });
@@ -2970,12 +2979,19 @@ HS.onReady(function(){
     // EPA did not answer, but a stored count above zero was confirmed on the day the facility
     // clock holds: show it with that date (HS.facilityCount, lib/templates.js) rather than a dash.
     var _facN = (data.counts && data.counts.facilities) != null ? data.counts.facilities : fac.length;
-    var _facState = (FAC_UNAVAILABLE && !FAC_UNMEASURED && HS.facilityCount)
+    // ZIP MODE (2026-11-09): the count says what it is. HS.facilityInventory (lib/templates.js) presents the state the
+    // database decided (complete / complete as of a date / not complete / not measured); only a complete inventory
+    // prints a plain total. Address mode keeps the radius count below, unchanged.
+    FAC_INVENTORY = (ZIP_MODE && !FAC_UNMEASURED && HS.facilityInventory)
+      ? HS.facilityInventory(data.facInventory || null, _facN) : null;
+    var _facState = (!FAC_INVENTORY && FAC_UNAVAILABLE && !FAC_UNMEASURED && HS.facilityCount)
       ? HS.facilityCount({ unavailable:true, count:_facN, confirmedAt:data.facConfirmedAt }) : null;
     FAC_CONFIRMED_ON = (_facState && _facState.mode === "dated") ? _facState.confirmedOn : "";
-    $("cFac").textContent  = FAC_CONFIRMED_ON ? _facN
+    $("cFac").textContent  = FAC_INVENTORY ? FAC_INVENTORY.tile
+      : FAC_CONFIRMED_ON ? _facN
       : (FAC_UNAVAILABLE || FAC_UNMEASURED) ? "\u2014" : _facN;
     // Both mode branches above reset #kFac on every render, so this suffix never stacks.
+    if(FAC_INVENTORY && FAC_INVENTORY.suffix && $("kFac")) $("kFac").textContent += FAC_INVENTORY.suffix;
     if(FAC_CONFIRMED_ON && $("kFac")) $("kFac").textContent += " · last confirmed " + FAC_CONFIRMED_ON;
     // DEVELOPMENT: same rule as facilities above, for the same reason. On a ZIP whose
     // authoritative membership is NOT MEASURED the page deliberately drops radius-derived

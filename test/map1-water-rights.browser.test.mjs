@@ -46,6 +46,8 @@ const DC_PROJECT = { e: 1.515, n: 1.756, lat: 38.95065, lng: -77.36458, type: 'a
   record_url: 'https://plus.fairfaxcounty.gov/x', source_id: 'arcgis:fairfax:P-1' };
 const ZIP_ROW = { '20171': [{ zip: '20171', home_lat: 38.9506, home_lng: -77.3645,
   counts: { facilities: 2, development: 1 }, sites: [DUAL, PLAIN_FAC, DC_PROJECT],
+  // A complete boundary inventory, so the tile prints a plain total (docs/zip-facility-inventory.sql).
+  facility_inventory: { state: 'complete', coverage: 'zip_boundary_v1', latest_refresh: 'ok', member_count: 2 },
   refreshed_at: '2026-09-06T00:00:00Z', facilities_unavailable: false }] };
 const COMMUNITIES = { '20171': [{ name: 'Herndon (20171)', level: 'zip', county: 'Fairfax', state: 'VA' }] };
 const ZIP_AUTH = { '20171': { zip: '20171', mode: 'development', status: 'boundary_complete',

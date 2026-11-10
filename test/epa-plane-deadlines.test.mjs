@@ -97,7 +97,8 @@ console.log('\n== 0. composition lock — both index.ts call sites use resolvePl
   ok(planeCalls.length === 2,
     '0b. BOTH call sites (ZIP and address) go through resolvePlanes',
     `got ${planeCalls.length} typed resolvePlanes calls`);
-  const overlayWired = index.match(/overlay:\s*\(deadlineAt\)\s*=>\s*facilitySites\([^)]*deadlineAt(?:, frsStart)?\)/g) || [];
+  // ZIP mode calls facilitySitesForZip (whole-boundary coverage, 2026-11-09); address mode facilitySites.
+  const overlayWired = index.match(/overlay:\s*\(deadlineAt\)\s*=>\s*facilitySites(?:ForZip)?\([^)]*deadlineAt\)/g) || [];
   ok(overlayWired.length === 2,
     '0c. both overlays pass the absolute deadline into facilitySites',
     `got ${overlayWired.length}`);

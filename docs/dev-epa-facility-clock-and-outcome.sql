@@ -49,8 +49,22 @@
 -- docs/dev-refresh-collect-once-per-response.sql (it ignores the new column and
 -- restores the core-clock argument). The column may stay (NULL-safe) or be dropped.
 -- ============================================================================
+--
+-- ⛔ SUPERSEDED — DO NOT APPLY AS WRITTEN (2026-11-09). This file replaces the WHOLE collector
+-- with a body written before 2026-11-05. The live collector (md5(prosrc) b17263cc5eca232dbde8fc33e27093e4,
+-- read 2026-11-09) keeps a failed source's stored records (dev_with_carried_sources,
+-- docs/dev-refresh-collect-carry-failed-sources.sql); this body has no such call and still carries
+-- CORE GUARD 1, so applying it would again freeze every source on a page when one source fails.
+-- Its facility-clock half is already live. The outcome column must be re-derived as a SPLICE of
+-- the live collector, never by replaying this body. The statement below refuses, so a replay
+-- changes nothing: it is the first statement INSIDE the one transaction, so every later statement is
+-- rejected and the final commit rolls back, under psql with or without ON_ERROR_STOP and in any runner.
 
 begin;
+do $refuse$ begin
+  raise exception 'SUPERSEDED: docs/dev-epa-facility-clock-and-outcome.sql would revert the 2026-11-05 '
+    'failed-source retention fix (dev_with_carried_sources). Re-derive any change as a splice of the live collector.';
+end $refuse$;
 
 alter table public.development_reports
   add column if not exists epa_last_outcome jsonb;

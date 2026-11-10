@@ -1,7 +1,7 @@
-// MAP 1 — THE FACILITY COUNT WHEN EPA DID NOT ANSWER (2026-10-23, Washington audit step 4).
-// A stored count above zero is shown with the day it was last confirmed
-// (development_reports.facilities_refreshed_at), through HS.facilityCount in lib/templates.js.
-// With no confirmed date the tile stays a dash. Harness copied from map1-state-cleanup.
+// MAP 1 — WHAT THE ZIP FACILITY COUNT MAY CLAIM (2026-11-09; replaces the 2026-10-23 "last confirmed" rule in ZIP mode).
+// zip_mode_report_sites carries `facility_inventory` (state decided by public.zip_facility_inventory_state,
+// docs/zip-facility-inventory.sql; proven end to end in test/dev_collect_inventory_pg). The page presents it through
+// HS.facilityInventory: only a COMPLETE inventory prints a plain total. Harness copied from map1-state-cleanup.
 //
 // Run: node test/map1-facility-count-dated.browser.test.mjs
 import { chromium } from 'playwright';
@@ -9,7 +9,7 @@ import { createServer } from 'node:http';
 import { readFile } from './lib/serve-page.mjs';
 import { extname, join, normalize } from 'node:path';
 import { createRequire } from 'node:module';
-import { fulfillZipModeReport } from './lib/zip-mode-rpc-mock.mjs';
+import { zipModeReportPayload, rpcZip } from './lib/zip-mode-rpc-mock.mjs';
 const require = createRequire(import.meta.url);
 
 let fails = 0;
@@ -39,8 +39,8 @@ const PLAIN_FAC = { e: 1.82, n: 2.361, lat: 38.95942, lng: -77.35889,
 // One development_reports row per case; the page reads it through REST and the facility RPC.
 const BASE_ROW = { zip: '20171', home_lat: 38.9506, home_lng: -77.3645,
   counts: { facilities: 2 }, sites: [DUAL, PLAIN_FAC], refreshed_at: '2026-10-22T00:00:00Z' };
-let ZIP_ROW = {};
-const setRow = (extra) => { ZIP_ROW = { '20171': [Object.assign({}, BASE_ROW, extra)] }; };
+let ZIP_ROW = {}; let INVENTORY = null;
+const setRow = (extra, inv) => { ZIP_ROW = { '20171': [Object.assign({}, BASE_ROW, extra)] }; INVENTORY = inv === undefined ? null : inv; };
 const COMMUNITIES = { '20171': [{ name: 'Herndon (20171)', level: 'zip', county: 'Fairfax', state: 'VA' }] };
 const ZIP_AUTH = { '20171': { zip: '20171', mode: 'development', status: 'boundary_complete', projects: [], markers: [] } };
 const CLEANUP = {};
@@ -85,7 +85,12 @@ await page.route('**/*', async (route) => {
   if (url.includes('/rpc/map1_state_cleanup_near'))
     return route.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify({ status: 'complete', sites: [Object.assign({}, CLEANUP_MEMBER, { zip_membership: undefined })] }) });
-  if (url.includes('/rpc/zip_mode_report_sites')) return fulfillZipModeReport(route, (z) => ZIP_ROW[z] || []);
+  if (url.includes('/rpc/zip_mode_report_sites')) {
+    const z = rpcZip(route);
+    const body = zipModeReportPayload(ZIP_ROW[z] || [], z);
+    if (INVENTORY) body.facility_inventory = Object.assign({ member_count: body.facility_counts.member }, INVENTORY);
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+  }
   if (url.includes('/rest/v1/development_reports'))
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ZIP_ROW[zipOf(url)] || []) });
   if (url.includes('/rest/v1/communities'))
@@ -122,28 +127,46 @@ async function load() {
     note: (document.getElementById('covNote') || {}).textContent || '' }));
 }
 
-// 1. EPA answered: the count, the plain label, no outage note.
-setRow({ facilities_unavailable: false, facilities_refreshed_at: '2026-10-22T00:00:00Z' });
+const NOTE_OK = (r) => !/not a complete|complete as of|did not answer/.test(r.note);
+// 1. COMPLETE boundary inventory, latest refresh ok: a plain total.
+setRow({ facilities_unavailable: false, facilities_refreshed_at: '2026-10-22T00:00:00Z' }, { state: 'complete', latest_refresh: 'ok' });
 let r = await load();
-ok(r.n === '2' && !/last confirmed/.test(r.k) && !/did not answer/.test(r.note), '1: EPA answered: count 2, plain label', JSON.stringify(r));
-
-// 2. EPA did not answer, stored count confirmed on Sep 14: the count with its date.
-setRow({ facilities_unavailable: true, facilities_refreshed_at: '2026-09-14T12:00:00Z' });
+ok(r.n === '2' && r.k === 'Nearby regulated facilities' && NOTE_OK(r), '1: complete inventory: 2, plain label, no note', JSON.stringify(r));
+// 2. COMPLETE with zero members: a verified empty ZIP prints 0.
+setRow({ sites: [], facilities_unavailable: false }, { state: 'complete', latest_refresh: 'ok' });
 r = await load();
-ok(r.n === '2', '2a: the stored count is shown, not a dash', r.n);
-ok(/last confirmed Sep 14, 2026$/.test(r.k), '2b: the tile says the day it was last confirmed', r.k);
-ok(/did not answer/.test(r.note) && /last confirmed on Sep 14, 2026/.test(r.note), '2c: the note names the date', r.note);
-ok(!/since 2026-08-09/.test(r.note), '2d: no fixed outage date', r.note);
-
-// 3. EPA did not answer and there is no facility clock: a dash, never a number.
-setRow({ facilities_unavailable: true, facilities_refreshed_at: null });
+ok(r.n === '0' && r.k === 'Nearby regulated facilities', '2: complete inventory of zero: 0', JSON.stringify(r));
+// 3. COMPLETE, THEN A FAILED REFRESH: the count with the day it was complete, and why.
+setRow({ facilities_unavailable: true, facilities_refreshed_at: '2026-09-14T12:00:00Z' },
+       { state: 'complete_as_of', latest_refresh: 'failed', last_success_at: '2026-09-14T12:00:00Z' });
 r = await load();
-ok(r.n === '\u2014' && !/last confirmed/.test(r.k) && /cannot be confirmed/.test(r.note), '3: no confirmed date: dash and count-unknown note', JSON.stringify(r));
-
-// 4. Back to an answered read on the same page: the label suffix does not linger.
-setRow({ facilities_unavailable: false, facilities_refreshed_at: '2026-10-22T00:00:00Z' });
+ok(r.n === '2' && /complete as of Sep 14, 2026$/.test(r.k), '3a: complete as of its date', JSON.stringify(r));
+ok(/complete count of EPA-registered facilities in this ZIP as of Sep 14, 2026, not a current one/.test(r.note) && /did not answer/.test(r.note),
+  '3b: the note says it is the count as of that day, not a current one', r.note);
+// 4. LEGACY (radius-era) list: never a total.
+setRow({ facilities_unavailable: false, facilities_refreshed_at: '2026-10-22T00:00:00Z' }, { state: 'not_complete', latest_refresh: 'ok' });
 r = await load();
-ok(r.n === '2' && !/last confirmed/.test(r.k), '4: label resets', r.k);
+ok(r.n === '2+' && /not a complete count$/.test(r.k) && /Not a complete count/.test(r.note), '4: legacy list: 2+, "not a complete count"', JSON.stringify(r));
+// 4b. LEGACY with nothing inside the ZIP: a dash, never a zero.
+setRow({ sites: [], facilities_unavailable: false }, { state: 'not_complete', latest_refresh: 'ok' });
+r = await load();
+ok(r.n === '\u2014' && /not yet counted$/.test(r.k), '4b: legacy zero: dash, "not yet counted"', JSON.stringify(r));
+// 5. UNRESOLVED RETRIEVAL (no complete read ever, latest failed): a dash and the outage sentence.
+setRow({ sites: [], facilities_unavailable: true, facilities_refreshed_at: null }, { state: 'not_complete', latest_refresh: 'failed' });
+r = await load();
+ok(r.n === '\u2014' && /did not answer/.test(r.note), '5: unresolved retrieval: dash, says EPA did not answer', JSON.stringify(r));
+// 6. MISSING BOUNDARY: the reader cannot measure; a dash.
+setRow({ facilities_unavailable: false }, { state: 'not_measured', latest_refresh: 'ok', member_count: null });
+r = await load();
+ok(r.n === '\u2014', '6: no boundary: dash', JSON.stringify(r));
+// 7. THE READER HAS NOT BEEN UPDATED (no facility_inventory in the answer): never a total.
+setRow({ facilities_unavailable: false }, null);
+r = await load();
+ok(r.n === '2+' && /not a complete count$/.test(r.k), '7: no inventory state: not presented as a total', JSON.stringify(r));
+// 8. Back to complete on the same page: the label suffix does not linger.
+setRow({ facilities_unavailable: false }, { state: 'complete', latest_refresh: 'ok' });
+r = await load();
+ok(r.n === '2' && r.k === 'Nearby regulated facilities', '8: label resets', r.k);
 
 ok(pageErrors.length === 0, 'no page errors', pageErrors.join(' | '));
 await browser.close(); srv.close();
