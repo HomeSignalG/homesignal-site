@@ -141,3 +141,22 @@ until that deploy. Removal is not done until approved.
 - Verification uses the next naturally scheduled run only (no extra run, no extra EPA request). If that
   run's proof does not pass, it is recorded as: "pause configured; skip reason not independently
   demonstrated by this run."
+
+### First scheduled run after the pause: run 1509 (42842850886)
+
+Scheduled, created 15:17:46Z, on `a0c7d398` (the #2756 condition). Read from that run's own job log; no
+extra run and no extra EPA request was made to verify it.
+
+| step | outcome |
+|---|---|
+| Step 2a, fire the 82801 proof | ran (the normal one proof request this workflow sends each hour) |
+| Step 2b, harvest the proof | `proof_passed: true` on the first poll (facilities 61 before, 61 after, at least 40 expected) |
+| Step 3, the 60-ZIP repair batch | **skipped** |
+| Report | ran; it opened issue #2771, as it does every run |
+| Disable step | ran and failed silently (`not a git repository`, then `|| true`), as before; the schedule stays on |
+
+With `steps.proof.outputs.passed == 'true'`, the only other operand in Step 3's condition is
+`vars.EPA_RECOVERY_REPAIR_PAUSED != 'true'`, so this run is the first one in which the pause, and not a failed
+proof, is what kept the repair batch from being sent. The variable itself is still not read back by this
+session. Runs 1507 (13:18Z) and 1508 (14:18Z) had skipped Step 3 because their proof did not pass, so they
+show nothing about the pause.
