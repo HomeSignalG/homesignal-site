@@ -33,6 +33,7 @@ import {
   FRS_RETRY_BACKOFF_MS,
   frsAt,
   type FrsAttempt,
+  type FrsErrorDiag,
 } from "./epa-frs.ts";
 import type { ZipBounds } from "./scope-box.ts";
 import type { MembershipFn, Verdict } from "./scope-members.ts";
@@ -79,7 +80,11 @@ export interface ZipFrsOutcome {
   cover_radius_mi: number;
   /** rows returned before de-duplication across overlapping circles */
   raw_rows: number;
+  /** DIAGNOSTIC ONLY: thrown-error details for failed attempts, at most DIAG_MAX, never read by a decision. */
+  diag?: ZipFrsDiag[];
 }
+export type ZipFrsDiag = FrsErrorDiag & { attempt: number; since_prev_ms: number | null };
+export const DIAG_MAX = 8;
 
 export interface ZipFrsOptions {
   deadlineAt?: number;
@@ -137,10 +142,11 @@ export async function frsZipCoverage(
   const maxRequests = opts.maxRequests ?? FRS_ZIP_MAX_REQUESTS;
   const cover = circumCircle(bounds);
   const failures: string[] = [];
-  let attempts = 0, tiles = 0, raw = 0;
+  const diag: ZipFrsDiag[] = [];
+  let attempts = 0, tiles = 0, raw = 0, lastEnd: number | null = null;
   const byKey = new Map<string, Record<string, unknown>>();
   const fail = (reason: ZipFrsReason): ZipFrsOutcome =>
-    ({ ok: false, rows: [], reason, attempts, failures, tiles, cover_radius_mi: cover.radiusMi, raw_rows: raw });
+    ({ ok: false, rows: [], reason, attempts, failures, tiles, cover_radius_mi: cover.radiusMi, raw_rows: raw, ...(diag.length ? { diag } : {}) });
 
   const queue: ZipBounds[] = [bounds];
   while (queue.length) {
@@ -156,7 +162,13 @@ export async function frsZipCoverage(
         timeoutMs = Math.min(FRS_ATTEMPT_TIMEOUT_MS, remaining);
       }
       attempts++;
+      // Diagnostic timing reads its own clock, never opts.now: an injected clock sees exactly the reads it saw before.
+      const started = Date.now();
       const a = await frsAt(c.lat, c.lng, c.radiusMi, fetchImpl, timeoutMs);
+      if (a.diag && diag.length < DIAG_MAX) {
+        diag.push({ ...a.diag, attempt: attempts, since_prev_ms: lastEnd === null ? null : Math.round(started - lastEnd) });
+      }
+      lastEnd = Date.now();
       if (a.ok || a.tooBig) { answered = a; break; }
       failures.push(`${c.radiusMi}:${a.schema ? "schema" : a.why ?? "unknown"}`);
       if (a.schema) return fail("schema");
@@ -193,7 +205,7 @@ export async function frsZipCoverage(
       if (!byKey.has(k)) byKey.set(k, r);
     }
   }
-  return { ok: true, rows: [...byKey.values()], reason: null, attempts, failures, tiles, cover_radius_mi: cover.radiusMi, raw_rows: raw };
+  return { ok: true, rows: [...byKey.values()], reason: null, attempts, failures, tiles, cover_radius_mi: cover.radiusMi, raw_rows: raw, ...(diag.length ? { diag } : {}) };
 }
 
 export interface ZipFacilityPick<T> {

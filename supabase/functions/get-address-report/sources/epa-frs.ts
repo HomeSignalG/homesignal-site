@@ -60,7 +60,39 @@ export type FrsAttempt = {
   why?: string;
   /** Seconds from a Retry-After header on a refused attempt, when EPA sent one. */
   retryAfterS?: number;
+  /** DIAGNOSTIC ONLY (never read by a decision): for a thrown error, a sanitized description. */
+  diag?: FrsErrorDiag;
 };
+
+/** A thrown fetch error, sanitized: no URL, no query, no header, bounded length. */
+export type FrsErrorDiag = { stage: "fetch" | "body"; name: string; cause: string | null; msg: string; ms: number };
+
+const DIAG_MSG_MAX = 100;
+/**
+ * Strip anything that could identify a request or a credential, then cap the length. Order matters: whole URLs
+ * first, then any "name=value" left over (query values: the search point, a key), then addresses and host names,
+ * then authorization schemes. What remains is the runtime's own wording ("fetch failed", "Connection reset by
+ * peer (os error 104)").
+ */
+export function sanitizeErrorText(t: unknown): string {
+  return String(t ?? "")
+    .replace(/[a-z][a-z0-9+.-]*:\/\/[^\s)]+/gi, "<url>")
+    .replace(/\b([A-Za-z_][A-Za-z0-9_.-]*)=[^&\s,;)]*/g, "$1=<v>")
+    .replace(/\b(bearer|basic|token|apikey|api_key)\s+[^\s,;)]+/gi, "$1 <redacted>")
+    .replace(/\[?(?:[0-9a-f]{1,4}:){2,7}[0-9a-f]{0,4}\]?(?::\d+)?/gi, "<ip>")
+    .replace(/\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b/g, "<ip>")
+    .replace(/\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}\b(?::\d+)?/gi, "<host>")
+    .replace(/\s+/g, " ").trim().slice(0, DIAG_MSG_MAX);
+}
+export function errorDiag(e: unknown, stage: "fetch" | "body", ms: number): FrsErrorDiag {
+  const err = e instanceof Error ? e : null;
+  const c = err && (err as { cause?: unknown }).cause;
+  const cause = c && typeof c === "object"
+    ? sanitizeErrorText([(c as { code?: unknown }).code ?? (c as { name?: unknown }).name, (c as { message?: unknown }).message]
+        .filter((x) => x != null && x !== "").join(": "))
+    : c != null ? sanitizeErrorText(c) : null;
+  return { stage, name: err ? sanitizeErrorText(err.name).slice(0, 40) : "error", cause: cause || null, msg: sanitizeErrorText(err ? err.message : e), ms: Math.round(ms) };
+}
 
 /** The result of the whole back-off sequence. `ok:false` must NEVER be persisted as zero. */
 export type FrsOutcome = {
@@ -174,10 +206,13 @@ export async function frsAt(
     search_radius: String(rad),
     output: "JSON",
   });
+  const t0 = Date.now();
+  let stage: "fetch" | "body" = "fetch";
   try {
     const r = await fetchImpl(`${FRS_ENDPOINT}?${q}`, {
       signal: AbortSignal.timeout(Math.max(1, Math.floor(timeoutMs))),
     });
+    stage = "body";
     // Probe and ingest now agree: only HTTP 200 is an answer. A 204 / other 2xx used to
     // fall through to JSON.parse and become a schema miss or, before that, a silent zero.
     // 5xx and 429 remain transient (retried); 403/404 remain not-a-zero.
@@ -191,7 +226,7 @@ export async function frsAt(
     return recognizedFrsPayload(parseEpaJson(text));
   } catch (e) {
     // network/parse → transient. The error NAME (TimeoutError, SyntaxError, TypeError…) says which.
-    return { ...TRANSIENT, why: e instanceof Error ? e.name : "error" };
+    return { ...TRANSIENT, why: e instanceof Error ? e.name : "error", diag: errorDiag(e, stage, Date.now() - t0) };
   }
 }
 
