@@ -384,7 +384,7 @@ async function facilitySitesForZip(
   if (!bounds) return facilitiesUnavailable("no_boundary");
   const out = await frsZipCoverage(bounds, undefined, { deadlineAt });
   const cover = circumCircle(bounds);
-  const base = { mode: "zip_boundary", attempts: out.attempts, failures: out.failures, tiles: out.tiles, cover_radius_mi: out.cover_radius_mi, raw_rows: out.raw_rows, ...(out.diag ? { diag: out.diag } : {}) };
+  const base = { mode: "zip_boundary", attempts: out.attempts, failures: out.failures, tiles: out.tiles, cover_radius_mi: out.cover_radius_mi, raw_rows: out.raw_rows };
   if (!out.ok) return { sites: [], epa: { ok: false, radius_used: null, reason: out.reason, ...base, pre_cap: 0, kept: 0 } };
   let pick;
   try {

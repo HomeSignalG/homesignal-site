@@ -33,7 +33,6 @@ import {
   FRS_RETRY_BACKOFF_MS,
   frsAt,
   type FrsAttempt,
-  type FrsErrorDiag,
 } from "./epa-frs.ts";
 import type { ZipBounds } from "./scope-box.ts";
 import type { MembershipFn, Verdict } from "./scope-members.ts";
@@ -80,26 +79,6 @@ export interface ZipFrsOutcome {
   cover_radius_mi: number;
   /** rows returned before de-duplication across overlapping circles */
   raw_rows: number;
-  /** DIAGNOSTIC ONLY: fixed-value details of thrown errors, at most DIAG_MAX entries and DIAG_MAX_BYTES bytes; never read by a decision. */
-  diag?: ZipFrsDiag[];
-}
-export type ZipFrsDiag = FrsErrorDiag & { attempt: number; since_prev_ms: number | null };
-/** At most this many entries per ZIP read; later thrown errors are not recorded (their attempt numbers show the gap). */
-export const DIAG_MAX = 8;
-/** The diag array, serialized as JSON and encoded as UTF-8, never exceeds this many bytes. Enforced, not estimated. */
-export const DIAG_MAX_BYTES = 1024;
-const utf8 = new TextEncoder();
-/** UTF-8 byte length of a value's JSON serialization (what the response body and the database actually store). */
-export function jsonBytes(v: unknown): number { return utf8.encode(JSON.stringify(v)).length; }
-/**
- * Append an entry only if the array stays within DIAG_MAX entries and DIAG_MAX_BYTES bytes once serialized.
- * Returns whether it was kept. Pure: decides nothing else.
- */
-export function pushDiag(list: ZipFrsDiag[], entry: ZipFrsDiag): boolean {
-  if (list.length >= DIAG_MAX) return false;
-  if (jsonBytes([...list, entry]) > DIAG_MAX_BYTES) return false;
-  list.push(entry);
-  return true;
 }
 
 export interface ZipFrsOptions {
@@ -158,11 +137,10 @@ export async function frsZipCoverage(
   const maxRequests = opts.maxRequests ?? FRS_ZIP_MAX_REQUESTS;
   const cover = circumCircle(bounds);
   const failures: string[] = [];
-  const diag: ZipFrsDiag[] = [];
-  let attempts = 0, tiles = 0, raw = 0, lastEnd: number | null = null;
+  let attempts = 0, tiles = 0, raw = 0;
   const byKey = new Map<string, Record<string, unknown>>();
   const fail = (reason: ZipFrsReason): ZipFrsOutcome =>
-    ({ ok: false, rows: [], reason, attempts, failures, tiles, cover_radius_mi: cover.radiusMi, raw_rows: raw, ...(diag.length ? { diag } : {}) });
+    ({ ok: false, rows: [], reason, attempts, failures, tiles, cover_radius_mi: cover.radiusMi, raw_rows: raw });
 
   const queue: ZipBounds[] = [bounds];
   while (queue.length) {
@@ -178,11 +156,7 @@ export async function frsZipCoverage(
         timeoutMs = Math.min(FRS_ATTEMPT_TIMEOUT_MS, remaining);
       }
       attempts++;
-      // Diagnostic timing reads its own clock, never opts.now: an injected clock sees exactly the reads it saw before.
-      const started = Date.now();
       const a = await frsAt(c.lat, c.lng, c.radiusMi, fetchImpl, timeoutMs);
-      if (a.diag) pushDiag(diag, { ...a.diag, attempt: attempts, since_prev_ms: lastEnd === null ? null : Math.round(started - lastEnd) });
-      lastEnd = Date.now();
       if (a.ok || a.tooBig) { answered = a; break; }
       failures.push(`${c.radiusMi}:${a.schema ? "schema" : a.why ?? "unknown"}`);
       if (a.schema) return fail("schema");
@@ -219,7 +193,7 @@ export async function frsZipCoverage(
       if (!byKey.has(k)) byKey.set(k, r);
     }
   }
-  return { ok: true, rows: [...byKey.values()], reason: null, attempts, failures, tiles, cover_radius_mi: cover.radiusMi, raw_rows: raw, ...(diag.length ? { diag } : {}) };
+  return { ok: true, rows: [...byKey.values()], reason: null, attempts, failures, tiles, cover_radius_mi: cover.radiusMi, raw_rows: raw };
 }
 
 export interface ZipFacilityPick<T> {
