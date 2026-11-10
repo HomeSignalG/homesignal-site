@@ -15,7 +15,8 @@ text, no ZIP lists, no addresses. Draft; not to be merged without the founder's 
 | old text-scrubbing code (`sanitizeErrorText`) | 0 occurrences in the deployed files |
 | registry table rewrite | 10 rows, fingerprint `d807a5055d04012b2eef7d26e1ae2810` before and after; only `computed_at` moved (2026-11-09 23:33:50Z → 2026-11-10 13:36:09Z) |
 
-Pause variable `EPA_RECOVERY_REPAIR_PAUSED`: **not set at the time of this receipt** (see the last section).
+Pause variable `EPA_RECOVERY_REPAIR_PAUSED=true`: saved by the founder at **about 2026-11-10 14:24Z**
+(user-confirmed; not read back by this session). Observations after it are split at 14:24Z.
 
 ## Collection cutoffs (each query, exactly)
 
@@ -104,8 +105,9 @@ the 32 reads with `diag` recorded: 23 × `429 > 429 > TypeError`, 8 × `process_
 
 What this does not show: whether the TypeErrors would otherwise have been 429s, why a request after two
 429s fails at connection setup, or whether the server, the network or the runtime is responsible.
-Increase observed after deployment; mechanism unknown. No retry, TLS, connection-handling or other
-behaviour change follows from this receipt.
+Increase observed after deployment; mechanism unknown. These findings narrow the failure pattern (which
+stage, how fast, which attempt); they do not establish a TLS mechanism, and they do not authorize a
+connection-handling or retry change.
 
 ## Diagnostic removal proposal (needs approval)
 
@@ -113,7 +115,7 @@ The diagnostic has answered what it was added to answer: which stage fails (fetc
 fast (milliseconds), and on which attempt (only the one after the second 429's 5-second wait). It cannot
 say more without keeping message text, which was deliberately excluded.
 
-Proposed: a revert PR of #2752's three engine files (`sources/epa-frs.ts`, `sources/epa-frs-zip.ts`,
+Draft revert PR: #2770 (head `782da633`), not merged or deployed. Proposed: a revert PR of #2752's three engine files (`sources/epa-frs.ts`, `sources/epa-frs-zip.ts`,
 `index.ts`) plus `test/epa-frs-diagnostic.test.mjs`, then one `deploy-edge-functions` dispatch from main
 after the same pre-checks used for v314 (tree hashes, registry-table content, version and bundle
 read-back, deployed files byte-identical to the commit). Collection does not stop by itself; it continues
@@ -134,4 +136,8 @@ until that deploy. Removal is not done until approved.
   sent at 13:18Z or 14:18Z. Any batch sent by an earlier run is not cancelled by the variable.
 - Consequence for verification: a skipped Step 3 does not by itself show the variable is working. That
   needs a scheduled run whose proof PASSED and whose Step 3 is still skipped, read from that run's log.
-- Variable set at: _not yet_.
+- Variable set: `EPA_RECOVERY_REPAIR_PAUSED=true`, saved by the founder at about 2026-11-10 14:24Z.
+  User-confirmed; this session has no tool that can read repository variables, so it is not read back.
+- Verification uses the next naturally scheduled run only (no extra run, no extra EPA request). If that
+  run's proof does not pass, it is recorded as: "pause configured; skip reason not independently
+  demonstrated by this run."
