@@ -17,7 +17,13 @@ ok(pages.length > 5 && pages.every((p) => !read(p).includes('acq-weekly-slice'))
 const rpcs = [...code.matchAll(/rpc\('([a-z_]+)'/g)].map((m) => m[1]);
 ok(rpcs.length >= 12 && rpcs.every((n) => /^hs_weekly_/.test(n)), '2a every call is an hs_weekly_* admin function (' + rpcs.length + ')');
 ok(rpcs.every((n) => new RegExp('function public\\.' + n + '\\(').test(sql)), '2b every function it calls is defined in the migration');
-ok(!/\bfetch\s*\(|XMLHttpRequest|WebSocket|sendBeacon|\.from\s*\(\s*['"]|storage\s*\.\s*from|perplexity\.ai|anthropic\.com/i.test(code), '2c no network, table or provider calls');
+// the only storage call: a read of a page image from the private weekly-visuals bucket
+const storageCalls = code.match(/storage\s*\.\s*from\s*\([^)]*\)\s*\.\s*\w+/g) || [];
+ok(!/\bfetch\s*\(|XMLHttpRequest|WebSocket|sendBeacon|\.from\s*\(\s*['"]|perplexity\.ai|anthropic\.com/i.test(code) &&
+  storageCalls.length === 1 && /from\(PREVIEW_BUCKET\)\s*\.\s*download$/.test(storageCalls[0]) && /var PREVIEW_BUCKET = 'weekly-visuals';/.test(code) &&
+  /bucket !== PREVIEW_BUCKET\) return Promise\.resolve\(null\)/.test(code) && !/\.upload\s*\(/.test(code), '2c no network, table or provider calls; one storage read, of a page image');
+ok(/var CUE_HL = 'rgba\(255,200,40,\.45\)'/.test(code) && /status === 'resolved'/.test(code) && /Nothing is shown in its place/.test(code) &&
+  /function cueBlock/.test(code), '2e cues: DocScene’s yellow, the engine’s status, and nothing drawn for an unresolved cue');
 ok(!/\bverified\b/i.test(code.replace(/not a certification/g, '')), '2d the screens never label anything "verified"');
 const ctx = { window: {} }; ctx.window.window = ctx.window; vm.createContext(ctx); vm.runInContext(js, ctx);
 const W = ctx.window.HS.acqWeeklySlice;

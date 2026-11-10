@@ -403,6 +403,146 @@ select 'T17|' || ((select depends_on = :'s5'::uuid and parent_id = :'t3'::uuid a
   and (public.weekly_version_status(:'t4') ->> 'approved') = 'false' and (public.weekly_version_status(:'t4') ->> 'outdated') = 'false'
   and (public.weekly_version_status(:'t4') ->> 'selected_index') is null);
 
+-- DOCUMENT CUES (a segment's visual). A cue points at a stored copy of a source of a finding the segment cites; setting one
+-- makes a new version (only the cue changes); a visual_check run resolves it against the document; an unresolved or
+-- unchecked cue blocks approval. TEST DATA.
+select 'V01|' || (pg_temp.raises($q$insert into public.weekly_sources (answer_id, url, quote_match, date_extraction, document_path, document_sha256, document_kind)
+  select id, 'https://example.test/doc', 'not_checked', 'unknown', 'weekly-sources/t/a.pdf', repeat('c', 64), 'pdf' from public.weekly_research_answers limit 1$q$, '23514')
+  and pg_temp.raises($q$insert into public.weekly_sources (answer_id, url, quote_match, date_extraction, storage_permission, document_path, document_sha256, document_kind)
+  select id, 'https://example.test/doc', 'not_checked', 'unknown', 'full_copy', 'weekly-sources/t/a.html', repeat('c', 64), 'pdf' from public.weekly_research_answers limit 1$q$, '23514')
+  and pg_temp.raises($q$insert into public.weekly_sources (answer_id, url, quote_match, date_extraction, storage_permission, document_path, document_kind)
+  select id, 'https://example.test/doc', 'not_checked', 'unknown', 'full_copy', 'weekly-sources/t/a.pdf', 'pdf' from public.weekly_research_answers limit 1$q$, '23514'));
+select f.id as fps from public.weekly_findings f join public.weekly_library_version_findings x on x.finding_id = f.id
+  where x.library_version_id = (select library_version_id from public.weekly_scripts where id = :'s5') and f.finding_key = 'air-proposal-status' \gset
+select id as ans from public.weekly_research_answers limit 1 \gset
+insert into public.weekly_sources (answer_id, url, title, quote_match, date_extraction, storage_permission, document_path, document_sha256, document_kind)
+  values (:'ans', 'https://example.test/rule.pdf', 'TEST rule', 'not_checked', 'unknown', 'full_copy', 'weekly-sources/t/rule.pdf', repeat('d', 64), 'pdf') returning id as dpdf \gset
+insert into public.weekly_sources (answer_id, url, title, quote_match, date_extraction, storage_permission, document_path, document_sha256, document_kind)
+  values (:'ans', 'https://example.test/page', 'TEST page', 'not_checked', 'unknown', 'full_copy', 'weekly-sources/t/page.html', repeat('e', 64), 'html') returning id as dhtml \gset
+insert into public.weekly_sources (answer_id, url, quote, quote_match, date_extraction)
+  values (:'ans', 'https://example.test/excerpt', 'TEST excerpt only', 'not_checked', 'unknown') returning id as dexc \gset
+insert into public.weekly_sources (answer_id, url, quote_match, date_extraction, storage_permission, document_path, document_sha256, document_kind)
+  values (:'ans', 'https://example.test/other.pdf', 'not_checked', 'unknown', 'full_copy', 'weekly-sources/t/other.pdf', repeat('f', 64), 'pdf') returning id as doth \gset
+insert into public.weekly_finding_sources values (:'fps', :'dpdf'), (:'fps', :'dhtml'), (:'fps', :'dexc');
+insert into public.weekly_finding_sources select f.id, :'doth' from public.weekly_findings f where f.finding_key = 'air-estimate-scope' limit 1;
+select jsonb_build_object('type', 'doc', 'claim_id', 'air-proposal-status@1', 'source_id', :'dpdf', 'page', 1,
+  'quote', 'TEST: the agency proposes to rescind the program.', 'highlight', 'yellow')::text as cue0 \gset
+set role authenticated;
+select set_config('test.jwt', :'other', false);
+select 'V02|' || pg_temp.raises(format('select public.hs_weekly_doc_cue_set(%L::uuid, 0, %L::jsonb)', :'s5', :'cue0'), '42501');
+select set_config('test.jwt', :'admin', false);
+select 'V03|' || (pg_temp.raises(format('select public.hs_weekly_doc_cue_set(%L::uuid, 0, %L::jsonb)', :'s5', jsonb_set(:'cue0'::jsonb, '{claim_id}', '"air-estimate-scope@1"')), '22023')
+  and pg_temp.raises(format('select public.hs_weekly_doc_cue_set(%L::uuid, 0, %L::jsonb)', :'s5', jsonb_set(:'cue0'::jsonb, '{source_id}', to_jsonb(:'doth'::text))), '22023')
+  -- a real source of a finding in the library, but the segment does not cite that finding
+  and pg_temp.raises(format('select public.hs_weekly_doc_cue_set(%L::uuid, 0, %L::jsonb)', :'s5',
+        jsonb_set(jsonb_set(:'cue0'::jsonb, '{claim_id}', '"air-estimate-scope@1"'), '{source_id}', to_jsonb(:'doth'::text))), '22023')
+  and pg_temp.raises(format('select public.hs_weekly_doc_cue_set(%L::uuid, 0, %L::jsonb)', :'s5', jsonb_set(:'cue0'::jsonb, '{source_id}', to_jsonb(:'dexc'::text))), '22023')
+  and pg_temp.raises(format('select public.hs_weekly_doc_cue_set(%L::uuid, 0, %L::jsonb)', :'s5', jsonb_set(:'cue0'::jsonb, '{highlight}', '"red"')), '22023')
+  and pg_temp.raises(format('select public.hs_weekly_doc_cue_set(%L::uuid, 0, %L::jsonb)', :'s5', jsonb_set(:'cue0'::jsonb, '{page}', '0')), '22023')
+  and pg_temp.raises(format('select public.hs_weekly_doc_cue_set(%L::uuid, 0, %L::jsonb)', :'s5', jsonb_set(:'cue0'::jsonb, '{page}', '1.5')), '22023')
+  and pg_temp.raises(format('select public.hs_weekly_doc_cue_set(%L::uuid, 0, %L::jsonb)', :'s5', :'cue0'::jsonb || '{"image_url":"https://x.test/a.png"}'), '22023')
+  and pg_temp.raises(format('select public.hs_weekly_doc_cue_set(%L::uuid, 0, %L::jsonb)', :'s5', jsonb_set(:'cue0'::jsonb, '{source_id}', to_jsonb(:'dhtml'::text))), '22023')
+  and pg_temp.raises(format('select public.hs_weekly_doc_cue_set(%L::uuid, 0, %L::jsonb)', :'s5', jsonb_set(:'cue0'::jsonb, '{quote}', '""')), '22023')
+  and pg_temp.raises(format('select public.hs_weekly_doc_cue_set(%L::uuid, 9, %L::jsonb)', :'s5', :'cue0'), '22023')
+  and pg_temp.raises(format('select public.hs_weekly_doc_cue_set(%L::uuid, 0, null)', :'s5'), '22023'));
+reset role;
+select (select count(*) from net.calls) as calls_before \gset
+set role authenticated;
+select set_config('test.jwt', :'admin', false);
+select public.hs_weekly_doc_cue_set(:'s5', 0, :'cue0'::jsonb) as c6 \gset
+reset role;
+select (:'c6'::jsonb ->> 'script_version') as s6, (:'c6'::jsonb ->> 'run_id') as vr1 \gset
+select 'V04|' || ((select kind = 'human_reviewed' and run_id is null and parent_id = :'s5'::uuid and stage = 'script'
+    and public.weekly_without_visuals(body) = public.weekly_without_visuals((select body from public.weekly_scripts where id = :'s5'))
+    and body -> 'segments' -> 0 -> 'visual' = jsonb_set(:'cue0'::jsonb, '{source_id}', to_jsonb(:'dpdf'::text))
+    and body -> 'segments' -> 1 -> 'visual' is null and public.weekly_cue_count(body) = 1
+  from public.weekly_scripts where id = :'s6')
+  and (public.weekly_version_status(:'s5') ->> 'superseded') = 'true'
+  and (select kind = 'visual_check' and status = 'queued' and input ->> 'version_id' = :'s6' from public.weekly_runs where id = :'vr1'::uuid)
+  and (select count(*) from net.calls) = :'calls_before'::integer + 1
+  and (select body -> 'inputs' ->> 'run' from net.calls order by id desc limit 1) = :'vr1');
+-- a person-made version must change only cues, and must be a new version of an existing script
+select body::text as s6body from public.weekly_scripts where id = :'s6' \gset
+select 'V05|' || (pg_temp.raises(format($q$insert into public.weekly_scripts (stage, parent_id, depends_on, selected_index, topic, library_version_id, profile_id, body, checks, kind)
+    select 'script', id, depends_on, selected_index, topic, library_version_id, profile_id, jsonb_set(body, '{segments,1,text}', '"TEST: changed by a person"'), checks, 'human_reviewed'
+    from public.weekly_scripts where id = %L$q$, :'s6'), '22023')
+  and pg_temp.raises(format($q$insert into public.weekly_scripts (stage, depends_on, selected_index, topic, library_version_id, profile_id, body, checks, kind)
+    select 'script', depends_on, selected_index, topic, library_version_id, profile_id, body, checks, 'human_reviewed'
+    from public.weekly_scripts where id = %L$q$, :'s6'), '22023'));
+-- not approvable until the cue is checked against the document
+set role authenticated;
+select set_config('test.jwt', :'admin', false);
+select 'V06|' || pg_temp.raises(format('select public.hs_weekly_version_approve(%L::uuid, null, %L::jsonb)', :'s6', :'good'), '22023');
+reset role;
+select body_sha256 as s6sha from public.weekly_scripts where id = :'s6' \gset
+set role service_role;
+select public.weekly_run_claim(:'vr1')::text as vclaim \gset
+select 'V07|' || ((:'vclaim'::jsonb -> 'cue_version' ->> 'id') = :'s6' and (:'vclaim'::jsonb -> 'cue_version' ->> 'body_sha256') = :'s6sha'
+  and (select count(*) from jsonb_array_elements(:'vclaim'::jsonb -> 'sources') x where x ->> 'source_id' in (:'dpdf', :'dhtml')
+       and x ->> 'document_path' like 'weekly-sources/t/%' and x -> 'finding_ids' ? 'air-proposal-status@1') = 2
+  and not exists (select 1 from jsonb_array_elements(:'vclaim'::jsonb -> 'sources') x where x ->> 'source_id' in (:'dexc'))
+  and (:'vclaim'::jsonb ->> 'mode') = 'visual_check' and jsonb_array_length(:'vclaim'::jsonb -> 'findings') > 0);
+select 'V08|' || (pg_temp.raises(format('select public.weekly_visual_check_record(%L::uuid, %L, %L::jsonb)', :'vr1', repeat('0', 64), '{"ok":true,"segments":[]}'), '22023')
+  and pg_temp.raises(format('select public.weekly_visual_check_record(%L::uuid, %L, %L::jsonb)', :'vr1', :'s6sha', '{"segments":[]}'), '22023'));
+select public.weekly_visual_check_record(:'vr1', :'s6sha', '{"ok":false,"label":"document cue checks","certifies_accuracy":false,"unresolved":1,"segments":[{"segment":0,"status":"unresolved","problems":["the words to highlight are not in the document"],"scene":null},{"segment":1,"status":"none"}]}'::jsonb);
+reset role;
+set role authenticated;
+select set_config('test.jwt', :'admin', false);
+select 'V09|' || (pg_temp.raises(format('select public.hs_weekly_version_approve(%L::uuid, null, %L::jsonb)', :'s6', :'good'), '22023')
+  and pg_temp.raises(format('select public.hs_weekly_doc_cue_set(%L::uuid, 0, %L::jsonb)', :'s6', jsonb_set(:'cue0'::jsonb, '{source_id}', to_jsonb(:'dpdf'::text))), '22023'));
+reset role;
+select 'V09b|' || ((public.weekly_visual_checks(:'s6') ->> 'ok') = 'false');
+set role authenticated;
+select set_config('test.jwt', :'admin', false);
+-- the corrected cue is a new version; once its check resolves it can be approved
+select public.hs_weekly_doc_cue_set(:'s6', 0, jsonb_set(:'cue0'::jsonb, '{quote}', '"TEST: the corrected sentence."')) as c7 \gset
+reset role;
+select (:'c7'::jsonb ->> 'script_version') as s7, (:'c7'::jsonb ->> 'run_id') as vr2 \gset
+select body_sha256 as s7sha from public.weekly_scripts where id = :'s7' \gset
+set role service_role;
+select public.weekly_run_claim(:'vr2') is not null as c9 \gset
+select public.weekly_visual_check_record(:'vr2', :'s7sha', '{"ok":true,"label":"document cue checks","certifies_accuracy":false,"unresolved":0,"segments":[{"segment":0,"status":"resolved","problems":[],"scene":{"type":"doc","doc":{"page":1,"highlights":[{"x":0.1,"y":0.5,"w":0.2,"h":0.01}]}}},{"segment":1,"status":"none"}]}'::jsonb);
+reset role;
+set role authenticated;
+select set_config('test.jwt', :'admin', false);
+select (public.hs_weekly_version_approve(:'s7', null, :'good'::jsonb, false, 'TEST approve the cued version') ->> 'current') as s7cur \gset
+select hs_weekly_overview('Air Quality')::text as ov7 \gset
+reset role;
+select 'V10|' || (:'s7cur' = 'true' and (public.weekly_visual_checks(:'s7') ->> 'ok') = 'true'
+  and (select (v ->> 'cues') = '1' and (v -> 'visual_checks' ->> 'ok') = 'true' and v ->> 'kind' = 'human_reviewed'
+       from jsonb_array_elements(:'ov7'::jsonb -> 'versions') v where v ->> 'id' = :'s7')
+  and exists (select 1 from jsonb_array_elements(:'ov7'::jsonb -> 'findings') f, jsonb_array_elements(f -> 'sources') w
+              where w ->> 'id' = :'dpdf' and w ->> 'document_kind' = 'pdf'));
+-- a rewrite of a cued version keeps the cue and is checked against it again
+set role authenticated;
+select set_config('test.jwt', :'admin', false);
+select (public.hs_weekly_passage_review(:'s7', 1, 'rewrite', 'TEST DATA: tighten', 'tighten', array['air-proposal-status@1']) ->> 'run_id') as run9 \gset
+reset role;
+select (select count(*) from public.weekly_runs where kind = 'visual_check') as vbefore \gset
+select jsonb_set(body, '{segments,1,text}', '"TEST: Proposed, not final, as of now."')::text as s8body from public.weekly_scripts where id = :'s7' \gset
+set role service_role;
+select public.weekly_run_claim(:'run9') is not null as c10 \gset
+select public.weekly_script_record(:'run9', jsonb_build_object('provider', 'claude-plan', 'prompt_sha256', repeat('a', 64),
+  'body', :'s8body'::jsonb, 'checks', '{"ok":true,"material_issues":[],"high_risk":[]}'::jsonb, 'lessons_included', '[]'::jsonb)) as s8 \gset
+reset role;
+select 'V11|' || ((select count(*) from public.weekly_runs where kind = 'visual_check') = :'vbefore'::integer + 1
+  and exists (select 1 from public.weekly_runs where kind = 'visual_check' and input ->> 'version_id' = :'s8' and status = 'queued')
+  and public.weekly_visual_checks(:'s8') is null and public.weekly_cue_count((select body from public.weekly_scripts where id = :'s8')) = 1);
+-- removing the cue: a new version with no visual and no check to wait for
+set role authenticated;
+select set_config('test.jwt', :'admin', false);
+select 'V12|' || pg_temp.raises(format('select public.hs_weekly_version_approve(%L::uuid, null, %L::jsonb)', :'s8', :'good'), '22023');
+select public.hs_weekly_doc_cue_set(:'s8', 0, null) as c9r \gset
+select (:'c9r'::jsonb ->> 'script_version') as s9 \gset
+select (public.hs_weekly_version_approve(:'s9', null, :'good'::jsonb, false, 'TEST approve without a cue') ->> 'current') as s9cur \gset
+reset role;
+select 'V13|' || (:'s9cur' = 'true' and (:'c9r'::jsonb ->> 'run_id') is null
+  and (select body -> 'segments' -> 0 -> 'visual' = 'null'::jsonb and public.weekly_cue_count(body) = 0 from public.weekly_scripts where id = :'s9'));
+select 'V14|' || (has_function_privilege('authenticated', 'public.hs_weekly_doc_cue_set(uuid,integer,jsonb)', 'execute')
+  and not has_function_privilege('anon', 'public.hs_weekly_doc_cue_set(uuid,integer,jsonb)', 'execute')
+  and has_function_privilege('service_role', 'public.weekly_visual_check_record(uuid,text,jsonb)', 'execute')
+  and not has_function_privilege('authenticated', 'public.weekly_visual_check_record(uuid,text,jsonb)', 'execute'));
+
 set role authenticated;
 select set_config('test.jwt', :'admin', false);
 -- DEPENDENCIES: selecting a different angle card makes the outline AND the script outdated; history stays
@@ -435,10 +575,10 @@ set role authenticated;
 select set_config('test.jwt', :'admin', false);
 select public.hs_weekly_overview('Air Quality') -> 'measurement' as meas \gset
 select 'M01|' || (((:'meas')::jsonb -> 'audience' ->> 'status') = 'not_collected'
-  and ((:'meas')::jsonb -> 'mechanical' ->> 'script_versions') = '5'
-  and ((:'meas')::jsonb -> 'human' ->> 'approvals') = '1'
-  and ((:'meas')::jsonb -> 'human' -> 'rubric_totals') = '[22]'::jsonb
-  and ((:'meas')::jsonb -> 'editing' ->> 'rewrites') = '3'
+  and ((:'meas')::jsonb -> 'mechanical' ->> 'script_versions') = '9'
+  and ((:'meas')::jsonb -> 'human' ->> 'approvals') = '3'
+  and ((:'meas')::jsonb -> 'human' -> 'rubric_totals') = '[22, 22, 22]'::jsonb
+  and ((:'meas')::jsonb -> 'editing' ->> 'rewrites') = '4'
   and (public.hs_weekly_overview('Air Quality') -> 'rubric' ->> 'label') like 'Provisional%');
 reset role;
 
@@ -492,7 +632,7 @@ select 'W27b|' || ((select count(*) from public.weekly_cost_entries where catego
   and (select count(*) from public.weekly_cost_entries where category = 'verification' and cost_type = 'no_incremental_api_charge')
     = (select count(*) from public.weekly_scripts where run_id is not null)
   and (select count(*) from public.weekly_cost_entries where category = 'verification' and cost_type = 'runner_minutes')
-    = (select count(*) from public.weekly_runs where kind = 'title_check' and status = 'done')
+    = (select count(*) from public.weekly_runs where kind in ('title_check', 'visual_check') and status = 'done')
   and not exists (select 1 from public.weekly_cost_entries where cost_type = 'no_incremental_api_charge' and amount_usd is not null));
 set role authenticated;
 select set_config('test.jwt', :'admin', false);

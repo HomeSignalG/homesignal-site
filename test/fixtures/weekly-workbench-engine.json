@@ -111,6 +111,84 @@
   },
   "words": 106
  },
+ "doc_cue": {
+  "checks": {
+   "certifies_accuracy": false,
+   "cued": 1,
+   "disclaimer": "Mechanical document checks: the highlighted words are in the stored document. Not a check that the finding is true.",
+   "download_errors": [],
+   "label": "document cue checks",
+   "ok": true,
+   "segments": [
+    {
+     "cue": {
+      "claim_id": "air-proposal-status@1",
+      "highlight": "yellow",
+      "page": 1,
+      "quote": "First, the EPA proposes to rescind the Super Emitter Program.",
+      "source_id": "SOURCE_ID",
+      "type": "doc"
+     },
+     "match": "first the epa proposes to rescind the super emitter program",
+     "page": 1,
+     "preview_path": "weekly-visuals/VERSION_ID/pages/SOURCE_ID_pdf_dfc3cf9a_p1.png",
+     "problems": [],
+     "scene": {
+      "doc": {
+       "focusSentence": 0,
+       "highlights": [
+        {
+         "h": 0.011329545454545453,
+         "w": 0.17538823529411765,
+         "x": 0.15188954248366013,
+         "y": 0.5306539141414142
+        },
+        {
+         "h": 0.011329545454545453,
+         "w": 0.2374764705882353,
+         "x": 0.07354248366013072,
+         "y": 0.5432789141414142
+        }
+       ],
+       "image": "pages/SOURCE_ID_pdf_dfc3cf9a_p1.png",
+       "note": null,
+       "page": 1,
+       "pageHeightPx": 1650,
+       "pageWidthPx": 1275,
+       "quote": "First, the EPA proposes to rescind the Super Emitter Program.",
+       "source": "EPA, Proposed Rule, 91 FR 68234 (October 29, 2026)",
+       "status": "confirmed",
+       "title": "EPA, Proposed Rule, 91 FR 68234 (October 29, 2026)"
+      },
+      "type": "doc"
+     },
+     "segment": 0,
+     "status": "resolved"
+    },
+    {
+     "segment": 1,
+     "status": "none"
+    }
+   ],
+   "unresolved": 0
+  },
+  "cue": {
+   "claim_id": "air-proposal-status@1",
+   "highlight": "yellow",
+   "page": 1,
+   "quote": "First, the EPA proposes to rescind the Super Emitter Program.",
+   "source_id": "SOURCE_ID",
+   "type": "doc"
+  },
+  "document": {
+   "kind": "pdf",
+   "label": "EPA, Proposed Rule, 91 FR 68234 (October 29, 2026)",
+   "repo_path": "video/projects/epa-oil-gas-methane-reconsideration-national/sources/docs/fr_2026-22082.pdf",
+   "sha256": "faa7045eb0c311e8795dafcf7744b2d5db6f6f297fe29ef76f2d64d1923c5758",
+   "url": "https://www.govinfo.gov/content/pkg/FR-2026-10-29/pdf/2026-22082.pdf"
+  },
+  "segment_index": 0
+ },
  "findings": [
   {
    "claim_id": "air-proposal-status@1",

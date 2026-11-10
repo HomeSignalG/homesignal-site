@@ -26,6 +26,7 @@ await ctx.route('**/*', (r) => {
   const u = new URL(r.request().url());
   if (u.origin !== 'https://ws.test') { outside.push(u.href); return r.abort(); }
   if (u.pathname === '/ws.js') return r.fulfill({ contentType: 'text/javascript', body: read('lib/acq-weekly-slice.js') });
+  if (u.pathname === '/page.png') return r.fulfill({ contentType: 'image/png', body: fs.readFileSync(new URL('../test/fixtures/weekly-doc-cue-page.png', import.meta.url)) });
   return r.fulfill({ contentType: 'text/html', body: HTML });
 });
 const page = await ctx.newPage();
@@ -37,6 +38,10 @@ await page.evaluate((OV) => {
   window.calls = [];
   window.fixture = OV;
   window.client = { rpc: (n, a) => { window.calls.push([n, a]); return Promise.resolve(n === 'hs_weekly_overview' ? { data: window.fixture, error: null } : { data: { ok: true }, error: null }); } };
+  // private-bucket download stub: every object is the fixture page (Tab 16's page 1 render of the EPA proposed rule)
+  window.downloads = [];
+  window.client.storage = { from: (b) => ({ download: (name) => { window.downloads.push(b + '/' + name);
+    return fetch('/page.png').then((r) => r.blob()).then((d) => ({ data: d, error: null })); } }) };
   return window.HS.acqWeeklySlice.mount(window.client, document.getElementById('ws'));
 }, OV);
 const T = (sel) => page.locator(sel || '#ws').innerText();
@@ -67,7 +72,7 @@ ok(ed.includes('Quote: not found in the sources reviewed') && ed.includes('Quote
 ok((await T('.ws-spokenwords')) === String(v2.checks.word_counts.spoken_words) && ed.includes('notes and sources: 0') && ed.includes('No rhythm warnings.'), '4g right: spoken words counted apart; no warnings on version 2');
 ok((await page.locator('.ws-dim').count()) === 7 && ed.includes('Provisional internal criteria, not validated performance benchmarks') && ed.includes('factual discipline = 4'), '4h the seven-dimension rubric and its gates');
 const bot = await T('.ws-bottom');
-ok(bot.includes('Put the conflict first.') && bot.includes('For several years') && bot.includes('Under an EPA proposal') && bot.includes('lesson reusable'), '4i bottom: before and after with the reason, findings and lesson scope');
+ok(bot.includes('a person changed only a document visual') && bot.includes('Put the conflict first.') && bot.includes('For several years') && bot.includes('Under an EPA proposal') && bot.includes('lesson reusable'), '4i bottom: before and after with the reason, findings and lesson scope');
 ok(bot.includes('Superseded by a newer version') && bot.includes('Not approved') && bot.includes('No decision on this version.'), '4j version history: the new version needs its own approval');
 ok(bot.includes('Audience outcomes: not collected') && bot.includes('No virality or improvement is claimed'), '4k measurement kept apart; no audience or virality claim');
 // title section
@@ -94,6 +99,62 @@ if (shots) {
   await page.locator('#ws-scripts').screenshot({ path: path.join(shots, 'weekly-workbench-editor.png') });
   await page.locator('.ws-bottom').screenshot({ path: path.join(shots, 'weekly-workbench-before-after.png') });
 }
+// DOCUMENT CUE on passage 1 of the current version: resolved against the stored EPA proposed rule by the engine
+const cueSeg = page.locator('.ws-center .ws-seg').nth(0), plainSeg = page.locator('.ws-center .ws-seg').nth(1);
+const cueRes = v2.visual_checks.segments[0], cueDoc = cueRes.scene.doc;
+const ct = await cueSeg.innerText();
+ok(v2.kind === 'human_reviewed' && v2.cues === 1 && ct.includes('Document visual (chosen by a person)') && ct.includes('EPA, Proposed Rule, 91 FR 68234') &&
+  ct.includes('page 1') && ct.includes('First, the EPA proposes to rescind the Super Emitter Program.') && ct.includes('Found in the stored document on page 1'), 'C1 the cue: source, page, exact words, resolved');
+await page.waitForFunction(() => document.querySelector('.ws-docpassage') && document.querySelector('.ws-docpassage').getAttribute('data-drawn'));
+const dl = await page.evaluate(() => window.downloads);
+ok(dl.length === 1 && dl[0] === cueRes.preview_path && dl[0].startsWith('weekly-visuals/' + v2.id + '/pages/'), 'C2 the page image is Tab 16’s staged page, from the private bucket');
+const prev = await page.evaluate(() => {
+  const img = document.querySelector('.ws-docpage img'), hl = [...document.querySelectorAll('.ws-docpage .ws-hl')];
+  return { w: img.naturalWidth, h: img.naturalHeight, n: hl.length, bg: hl.length ? getComputedStyle(hl[0]).backgroundColor : '',
+    left: hl.length ? hl[0].style.left : '', drawn: document.querySelector('.ws-docpassage').getAttribute('data-drawn') };
+});
+ok(prev.w === cueDoc.pageWidthPx && prev.h === cueDoc.pageHeightPx && prev.n === cueDoc.highlights.length && prev.n === 2 &&
+  prev.bg === 'rgba(255, 200, 40, 0.45)' && Math.abs(parseFloat(prev.left) - cueDoc.highlights[0].x * 100) < 0.01 && prev.drawn === '2', 'C3  the engine’s highlight boxes, in DocScene’s yellow, on the page and on the readable passage');
+const pt = await plainSeg.innerText();
+ok(pt.includes('No document visual. Citing a source does not add one; a person chooses it.') && (await plainSeg.locator('.ws-docprev').count()) === 0 &&
+  v2.body.segments[1].claim_ids.includes('air-proposal-status@1'), 'C4 a passage citing the same finding with a stored document has no visual unless chosen');
+ok(!(await page.locator('button[data-ws="approve-script"]').isDisabled()) && (await page.locator('.ws-cueblock').count()) === 0, 'C5 a resolved cue does not block approval');
+if (shots) {
+  await cueSeg.screenshot({ path: path.join(shots, 'weekly-doc-cue.png') });
+  await page.locator('.ws-docpassage').screenshot({ path: path.join(shots, 'weekly-doc-cue-passage.png') });
+}
+// set and remove cues: exactly the admin function, with the cue's own fields
+await plainSeg.locator('.ws-cueform summary').click();
+await plainSeg.locator('.ws-cuequote').fill('First, the EPA proposes to rescind the Super Emitter Program.');
+await plainSeg.locator('button[data-ws="cue-set"]').click();
+ok((await T('.ws-bad')).includes('Give the page number'), 'C6 a PDF cue needs its page');
+await plainSeg.locator('.ws-cueform summary').click();   // the error re-rendered the screen
+await plainSeg.locator('.ws-cuequote').fill('First, the EPA proposes to rescind the Super Emitter Program.');
+await plainSeg.locator('.ws-cuepage').fill('1');
+await plainSeg.locator('button[data-ws="cue-set"]').click();
+await page.waitForFunction(() => window.calls.some((c) => c[0] === 'hs_weekly_doc_cue_set'));
+let cc = (await page.evaluate(() => window.calls)).find((x) => x[0] === 'hs_weekly_doc_cue_set')[1];
+ok(cc.p_script === v2.id && cc.p_segment === 1 && JSON.stringify(cc.p_cue) === JSON.stringify({ type: 'doc', claim_id: 'air-proposal-status@1',
+  source_id: v2.body.segments[0].visual.source_id, page: 1, quote: 'First, the EPA proposes to rescind the Super Emitter Program.', highlight: 'yellow' }), 'C7 setting a cue sends the person’s choice');
+await page.locator('.ws-center .ws-seg').nth(0).locator('button[data-ws="cue-remove"]').click();
+await page.waitForFunction(() => window.calls.filter((c) => c[0] === 'hs_weekly_doc_cue_set').length >= 2);
+cc = (await page.evaluate(() => window.calls)).filter((x) => x[0] === 'hs_weekly_doc_cue_set')[1][1];
+ok(cc.p_segment === 0 && cc.p_cue === null, 'C8 removing a cue');
+// an unresolved cue: flagged, nothing drawn in its place, approval blocked; an unchecked cue blocks too
+const remount = (fx) => page.evaluate((fx) => { window.fixture = fx; window.downloads = []; return window.HS.acqWeeklySlice.mount(window.client, document.getElementById('ws')); }, fx);
+const bad = JSON.parse(JSON.stringify(OV)), bv = bad.versions.find((v) => v.id === v2.id);
+bv.visual_checks = { ok: false, unresolved: 1, segments: [{ segment: 0, status: 'unresolved', scene: null, problems: ['the words to highlight are not in the document'] }, { segment: 1, status: 'none' }] };
+await remount(bad);
+const bt = await page.locator('.ws-center .ws-seg').nth(0).innerText();
+ok(bt.includes('Not resolved. Nothing is shown in its place.') && bt.includes('the words to highlight are not in the document') &&
+  (await page.locator('.ws-docprev').count()) === 0 && (await page.evaluate(() => window.downloads.length)) === 0, 'C9 an unresolved cue is flagged; no page and no substitute image');
+ok((await page.locator('button[data-ws="approve-script"]').isDisabled()) && (await T('.ws-cueblock')).includes('not resolved'), 'C10 an unresolved cue blocks approval');
+bv.visual_checks = null;
+await remount(bad);
+ok((await page.locator('.ws-center .ws-seg').nth(0).innerText()).includes('Not checked against the stored document yet.') &&
+  (await page.locator('button[data-ws="approve-script"]').isDisabled()), 'C11 an unchecked cue blocks approval');
+await remount(OV);
+await page.waitForFunction(() => document.querySelector('.ws-docpassage') && document.querySelector('.ws-docpassage').getAttribute('data-drawn'));
 // version 1 (open from history): the weak opening and its warnings; no approval offered on a superseded version
 await page.locator('button[data-ws="open"]').first().click();
 const ed1 = await T('#ws-scripts');

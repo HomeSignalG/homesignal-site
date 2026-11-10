@@ -63,7 +63,7 @@ end $$;
 -- ── run queue ─────────────────────────────────────────────────────────────────────────────────────────────────────
 create table if not exists public.weekly_runs (
   id uuid primary key default gen_random_uuid(),
-  kind text not null check (kind in ('research_ingest', 'angles', 'outline', 'script', 'rewrite', 'titles', 'title_check')),
+  kind text not null check (kind in ('research_ingest', 'angles', 'outline', 'script', 'rewrite', 'titles', 'title_check', 'visual_check')),
   topic text not null,
   status text not null default 'queued' check (status in ('queued', 'running', 'done', 'failed')),
   input jsonb not null default '{}'::jsonb,
@@ -122,6 +122,12 @@ create table if not exists public.weekly_sources (
   export_permission text not null default 'record_only' check (export_permission in ('include', 'record_only', 'exclude')),
   terms_status text not null default 'not_reviewed',
   attribution text,
+  -- A stored copy of the source document (PDF or saved web page), kept only when its storage permission is full_copy.
+  -- A document-evidence cue (a segment's visual) can only point at a source with a stored copy; the checksum is what the
+  -- visual_check run compares the downloaded bytes against. Private bucket 'weekly-sources'.
+  document_path text check (document_path ~ '^weekly-sources/[A-Za-z0-9/_.-]+\.(pdf|html)$'),
+  document_sha256 text check (document_sha256 ~ '^[0-9a-f]{64}$'),
+  document_kind text check (document_kind in ('pdf', 'html')),
   created_at timestamptz not null default now(),
   -- An unknown or unstated date has no value; a stated one must have one. Never filled from the fetch date.
   constraint weekly_sources_date_ck check (
@@ -130,7 +136,11 @@ create table if not exists public.weekly_sources (
   -- A page that was never read cannot have matched a quote.
   constraint weekly_sources_unread_ck check (fetch_error is null or (quote_match = 'not_checked' and date_extraction = 'unknown')),
   -- A quote stored only as a link must not carry the quote text.
-  constraint weekly_sources_storage_ck check (storage_permission not in ('link_only', 'none') or quote is null)
+  constraint weekly_sources_storage_ck check (storage_permission not in ('link_only', 'none') or quote is null),
+  -- all three document fields or none, and a full copy only where storage of a full copy is permitted
+  constraint weekly_sources_document_ck check (
+    ((document_path is null) = (document_sha256 is null) and (document_path is null) = (document_kind is null))
+    and (document_path is null or (storage_permission = 'full_copy' and document_path like '%.' || document_kind)))
 );
 
 create table if not exists public.weekly_findings (
@@ -259,10 +269,18 @@ create table if not exists public.weekly_scripts (
     when 'title' then jsonb_typeof(body -> 'candidates') = 'array' and jsonb_array_length(body -> 'candidates') between 1 and 3 end),
   constraint weekly_scripts_lineage_ck check ((stage = 'angles') = (depends_on is null)
     and (stage in ('angles', 'title') or selected_index is not null)),
-  -- Only a title may be written by a person (no run); every other version comes from a checked engine run.
-  constraint weekly_scripts_origin_ck check ((run_id is null) = (kind = 'human_reviewed') and (run_id is not null or stage = 'title')
+  -- A person may write a title, or a new script version that changes only its document cues (the lineage guard checks
+  -- that); every other version comes from a checked engine run.
+  constraint weekly_scripts_origin_ck check ((run_id is null) = (kind = 'human_reviewed') and (run_id is not null or stage in ('title', 'script'))
     and (run_id is null or (prompt_sha256 is not null and provider is not null)))
 );
+-- A script body with every segment's visual removed: what a person-made cue version must keep word for word.
+create or replace function public.weekly_without_visuals(b jsonb) returns jsonb language sql immutable parallel safe as $$
+  select case when jsonb_typeof(b -> 'segments') = 'array' then b || jsonb_build_object('segments',
+    (select coalesce(jsonb_agg(g - 'visual' order by n), '[]'::jsonb) from jsonb_array_elements(b -> 'segments') with ordinality t(g, n)))
+  else b end
+$$;
+
 -- depends_on must be the previous stage; a parent is an earlier version of the same draft (same stage, same basis).
 create or replace function public.weekly_scripts_lineage_guard() returns trigger language plpgsql as $$
 declare d public.weekly_scripts; p public.weekly_scripts;
@@ -283,6 +301,14 @@ begin
       end if;
     elsif p.stage <> new.stage or p.depends_on is distinct from new.depends_on or p.selected_index is distinct from new.selected_index then
       raise exception 'a new version keeps its stage and basis' using errcode = '22023';
+    end if;
+  end if;
+  -- A person-made script version is a new version of an existing script that changes only document cues.
+  if new.stage = 'script' and new.run_id is null then
+    if p.id is null then raise exception 'a person-made script version is a new version of an existing script' using errcode = '22023'; end if;
+    if public.weekly_without_visuals(new.body) is distinct from public.weekly_without_visuals(p.body)
+       or new.library_version_id is distinct from p.library_version_id or new.profile_id is distinct from p.profile_id then
+      raise exception 'a person changes only the document cues of a script version' using errcode = '22023';
     end if;
   end if;
   return new;
@@ -765,6 +791,107 @@ begin
 end $$;
 
 -- Claim ids ("key@version") of the findings pinned in a library version.
+-- ── document-evidence cues (a segment's visual) ──────────────────────────────────────────────────────────────────
+-- A cue says: while this segment is spoken, show this page of this stored source with these words highlighted in yellow.
+-- It is resolved by homesignal-ingest weekly_slice/doc_cue.py with Tab 16's own document code (video/pdf_tools.find_quote,
+-- video/build.stage_assets, video/build.visual -> the DocScene props). A cue is chosen by a person (hs_weekly_doc_cue_set);
+-- a segment that only cites a document gets no document visual. An unresolved cue blocks approval; nothing is substituted.
+create or replace function public.weekly_cue_count(b jsonb) returns integer language sql immutable parallel safe as $$
+  select count(*)::integer from jsonb_array_elements(case when jsonb_typeof(b -> 'segments') = 'array' then b -> 'segments' else '[]'::jsonb end) g
+  where jsonb_typeof(g -> 'visual') = 'object'
+$$;
+
+-- The document cue checks of a version: the newest visual_check run done on this exact text.
+create or replace function public.weekly_visual_checks(p_id uuid) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select r.result -> 'checks' from public.weekly_runs r join public.weekly_scripts v on v.id = p_id
+   where r.kind = 'visual_check' and r.status = 'done' and r.input ->> 'version_id' = p_id::text
+     and r.result ->> 'body_sha256' = v.body_sha256 order by r.finished_at desc limit 1
+$$;
+
+-- A person sets (or, with p_cue null, removes) one segment's document cue. The result is a NEW script version that differs
+-- from p_script only in that cue (the lineage guard enforces it); it needs its own approval, and a visual_check run
+-- resolves its cues against the stored documents.
+create or replace function public.hs_weekly_doc_cue_set(p_script uuid, p_segment integer, p_cue jsonb) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); v public.weekly_scripts; st jsonb; g jsonb; b jsonb; nv uuid; q jsonb := '{}';
+        cid text; src public.weekly_sources;
+begin
+  select * into v from public.weekly_scripts where id = p_script and stage = 'script';
+  if v.id is null then raise exception 'unknown script' using errcode = '22023'; end if;
+  st := public.weekly_version_status(v.id);
+  if (st ->> 'superseded')::boolean then raise exception 'a newer version exists; set the cue on that one' using errcode = '22023'; end if;
+  if (st ->> 'outdated')::boolean then raise exception 'this script is outdated' using errcode = '22023'; end if;
+  g := v.body -> 'segments' -> p_segment;
+  if g is null then raise exception 'no such segment' using errcode = '22023'; end if;
+  if p_cue is not null and jsonb_typeof(p_cue) <> 'null' then
+    if jsonb_typeof(p_cue) <> 'object' or exists (select 1 from jsonb_object_keys(p_cue) k
+         where k not in ('type', 'claim_id', 'source_id', 'page', 'quote', 'highlight')) then
+      raise exception 'a cue has type, claim_id, source_id, page, quote and highlight only' using errcode = '22023';
+    end if;
+    if p_cue ->> 'type' is distinct from 'doc' then raise exception 'a document cue has type doc' using errcode = '22023'; end if;
+    if p_cue ->> 'highlight' is distinct from 'yellow' then raise exception 'the highlight is yellow' using errcode = '22023'; end if;
+    if char_length(btrim(coalesce(p_cue ->> 'quote', ''))) not between 1 and 1000 then
+      raise exception 'the words to highlight are 1 to 1000 characters' using errcode = '22023';
+    end if;
+    if jsonb_typeof(p_cue -> 'page') not in ('null', 'number') or (jsonb_typeof(p_cue -> 'page') = 'number'
+         and ((p_cue ->> 'page')::numeric <> trunc((p_cue ->> 'page')::numeric) or (p_cue ->> 'page')::numeric < 1)) then
+      raise exception 'the page is a page number (1 or more) or empty' using errcode = '22023';
+    end if;
+    cid := p_cue ->> 'claim_id';
+    if not (g -> 'claim_ids') ? cid then raise exception 'the segment does not cite %', cid using errcode = '22023'; end if;
+    select w.* into src from public.weekly_sources w
+      join public.weekly_finding_sources fs on fs.source_id = w.id
+      join public.weekly_findings f on f.id = fs.finding_id
+      join public.weekly_library_version_findings x on x.finding_id = f.id and x.library_version_id = v.library_version_id
+     where w.id::text = p_cue ->> 'source_id' and f.finding_key || '@' || f.version = cid;
+    if src.id is null then raise exception 'that source is not a source of % in this library', cid using errcode = '22023'; end if;
+    if src.document_path is null then
+      raise exception 'no stored copy of that source (only an excerpt or a link is kept)' using errcode = '22023';
+    end if;
+    if src.document_kind = 'html' and jsonb_typeof(p_cue -> 'page') = 'number' then
+      raise exception 'a saved web page has no page numbers' using errcode = '22023';
+    end if;
+    b := jsonb_set(v.body, array['segments', p_segment::text, 'visual'],
+                   jsonb_build_object('type', 'doc', 'claim_id', cid, 'source_id', src.id, 'page', p_cue -> 'page',
+                                      'quote', btrim(p_cue ->> 'quote'), 'highlight', 'yellow'));
+  else
+    b := jsonb_set(v.body, array['segments', p_segment::text, 'visual'], 'null'::jsonb);
+  end if;
+  -- a segment with no visual key and one with visual null both have no cue
+  if coalesce(b -> 'segments' -> p_segment -> 'visual', 'null'::jsonb) = coalesce(g -> 'visual', 'null'::jsonb) then
+    raise exception 'the cue is unchanged' using errcode = '22023';
+  end if;
+  insert into public.weekly_scripts (stage, parent_id, depends_on, selected_index, topic, library_version_id, profile_id,
+                                     lessons_included, body, checks, kind)
+    values ('script', v.id, v.depends_on, v.selected_index, v.topic, v.library_version_id, v.profile_id, v.lessons_included,
+            b, v.checks || jsonb_build_object('text_checks_from', v.id), 'human_reviewed')
+    returning id into nv;
+  if public.weekly_cue_count(b) > 0 then
+    q := public._wk_queue('visual_check', v.topic, jsonb_build_object('version_id', nv), e);
+  end if;
+  return jsonb_build_object('script_version', nv) || q;
+end $$;
+
+-- The document cue checks of one script version (visual_check run, no AI step). Recorded against the body hash.
+create or replace function public.weekly_visual_check_record(p_run uuid, p_body_sha256 text, p_checks jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare r public.weekly_runs;
+begin
+  select * into r from public.weekly_runs where id = p_run and kind = 'visual_check' and status = 'running';
+  if r.id is null then raise exception 'run is not a running visual check' using errcode = '55000'; end if;
+  if p_body_sha256 is distinct from (select body_sha256 from public.weekly_scripts where id = (r.input ->> 'version_id')::uuid) then
+    raise exception 'the checks were made on a different text' using errcode = '22023';
+  end if;
+  if coalesce(jsonb_typeof(p_checks -> 'ok'), '') <> 'boolean' or coalesce(jsonb_typeof(p_checks -> 'segments'), '') <> 'array' then
+    raise exception 'document cue checks have ok and segments' using errcode = '22023';
+  end if;
+  insert into public.weekly_cost_entries (run_id, category, cost_type, scope, note)
+    values (r.id, 'verification', 'runner_minutes', 'report', 'document cue checks on a GitHub runner (no AI call)');
+  update public.weekly_runs set status = 'done', finished_at = now(),
+    result = jsonb_build_object('body_sha256', p_body_sha256, 'checks', p_checks) where id = r.id;
+end $$;
+
 create or replace function public.weekly_library_claim_ids(p_lv uuid) returns text[]
 language sql stable security definer set search_path = public as $$
   select coalesce(array_agg(f.finding_key || '@' || f.version), '{}') from public.weekly_library_version_findings x
@@ -909,6 +1036,10 @@ begin
     if jsonb_array_length(coalesce(v.checks -> 'high_risk', '[]')) > 0 and not coalesce(p_high_risk_ack, false) then
       raise exception 'high-risk wording needs an explicit acknowledgement' using errcode = '22023';
     end if;
+    if public.weekly_cue_count(v.body) > 0
+       and coalesce((public.weekly_visual_checks(v.id) ->> 'ok')::boolean, false) is not true then
+      raise exception 'a document cue on this version is not resolved (checked against the stored document)' using errcode = '22023';
+    end if;
   end if;
   insert into public.weekly_script_approvals (script_id, body_sha256, selected_index, rubric, high_risk_ack, note, approved_by)
     values (v.id, v.body_sha256, p_selected, p_rubric, coalesce(p_high_risk_ack, false), p_note, e);
@@ -1020,7 +1151,8 @@ begin
     'findings', (select coalesce(jsonb_agg(jsonb_build_object('id', s.id, 'finding_key', s.finding_key, 'version', s.version,
         'statement', s.statement, 'qualifiers', s.qualifiers, 'uncertainty', s.uncertainty, 'scope', s.scope, 'kind', s.kind,
         'human_decision', s.human_decision, 'is_latest', s.is_latest,
-        'sources', (select coalesce(jsonb_agg(jsonb_build_object('url', w.url, 'publisher', w.publisher, 'title', w.title,
+        'sources', (select coalesce(jsonb_agg(jsonb_build_object('id', w.id, 'document_kind', w.document_kind,
+            'url', w.url, 'publisher', w.publisher, 'title', w.title,
             'quote', w.quote, 'quote_match', w.quote_match, 'date_extraction', w.date_extraction, 'published_date', w.published_date,
             'retrieved_at', w.retrieved_at, 'fetch_error', w.fetch_error, 'publication_permission', w.publication_permission)), '[]')
           from public.weekly_finding_sources fs join public.weekly_sources w on w.id = fs.source_id where fs.finding_id = s.id))
@@ -1035,7 +1167,8 @@ begin
         'parent_id', s.parent_id, 'depends_on', s.depends_on, 'selected_index', s.selected_index,
         'library_version_id', s.library_version_id, 'profile_id', s.profile_id, 'provider', s.provider, 'model', s.model,
         'body', s.body, 'body_sha256', s.body_sha256, 'checks', s.checks, 'lessons_included', s.lessons_included,
-        'status', public.weekly_version_status(s.id),
+        'status', public.weekly_version_status(s.id), 'kind', s.kind,
+        'cues', public.weekly_cue_count(s.body), 'visual_checks', case when s.stage = 'script' then public.weekly_visual_checks(s.id) end,
         'approvals', (select coalesce(jsonb_agg(jsonb_build_object('kind', a.approval_kind, 'approved_by', a.approved_by, 'approved_at', a.approved_at,
             'body_sha256', a.body_sha256, 'this_version', a.body_sha256 = s.body_sha256, 'selected_index', a.selected_index,
             'rubric', a.rubric, 'high_risk_ack', a.high_risk_ack, 'note', a.note) order by a.approved_at), '[]')
@@ -1113,13 +1246,25 @@ begin
       'answer', (select jsonb_build_object('id', a.id, 'raw_text', a.raw_text, 'raw_sha256', a.raw_sha256)
                  from public.weekly_research_answers a where a.id = (r.input ->> 'answer_id')::uuid));
   end if;
-  if r.kind = 'title_check' then
+  if r.kind in ('title_check', 'visual_check') then
     select v.* into tv from public.weekly_scripts v where v.id = (r.input ->> 'version_id')::uuid;
     r.input := r.input || jsonb_build_object('library_version_id', tv.library_version_id, 'profile_id', tv.profile_id, 'depends_on', tv.depends_on);
   end if;
   select * into lv from public.weekly_library_versions where id = (r.input ->> 'library_version_id')::uuid;
   return jsonb_build_object('run', r.id, 'kind', r.kind, 'mode', r.kind, 'topic', r.topic, 'library_version', lv.n,
     'title_version', case when r.kind = 'title_check' then jsonb_build_object('id', tv.id, 'body', tv.body, 'body_sha256', tv.body_sha256) end,
+    'cue_version', case when r.kind = 'visual_check' then jsonb_build_object('id', tv.id, 'body', tv.body, 'body_sha256', tv.body_sha256) end,
+    -- the library's sources that carry a stored copy (visual_check only): what a cue may point at
+    'sources', case when r.kind = 'visual_check' then (select coalesce(jsonb_agg(jsonb_build_object('source_id', w.id, 'url', w.url,
+        'publisher', w.publisher, 'title', w.title, 'label', coalesce(w.title, w.publisher, w.url),
+        'document_path', w.document_path, 'document_sha256', w.document_sha256, 'document_kind', w.document_kind,
+        'finding_ids', (select jsonb_agg(f2.finding_key || '@' || f2.version order by f2.finding_key)
+                        from public.weekly_finding_sources s2 join public.weekly_findings f2 on f2.id = s2.finding_id
+                        join public.weekly_library_version_findings x2 on x2.finding_id = f2.id and x2.library_version_id = lv.id
+                        where s2.source_id = w.id)) order by w.created_at, w.id), '[]')
+        from public.weekly_sources w where w.document_path is not null and exists (select 1 from public.weekly_finding_sources s3
+          join public.weekly_library_version_findings x3 on x3.finding_id = s3.finding_id and x3.library_version_id = lv.id
+          where s3.source_id = w.id)) end,
     'script', (select sv.body from public.weekly_scripts sv where sv.id = (r.input ->> 'depends_on')::uuid and sv.stage = 'script'),
     'findings', (select coalesce(jsonb_agg(jsonb_build_object('claim_id', f.finding_key || '@' || f.version, 'statement', f.statement,
         'qualifiers', f.qualifiers, 'uncertainty', f.uncertainty, 'scope', f.scope,
@@ -1164,10 +1309,14 @@ begin
   if r.id is null then raise exception 'run is not a running research ingest' using errcode = '55000'; end if;
   a := (r.input ->> 'answer_id')::uuid;
   for s in select * from jsonb_array_elements(coalesce(p_payload -> 'sources', '[]')) loop
+    -- A stored copy of the document (document_path/sha256/kind) is recorded only with storage_permission full_copy (the table's
+    -- check refuses it otherwise). The fetcher does not store copies yet; until it does, no source carries one.
     insert into public.weekly_sources (answer_id, url, final_url, publisher, title, quote, retrieved_at, content_sha256, fetch_error,
-                                       quote_match, date_extraction, published_date)
+                                       quote_match, date_extraction, published_date, storage_permission,
+                                       document_path, document_sha256, document_kind)
       values (a, s ->> 'url', s ->> 'final_url', s ->> 'publisher', s ->> 'title', s ->> 'quote', (s ->> 'retrieved_at')::timestamptz,
-              s ->> 'content_sha256', s ->> 'fetch_error', s ->> 'quote_match', s ->> 'date_extraction', (s ->> 'published_date')::date)
+              s ->> 'content_sha256', s ->> 'fetch_error', s ->> 'quote_match', s ->> 'date_extraction', (s ->> 'published_date')::date,
+              coalesce(s ->> 'storage_permission', 'excerpt'), s ->> 'document_path', s ->> 'document_sha256', s ->> 'document_kind')
       returning id into sid;
     ids := ids || jsonb_build_object(s ->> 'ref', sid);
   end loop;
@@ -1245,6 +1394,10 @@ begin
     values (r.id, 'writing', 'runner_minutes', 'report', sid, round(coalesce((p_payload ->> 'runner_seconds')::numeric, 0) / 60, 2), 'minutes',
             'writing, audit and check jobs on GitHub runners');
   update public.weekly_runs set status = 'done', finished_at = now(), result = jsonb_build_object('script_id', sid, 'stage', stg) where id = r.id;
+  -- a rewrite keeps its parent's document cues; the new text is checked against them like any cued version
+  if stg = 'script' and public.weekly_cue_count(p_payload -> 'body') > 0 then
+    perform public._wk_queue('visual_check', r.topic, jsonb_build_object('version_id', sid), r.requested_by);
+  end if;
   return sid;
 end $$;
 
@@ -1275,6 +1428,8 @@ begin
     'hs_weekly_title_propose(uuid,jsonb,uuid,uuid)', 'hs_weekly_title_refit(uuid,uuid)', 'hs_weekly_titles_request(uuid,uuid)',
     'hs_weekly_title_decide(uuid,integer,text,text)', 'hs_weekly_title_evidence_review(uuid,text,text,boolean)',
     'hs_weekly_title_publication_approve(uuid,text)', 'weekly_title_check_record(uuid,text,jsonb)',
+    'weekly_without_visuals(jsonb)', 'weekly_cue_count(jsonb)', 'weekly_visual_checks(uuid)',
+    'hs_weekly_doc_cue_set(uuid,integer,jsonb)', 'weekly_visual_check_record(uuid,text,jsonb)',
     'hs_weekly_angles_request(uuid,uuid,uuid)', 'hs_weekly_outline_request(uuid,uuid)', 'hs_weekly_version_approve(uuid,integer,jsonb,boolean,text)',
     'hs_weekly_passage_review(uuid,integer,text,text,text,text[],text,text)',
     'hs_weekly_request_research(text,text)', 'hs_weekly_paste_answer(uuid,text)', 'hs_weekly_finding_decide(uuid,text,text)',
@@ -1292,15 +1447,29 @@ begin
     'hs_weekly_passage_review(uuid,integer,text,text,text,text[],text,text)', 'hs_weekly_correction_save(uuid,integer,text,text,text)',
     'hs_weekly_title_propose(uuid,jsonb,uuid,uuid)', 'hs_weekly_title_refit(uuid,uuid)', 'hs_weekly_titles_request(uuid,uuid)',
     'hs_weekly_title_decide(uuid,integer,text,text)', 'hs_weekly_title_evidence_review(uuid,text,text,boolean)',
-    'hs_weekly_title_publication_approve(uuid,text)', 'hs_weekly_lesson_propose(uuid,text,jsonb)',
+    'hs_weekly_title_publication_approve(uuid,text)', 'hs_weekly_doc_cue_set(uuid,integer,jsonb)', 'hs_weekly_lesson_propose(uuid,text,jsonb)',
     'hs_weekly_lesson_decide(uuid,text)', 'hs_weekly_lesson_use_review(bigint,text,text)',
     'hs_weekly_subscription_record(text,text,numeric,text,boolean)', 'hs_weekly_overview(text)', 'hs_weekly_export(text)'] loop
     execute format('grant execute on function public.%s to authenticated', f);
   end loop;
   foreach f in array array['weekly_run_claim(uuid)', 'weekly_run_fail(uuid,text)', 'weekly_research_record(uuid,jsonb)',
-    'weekly_script_record(uuid,jsonb)', 'weekly_title_check_record(uuid,text,jsonb)'] loop
+    'weekly_script_record(uuid,jsonb)', 'weekly_title_check_record(uuid,text,jsonb)', 'weekly_visual_check_record(uuid,text,jsonb)'] loop
     execute format('grant execute on function public.%s to service_role', f);
   end loop;
+end $$;
+
+-- Private buckets for stored source documents and the page images a visual_check makes (Tab 16's staged page PNGs).
+-- Read by dashboard admins only; written only by the service role. Skipped where Supabase Storage is absent (test databases).
+do $$
+begin
+  if to_regclass('storage.buckets') is null then return; end if;
+  insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('weekly-sources', 'weekly-sources', false, 20971520, array['application/pdf', 'text/html']),
+         ('weekly-visuals', 'weekly-visuals', false, 10485760, array['image/png'])
+  on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+  execute 'drop policy if exists weekly_documents_admin_read on storage.objects';
+  execute $p$create policy weekly_documents_admin_read on storage.objects for select to authenticated
+             using (bucket_id in ('weekly-sources', 'weekly-visuals') and public.hs_is_dashboard_admin())$p$;
 end $$;
 
 commit;

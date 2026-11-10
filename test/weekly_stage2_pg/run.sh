@@ -62,6 +62,16 @@ MUT=(
  "title-outdated-ignored|s.replace(\"    if (st ->> 'outdated')::boolean then raise exception 'outdated: %; check the title against the new script'\",\"    if false then raise exception 'outdated: %; check the title against the new script'\")"
  "title-concerns-ignored|s.replace(\"    when exists (select 1 from public.weekly_corrections x where x.script_id = v.id and x.decision = 'material_issue') then 'concerns_open'\n\",\"\")"
  "title-profile-unscoped|s.replace(\"  if not exists (select 1 from public.weekly_editorial_profiles where id = p_profile and scope = 'title') then\",\"  if not exists (select 1 from public.weekly_editorial_profiles where id = p_profile) then\")"
+ "cue-approval-ungated|s.replace(\"    if public.weekly_cue_count(v.body) > 0\\n       and coalesce((public.weekly_visual_checks(v.id) ->> 'ok')::boolean, false) is not true then\",'    if false then',1)"
+ "cue-person-may-change-text|s.replace('    if public.weekly_without_visuals(new.body) is distinct from public.weekly_without_visuals(p.body)\\n       or new.library_version_id','    if false\\n       and new.library_version_id',1)"
+ "cue-any-source|s.replace(\"     where w.id::text = p_cue ->> 'source_id' and f.finding_key || '@' || f.version = cid;\",\"     where w.id::text = p_cue ->> 'source_id';\",1)"
+ "cue-excerpt-allowed|s.replace(\"    if src.document_path is null then\\n      raise exception 'no stored copy\",\"    if false then\\n      raise exception 'no stored copy\",1)"
+ "cue-highlight-any|s.replace(\"    if p_cue ->> 'highlight' is distinct from 'yellow' then\",'    if false then',1)"
+ "cue-not-cited-allowed|s.replace(\"    if not (g -> 'claim_ids') ? cid then\",'    if false then',1)"
+ "visual-check-any-text|s.replace(\"  if p_body_sha256 is distinct from (select body_sha256 from public.weekly_scripts where id = (r.input ->> 'version_id')::uuid) then\\n    raise exception 'the checks were made on a different text' using errcode = '22023';\\n  end if;\\n  if coalesce(jsonb_typeof\",\"  if false then\\n    raise exception 'the checks were made on a different text' using errcode = '22023';\\n  end if;\\n  if coalesce(jsonb_typeof\",1)"
+ "rewrite-cue-unchecked|s.replace(\"    perform public._wk_queue('visual_check', r.topic, jsonb_build_object('version_id', sid), r.requested_by);\\n\",'',1)"
+ "document-without-full-copy|s.replace(\"    and (document_path is null or (storage_permission = 'full_copy' and document_path like '%.' || document_kind)))\",'    and true)',1)"
+ "cue-no-check-queued|s.replace(\"  if public.weekly_cue_count(b) > 0 then\\n    q := public._wk_queue('visual_check'\",\"  if false then\\n    q := public._wk_queue('visual_check'\",1)"
 )
 bad=0
 for m in "${MUT[@]}"; do

@@ -60,15 +60,17 @@
    "sources": [
     {
      "date_extraction": "not_stated",
+     "document_kind": "pdf",
      "fetch_error": null,
+     "id": "id-07",
      "publication_permission": "to_confirm",
      "published_date": null,
-     "publisher": "TEST Publisher",
+     "publisher": "U.S. EPA (Federal Register)",
      "quote": "TEST DATA: this action proposes to amend the rule",
      "quote_match": "exact",
      "retrieved_at": "2026-11-10T12:00:00Z",
-     "title": "TEST page",
-     "url": "https://example.test/source-0"
+     "title": "EPA, Proposed Rule, 91 FR 68234 (October 29, 2026)",
+     "url": "https://www.govinfo.gov/content/pkg/FR-2026-10-29/pdf/2026-22082.pdf"
     }
    ],
    "statement": "TEST DATA: The EPA change is proposed, not final.",
@@ -78,7 +80,7 @@
   {
    "finding_key": "air-third-party-reports",
    "human_decision": "approved",
-   "id": "id-07",
+   "id": "id-08",
    "is_latest": true,
    "kind": "ai_draft",
    "qualifiers": [
@@ -88,7 +90,9 @@
    "sources": [
     {
      "date_extraction": "not_stated",
+     "document_kind": null,
      "fetch_error": null,
+     "id": "id-09",
      "publication_permission": "to_confirm",
      "published_date": null,
      "publisher": "TEST Publisher",
@@ -106,7 +110,7 @@
   {
    "finding_key": "air-warning-effect",
    "human_decision": "approved",
-   "id": "id-08",
+   "id": "id-10",
    "is_latest": true,
    "kind": "ai_draft",
    "qualifiers": [
@@ -123,7 +127,7 @@
  "library_versions": [
   {
    "findings": 5,
-   "id": "id-09",
+   "id": "id-11",
    "n": 1,
    "sealed": true
   }
@@ -142,14 +146,14 @@
    "rubric_totals": []
   },
   "mechanical": {
-   "checks_passed": 2,
-   "script_versions": 2
+   "checks_passed": 3,
+   "script_versions": 3
   }
  },
  "profiles": [
   {
    "approved": true,
-   "id": "id-10",
+   "id": "id-12",
    "rules": [
     "Keep qualifications and uncertainty.",
     "Attribute forecasts; distinguish proposed changes from final rules."
@@ -159,7 +163,7 @@
   },
   {
    "approved": false,
-   "id": "id-11",
+   "id": "id-13",
    "rules": [
     {
      "origin": "inferred",
@@ -197,7 +201,7 @@
  "requests": [
   {
    "created_at": "2026-11-10T12:02:00Z",
-   "id": "id-12",
+   "id": "id-14",
    "request_text": "TEST DATA: research the October 2026 EPA proposal (fixture)"
   }
  ],
@@ -224,42 +228,49 @@
   {
    "created_at": "2026-11-10T12:03:00Z",
    "error": null,
-   "id": "id-13",
+   "id": "id-15",
    "kind": "title_check",
    "status": "done"
   },
   {
    "created_at": "2026-11-10T12:04:00Z",
    "error": null,
-   "id": "id-14",
-   "kind": "rewrite",
+   "id": "id-16",
+   "kind": "visual_check",
    "status": "done"
   },
   {
    "created_at": "2026-11-10T12:05:00Z",
    "error": null,
-   "id": "id-15",
-   "kind": "script",
+   "id": "id-17",
+   "kind": "rewrite",
    "status": "done"
   },
   {
    "created_at": "2026-11-10T12:06:00Z",
    "error": null,
-   "id": "id-16",
-   "kind": "outline",
+   "id": "id-18",
+   "kind": "script",
    "status": "done"
   },
   {
    "created_at": "2026-11-10T12:07:00Z",
    "error": null,
-   "id": "id-17",
-   "kind": "angles",
+   "id": "id-19",
+   "kind": "outline",
    "status": "done"
   },
   {
    "created_at": "2026-11-10T12:08:00Z",
    "error": null,
-   "id": "id-18",
+   "id": "id-20",
+   "kind": "angles",
+   "status": "done"
+  },
+  {
+   "created_at": "2026-11-10T12:09:00Z",
+   "error": null,
+   "id": "id-21",
    "kind": "research_ingest",
    "status": "done"
   }
@@ -269,9 +280,9 @@
   {
    "approvals": [
     {
-     "approved_at": "2026-11-10T12:09:00Z",
+     "approved_at": "2026-11-10T12:10:00Z",
      "approved_by": "founder@test.invalid",
-     "body_sha256": "00cd716d838ae7d5764419c998f2fd1c3d4c304e53d56d7fb1d72c251f58812a",
+     "body_sha256": "sha-26",
      "high_risk_ack": false,
      "kind": "editorial",
      "note": "TEST DATA: lead with the residents",
@@ -335,21 +346,23 @@
      }
     ]
    },
-   "body_sha256": "00cd716d838ae7d5764419c998f2fd1c3d4c304e53d56d7fb1d72c251f58812a",
+   "body_sha256": "sha-26",
    "checks": {
     "certifies_accuracy": false,
     "label": "mechanical checks passed",
     "ok": true
    },
-   "created_at": "2026-11-10T12:10:00Z",
+   "created_at": "2026-11-10T12:11:00Z",
+   "cues": 0,
    "depends_on": null,
-   "id": "id-19",
+   "id": "id-22",
+   "kind": "ai_draft",
    "lesson_uses": [],
    "lessons_included": [],
-   "library_version_id": "id-09",
+   "library_version_id": "id-11",
    "model": null,
    "parent_id": null,
-   "profile_id": "id-10",
+   "profile_id": "id-12",
    "provider": "claude-plan",
    "selected_index": null,
    "stage": "angles",
@@ -357,19 +370,20 @@
     "approved": true,
     "approved_earlier_version": false,
     "current": true,
-    "id": "id-19",
+    "id": "id-22",
     "outdated": false,
     "outdated_reason": null,
     "stage": "angles",
     "superseded": false
-   }
+   },
+   "visual_checks": null
   },
   {
    "approvals": [
     {
-     "approved_at": "2026-11-10T12:11:00Z",
+     "approved_at": "2026-11-10T12:12:00Z",
      "approved_by": "founder@test.invalid",
-     "body_sha256": "b4f3235bdef49e4a8b92b1180c2116117e999d4c824363211596a6379b61044f",
+     "body_sha256": "sha-27",
      "high_risk_ack": false,
      "kind": "editorial",
      "note": null,
@@ -404,21 +418,23 @@
      }
     ]
    },
-   "body_sha256": "b4f3235bdef49e4a8b92b1180c2116117e999d4c824363211596a6379b61044f",
+   "body_sha256": "sha-27",
    "checks": {
     "certifies_accuracy": false,
     "label": "mechanical checks passed",
     "ok": true
    },
-   "created_at": "2026-11-10T12:12:00Z",
-   "depends_on": "id-19",
-   "id": "id-20",
+   "created_at": "2026-11-10T12:13:00Z",
+   "cues": 0,
+   "depends_on": "id-22",
+   "id": "id-23",
+   "kind": "ai_draft",
    "lesson_uses": [],
    "lessons_included": [],
-   "library_version_id": "id-09",
+   "library_version_id": "id-11",
    "model": null,
    "parent_id": null,
-   "profile_id": "id-10",
+   "profile_id": "id-12",
    "provider": "claude-plan",
    "selected_index": 0,
    "stage": "outline",
@@ -426,12 +442,13 @@
     "approved": true,
     "approved_earlier_version": false,
     "current": true,
-    "id": "id-20",
+    "id": "id-23",
     "outdated": false,
     "outdated_reason": null,
     "stage": "outline",
     "superseded": false
-   }
+   },
+   "visual_checks": null
   },
   {
    "approvals": [],
@@ -458,7 +475,7 @@
      }
     ]
    },
-   "body_sha256": "1cc8e8045872a9842b92923d8d6fc7eb11f0363025992a9fb5349b2f42343a8c",
+   "body_sha256": "sha-28",
    "checks": {
     "ceiling_words": 750,
     "certifies_accuracy": false,
@@ -495,15 +512,17 @@
     },
     "words": 106
    },
-   "created_at": "2026-11-10T12:13:00Z",
-   "depends_on": "id-20",
+   "created_at": "2026-11-10T12:14:00Z",
+   "cues": 0,
+   "depends_on": "id-23",
    "id": "id-03",
+   "kind": "ai_draft",
    "lesson_uses": [],
    "lessons_included": [],
-   "library_version_id": "id-09",
+   "library_version_id": "id-11",
    "model": null,
    "parent_id": null,
-   "profile_id": "id-10",
+   "profile_id": "id-12",
    "provider": "claude-plan",
    "selected_index": 0,
    "stage": "script",
@@ -516,7 +535,8 @@
     "outdated_reason": null,
     "stage": "script",
     "superseded": true
-   }
+   },
+   "visual_checks": null
   },
   {
    "approvals": [],
@@ -543,7 +563,7 @@
      }
     ]
    },
-   "body_sha256": "0578e2c30cbd397850e2c475a5e587438c67deef3c940d4c3d64a06787eb99f7",
+   "body_sha256": "sha-29",
    "checks": {
     "ceiling_words": 750,
     "certifies_accuracy": false,
@@ -573,15 +593,17 @@
     },
     "words": 92
    },
-   "created_at": "2026-11-10T12:14:00Z",
-   "depends_on": "id-20",
+   "created_at": "2026-11-10T12:15:00Z",
+   "cues": 0,
+   "depends_on": "id-23",
    "id": "id-02",
+   "kind": "ai_draft",
    "lesson_uses": [],
    "lessons_included": [],
-   "library_version_id": "id-09",
+   "library_version_id": "id-11",
    "model": null,
    "parent_id": "id-03",
-   "profile_id": "id-10",
+   "profile_id": "id-12",
    "provider": "claude-plan",
    "selected_index": 0,
    "stage": "script",
@@ -593,15 +615,165 @@
     "outdated": false,
     "outdated_reason": null,
     "stage": "script",
+    "superseded": true
+   },
+   "visual_checks": null
+  },
+  {
+   "approvals": [],
+   "body": {
+    "segments": [
+     {
+      "beat": "collision",
+      "claim_ids": [
+       "air-third-party-reports@1",
+       "air-program-background@1",
+       "air-warning-effect@1",
+       "air-proposal-status@1"
+      ],
+      "story": "air",
+      "text": "Under an EPA proposal, reports of company emissions detected by third parties would stop reaching the agency, and residents near oil and gas sites could lose an early warning about large methane releases, an estimated effect. The change is proposed, not final. The Super Emitter Program behind those reports started in 2024. It is one of several monitoring tools the agency uses, and officials say it can find problems that routine monitoring misses.",
+      "visual": {
+       "claim_id": "air-proposal-status@1",
+       "highlight": "yellow",
+       "page": 1,
+       "quote": "First, the EPA proposes to rescind the Super Emitter Program.",
+       "source_id": "id-07",
+       "type": "doc"
+      }
+     },
+     {
+      "beat": "landing",
+      "claim_ids": [
+       "air-proposal-status@1"
+      ],
+      "story": "air",
+      "text": "TEST DATA: For now this is a proposal, not a final rule, and residents can still comment on it."
+     }
+    ]
+   },
+   "body_sha256": "sha-30",
+   "checks": {
+    "ceiling_words": 750,
+    "certifies_accuracy": false,
+    "disclaimer": "Automated checks; not a certification of factual accuracy.",
+    "estimated_seconds_from_words": 37,
+    "high_risk": [],
+    "label": "mechanical checks passed",
+    "material_issues": [],
+    "ok": true,
+    "opening": {
+     "conflict_at_word": 0,
+     "limit": 45,
+     "stake_at_word": 18
+    },
+    "problems": [],
+    "quotes": [],
+    "rewrite": {
+     "action": "conflict_first",
+     "segment_index": 0
+    },
+    "runtime_note": "An estimate from word count, not a measured narration time.",
+    "target_words": 450,
+    "text_checks_from": "id-02",
+    "warnings": [],
+    "word_counts": {
+     "notes_and_source_words": 0,
+     "spoken_words": 92
+    },
+    "words": 92
+   },
+   "created_at": "2026-11-10T12:16:00Z",
+   "cues": 1,
+   "depends_on": "id-23",
+   "id": "id-24",
+   "kind": "human_reviewed",
+   "lesson_uses": [],
+   "lessons_included": [],
+   "library_version_id": "id-11",
+   "model": null,
+   "parent_id": "id-02",
+   "profile_id": "id-12",
+   "provider": null,
+   "selected_index": 0,
+   "stage": "script",
+   "status": {
+    "approved": false,
+    "approved_earlier_version": false,
+    "current": false,
+    "id": "id-24",
+    "outdated": false,
+    "outdated_reason": null,
+    "stage": "script",
     "superseded": false
+   },
+   "visual_checks": {
+    "certifies_accuracy": false,
+    "cued": 1,
+    "disclaimer": "Mechanical document checks: the highlighted words are in the stored document. Not a check that the finding is true.",
+    "download_errors": [],
+    "label": "document cue checks",
+    "ok": true,
+    "segments": [
+     {
+      "cue": {
+       "claim_id": "air-proposal-status@1",
+       "highlight": "yellow",
+       "page": 1,
+       "quote": "First, the EPA proposes to rescind the Super Emitter Program.",
+       "source_id": "id-07",
+       "type": "doc"
+      },
+      "match": "first the epa proposes to rescind the super emitter program",
+      "page": 1,
+      "preview_path": "weekly-visuals/id-24/pages/id-07_pdf_dfc3cf9a_p1.png",
+      "problems": [],
+      "scene": {
+       "doc": {
+        "focusSentence": 0,
+        "highlights": [
+         {
+          "h": 0.011329545454545453,
+          "w": 0.17538823529411765,
+          "x": 0.15188954248366013,
+          "y": 0.5306539141414142
+         },
+         {
+          "h": 0.011329545454545453,
+          "w": 0.2374764705882353,
+          "x": 0.07354248366013072,
+          "y": 0.5432789141414142
+         }
+        ],
+        "image": "pages/id-07_pdf_dfc3cf9a_p1.png",
+        "note": null,
+        "page": 1,
+        "pageHeightPx": 1650,
+        "pageWidthPx": 1275,
+        "quote": "First, the EPA proposes to rescind the Super Emitter Program.",
+        "source": "EPA, Proposed Rule, 91 FR 68234 (October 29, 2026)",
+        "status": "confirmed",
+        "title": "EPA, Proposed Rule, 91 FR 68234 (October 29, 2026)"
+       },
+       "type": "doc"
+      },
+      "segment": 0,
+      "status": "resolved"
+     },
+     {
+      "segment": 1,
+      "status": "none"
+     }
+    ],
+    "unresolved": 0
    }
   },
   {
    "approvals": [
     {
-     "approved_at": "2026-11-10T12:15:00Z",
+     "approved_at": "2026-11-10T12:17:00Z",
      "approved_by": "founder@test.invalid",
-     "body_sha256": "507988658f22e7a96b06ef9f23d46637841710cdb5a1fecca0bf40907bb8d803",
+     "body_sha256": "sha-31",
      "high_risk_ack": false,
      "kind": "editorial",
      "note": "FIXTURE: approved by the founder in a conversation on 2026-11-10; not a dashboard action",
@@ -635,20 +807,22 @@
     ],
     "origin": "person"
    },
-   "body_sha256": "507988658f22e7a96b06ef9f23d46637841710cdb5a1fecca0bf40907bb8d803",
+   "body_sha256": "sha-31",
    "checks": {
     "certifies_accuracy": false,
     "label": "title checks not run yet"
    },
-   "created_at": "2026-11-10T12:16:00Z",
-   "depends_on": "id-02",
-   "id": "id-21",
+   "created_at": "2026-11-10T12:18:00Z",
+   "cues": 0,
+   "depends_on": "id-24",
+   "id": "id-25",
+   "kind": "human_reviewed",
    "lesson_uses": [],
    "lessons_included": [],
-   "library_version_id": "id-09",
+   "library_version_id": "id-11",
    "model": null,
    "parent_id": null,
-   "profile_id": "id-11",
+   "profile_id": "id-13",
    "provider": null,
    "selected_index": null,
    "stage": "title",
@@ -657,7 +831,7 @@
     "approved_earlier_version": false,
     "current": true,
     "evidence_review": "ready_for_review",
-    "id": "id-21",
+    "id": "id-25",
     "outdated": false,
     "outdated_reason": null,
     "publication": "not_approved",
@@ -695,7 +869,8 @@
      "ok": true,
      "problems": []
     }
-   }
+   },
+   "visual_checks": null
   }
  ]
 }

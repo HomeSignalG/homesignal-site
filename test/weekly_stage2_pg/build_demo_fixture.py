@@ -24,7 +24,12 @@ def lit(v):
     return "'" + json.dumps(v, ensure_ascii=False).replace("'", "''") + "'::jsonb"
 
 
+def q(t):
+    return "'" + str(t).replace("'", "''") + "'"
+
+
 def sql(e):
+    dc = e["doc_cue"]
     f = e["findings"]
     findings = [{"finding_key": x["claim_id"].split("@")[0], "statement": x["statement"], "qualifiers": x["qualifiers"],
                  "uncertainty": x["uncertainty"], "scope": x["scope"], "source_refs": ["s%d" % i] if x["quotes"] else []}
@@ -32,6 +37,13 @@ def sql(e):
     sources = [{"ref": "s%d" % i, "url": "https://example.test/source-%d" % i, "publisher": "TEST Publisher", "title": "TEST page",
                 "quote": x["quotes"][0], "retrieved_at": "2026-11-10T12:00:00Z", "content_sha256": "ab", "quote_match": "exact",
                 "date_extraction": "not_stated"} for i, x in enumerate(f) if x["quotes"]]
+    # the source behind the cue's finding carries a stored copy: the real EPA proposed rule (the research ingest does not
+    # store copies yet; this fixture records one as the ingest would once it does)
+    for src, x in zip(sources, [x for x in f if x["quotes"]]):
+        if x["claim_id"] == dc["cue"]["claim_id"]:
+            src.update(url=dc["document"]["url"], title=dc["document"]["label"], publisher="U.S. EPA (Federal Register)",
+                       storage_permission="full_copy", document_path="weekly-sources/fixture/fr_2026-22082.pdf",
+                       document_sha256=dc["document"]["sha256"], document_kind="pdf")
     ids = [x["claim_id"] for x in f]
     cards = [{"claim": "TEST DATA: EPA says the proposal keeps methane rules workable.", "category": c,
               "finding_ids": ids, "public_stakes": s, "editorial_position": p, "context": "TEST DATA: EPA's stated rationale; the change is proposed.",
@@ -91,6 +103,23 @@ def sql(e):
         "select public.weekly_script_record(:'rw', jsonb_build_object('provider','claude-plan','prompt_sha256',repeat('6',64),'checks',%s,'body',%s));"
         % (lit(e["after_checks"]), lit(e["after_body"])),
         "reset role;",
+        # A document cue on segment 0 of version 2: a person sets the cue on the stored source of air-proposal-status@1, and
+        # the visual_check run records the engine's own result (homesignal-ingest weekly_slice/doc_cue.py on that PDF).
+        "select fs.source_id as src0 from public.weekly_finding_sources fs join public.weekly_findings f on f.id = fs.finding_id"
+        " where f.finding_key || '@' || f.version = %s \\gset" % q(dc["cue"]["claim_id"]),
+        "select (v ->> 'id') as s2 from jsonb_array_elements(public.hs_weekly_overview('Air Quality') -> 'versions') v"
+        " where v ->> 'stage' = 'script' and not (v -> 'status' ->> 'superseded')::boolean \\gset",
+        "set role authenticated;",
+        "select public.hs_weekly_doc_cue_set(:'s2', %d, jsonb_build_object('type', 'doc', 'claim_id', %s, 'source_id', :'src0', 'page', %d,"
+        " 'quote', %s, 'highlight', 'yellow')) as cue \\gset" % (dc["segment_index"], q(dc["cue"]["claim_id"]), dc["cue"]["page"], q(dc["cue"]["quote"])),
+        "reset role;",
+        "select (:'cue'::jsonb ->> 'run_id') as vr, (:'cue'::jsonb ->> 'script_version') as s3 \\gset",
+        "select body_sha256 as s3sha from public.weekly_scripts where id = :'s3' \\gset",
+        "set role service_role;",
+        "select public.weekly_run_claim(:'vr') is not null as c \\gset",
+        "select public.weekly_visual_check_record(:'vr', :'s3sha', replace(replace(%s, 'SOURCE_ID', :'src0'), 'VERSION_ID', :'s3')::jsonb);"
+        % q(json.dumps(dc["checks"], ensure_ascii=False)),
+        "reset role;",
         # the Air title: wording approved IN A CONVERSATION, recorded here by the test identity as fixture data only;
         # its mechanical checks are recorded; the evidence review and publication are left undone.
         "select (v ->> 'id') as s2 from jsonb_array_elements(public.hs_weekly_overview('Air Quality') -> 'versions') v"
@@ -112,12 +141,16 @@ def sql(e):
 
 
 UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+SHA = re.compile(r'("body_sha256": ")([0-9a-f]{64})"')
 TS = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z)")
 
 
 def normalize(o):
     toks, s = {}, json.dumps(o, sort_keys=True, ensure_ascii=False)
     s = UUID.sub(lambda m: toks.setdefault(m.group(0), "id-%02d" % (len(toks) + 1)), s)
+    # a cue version's text holds a source id, so its hash differs on every build: hashes become stable tokens too
+    # (equal hashes stay equal, so "approved on this exact text" is still visible in the fixture)
+    s = SHA.sub(lambda m: m.group(1) + toks.setdefault(m.group(2), "sha-%02d" % (len(toks) + 1)) + '"', s)
     n = iter(range(10 ** 6))
     s = TS.sub(lambda m: "2026-11-10T12:%02d:00Z" % (next(n) % 60), s)
     return json.loads(s)
