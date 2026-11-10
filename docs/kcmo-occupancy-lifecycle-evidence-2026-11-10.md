@@ -141,11 +141,11 @@ Club House", "2301 Holmes St FL 1"); line 2 can be wrong ("Kansas City, KS 64126
 
 ## 4. Identity and counting
 
-- **A certificate keeps its own source identity:** `source_key = <connector>:kcmo-building-permits:<permit_number>`
-  (e.g. `…:CICO-2026-01123`), its own raw status and dates, unchanged.
 Every bullet below except the first is a **PROPOSAL**, not a decision. None is built.
 
-- **A certificate keeps its own identity** (stated above): this is how the connector already keys records.
+- **A certificate keeps its own source identity:** `source_key = <connector>:kcmo-building-permits:<permit_number>`
+  (e.g. `…:CICO-2026-01123`), its own raw status and dates, unchanged. This is how the connector already
+  keys records.
 - **PROPOSAL, milestone storage:** a certificate is not a development. It would be stored as a milestone
   record (record kind to be decided with the lifecycle owners).
 - **PROPOSAL, count exclusions:** milestone records would be excluded from development counts and ZIP
@@ -169,12 +169,17 @@ Every bullet below except the first is a **PROPOSAL**, not a decision. None is b
 
 ## 5. Proposed change boundary (staged; each stage needs its own approval)
 
-1. **Classification and label correction (no new records).**
-   - Decide section 1 (one occupancy stage meaning across the plan and the report engine).
+**Two separate decisions.** (A) Correct the unsupported KCMO "Closed"/"Work Completed" → Operating mappings.
+(B) Decide the meaning and future handling of CO/TCO and final-inspection evidence (section 1). Stage 1
+below is decision A and does **not** depend on decision B or on any CO/TCO ingestion: the existing permits
+carry no certificate evidence, and D5/D3 are already approved. Decision B is a separate track for the
+lifecycle owners and gates only stages 3 and 4.
+
+1. **Correction of the existing labels (decision A; no new records).**
    - Apply D5/D3 to KCMO "Closed" and "Work Completed" through the lifecycle plan's per-source enablement,
      not a KCMO-only branch.
-   - Dependencies: the lifecycle plan's switch (`stage_model`) and its §10 release gate; the reconciled
-     report label.
+   - Dependencies: the lifecycle plan's switch (`stage_model`) and its §10 release gate. Not dependent on
+     section 1, the report label, or stage 3.
    - Dry run on a replica: before/after counts per column for the 1,243 rows, the ZIPs whose counts move, and
      the change-ledger events (a reclassification must not emit "status changed" or property-follow alerts, D7).
    - **Hypothesis to check, not a guaranteed result:** Operating −1,243 and Lifecycle unknown +1,243. Two
@@ -187,11 +192,13 @@ Every bullet below except the first is a **PROPOSAL**, not a decision. None is b
        retained column) for the 176.
      - **Drift.** The figures are a 2026-11-10 reading; the 365-day window and KCMO's status updates move
        rows in and out before any run.
-2. **Tests.** Fixtures F1–F8 and the four section-2 rows as a frozen file, asserting:
-   Closed/Work Completed never give Operating now; a demolition never reaches Operating now; a CO/TCO gives
-   only the occupancy-authorized meaning (if section 1's proposal is approved); an expired TCO gives no conclusion about later occupancy; a tenant
-   name never gives "open"; certificates never enter development counts; parcel alone never creates a link.
-3. **Optional CO/TCO ingestion expansion (after 1 and 2).**
+2. **Tests.**
+   - With stage 1: the four section-2 rows as a frozen file, asserting Closed/Work Completed never give
+     Operating now and a demolition never reaches Operating now.
+   - With stage 3 only, after decision B: fixtures F1–F8, asserting a CO/TCO gives only the meaning decision B
+     approves; an expired TCO gives no conclusion about later occupancy; a tenant name never gives "open";
+     certificates never enter development counts; parcel alone never creates a link.
+3. **Optional CO/TCO ingestion expansion (after decision B and stage 2; not a prerequisite for stage 1).**
    - Registry: add `CPPU - Certificate of Occupancy` and `CPPU - Temporary Certificate of Occupancy` to the
      entry's filter **and** a way to carry occupancy evidence from `permit_type` (KCMO records it as the
      type, with status "Issued"; the current occupancy rule reads only status words such as "TCO issued").
