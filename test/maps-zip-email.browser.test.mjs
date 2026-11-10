@@ -132,6 +132,12 @@ const routeHandler = async (route) => {
   if (url.startsWith(base)) return route.continue();
   const J = (b) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
   if (url.includes('/rpc/zip_mode_report_sites')) return fulfillZipModeReport(route, () => ZIP_ROW);
+  // The address geocoder: the ZIP it names comes from the visitor's typed address (test hook).
+  if (url.includes('/functions/v1/geocode-address')) {
+    const body = JSON.parse(route.request().postData() || '{}');
+    const zip = (String(body.address || '').match(/\b(\d{5})\b/) || [])[1] || null;
+    return J({ match: { lat: 44.05, lng: -121.31, zip, matchedAddress: String(body.address || '').toUpperCase() } });
+  }
   if (url.includes('/rest/v1/development_reports')) return J(ZIP_ROW);
   if (url.includes('/rest/v1/') || url.includes('/functions/v1/')) return J([]);
   if (url.includes('leaflet@1.9.4/dist/leaflet.js') || url.includes('leaflet@1.9.4/dist/leaflet.css')) {
@@ -275,6 +281,41 @@ const LANDING = '/homesignalmap.html?zip=97702&utm_source=bluesky&utm_medium=soc
   await ctx.close();
 }
 
+// ═══════ 5. An address search offers the sign-up for the ZIP the address is in (founder, 2026-11-09) ═══════
+async function searchAddress(page, address) {
+  await page.fill('#addr', address);
+  await page.click('#go');
+  await page.waitForFunction(() => !document.body.classList.contains('zipmode'), null, { timeout: 10000 });
+  await page.waitForTimeout(1500);
+}
+{
+  const { ctx, page } = await open('/homesignalmap.html?zip=97702',
+    { session: { access_token: 'fake', user: { id: 'auth-user-1', email: 'resident@example.com' } },
+      subscribed: false, follows: ['97702'] });
+  await searchAddress(page, '123 Main St, Bend, OR 97702');
+  ok(await page.evaluate(() => document.body.classList.contains('addrzip')), '5a address mode marks the page addrzip');
+  ok(await page.locator('#zipEmailBtn').isVisible(), '5b the sign-up is visible after an address search');
+  ok((await page.locator('#zipEmailBtn').textContent()).trim() === BUTTON_LABEL, "5c it keeps the founder's label word for word");
+  ok((await page.locator('#zipEmailFor').textContent()).trim() === 'This address is in ZIP 97702.',
+    '5d it says which ZIP the sign-up is for', await page.locator('#zipEmailFor').textContent());
+  await page.click('#zipEmailBtn');
+  await page.waitForFunction(() => (document.getElementById('zipEmailBtn').textContent || '').indexOf('signed up') > -1,
+    null, { timeout: 8000 }).catch(() => {});
+  const F = await page.evaluate(() => window.__fake);
+  const a = F.rpcArgs || {};
+  ok(a.p_community_id === 'zip-97702' && a.p_zip_code === '97702',
+    "5e the address's ZIP is filed on that ZIP's own community", a);
+  ok(JSON.stringify(a.p_topics) === JSON.stringify({ maps: [TOPIC] }) && a.p_marketing_consent === false,
+    '5f the same maps topic, alert consent only', a);
+  await ctx.close();
+}
+{
+  const { ctx, page } = await open('/homesignalmap.html?zip=97702');
+  await searchAddress(page, '1 Nowhere Rd, Somewhere, ZZ 99999');
+  ok(!(await page.evaluate(() => document.body.classList.contains('addrzip'))), '5g an address in a ZIP with no ZIP page gets no sign-up');
+  ok(!(await page.locator('#zipEmailBtn').isVisible()), '5h and the button is hidden');
+  await ctx.close();
+}
 ok(!pageErrors.length, 'no uncaught page errors', pageErrors);
 await browser.close(); server.close();
 console.log('========================================================================');

@@ -18,7 +18,7 @@ run_once() {  # $1 = file to apply; prints check lines
 out="$(run_once "$SQL")"; echo "$out" | sed 's/^/  /'
 n=$(grep -c '|' <<<"$out" || true); f=$(grep -c '|false$' <<<"$out" || true)
 echo "SHIPPED: $n checks, $f failed"
-[ "$n" -ge 13 ] && [ "$f" -eq 0 ] || { echo FAIL; exit 1; }
+[ "$n" -ge 15 ] && [ "$f" -eq 0 ] || { echo FAIL; exit 1; }   # every check in suite.sql printed
 # mutations: name|python expression on the text s
 MUT=(
  "no-insert-trigger|s.replace('after insert or update on public.user_subscriptions','after delete on public.user_subscriptions')"
@@ -33,6 +33,8 @@ for m in "${MUT[@]}"; do
   name="${m%%|*}"; expr="${m#*|}"
   python3 -c "import sys;s=open(sys.argv[1]).read();t=$expr;assert t!=s,'mutation did not apply';open(sys.argv[2],'w').write(t)" "$SQL" "$tmp/m.sql"
   set +e; mo="$(run_once "$tmp/m.sql")"; rc=$?; set -e
-  if [ $rc -ne 0 ] || grep -q '|false$' <<<"$mo" || [ "$(grep -c '|' <<<"$mo")" -lt 13 ]; then echo "  killed: $name"; else echo "  SURVIVED: $name"; bad=1; fi
+  if [ $rc -ne 0 ] || grep -q '|false$' <<<"$mo" || [ "$(grep -c '|' <<<"$mo")" -lt "$n" ]; then echo "  killed: $name"; else echo "  SURVIVED: $name"; bad=1; fi
 done
-[ $bad -eq 0 ] && echo "PASS" || { echo FAIL; exit 1; }
+[ $bad -eq 0 ] || { echo FAIL; exit 1; }
+bash "$here/replay_guard.sh"
+echo "PASS"

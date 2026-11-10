@@ -142,8 +142,13 @@ ok(head.includes('<button type="button" class="zip-email-btn" id="zipEmailBtn">'
   "§5 the button reads the founder's wording, word for word, and lives inside .head");
 ok(/\.hs-embed \.wrap>\.head,/.test(page),
   '§5 .head is on the embed hide list, so the button never appears inside a Place-page map');
-ok(/\.zip-email\{display:none;/.test(page) && /body\.zipmode \.zip-email\{display:block\}/.test(page),
-  '§5 the control shows in ZIP mode only');
+ok(/\.zip-email\{display:none;/.test(page) && /body\.zipmode \.zip-email,body\.addrzip \.zip-email\{display:block\}/.test(page),
+  '§5 the control shows in ZIP mode, and in address mode for the address\'s ZIP (founder, 2026-11-09)');
+const offer = (page.match(/function offerZipEmailForAddress\(zip, token\)\{[\s\S]*?\n  \}/) || [''])[0];
+ok(/HS\.data\.zipCommunity\(zip\)/.test(offer) && /if\(!zc \|\| !currentReq\(token\) \|\| ZIP_MODE\) return;/.test(offer),
+  '§5 address mode offers it only for a ZIP with its own ZIP page, and only for the current search');
+ok(/paintZipEmail\(zip, "This address is in ZIP " \+ zip \+ "\."\)/.test(offer),
+  '§5 address mode names the ZIP the sign-up is for');
 ok(/\.zip-email\{display:none;margin:16px 0 4px\}/.test(page),
   '§5 the sign-up block has no width cap, so the consent line fits on one line on desktop');
 ok(!/\.zip-email-note\{[^}]*nowrap/.test(page),
@@ -151,7 +156,7 @@ ok(!/\.zip-email-note\{[^}]*nowrap/.test(page),
 const loadZip = (page.match(/function loadZip\(zip\)\{[\s\S]*?paintZipEmail\(zip\);/) || [''])[0];
 ok(loadZip.length > 0 && loadZip.indexOf('classList.add("zipmode")') > -1,
   '§5 loadZip paints the control when it enters ZIP mode');
-const paint = (page.match(/function paintZipEmail\(zip\)\{[\s\S]*?\n  \}/) || [''])[0];
+const paint = (page.match(/function paintZipEmail\(zip, forLine\)\{[\s\S]*?\n  \}/) || [''])[0];
 ok(/note\.textContent = HS\.MAPS_CONSENT_COPY/.test(paint),
   '§5 the consent line is HS.MAPS_CONSENT_COPY, not a second copy of the words');
 ok(!/We'll email you when HomeSignal posts/.test(page),
