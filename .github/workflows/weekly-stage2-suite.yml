@@ -1,0 +1,62 @@
+name: weekly-stage2-suite
+
+# docs/weekly-stage2-slice.sql (Tab 20 Stage 2 proof slice) against a DISPOSABLE Postgres. Never production:
+# no secrets, no Supabase URL, and the job refuses to run if any Supabase credential is present.
+on:
+  pull_request:
+    paths:
+      - 'docs/weekly-stage2-slice.sql'
+      - 'test/weekly_stage2_pg/**'
+      - '.github/workflows/weekly-stage2-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/weekly-stage2-slice.sql'
+      - 'test/weekly_stage2_pg/**'
+      - '.github/workflows/weekly-stage2-suite.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: mirror.gcr.io/library/postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: weekly_stage2_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Slice rules hold; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: weekly_stage2_disposable
+        run: |
+          set -o pipefail
+          bash test/weekly_stage2_pg/run.sh 2>&1 | grep -v NOTICE
