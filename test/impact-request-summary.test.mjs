@@ -6,3 +6,6 @@ assert.match(src, /return head \+ bar \+ intro \+ requestSummary\(\)/, 'summary 
 assert.match(src, /id="is-req-summary"/);
 for (const w of ['Found', 'None found', 'Not tried yet']) assert.ok(src.includes('>' + w + '<'), w);
 console.log('impact-request-summary: ok');
+assert.match(src, /function failReasons\(bl\)/, 'failed checks are named in the top box');
+assert.match(src, /cannot be approved\. ' \+ failReasons\(bl\)/);
+console.log('impact fail reasons: ok');
