@@ -160,3 +160,65 @@ With `steps.proof.outputs.passed == 'true'`, the only other operand in Step 3's 
 proof, is what kept the repair batch from being sent. The variable itself is still not read back by this
 session. Runs 1507 (13:18Z) and 1508 (14:18Z) had skipped Step 3 because their proof did not pass, so they
 show nothing about the pause.
+
+## 4-hour check, read 2026-11-10 ~18:16Z
+
+Windows: deploy → pause is `created` ≥ 13:36:07Z and < 14:24:00Z; after pause is ≥ 14:24:00Z and < 18:15:00Z
+(`net._http_response`, HTTP 200, ZIP-mode). The pause boundary is the founder's approximate save time.
+Edge logs for the same span: version 314 only (205 requests before 14:24Z, 930 after; first 13:38:23Z, last
+18:14:23Z). 3 requests returned HTTP 546, between 14:53:19Z and 16:02:54Z; the rest returned 200. The 546
+responses carry no body this receipt reads, so their cause is not recorded here.
+
+| | reads | `ok` false | with `diag` | `diag` on a successful read | largest `diag`, bytes |
+|---|---:|---:|---:|---:|---:|
+| deploy → pause (≈48 min) | 180 | 100 | 38 | 0 | 444 |
+| after pause (≈3 h 51 min) | 878 | 332 | 119 | 0 | 443 |
+
+The first row now covers 180 reads, not the 143 in the first check, because the first check stopped at 14:14Z.
+
+Diagnostic entries (name / stage / kind / attempt):
+
+| | deploy → pause | after pause |
+|---|---:|---:|
+| TypeError / fetch / tls / attempt 3 | 27 | 83 |
+| TypeError / fetch / tls / attempt 4 | 9 | 21 |
+| SyntaxError / parse / invalid_json / attempt 1 | 2 | 23 |
+| SyntaxError / parse / invalid_json / attempt 2 | 1 | 1 |
+| SyntaxError / parse / invalid_json / attempt 3 | 1 | 1 |
+
+`code` and `os_error` were null on every entry in both windows. TypeError attempt length was at most 63 ms
+(before the pause) and 52 ms (after). The gap before a TypeError was 5,000–5,015 ms before the pause and
+2,002–5,015 ms after; the 2,002 ms case is the `process_limit > 429 > TypeError > 429` sequence below.
+
+Failure sequences recorded by the engine in `epa.failures` (failed reads only):
+
+| sequence | deploy → pause | after pause |
+|---|---:|---:|
+| 429 > 429 > 429 | 50 | 110 |
+| process_limit > 429 > 429 > 429 | 11 | 100 |
+| 429 > 429 > TypeError | 27 | 73 |
+| process_limit > 429 > 429 > TypeError | 9 | 20 |
+| SyntaxError > 429 > 429 | 1 | 14 |
+| SyntaxError > 429 > TypeError | 0 | 8 |
+| process_limit > 429 > TypeError > 429 | 0 | 2 |
+| row_ceiling > 429 > 429 > TypeError | 0 | 1 |
+| process_limit > process_limit > 429 > 429 > 429 | 0 | 2 |
+| process_limit > 429 > 429 > 429 > 429 | 0 | 1 |
+| process_limit > 429 > 429 > 429 > 429 > 429 | 1 | 0 |
+| SyntaxError > SyntaxError > SyntaxError | 1 | 1 |
+
+What this adds: after the pause, TypeError also appeared once after a single 429 and a 2-second wait (2 reads),
+not only after two 429s. Every TypeError still came after at least one 429 on the same search area. More reads
+ran after the pause than before it, over a longer window; this receipt does not measure why. Increase observed
+after deployment; mechanism unknown.
+
+### Scheduled recovery runs after the pause
+
+| run | created | proof passed? | Step 3 (repair) | disable step |
+|---|---|---|---|---|
+| 1509 (42842850886) | 15:17:46Z | yes (from its log) | skipped | ran (the condition `steps.proof.outputs.passed == 'true'` held); failed silently |
+| 1510 (42853262717) | 16:18:51Z | yes (the disable step, which runs only when the proof passed, ran) | skipped | ran |
+| 1511 (42863454488) | 17:17:41Z | yes (same reasoning) | skipped | ran |
+
+So in three scheduled runs since the pause the proof passed and the repair batch was not sent. Each run still
+sent its one proof request and opened its report issue; the schedule stays on.
