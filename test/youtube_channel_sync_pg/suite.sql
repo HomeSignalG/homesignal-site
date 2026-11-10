@@ -112,5 +112,18 @@ update public.youtube_video_reviews set bsky_posts = jsonb_set(jsonb_set(bsky_po
 select pg_temp.chk('11a the placeholder is replaced by the saved link, not appended twice', public.video_bsky_text('p3','short1') = E'Watch: https://youtu.be/UNSURE00001\nhttps://jodytracks.com\n\n#Tacoma #JodyTracks');
 update public.youtube_video_reviews set youtube_url = null where slug='p3';
 select pg_temp.chk('11b a placeholder caption with no saved link is held', 'missing_youtube_url' = any(public.video_bsky_problems('p3','short1')));
+-- 12. a thumbnail approved before the main video's link exists is released when the sync links it (2026-11-10:
+--     the EPA methane hearing thumbnail stayed held although its main video was matched and linked)
+insert into public.youtube_video_reviews (slug, title, files, meta, bsky_posts, reconcile_required) values ('p4', 'Project p4',
+ '{"final":{"path":"p4/final.mp4","bytes":2000,"sha256":"f"},"thumbnail":{"path":"p4/thumbnail.png","bytes":500,"sha256":"t"}}', '{}',
+ '{"final":{"caption":"Main.","hashtags":["JodyTracks"],"alt":"Map","link_youtube":true},
+   "thumbnail":{"caption":"Register by Nov 10.","hashtags":["JodyTracks"],"alt":"Thumbnail words","link_youtube":true}}', false);
+insert into storage.objects (bucket_id, name, metadata) values ('jody-videos','p4/final.mp4','{"size":2000}'), ('jody-videos','p4/thumbnail.png','{"size":500}');
+select pg_temp.as_user('founder@example.com');
+select public.hs_youtube_video_file_decide('p4','thumbnail','approved');
+select pg_temp.chk('12a the thumbnail waits for the main video link', (pg_temp.job('p4','thumbnail')).status='held' and (pg_temp.job('p4','thumbnail')).hold_reason like '%missing_youtube_url%');
+select public.youtube_sync_record(jsonb_build_array(pg_temp.row('P4VIDEO0001','p4','final','matched',true)), 'oauth');
+select pg_temp.chk('12b the sync links the main video and releases the thumbnail', pg_temp.url('p4') = 'https://youtu.be/P4VIDEO0001'
+   and (pg_temp.job('p4','thumbnail')).status='scheduled' and (pg_temp.job('p4','thumbnail')).post_text like '%https://youtu.be/P4VIDEO0001%');
 \o
 select 'ALL ' || count(*) || ' CHECKS PASSED' from _res where ok;
