@@ -215,8 +215,8 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
 #share-status{margin:0;font-size:14px;min-height:1.5em}
 #share-status.err{color:var(--red);font-weight:600}
 /* The report's own "Share report" button opens this popup (build step 8 follow-up, founder 2026-10-04). It makes the private client link and offers it where
-   the person is: Copy, the phone's share sheet, text message, email, WhatsApp. No public networks: this is a private link. The card above stays for the list
-   of links and for withdrawing one. */
+   the person is. Since 2026-11-09 (founder: "it should be icons same as what share does on website") it shows the site's own Share icons from
+   lib/share-modal.js, carrying the client link. The card above stays for the list of links and for withdrawing one. */
 #share-pop{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(22,33,28,.45)}
 #share-pop .box{background:var(--panel);border-radius:14px;max-width:440px;width:100%;max-height:calc(100vh - 32px);overflow:auto;padding:20px;display:grid;gap:12px;box-shadow:0 16px 44px rgba(0,0,0,.25)}
 #share-pop h2{margin:0;font-size:17px}
@@ -225,6 +225,13 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
 #share-pop-msg.err{color:var(--red);font-weight:600}
 #share-pop-link{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
 #share-pop a.go{display:inline-flex;align-items:center;text-decoration:none}
+/* The site's Share icons (founder 2026-11-09: "it should be icons same as what share does on website"). Same rules as app.css .sharegrid/.sopt, which this page does not load. */
+#share-pop .sharegrid{display:grid;grid-template-columns:repeat(4,1fr);gap:15px 6px;margin:4px 0}
+#share-pop .sopt{display:flex;flex-direction:column;align-items:center;gap:7px;font:inherit;font-size:11px;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;text-decoration:none;padding:0}
+#share-pop .sopt .si{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:19px;font-weight:700}
+#share-pop .sopt:hover .si{filter:brightness(.93)}
+#share-pop .sopt:hover{color:var(--ink,inherit)}
+@media(max-width:420px){#share-pop .sharegrid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:620px){#share-pop{align-items:flex-end;padding:0}#share-pop .box{max-width:none;border-radius:14px 14px 0 0}}
 #watch{display:grid;gap:10px}
 #watch h2{margin:0;font-size:17px}
@@ -607,13 +614,8 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
         <label>Client link<input type="text" id="share-pop-link" readonly></label>
         <div class="row">
           <button type="button" class="go" id="share-pop-copy">Copy link</button>
-          <button type="button" class="go ghost" id="share-pop-native" hidden>Share&hellip;</button>
         </div>
-        <div class="row">
-          <a class="go ghost" id="share-pop-sms" href="#">Text message</a>
-          <a class="go ghost" id="share-pop-mail" href="#">Email</a>
-          <a class="go ghost" id="share-pop-wa" href="#" target="_blank" rel="noopener noreferrer">WhatsApp</a>
-        </div>
+        <div class="sharegrid" id="share-pop-grid"><!-- the site's Share icons, from lib/share-modal.js --></div>
         <p class="hint" id="share-pop-note"></p>
       </div>
       <button type="button" class="go ghost" id="share-pop-close">Close</button>
@@ -637,6 +639,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 <script src="lib/project-type.js?v=ed9e58be"></script>
 <script src="lib/da-report-view.js?v=39cc47d8"></script>
 <script src="lib/da-report-compare.js?v=a97e336e"></script>
+<script src="lib/share-modal.js?v=971e0041"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script>
 // ============================================================================
@@ -1630,10 +1633,8 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   function fillSharePop(link){
     var text = 'A private development activity report prepared for you: ' + link, t = encodeURIComponent(text);
     $('share-pop-link').value = link;
-    $('share-pop-sms').href = 'sms:?&body=' + t;
-    $('share-pop-mail').href = 'mailto:?subject=' + encodeURIComponent('Development activity report') + '&body=' + t;
-    $('share-pop-wa').href = 'https://wa.me/?text=' + t;
-    $('share-pop-native').hidden = !(typeof navigator.share === 'function');
+    // the site's own Share icons (lib/share-modal.js, the same list as every other page), carrying this one client link and this message
+    if (window.HS && typeof window.HS.fillShareGridEl === 'function') window.HS.fillShareGridEl($('share-pop-grid'), link, 'A private development activity report prepared for you');
     $('share-pop-copy').textContent = 'Copy link';
     $('share-pop-note').textContent = $('share-note').textContent;
     $('share-pop-body').hidden = false;
@@ -1664,11 +1665,6 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(function(){ $('share-pop-copy').textContent = 'Copied'; }, select);
       else select();
     } catch (e) { select(); }
-  }
-  function nativePop(){
-    var v = $('share-pop-link').value;
-    if (!v || typeof navigator.share !== 'function') return;
-    try { navigator.share({ title: 'Development activity report', text: 'A private development activity report prepared for you.', url: v }).catch(function(){}); } catch (e) { /* cancelled or unsupported */ }
   }
   function sharePopKeys(e){
     if ($('share-pop').hidden) return;
@@ -2023,7 +2019,8 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     $('copy-invite').addEventListener('click', copyInvite);
     $('share-copy').addEventListener('click', copyShare);
     $('share-pop-copy').addEventListener('click', copyPop);
-    $('share-pop-native').addEventListener('click', nativePop);
+    // a "Copy link" (or Signal) icon in the grid copies the client link, like the Copy link button
+    $('share-pop-grid').addEventListener('click', function(e){ if (e.target.closest && e.target.closest('[data-hs-copy]')) copyPop(); });
     $('share-pop-close').addEventListener('click', closeSharePop);
     $('share-pop').addEventListener('click', function(e){ if (e.target === $('share-pop')) closeSharePop(); });
     document.addEventListener('keydown', sharePopKeys);
