@@ -778,12 +778,29 @@ returns setof public.impact_story_asset_choices language sql stable security def
    where c.action = 'add' order by c.subject_id, c.candidate_id
 $$;
 
+-- Style checks are warnings, not blocks (Tab 17 audit, 2026-11-11: 65 of 72 rendered videos failed the visual quality
+-- gate and no video had ever been approved). A video whose FILE checks passed and whose only failures are style
+-- checks (pacing, share of photos, opening, closing ...) may be approved by the founder after watching it. What still
+-- blocks: a failed file check (size, sync, loudness ...), and the quality codes listed here.
+create or replace function public._hs_is_hard_quality_codes()
+returns text[] language sql immutable as $$ select array['audio_defect'] $$;
+
+-- The style checks a file failed, when those are ALL that it failed; null otherwise.
+create or replace function public._hs_is_style_warnings(p_qc jsonb)
+returns text language sql immutable as $$
+  select case when coalesce((p_qc->>'ok')::boolean, false) and (p_qc->'quality'->>'ok') = 'false'
+                   and jsonb_typeof(p_qc->'quality'->'failures') = 'array' and jsonb_array_length(p_qc->'quality'->'failures') > 0
+                   and not exists (select 1 from jsonb_array_elements(p_qc->'quality'->'failures') f
+                                    where coalesce(f->>'code', '') = '' or f->>'code' = any (public._hs_is_hard_quality_codes()))
+              then (select string_agg(distinct coalesce(f->>'label', f->>'code'), '; ') from jsonb_array_elements(p_qc->'quality'->'failures') f) end
+$$;
+
 create or replace function public._hs_is_media(p_story uuid)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare na jsonb := public._hs_is_artifact_state(p_story, 'narrative'); j public.impact_story_jobs%rowtype;
         files jsonb := '[]'::jsonb; r record; d public.impact_story_media_decisions%rowtype; st text; why text;
         cur boolean; n int := 0; nok int := 0; b public.impact_story_jobs%rowtype; blocked jsonb; choices jsonb; fixes jsonb;
-        vs jsonb := public._hs_is_visuals(p_story); stale_reason text; hum boolean;
+        vs jsonb := public._hs_is_visuals(p_story); stale_reason text; hum boolean; sw text;
 begin
   select * into j from public.impact_story_jobs where story_id = p_story and kind = 'render' and status = 'complete'
    order by completed_at desc limit 1;
@@ -854,10 +871,13 @@ begin
   for r in select * from public.impact_story_assets where job_id = j.id
            order by array_position(array['main', 'short_a', 'short_b', 'thumbnail'], asset) loop
     select * into d from public.impact_story_media_decisions where asset_id = r.id order by id desc limit 1;
+    sw := public._hs_is_style_warnings(r.qc);
     if not cur then st := 'stale';
       why := case stale_reason when 'pictures' then 'Made before you approved the current pictures. Render the videos again.'
                                else 'Made from an earlier script. Render the videos again.' end;
     elsif not coalesce((r.qc->>'ok')::boolean, r.asset = 'thumbnail') then st := 'blocked'; why := 'The media checks failed: see the checks below.';
+    elsif sw is not null and d.decision = 'approved' then   -- style checks only, and the founder approved it anyway
+      st := 'approved'; why := 'Approved by ' || d.actor || ' with style warnings: ' || sw || '.';
     elsif (r.qc->'quality'->>'ok') = 'false' then   -- the storyboard and frame gates (impact/visual_gate.py)
       st := 'blocked';
       why := 'The visual quality gate failed: ' || coalesce((select string_agg(distinct f->>'label', '; ')
@@ -872,6 +892,8 @@ begin
       'bytes', r.bytes, 'sha256', r.sha256, 'width', r.width, 'height', r.height, 'duration_s', r.duration_s,
       'preset', r.preset, 'qc', r.qc, 'stills', r.stills, 'shots', r.shots, 'version', r.version, 'renderer', r.renderer,
       'created_at', r.created_at, 'state', st, 'why', why, 'hum', hum and r.asset <> 'thumbnail',
+      -- style checks only: the founder may approve it after watching (hs_impact_story_media_decide)
+      'style_warnings', sw, 'approve_anyway', st = 'blocked' and sw is not null,
       'last_decision', case when d.id is null then null else jsonb_build_object('decision', d.decision, 'note', d.note,
         'timecode', d.timecode, 'actor', d.actor, 'at', d.at) end);
   end loop;
@@ -948,13 +970,13 @@ begin
       elsif fb->>'status' = 'needs_you' then
         nxt := coalesce(fb->>'next_step', 'The fixer needs something from you: see Media review');
       elsif fb->>'status' = 'stalled' then
-        nxt := 'The fix run stopped before it finished. Press Fix in Media review to send your requests again.';
+        nxt := 'The fix run did not start or stopped before it finished. Press Fix in Media review to send your requests again.';
       elsif nunsent > 0 then
         nxt := 'Send your ' || nunsent || ' fix request' || case when nunsent = 1 then '' else 's' end || ' with Fix in Media review';
       elsif npend > 0 then
         nxt := 'Review ' || case when npend = 1 then 'the ' else 'these: ' end || pend_names;
       elsif nblk > 0 then
-        nxt := nblk || ' video' || case when nblk = 1 then '' else 's' end || ' failed the checks. Save a fix request in Media review, then press Fix';
+        nxt := nblk || ' video' || case when nblk = 1 then '' else 's' end || ' failed the checks. In Media review, watch and approve anyway where that is offered, or save a fix request and press Fix';
       else
         nxt := coalesce(case when fb->>'status' = 'done' then fb->>'next_step' end, 'Review each video and the thumbnail');
       end if;
@@ -1580,7 +1602,11 @@ begin
   if f->>'state' = 'stale' then raise exception 'That file was rendered from an earlier narrative. Render again.' using errcode = '55000'; end if;
   if p_decision = 'approved' then
     if f->>'state' = 'approved' then return jsonb_build_object('state', 'approved', 'unchanged', true); end if;
-    if f->>'state' = 'blocked' then raise exception 'Cannot approve: %', f->>'why' using errcode = '55000'; end if;
+    -- a failed FILE check or a hard quality code blocks; style checks alone do not (the founder watched it and decides)
+    if f->>'state' = 'blocked' and not coalesce((f->>'approve_anyway')::boolean, false) then
+      raise exception 'Cannot approve: %', f->>'why' using errcode = '55000';
+    end if;
+    if f->>'state' = 'blocked' then p_note := left('Approved with style warnings: ' || (f->>'style_warnings'), 1000); end if;
   elsif p_decision = 'rejected' then
     if nullif(btrim(p_note), '') is null then raise exception 'Say what to fix.' using errcode = '22023'; end if;
   elsif f->>'state' <> 'approved' then
@@ -1997,6 +2023,18 @@ begin
   values (p_story, p_artifact, s.current_version, h, p_decision, nullif(btrim(p_note), ''), nullif(btrim(p_target), ''), e);
   update public.impact_stories set updated_at = now() where id = p_story;
   perform public._hs_is_event(p_story, 'decision', jsonb_build_object('artifact', p_artifact, 'decision', p_decision, 'version', s.current_version), e);
+  -- Approving the script starts preparing its pictures at once (founder, 2026-11-10: "it is asking me to repeat steps I
+  -- have done multiple times"). A script change always makes the pictures stale, so the next step was always "Prepare the
+  -- visuals"; it is now started for you. It never blocks or undoes the approval: a refusal (a job already running, the
+  -- pictures already current) is ignored, and nothing is approved or rendered by it.
+  if p_decision = 'approved' then
+    begin
+      if coalesce(public._hs_is_visuals(p_story)->>'state', '') not in ('approved', 'preparing') then
+        perform public.hs_impact_story_visuals_prepare(p_story, s.current_version, false);
+      end if;
+    exception when others then null;
+    end;
+  end if;
   return jsonb_build_object('state', public._hs_is_artifact_state(p_story, p_artifact));
 end $$;
 
@@ -2188,10 +2226,14 @@ end $$;
 
 -- ── "Fix" (was "Start fixes") ─────────────────────────────────────────────────────────────────────────────────────
 -- The newest batch of a story, as the page shows it. A batch claimed more than 3 hours ago and not finished is
--- reported 'stalled' (the run died); pressing Fix again starts a run that may claim it.
+-- reported 'stalled' (the run died); pressing Fix again starts a run that may claim it. So is a batch that has waited
+-- 30 minutes without any run claiming it (2026-11-11: a batch sat unclaimed for four days while the page said "Claude
+-- is making the fixes"; its run had been cancelled in GitHub's queue).
 create or replace function public._hs_is_fix_batch(p_story uuid)
 returns jsonb language sql stable security definer set search_path = public as $$
-  select jsonb_build_object('id', b.id, 'status', case when b.status in ('working', 'planning') and b.claimed_at < now() - interval '3 hours' then 'stalled' else b.status end,
+  select jsonb_build_object('id', b.id, 'status', case when b.status in ('working', 'planning') and b.claimed_at < now() - interval '3 hours' then 'stalled'
+             when b.status in ('queued', 'plan_queued') and coalesce(b.confirmed_at, b.requested_at) < now() - interval '30 minutes' then 'stalled'
+             else b.status end,
            'phase', case when b.status in ('plan_queued', 'planning', 'planned') or (b.status in ('failed', 'cancelled') and b.confirmed_at is null) then 'plan' else 'work' end,
            'plan', b.plan, 'plan_md5', b.plan_md5, 'planned_at', b.planned_at, 'confirmed_at', b.confirmed_at,
            'requests', jsonb_array_length(b.requests), 'requested_by', b.requested_by, 'requested_at', b.requested_at,
@@ -2532,6 +2574,19 @@ begin
                and status in ('plan_queued', 'planning', 'planned', 'queued', 'working')) then
     return jsonb_build_object('action', 'none', 'reason', 'a fix batch is already active');
   end if;
+  -- Style checks get ONE automatic fix round per story (Tab 17 audit, 2026-11-11: one story went through 13 fix
+  -- batches and 9 renders without a passing video). After that the videos are shown with their warnings and the
+  -- founder approves them anyway or asks for a fix. File-check and hard failures are still fixed every time.
+  if not exists (select 1 from jsonb_array_elements(bl) x where not coalesce((x->>'approve_anyway')::boolean, false))
+     and exists (select 1 from public.impact_story_fix_batches fb2, jsonb_array_elements(fb2.requests) rq
+                   join public.impact_story_media_decisions md on md.id = (rq->>'id')::bigint
+                   join public.impact_story_assets pa on pa.id = md.asset_id
+                  where fb2.story_id = p_story and fb2.requested_by = 'system:auto-fix' and fb2.status in ('done', 'needs_you')
+                    and rq->>'kind' = 'media' and public._hs_is_style_warnings(pa.qc) is not null) then
+    perform public._hs_is_event(p_story, 'auto_fix_skipped', jsonb_build_object('job_id', p_job,
+      'reason', 'style checks already had their one automatic fix round'), 'system:auto-fix');
+    return jsonb_build_object('action', 'none', 'reason', 'style checks already had their one automatic fix round');
+  end if;
   for f in select x from jsonb_array_elements(bl) x loop
     if exists (select 1 from public.impact_story_media_decisions where asset_id = (f->>'id')::bigint and actor = 'system:auto-fix') then
       continue;
@@ -2787,7 +2842,8 @@ begin
     'public._hs_is_choice_key(uuid)', 'public._hs_is_visuals(uuid)', 'public._hs_is_rejections(uuid)', 'public._hs_is_shot_decisions(bigint)',
     'public._hs_is_shot_print(jsonb)', 'public._hs_is_creator_hash(jsonb)', 'public._hs_is_creator_problems(jsonb)',
     'public._hs_is_creator_require(jsonb)', 'public._hs_is_creator_state(uuid)',
-    'public._hs_is_visuals_changed(text, text, jsonb, text)', 'public._hs_is_currency_dismissed(uuid)'] loop
+    'public._hs_is_visuals_changed(text, text, jsonb, text)', 'public._hs_is_currency_dismissed(uuid)',
+    'public._hs_is_hard_quality_codes()', 'public._hs_is_style_warnings(jsonb)'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
   end loop;
   foreach f in array array[

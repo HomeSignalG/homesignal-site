@@ -6284,6 +6284,25 @@ Results.
   are refused, the next step is Prepare the visuals, and `_hs_is_status.job.visuals_changed` lets the page drop Retry
   (#2655/#2657 built that box). pg 12z1-12z3.
 
+## IMPACT STORIES, TAB 17: STYLE CHECKS ARE WARNINGS; A FIX RUN THAT NEVER STARTED IS "STALLED" (audit, 2026-11-11)
+
+Measured 2026-11-11: 11 stories, 24 finished renders, 65 of 72 videos failed the visual quality gate, 0 videos ever approved;
+one story went through 13 fix batches and 9 renders. The founder asked for the audit's plan to be carried out.
+- **A video that failed ONLY style checks can be approved after watching it.** `_hs_is_style_warnings(qc)` is the one
+  decision: file checks passed, quality failed, every failure carries a code, none in `_hs_is_hard_quality_codes()`
+  (`audio_defect`). `_hs_is_media` still reports such a file `blocked` (so the automatic fix and the status keep working)
+  with `approve_anyway: true` and `style_warnings`; `hs_impact_story_media_decide` accepts the approval and records
+  "Approved with style warnings: …". A failed file check, an audio defect, an out-of-date file and outdated news still block.
+  The page shows the video with **Approve anyway** beside Request a fix (not while an automatic fix is running).
+- **Style checks get ONE automatic fix round per story** (`_hs_is_auto_fix`; event `auto_fix_skipped` after that). File-check
+  and hard failures are still fixed every time. This narrows the 2026-11-07 rule below: after the one round, a style-failed
+  video is shown with its warnings.
+- **A fix batch nobody claimed for 30 minutes reads `stalled`** (`_hs_is_fix_batch`), so the next step says to press Fix.
+  Before, a batch whose GitHub run was cancelled in the queue said "Claude is making the fixes" for four days.
+- Apply file (generated from the DDL of record, guarded on the live bodies): `docs/impact-style-warnings-apply-2026-11-11.sql`.
+- Engine half (package-server outage, dead runners recorded): homesignal-ingest CLAUDE.md, same date.
+- Tests: pg 12r6, 12S0-12S5 (4 deliberate breaks caught); `test/impact-stories.browser.test.mjs` "style-only failure".
+
 ## IMPACT STORIES, TAB 17: "NOT ABOUT THIS STORY — CONTINUE PREPARING" (2026-11-07)
 
 Founder: "the article does not matter but there is no button to disregard it and continue". When Prepare (or a render)
@@ -6556,6 +6575,21 @@ Tab 16 draws the thumbnail's Bluesky box only when `hs_video_jobs_list` lists it
 publisher half (image post, shrunk under 1 MB) is homesignal-ingest #1071. ⚠️ Replaying `docs/video-bluesky-queue.sql`,
 `docs/youtube-video-file-decide-queue-apply.sql` or `docs/youtube-video-outdated.sql` drops the thumbnail again: re-apply
 the thumbnail file after any of them. Tests: `test/video_bluesky_queue_pg` §13 + 4f/11g, `test/video-bluesky-queue.browser.test.mjs`.
+
+## TAB 12 QUEUE ORDER: SUBSCRIBER ZIPS FIRST, APPROVED LAST ⚖️ FOUNDER (2026-11-11)
+
+"i do not want the approved posts at the top anymore. i want the new subscriber zip code posts always at top."
+The post list in Tab 12 is three groups: **Subscriber ZIPs** (that ZIP's drafts newest first, then its approved posts,
+under one status line per subscriber ZIP, shown even when nothing is waiting) · **To review** (every other draft, newest
+first) · **Approved and scheduled** (by posting time, folded until opened). Before, the list was sorted by posting time,
+so 17 approved posts sat above 85 drafts.
+- Grouping: `lib/acq-bluesky-queue-order.js` (`HS.bskyQueueGroups`, a view only). Which ZIPs have a real subscriber:
+  admin-only `public.hs_bsky_subscriber_zips()` (`docs/bluesky-subscriber-zips.sql`, applied 2026-11-11), which reads
+  homesignal-ingest's `bsky_maps_priority_classification` (class `eligible`; test sign-ups are not subscribers) and
+  returns ZIPs and counts only. Do not decide "subscriber ZIP" anywhere else.
+- A failed read shows a red note and promotes nothing; it is never read as "no subscribers".
+- This is the review order only. Posting order is still homesignal-ingest's `bsky_maps_subscribers_first()`.
+- Test: `test/bluesky-queue-order.test.mjs`.
 
 ## BLUESKY PUBLISHING SCHEDULE (Tab 12) + MAPS vs SHORTS ⚖️ FOUNDER (2026-10-27)
 

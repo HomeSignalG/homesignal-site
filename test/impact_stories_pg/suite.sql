@@ -127,6 +127,12 @@ select pg_temp.chk('5g one approval: on to the Visuals step', pg_temp.stage() = 
 select pg_temp.chk('5h approving twice records nothing new', (select (public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'narrative', 'approved', 3))->>'unchanged') = 'true'
    and (select count(*) from public.impact_story_approvals where artifact = 'narrative' and decision = 'approved') = 1);
 
+select pg_temp.chk('5i approving the script starts preparing its pictures by itself',
+   (pg_temp.lastjob()).kind = 'visuals' and (pg_temp.lastjob()).status = 'queued');
+-- the worker takes that job and stops it, so the later steps start from no job in flight (as before this was automatic)
+select public.hs_impact_story_job_claim((pg_temp.lastjob()).id);
+select public.hs_impact_story_job_fail((pg_temp.lastjob()).id, 'test: stopped');
+
 -- 6. any change inside the narrative needs approving again; a change outside it does not ----------------
 select public.hs_impact_story_save(pg_temp.id('s')::uuid, 3, pg_temp.body() || '{"main":{"acts":[{"act":1},{"act":6}]},"suitability":"edited note"}');
 select pg_temp.work(jsonb_build_object('derived', jsonb_build_object('validation', pg_temp.ok_val(true, 'P1'))));
@@ -144,6 +150,9 @@ select public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'narrative', 'revoke
 select pg_temp.chk('6d a revoked approval blocks readiness', pg_temp.nst() = 'revoked' and pg_temp.stage() = 'script');
 select public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'narrative', 'approved', 6);
 select pg_temp.chk('6e re-approval is a new row; history kept', (select count(*) from public.impact_story_approvals where artifact = 'narrative') = 5);
+
+select public.hs_impact_story_job_claim((pg_temp.lastjob()).id) where (pg_temp.lastjob()).kind = 'visuals' and (pg_temp.lastjob()).status = 'queued';
+select public.hs_impact_story_job_fail((pg_temp.lastjob()).id, 'test: stopped') where (pg_temp.lastjob()).kind = 'visuals' and (pg_temp.lastjob()).status = 'running';
 
 -- 7. optimistic lock, superseded results ---------------------------------------------------------------
 select pg_temp.chk('7a a stale editor cannot overwrite', pg_temp.err(format('select public.hs_impact_story_save(%L, 5, %L::jsonb)', pg_temp.id('s'), pg_temp.body())) like '40001%');
@@ -238,7 +247,7 @@ create function pg_temp.approve_visuals() returns void language plpgsql as $$ be
   perform public.hs_impact_story_visuals_approve(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash');
 end $$;
 select pg_temp.chk('12V1 an approved narrative goes to the Visuals step first; Render is refused until the visuals are approved',
-  pg_temp.stage() = 'visuals' and pg_temp.nxt() = 'Prepare the visuals' and pg_temp.vis()->>'state' = 'none'
+  pg_temp.stage() = 'visuals' and pg_temp.nxt() like 'Prepar%' and pg_temp.vis()->>'state' in ('none', 'preparing', 'failed')
   and pg_temp.err(format('select public.hs_impact_story_render(%L, 7)', pg_temp.id('s'))) like '%Approve the visuals before rendering%');
 select pg_temp.as_user('stranger@example.com');
 select pg_temp.chk('12V2 non-admin cannot prepare, approve or revoke visuals',
@@ -984,9 +993,12 @@ select public.hs_impact_story_job_complete((pg_temp.lastjob()).id, jsonb_build_o
   jsonb_set(pg_temp.files((pg_temp.lastjob()).id), '{1,qc}', jsonb_build_object('ok', true, 'quality', jsonb_build_object('ok', false,
     'failures', jsonb_build_array(jsonb_build_object('code', 'excessive_documents', 'label', 'Too many documents and cards'))))),
   'quality', jsonb_build_object('ok', false), 'currency', jsonb_build_object('state', 'current')));
-select pg_temp.chk('12r6 a file the visual quality gate failed is blocked and cannot be approved',
+select pg_temp.chk('12r6 a file that failed only style checks is blocked, says so, and is marked approvable anyway',
   pg_temp.fst('short_a') = 'blocked' and pg_temp.fst('main') = 'pending'
-  and pg_temp.err(format('select public.hs_impact_story_media_decide(%L, %s, %L)', pg_temp.id('s'), pg_temp.fid('short_a'), 'approved')) like '%visual quality gate failed: Too many documents and cards%'
+  and (select (x->>'approve_anyway')::boolean and x->>'style_warnings' = 'Too many documents and cards' and x->>'why' like '%visual quality gate failed: Too many documents and cards%'
+         from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'files') x where x->>'asset' = 'short_a')
+  and (select not (x->>'approve_anyway')::boolean and x->'style_warnings' = 'null'::jsonb
+         from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'files') x where x->>'asset' = 'main')
   and public._hs_is_media(pg_temp.id('s')::uuid)->'blocked' = 'null'::jsonb
   and public._hs_is_media(pg_temp.id('s')::uuid)->'currency'->>'state' = 'current');
 select pg_temp.chk('12r6b a picture-check failure that rendering again cannot fix goes straight to the fixer: no new render, one automatic request for that video only',
@@ -995,6 +1007,50 @@ select pg_temp.chk('12r6b a picture-check failure that rendering again cannot fi
         where b.requested_by = 'system:auto-fix' and b.status = 'plan_queued') = '["short_a"]'
   and (select note from public.impact_story_media_decisions where actor = 'system:auto-fix' order by id desc limit 1) like '%Too many documents and cards%'
   and public._hs_is_status(pg_temp.id('s')::uuid)->>'owner' = 'working');
+-- Style checks are warnings (Tab 17 audit, 2026-11-11). What counts as style-only is decided in one function.
+select pg_temp.chk('12S0 style-only means: file checks passed, quality failed, and every failure is a known style code',
+  public._hs_is_style_warnings('{"ok":true,"quality":{"ok":false,"failures":[{"code":"slow_pacing","label":"Slow pacing"},{"code":"weak_opening","label":"Weak opening"}]}}') = 'Slow pacing; Weak opening'
+  and public._hs_is_style_warnings('{"ok":true,"quality":{"ok":false,"failures":[{"code":"slow_pacing","label":"Slow pacing"},{"code":"audio_defect","label":"Audio defect"}]}}') is null
+  and public._hs_is_style_warnings('{"ok":false,"quality":{"ok":false,"failures":[{"code":"slow_pacing","label":"Slow pacing"}]}}') is null
+  and public._hs_is_style_warnings('{"ok":true,"quality":{"ok":false,"failures":[{"label":"No code"}]}}') is null
+  and public._hs_is_style_warnings('{"ok":true,"quality":{"ok":false,"failures":[]}}') is null
+  and public._hs_is_style_warnings('{"ok":true,"quality":{"ok":false}}') is null
+  and public._hs_is_style_warnings('{"ok":true,"quality":{"ok":true}}') is null
+  and public._hs_is_style_warnings('{"ok":true}') is null);
+-- a fix batch nobody claimed for 30 minutes is shown as stalled, never as "Claude is making the fixes"
+update public.impact_story_fix_batches set requested_at = requested_at - interval '31 minutes' where story_id = pg_temp.id('s')::uuid;
+select pg_temp.chk('12S1 a fix batch that waited 30 minutes without starting reads stalled, and the next step says to press Fix',
+  public._hs_is_fix_batch(pg_temp.id('s')::uuid)->>'status' = 'stalled'
+  and public._hs_is_status(pg_temp.id('s')::uuid)->>'owner' = 'you'
+  and public._hs_is_status(pg_temp.id('s')::uuid)->>'next' like 'The fix run did not start or stopped%');
+update public.impact_story_fix_batches set requested_at = requested_at + interval '31 minutes' where story_id = pg_temp.id('s')::uuid;
+select pg_temp.chk('12S1b a batch that has just been sent is not stalled', public._hs_is_fix_batch(pg_temp.id('s')::uuid)->>'status' = 'plan_queued');
+-- style checks get one automatic fix round per story
+update public.impact_story_fix_batches set status = 'done' where story_id = pg_temp.id('s')::uuid and requested_by = 'system:auto-fix' and status = 'plan_queued';
+drop table if exists _af2;
+create temp table _af2 as select public._hs_is_auto_fix(pg_temp.id('s')::uuid, (public._hs_is_media(pg_temp.id('s')::uuid)->>'render_job')::uuid) r;
+select pg_temp.chk('12S2 after one automatic fix round, style-only failures start no second one',
+  (select r->>'reason' from _af2) = 'style checks already had their one automatic fix round'
+  and (select count(*) from public.impact_story_fix_batches where story_id = pg_temp.id('s')::uuid and status in ('plan_queued', 'planning', 'planned', 'queued', 'working')) = 0
+  and exists (select 1 from public.impact_story_events where story_id = pg_temp.id('s')::uuid and kind = 'auto_fix_skipped'));
+select public.hs_impact_story_media_decide(pg_temp.id('s')::uuid, pg_temp.fid('short_a'), 'approved');
+select pg_temp.chk('12S3 the founder can approve a style-only failure anyway; the approval records which checks it failed',
+  pg_temp.fst('short_a') = 'approved'
+  and (select x->>'why' like 'Approved by founder@example.com with style warnings: Too many documents and cards.' and not (x->>'approve_anyway')::boolean
+         from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'files') x where x->>'asset' = 'short_a')
+  and (select note from public.impact_story_media_decisions where asset_id = pg_temp.fid('short_a') order by id desc limit 1) = 'Approved with style warnings: Too many documents and cards');
+select public.hs_impact_story_media_decide(pg_temp.id('s')::uuid, pg_temp.fid('short_a'), 'revoked', 'changed my mind');
+select pg_temp.chk('12S4 revoking that approval puts the file back to failed-but-approvable', pg_temp.fst('short_a') = 'blocked'
+  and (select (x->>'approve_anyway')::boolean from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'files') x where x->>'asset' = 'short_a'));
+-- a hard quality code (audio) still blocks, whatever else failed
+set session_replication_role = replica;   -- the asset rows are append-only; the test rewrites one report in place
+update public.impact_story_assets set qc = jsonb_set(qc, '{quality,failures}', qc->'quality'->'failures' || '[{"code":"audio_defect","label":"Audio defect"}]'::jsonb)
+ where id = pg_temp.fid('short_a');
+set session_replication_role = origin;
+select pg_temp.chk('12S5 a video with an audio defect cannot be approved',
+  pg_temp.fst('short_a') = 'blocked'
+  and (select not (x->>'approve_anyway')::boolean from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'files') x where x->>'asset' = 'short_a')
+  and pg_temp.err(format('select public.hs_impact_story_media_decide(%L, %s, %L)', pg_temp.id('s'), pg_temp.fid('short_a'), 'approved')) like '%Cannot approve: The visual quality gate failed%');
 select pg_temp.chk('12r7 a file with no quality report (rendered before the gates) is not blocked by it', pg_temp.fst('main') = 'pending');
 
 -- 10. a story written before the outline, and its old approvals --------------------------------------

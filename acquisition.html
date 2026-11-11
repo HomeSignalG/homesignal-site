@@ -294,13 +294,15 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
 <script src="lib/acq-video-suggest.js?v=dcade81a"></script>
 <script src="lib/acq-bluesky-videos.js?v=574d20af"></script>
 <script src="lib/acq-bluesky-schedule.js?v=d543ca4c"></script>
+<!-- Tab 12 queue order: subscriber ZIPs first, then drafts to review, approved last. A view only. -->
+<script src="lib/acq-bluesky-queue-order.js?v=506d7e41"></script>
 <script src="lib/acq-engagement.js?v=d81c8179"></script>
 <script src="lib/acq-youtube.js?v=44fa15cc"></script>
 <script src="lib/creator-script.js?v=4cae37b2"></script>
 <script src="lib/acq-impact-creator.js?v=4964cd46"></script>
 <script src="lib/acq-impact-discovery.js?v=f402aaab"></script>
 <script src="lib/acq-impact-engagement.js?v=d36b6629"></script>
-<script src="lib/acq-impact-stories.js?v=b04dfdff"></script>
+<script src="lib/acq-impact-stories.js?v=eb77405a"></script>
 <script src="lib/acq-development-review.js?v=ddfaa1d6"></script>
 <script src="lib/acq-claim-check.js?v=3a241441"></script>
 <script src="assets/acquisition-video-producer.js"></script>
@@ -1416,6 +1418,59 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   var _bskyFamily='all';      // 'all' | 'MAPS' | 'ALERTS' | 'VIDEOS'
   var _bskyVideos=null;       // hs_video_jobs_list() result, or null when the video queue is not available
   var _bskyTheme=null;        // null = All Maps; otherwise a theme key
+  var _bskyApprovedOpen=false; // the "Approved and scheduled" group is folded unless the founder opened it
+  // ---- QUEUE ORDER (founder, 2026-11-11): subscriber ZIPs first, approved last ----------
+  // The grouping is lib/acq-bluesky-queue-order.js; which ZIPs have a real subscriber is
+  // public.hs_bsky_subscriber_zips() (docs/bluesky-subscriber-zips.sql). Nothing here changes a post.
+  function bskyGroupHead(title, note, accent){
+    return '<div style="margin:18px 0 10px;padding:0 0 6px;border-bottom:2px solid '+(accent?'var(--accent)':'var(--line)')+'">'+
+      '<span style="font-weight:700;font-size:15px">'+esc(title)+'</span>'+
+      (note?(' <span class="muted" style="font-size:12.5px;margin-left:6px">'+esc(note)+'</span>'):'')+'</div>';
+  }
+  function bskyDay(ts){ if(!ts) return ''; var d=new Date(ts); if(isNaN(d)) return ''; return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+  // One line per subscriber ZIP, so a ZIP with nothing waiting is still shown every morning.
+  function bskySubscriberStrip(sub, allRows){
+    if(sub.error){
+      return '<div id="bsky-subs" style="margin:0 0 12px;padding:9px 11px;border:1px solid #e6b8b4;border-radius:8px;background:#fbeceb;color:#8a231d;font-size:13px">The subscriber ZIP list could not be read ('+esc(sub.error)+'), '+
+        'so subscriber posts are NOT separated below. Reload the page; if it persists, report it.</div>';
+    }
+    var st=(window.HS&&HS.bskySubscriberZipStatus)?HS.bskySubscriberZipStatus(sub.zips, allRows):[];
+    if(!st.length){
+      return '<div id="bsky-subs" class="muted" style="margin:0 0 12px;font-size:13px">No ZIP has a Development-alert subscriber yet (test sign-ups are not counted).</div>';
+    }
+    return '<div id="bsky-subs" style="margin:0 0 12px;display:grid;gap:6px">'+st.map(function(z){
+      var parts=[];
+      if(z.drafts) parts.push('<b style="color:var(--persist)">'+z.drafts+' draft'+(z.drafts===1?'':'s')+' to review</b>');
+      if(z.approved) parts.push(z.approved+' approved'+(z.next_slot?(', next posts '+esc(fmtSlot(z.next_slot))):''));
+      if(!z.drafts && !z.approved) parts.push('<span class="muted">nothing waiting</span>');
+      parts.push('<span class="muted">'+(z.last_published_at?('last post published '+esc(bskyDay(z.last_published_at))):'no post published yet, so no email has gone out')+'</span>');
+      return '<div data-sub-zip="'+esc(z.zip)+'" style="font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)">'+
+        '<b>ZIP '+esc(z.zip)+'</b> <span class="muted">· '+z.subscribers+' subscriber'+(z.subscribers===1?'':'s')+'</span> &nbsp;·&nbsp; '+parts.join(' &nbsp;·&nbsp; ')+'</div>';
+    }).join('')+'</div>';
+  }
+  function bskyQueueHtml(visible, allRows, sub, emptyMsg){
+    var zips=(sub.zips||[]).map(function(z){ return z.zip; });
+    var g=(window.HS&&HS.bskyQueueGroups)?HS.bskyQueueGroups(visible, zips):{subscriber:[],review:visible,approved:[]};
+    var showSubs=(_bskyFamily==='all'||_bskyFamily==='MAPS');
+    var html='';
+    if(showSubs){
+      html+=bskyGroupHead('Subscriber ZIPs', 'review these first: a subscriber gets an email only after a post about their ZIP is approved and published', true)+
+        bskySubscriberStrip(sub, allRows)+g.subscriber.map(blueskyRow).join('');
+    }
+    var nd=g.review.length;
+    html+=bskyGroupHead('To review', nd+' draft'+(nd===1?'':'s')+', newest first', false)+
+      (nd?g.review.map(blueskyRow).join(''):'<div class="muted">'+esc(visible.length?'No other drafts in this view.':emptyMsg)+'</div>');
+    var na=g.approved.length;
+    if(na){
+      var next=g.approved[0].scheduled_slot;
+      html+='<details id="bsky-approved"'+(_bskyApprovedOpen?' open':'')+' style="margin-top:18px">'+
+        '<summary style="cursor:pointer;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);font-weight:700">'+
+        'Approved and scheduled <span class="muted" style="font-weight:400">· '+na+' post'+(na===1?'':'s')+
+        (next?(' · next posts '+esc(fmtSlot(next))):'')+' · click to show</span></summary>'+
+        '<div style="margin-top:12px">'+g.approved.map(blueskyRow).join('')+'</div></details>';
+    }
+    return html;
+  }
   function bskyNavBtn(scope,val,label,count,active){
     return '<button class="bsky-nav-btn" data-scope="'+scope+'" data-val="'+esc(String(val))+'" '+
       'style="border:1px solid '+(active?'var(--accent)':'var(--line)')+';'+
@@ -1765,6 +1820,15 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       // VIDEOS: approved Main Video / Shorts, from the video outbox (hs_video_jobs_list). null = not available.
       _bskyVideos=(window.HS&&HS.acqBlueskyVideos)?await HS.acqBlueskyVideos.fetch(window.hsClient):null;
       var vCounts=_bskyVideos?HS.acqBlueskyVideos.counts(_bskyVideos):null;
+      // SUBSCRIBER ZIPS: ZIPs and counts only (no email). A failed read is SHOWN, never treated as "none".
+      var sub={zips:[],error:''};
+      try{
+        var sr=await window.hsClient.rpc('hs_bsky_subscriber_zips');
+        if(sr.error) sub.error=sr.error.message||'read failed';
+        else sub.zips=(sr.data&&sr.data.zips)||[];
+      }catch(eSub){ sub.error='read failed'; }
+      var subSet={}; sub.zips.forEach(function(z){ subSet[z.zip]=true; });
+      var subDrafts=rows.filter(function(p){ return p.content_family==='MAPS' && p.status!=='approved' && subSet[p.zip]; }).length;
       // Stash full rows so the edit modal can preview embed data (link card /
       // image), which lives outside post_text and isn't in the rendered DOM.
       bskyReleaseBlobs();   // revoke last render's object URLs before re-creating them
@@ -1775,7 +1839,8 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       var qToday=rows.filter(function(p){ return new Date(p.created_at)>=today; }).length;
       var mp=document.getElementById('bsky-metrics');
       var nMaps=rows.filter(function(p){return p.content_family==='MAPS';}).length;
-      if(mp) mp.innerHTML=liveTile('In queue', rows.length, 'draft + approved')+
+      if(mp) mp.innerHTML=liveTile('Subscriber ZIPs · to review', sub.error?'?':subDrafts, sub.error?'list could not be read':(sub.zips.length+' ZIP'+(sub.zips.length===1?'':'s')+' with a subscriber'), (subDrafts||sub.error)?'persist':'real')+
+        liveTile('In queue', rows.length, 'draft + approved')+
         liveTile('MAPS · development', nMaps, 'from Map 1 project data')+
         liveTile('ALERTS · community', rows.length-nMaps, 'from notices / meetings')+
         liveTile('Queued today', qToday, 'new drafts')+
@@ -1817,7 +1882,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       var emptyMsg = rows.length
         ? 'No posts match this filter. The queue holds '+rows.length+' post(s) — switch the filter above to see them.'
         : 'No posts in the queue. A quiet day is valid — the generator drafts only real, source-backed candidates.';
-      body.innerHTML=visible.length?visible.map(blueskyRow).join(''):'<div class="muted">'+esc(emptyMsg)+'</div>';
+      body.innerHTML=bskyQueueHtml(visible, rows, sub, emptyMsg);
       var stamp=document.getElementById('bsky-stamp'); if(stamp) stamp.textContent='updated '+new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
     }catch(e){ body.innerHTML='<div class="muted">Queue error.</div>'; }
   }
@@ -2096,6 +2161,10 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         '<div id="bsky-zip-order" style="margin:0 0 14px"></div>'+
         '<div id="bsky-queue"><div class="muted">Loading queue…</div></div>';
       host.appendChild(card);
+      // Remember whether the founder opened the Approved group, so a refresh does not fold it again.
+      host.addEventListener('toggle', function(e){
+        if(e.target && e.target.id==='bsky-approved') _bskyApprovedOpen=!!e.target.open;
+      }, true);
       host.addEventListener('click', function(e){
         // Filter chips first — they change the VIEW only and never reach blueskyAction.
         var nav=e.target.closest && e.target.closest('.bsky-nav-btn');

@@ -826,6 +826,34 @@ ok(txt.includes('stopped before rendering anything') && txt.includes('Missing es
    && txt.includes('Latest development check') && !(await page.locator('#is b').allInnerTexts()).some((x) => x.includes('<b>')), 'media: a blocked render names what is missing and the licensed candidates');
 ok(await page.locator('#is [data-act=mdecide][data-d=approved][data-id="2"]').count() === 0, 'media: a file the visual gate failed has no Approve button');
 ok(!(await page.locator('#is').innerHTML()).includes('<b>Person'), 'media: candidate text is escaped');
+// Tab 17 audit 2026-11-11: style checks are warnings. When the database marks the file approve_anyway, the video is
+// shown with what it failed and can be approved; without the mark (above) nothing changes.
+{
+  const reopen = async (anyway) => {
+    await page.evaluate((v) => { const f = window.db.media.files[1];
+      if (v) { f.approve_anyway = true; f.style_warnings = 'Too many documents and cards'; } else { delete f.approve_anyway; delete f.style_warnings; }
+      window.HS.acqImpactStories.load(window.client, document.getElementById('is')); }, anyway);
+    await page.waitForTimeout(80);
+    await page.click('#is [data-act=step][data-step=media]'); await page.waitForTimeout(50);
+  };
+  await reopen(true);
+  const card = page.locator('#is section.is-angle', { hasText: 'Short A (9:16)' });
+  const ct = await card.innerText();
+  ok(ct.includes('did not pass these style checks: Too many documents and cards') && ct.includes('approve it anyway')
+     && await card.locator('[data-act=mdecide][data-d=approved][data-id="2"]', { hasText: 'Approve anyway' }).count() === 1
+     && await card.locator('[data-act=fixform][data-id="2"]').count() === 1
+     && !ct.includes('cannot be approved'), 'media: a style-only failure offers Approve anyway beside Request a fix, and says what it failed');
+  ok(await card.locator('> video, > [data-act=watch]').count() === 1, 'media: a style-only failure is shown for watching, not hidden under Details');
+  await card.locator('[data-act=mdecide][data-d=approved][data-id="2"]').click(); await page.waitForTimeout(60);
+  ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_media_decide' && c[1].p_asset_id === 2 && c[1].p_decision === 'approved')),
+     'media: Approve anyway sends one approval for that file');
+  await page.evaluate(() => { window.db.media.fix_batch = { id: 'fa', status: 'working', auto: true, requests: 1 }; });
+  await reopen(true);
+  ok(await page.locator('#is [data-act=mdecide][data-d=approved][data-id="2"]').count() === 0, 'media: while the automatic fix is running, Approve anyway is not offered');
+  await page.evaluate(() => { window.db.media.fix_batch = null; });
+  await reopen(false);
+  await page.evaluate(() => document.querySelectorAll('#is details').forEach((d) => { d.open = true; }));
+}
 // founder 2026-11-05: "i pressed request fix, but i do not know what fix is" — the box starts filled in with what failed
 ok(txt.includes('Rendering again will not change it') && txt.includes('already filled in with what failed'), 'media: a failed check says to request a fix, not to render again');
 await page.click('#is [data-act=fixform][data-id="2"]'); await page.waitForTimeout(50);
