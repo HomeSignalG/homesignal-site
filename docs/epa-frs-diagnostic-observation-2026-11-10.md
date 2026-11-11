@@ -294,3 +294,44 @@ deployment; mechanism unknown.
 `get-address-report` / `_shared` folders since `a0c7d398`. The Step 3 condition is still present. Run 1533
 (43046903806, 2026-11-11 15:17:40Z) ran its proof, skipped Step 3, and ran the disable step (which runs only
 when the proof passed), so its repair batch was not sent. Runs 1512–1532 were not inspected individually.
+
+## Check read 2026-11-11 19:51Z: window 15:56Z – 19:50Z
+
+The window is still retained (oldest row in `net._http_response` at the read: 13:52:01Z). `created` ≥ 15:56:00Z
+and < 19:50:00Z, HTTP 200, ZIP-mode; first row 15:56:01Z, last 19:48:01Z. All after the pause.
+Edge logs for the same span: version 314 only, 937 HTTP 200 and 1 HTTP 546 (15:59:32Z; cause not recorded here).
+
+| reads | `ok` false | with `diag` | `diag` on a successful read | largest `diag`, bytes |
+|---:|---:|---:|---:|---:|
+| 882 | 334 | 111 | 0 | 148 |
+
+| entry (name / stage / kind / attempt) | count |
+|---|---:|
+| TypeError / fetch / tls / attempt 3 | 64 |
+| TypeError / fetch / tls / attempt 4 | 40 |
+| TypeError / fetch / tls / attempt 5 | 2 |
+| SyntaxError / parse / invalid_json / attempt 1 | 5 |
+
+`code` and `os_error` null on every entry. TypeError attempts at most 73 ms; gap before them 2,001–5,014 ms.
+
+| failure sequence | count |
+|---|---:|
+| 429 > 429 > 429 | 129 |
+| process_limit > 429 > 429 > 429 | 94 |
+| 429 > 429 > TypeError | 60 |
+| process_limit > 429 > 429 > TypeError | 40 |
+| SyntaxError > 429 > 429 | 5 |
+| process_limit > 429 > TypeError > 429 | 4 |
+| 429 > process_limit > 429 > 429 > TypeError | 2 |
+
+New in this window: 2 TypeErrors on attempt 5, both in the sequence `429 > process_limit > 429 > 429 > TypeError`
+(a 429, then a refused larger area that split, then two 429s on the smaller area, then the TypeError). Every
+TypeError still follows at least one 429 on the same search area. Increase observed after deployment;
+mechanism unknown.
+
+### Recovery run
+
+Run 1537 (43085866443), scheduled, created 19:17:51Z, on `c4c0ea20` (no change to the recovery workflow or the
+function code since `a0c7d398`). From its log: `proof_passed: true` on the first poll (60 facilities before and
+after, at least 40 expected); Step 3 (repair) skipped; the disable step ran and failed silently as before. No
+repair batch was sent; the hourly proof request and the report issue (#2809) went out as usual.
