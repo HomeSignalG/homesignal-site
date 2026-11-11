@@ -127,6 +127,12 @@ select pg_temp.chk('5g one approval: on to the Visuals step', pg_temp.stage() = 
 select pg_temp.chk('5h approving twice records nothing new', (select (public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'narrative', 'approved', 3))->>'unchanged') = 'true'
    and (select count(*) from public.impact_story_approvals where artifact = 'narrative' and decision = 'approved') = 1);
 
+select pg_temp.chk('5i approving the script starts preparing its pictures by itself',
+   (pg_temp.lastjob()).kind = 'visuals' and (pg_temp.lastjob()).status = 'queued');
+-- the worker takes that job and stops it, so the later steps start from no job in flight (as before this was automatic)
+select public.hs_impact_story_job_claim((pg_temp.lastjob()).id);
+select public.hs_impact_story_job_fail((pg_temp.lastjob()).id, 'test: stopped');
+
 -- 6. any change inside the narrative needs approving again; a change outside it does not ----------------
 select public.hs_impact_story_save(pg_temp.id('s')::uuid, 3, pg_temp.body() || '{"main":{"acts":[{"act":1},{"act":6}]},"suitability":"edited note"}');
 select pg_temp.work(jsonb_build_object('derived', jsonb_build_object('validation', pg_temp.ok_val(true, 'P1'))));
@@ -144,6 +150,9 @@ select public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'narrative', 'revoke
 select pg_temp.chk('6d a revoked approval blocks readiness', pg_temp.nst() = 'revoked' and pg_temp.stage() = 'script');
 select public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'narrative', 'approved', 6);
 select pg_temp.chk('6e re-approval is a new row; history kept', (select count(*) from public.impact_story_approvals where artifact = 'narrative') = 5);
+
+select public.hs_impact_story_job_claim((pg_temp.lastjob()).id) where (pg_temp.lastjob()).kind = 'visuals' and (pg_temp.lastjob()).status = 'queued';
+select public.hs_impact_story_job_fail((pg_temp.lastjob()).id, 'test: stopped') where (pg_temp.lastjob()).kind = 'visuals' and (pg_temp.lastjob()).status = 'running';
 
 -- 7. optimistic lock, superseded results ---------------------------------------------------------------
 select pg_temp.chk('7a a stale editor cannot overwrite', pg_temp.err(format('select public.hs_impact_story_save(%L, 5, %L::jsonb)', pg_temp.id('s'), pg_temp.body())) like '40001%');
@@ -238,7 +247,7 @@ create function pg_temp.approve_visuals() returns void language plpgsql as $$ be
   perform public.hs_impact_story_visuals_approve(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash');
 end $$;
 select pg_temp.chk('12V1 an approved narrative goes to the Visuals step first; Render is refused until the visuals are approved',
-  pg_temp.stage() = 'visuals' and pg_temp.nxt() = 'Prepare the visuals' and pg_temp.vis()->>'state' = 'none'
+  pg_temp.stage() = 'visuals' and pg_temp.nxt() like 'Prepar%' and pg_temp.vis()->>'state' in ('none', 'preparing', 'failed')
   and pg_temp.err(format('select public.hs_impact_story_render(%L, 7)', pg_temp.id('s'))) like '%Approve the visuals before rendering%');
 select pg_temp.as_user('stranger@example.com');
 select pg_temp.chk('12V2 non-admin cannot prepare, approve or revoke visuals',

@@ -1997,6 +1997,18 @@ begin
   values (p_story, p_artifact, s.current_version, h, p_decision, nullif(btrim(p_note), ''), nullif(btrim(p_target), ''), e);
   update public.impact_stories set updated_at = now() where id = p_story;
   perform public._hs_is_event(p_story, 'decision', jsonb_build_object('artifact', p_artifact, 'decision', p_decision, 'version', s.current_version), e);
+  -- Approving the script starts preparing its pictures at once (founder, 2026-11-10: "it is asking me to repeat steps I
+  -- have done multiple times"). A script change always makes the pictures stale, so the next step was always "Prepare the
+  -- visuals"; it is now started for you. It never blocks or undoes the approval: a refusal (a job already running, the
+  -- pictures already current) is ignored, and nothing is approved or rendered by it.
+  if p_decision = 'approved' then
+    begin
+      if coalesce(public._hs_is_visuals(p_story)->>'state', '') not in ('approved', 'preparing') then
+        perform public.hs_impact_story_visuals_prepare(p_story, s.current_version, false);
+      end if;
+    exception when others then null;
+    end;
+  end if;
   return jsonb_build_object('state', public._hs_is_artifact_state(p_story, p_artifact));
 end $$;
 
