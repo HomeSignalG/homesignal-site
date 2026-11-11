@@ -186,6 +186,9 @@ def normalize(o):
 def main():
     e = json.load(open(ENGINE, encoding="utf-8"))
     out = subprocess.run(["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1"], input=sql(e), capture_output=True, text=True, check=True).stdout
+    if "--seed" in sys.argv:     # only fill the disposable database (test/weekly_stage2_pg/run_topic_queue.sh)
+        print("seeded the demonstration")
+        return
     line = [l for l in out.splitlines() if l.startswith("{")][-1]
     o = normalize(json.loads(line))
     text = json.dumps(o, indent=1, sort_keys=True, ensure_ascii=False) + "\n"

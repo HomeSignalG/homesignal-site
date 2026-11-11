@@ -23,7 +23,7 @@ begin
 end $$;
 create table public.alert_topic_catalog (stream text not null, topic text not null, active boolean not null default true,
   created_at timestamptz not null default now(), constraint alert_topic_catalog_pkey primary key (stream, topic));
-insert into public.alert_topic_catalog (stream, topic) values ('news', 'Air Quality'), ('news', 'Water Quality');
+insert into public.alert_topic_catalog (stream, topic) values ('news', 'Air Quality'), ('news', 'Water Quality'), ('news', 'Data Centers');
 create schema if not exists vault;
 create table vault.decrypted_secrets (name text primary key, decrypted_secret text);
 insert into vault.decrypted_secrets values ('github_actions_pat', 'TEST-PAT-not-real');
