@@ -1,20 +1,24 @@
 name: weekly-stage2-suite
 
-# docs/weekly-stage2-slice.sql (Tab 20 Stage 2 proof slice) against a DISPOSABLE Postgres. Never production:
+# docs/weekly-stage2-slice.sql (Tab 20 Stage 2 proof slice) and docs/weekly-topic-queue.sql (topic queue) against a DISPOSABLE Postgres. Never production:
 # no secrets, no Supabase URL, and the job refuses to run if any Supabase credential is present.
 on:
   pull_request:
     paths:
       - 'docs/weekly-stage2-slice.sql'
+      - 'docs/weekly-topic-queue.sql'
       - 'test/weekly_stage2_pg/**'
       - 'test/fixtures/weekly-workbench-*.json'
+      - 'test/fixtures/weekly-topic-*.json'
       - '.github/workflows/weekly-stage2-suite.yml'
   push:
     branches: [main]
     paths:
       - 'docs/weekly-stage2-slice.sql'
+      - 'docs/weekly-topic-queue.sql'
       - 'test/weekly_stage2_pg/**'
       - 'test/fixtures/weekly-workbench-*.json'
+      - 'test/fixtures/weekly-topic-*.json'
       - '.github/workflows/weekly-stage2-suite.yml'
   workflow_dispatch: {}
 
@@ -62,3 +66,13 @@ jobs:
         run: |
           set -o pipefail
           bash test/weekly_stage2_pg/run.sh 2>&1 | grep -v NOTICE
+      - name: Topic queue rules hold; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: weekly_stage2_disposable
+        run: |
+          set -o pipefail
+          bash test/weekly_stage2_pg/run_topic_queue.sh 2>&1 | grep -v NOTICE
