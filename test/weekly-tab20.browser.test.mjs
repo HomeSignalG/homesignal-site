@@ -100,6 +100,15 @@ const shot = async (sel, name) => { if (shots) await page.locator(sel).first().s
 async function openTab() {
   await page.goto(base + '/acquisition.html', { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#dash-root', { state: 'visible' });
+  if (!openTab.checked) {
+    // 0 the workbench file is on the page as a library only: loading it mounts nothing, calls nothing and requests nothing
+    openTab.checked = true;
+    await page.waitForTimeout(400);
+    const lib = await page.evaluate(() => ({ format: /WEEKLY-ANSWER v1/.test(window.HS.acqWeeklySlice.answerFormatText()), css: !!document.getElementById('ws-css') || !!document.getElementById('tq-css'),
+      dom: document.querySelectorAll('[class^="ws-"], [class^="tq-"]').length, tab: document.getElementById('tab-weeklyreport').innerHTML }));
+    ok(lib.format && !lib.css && lib.dom === 0 && lib.tab === '' && !calls.some((c) => /^hs_weekly_/.test(c[0])) && outside.length === 0,
+      '0 before Tab 20 is opened: the library is loaded and has mounted nothing, added no style, made no weekly call and no request', lib);
+  }
   await page.click('nav.tabs button[data-tab="weeklyreport"]');
   await page.waitForSelector('#tab-weeklyreport .tq-root #tq-list');
 }
@@ -231,6 +240,20 @@ ok(at === 16 && /water-quality-2026-11-09: deferred — TEST: the record is not 
 await shot('#tab-weeklyreport .tq-lead[data-lead="' + ID.lp + '"]', 'C3-carried-into-next-edition.png');
 await view('all');
 await shot('#tab-weeklyreport', 'E1-tab20-all-topics-end-state.png');
+
+// ── 7b Edit opens the form BELOW the sticky tab bar: the Title box is reachable, at desktop and phone width ──
+const reachable = () => page.evaluate(() => { const t = document.querySelector('#tq-title').getBoundingClientRect(), n = document.querySelector('nav.tabs').getBoundingClientRect();
+  return { hit: document.elementFromPoint(t.left + 20, t.top + t.height / 2) === document.querySelector('#tq-title'), heading: document.querySelector('#tq-capture h3').getBoundingClientRect().top >= n.bottom,
+    sticky: getComputedStyle(document.querySelector('nav.tabs')).position }; });
+for (const w of [1300, 390]) {
+  await page.setViewportSize({ width: w, height: w === 390 ? 800 : 900 });
+  await page.locator('#tab-weeklyreport .tq-lead button[data-tq="edit"]').last().click();
+  await page.waitForFunction(() => /Edit topic/.test(document.querySelector('#tq-capture h3').textContent));
+  const r = await reachable();
+  ok(r.sticky === 'sticky' && r.hit && r.heading, '7b at ' + w + 'px: after Edit, the form’s heading and Title box are below the sticky tab bar, not under it', r);
+  await page.click('button[data-tq="cancel-edit"]');
+}
+await page.setViewportSize({ width: 1300, height: 900 });
 
 // ── 8 the whole run: exact calls, nothing that dispatches, storage untouched, no outside request ──
 const weekly = calls.filter((c) => /^hs_weekly_/.test(c[0])).map((c) => c[0]);
