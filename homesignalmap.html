@@ -365,6 +365,15 @@
   .hs-map-about p{margin:0 0 10px}
   .hs-map-about ul{margin:0 0 10px;padding-left:20px}
   .hs-embed .hs-map-about,.hs-map-state .hs-map-about{display:none}
+  /* A /map/<zip>/ document's static ZIP summary (scripts/map_zip_summary.py). Same look as the About block,
+     but it stays visible in the ZIP state (loadZip adds hs-map-state); only the embed hides it. */
+  .hs-map-zip-summary{max-width:880px;margin:8px auto 48px;padding:0 16px;color:var(--soft);font-size:14px;line-height:1.6}
+  .hs-map-zip-summary h2{font-size:18px;font-weight:700;color:var(--ink);margin:0 0 8px}
+  .hs-map-zip-summary h3{font-size:14px;font-weight:700;color:var(--ink);margin:18px 0 4px}
+  .hs-map-zip-summary p{margin:0 0 10px}
+  .hs-map-zip-summary ul{margin:0 0 10px;padding-left:20px}
+  .hs-map-zip-summary li{margin:0 0 6px}
+  .hs-embed .hs-map-zip-summary{display:none}
 
   /* ── Property page (address dossier — case-study §4.3) ──────────────────────────
      Same visual language as the rest of the page: Inter, var(--green) #1f5130,
@@ -1062,6 +1071,10 @@ HS.onReady(function(){
   (function(){
     var about = document.getElementById("hs-map-about"), results = document.getElementById("results");
     if(about && results && results.parentNode) results.parentNode.insertBefore(about, results.nextSibling);
+    // A per-ZIP document's static summary (scripts/map_zip_summary.py, outside the <template>) moves to the
+    // same place, once. It is the page's project-page list, not a copy of the map's rails.
+    var summary = document.getElementById("hs-map-zip-summary");
+    if(summary && results && results.parentNode) results.parentNode.insertBefore(summary, results.nextSibling);
   })();
   // --- config -------------------------------------------------------------
   var ENDPOINT = "https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/get-address-report";

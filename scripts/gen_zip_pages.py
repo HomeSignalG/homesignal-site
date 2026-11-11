@@ -35,6 +35,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import page_semantics as ps  # noqa: E402
 import development_pages as dvp  # noqa: E402
 import fact_check_pages as fcp  # noqa: E402
+import map_zip_summary as mzs  # noqa: E402
 
 SUPA = "https://qwnnmljucajnexpxdgxr.supabase.co"
 BASE = ps.BASE   # one origin, from the brand contract
@@ -698,6 +699,10 @@ def assemble(d, now_iso):
                     "ln": [], "gn": [], "um": [],
                     "rule_d": bool(rec.get("rule_d")),
                     "rule_d_count": rec.get("count") if rec.get("count") is not None else 0,
+                    # What the plane says about this ZIP's count (scripts/map_zip_summary.py): counted,
+                    # held (not measured: count null) or absent (measured, below the Rule D bar, omitted).
+                    "dev_plane_state": ("absent" if not rec else
+                                        "held" if rec.get("count") is None else "counted"),
                     "dev_entities": list(rec.get("entities") or [])}
         # THE COUNTY-EQUIVALENT IS THE ROOT COMMUNITY, NAMED AS ITSELF. The short `county` field
         # is a join key, not a name: "Baltimore" is both Baltimore city and Baltimore County (two
@@ -1461,7 +1466,8 @@ def render_project_list(z, keys, projects, pages):
             f'<p>{len(rows)} project{"s" if len(rows) != 1 else ""}, newest first.</p></header>'
             f'<section class="zsec"><ul>{"".join(li)}</ul></section>'
             f'<nav class="zsec"><a href="/community/{esc(z)}/">Back to {esc(z)} · {esc(label)}</a> · '
-            f'<a href="/">HomeSignal home</a></nav></main>')
+            + (f'<a href="{esc(map_path(z))}">Development map for {esc(z)}</a> · ' if p.get("map_summary") else "")
+            + f'<a href="/">HomeSignal home</a></nav></main>')
     return (_head(title, desc, f"{BASE}{project_list_path(z)}", robots="index, follow")
             + f'<body data-nav="project-list">\n{body}\n</body>\n</html>\n')
 
@@ -2160,8 +2166,11 @@ class MapTemplate:
         # ZIP-framed static hero (what a crawler reads before any script runs). Facts come from the
         # same page record the community document uses; nothing is inferred.
         n = p.get("rule_d_count") if p.get("rule_d") else None
+        summary = p.get("map_summary_html") or ""
+        # With the static summary (map_zip_summary.py) the count lives there, once; the hero inside the
+        # template would repeat it after the runtime mounts the page.
         fact = (f" {n} distinct development projects are on record for this ZIP, compiled from "
-                f"official sources." if isinstance(n, int) and n > 0 else "")
+                f"official sources." if isinstance(n, int) and n > 0 and not summary else "")
         sub = ('<div class="sub">Development records, permits and regulated facilities on file for '
                f'ZIP {esc(z)} ({esc(plabel)}), each linked to its official public record.{fact} '
                'Search an address to see what is built and proposed nearby. '
@@ -2180,6 +2189,12 @@ class MapTemplate:
         ):
             out = out.replace(old, new, 1)
         out = out.replace(self.OG_IMAGE, f"{BASE}/og-default.png")
+        if summary:
+            # OUTSIDE the inert <template>: a crawler reads it in the first HTML, and page_semantics
+            # fingerprints it, so a change to these records moves the page's lastmod and IndexNow.
+            if out.count("</template>\n") != 1:
+                sys.exit("ERROR: Map 1 template: expected exactly one </template> to place the ZIP summary after")
+            out = out.replace("</template>\n", "</template>\n" + summary, 1)
         out = re.sub(r'<meta name="description" content="[^"]*"/>',
                      lambda m: f'<meta name="description" content="{esc(desc)}"/>', out, count=1)
         return out
@@ -2251,6 +2266,9 @@ def main():
     ap.add_argument("--dev-dossiers", default=None,
                     help="published development dossiers (default: data/development_dossiers.json; "
                          "a fixture reads a sibling development_dossiers.json when present)")
+    ap.add_argument("--map-pilot", default=mzs.PILOT_PATH,
+                    help="Development Map summary manifest (default: data/seo-map-pilot.json). Tests and "
+                         "previews point this at a fixture manifest; production always uses the committed one.")
     ap.add_argument("--zip-coverage", default=COVERAGE_PATH,
                     help="ZIP coverage model JSON (default: lib/zip-coverage.json). Tests point "
                          "this at a fixture model; production always uses the committed one.")
@@ -2401,6 +2419,24 @@ def main():
         pages[z]["rule_d"], pages[z]["rule_d_count"], pages[z]["dev_entities"] = False, 0, []
     link_cities(pages, cities)
     linked = link_projects(pages, cities, projects)
+    # Development Map indexing pilot (data/seo-map-pilot.json): the static ZIP summary on /map/<zip>/
+    # and the map link on that ZIP's project list. Mode pilot = the manifest's treatment ZIPs only.
+    pilot = mzs.load_pilot(a.map_pilot)
+    for z, p in pages.items():
+        if mzs.treated(z, p, pilot):
+            p["map_summary"] = True
+            p["map_summary_html"] = mzs.render({**p, "place_label": place_label(p["name"], p.get("state"), z)},
+                                               projects)
+    n_summary = sum(1 for p in pages.values() if p.get("map_summary"))
+    # Every treatment ZIP that has a standard page must get it; a treatment ZIP that has since lost its page or its
+    # Census area is reported, not fatal (it simply leaves the pilot).
+    expected = {z for z in pilot["treatment"] if z in pages and not pages[z].get("coverage")}
+    if pilot["mode"] == "pilot" and n_summary != len(expected):
+        sys.exit(f"ERROR: map pilot: {n_summary} summaries for {len(expected)} eligible treatment ZIPs")
+    if pilot["mode"] == "pilot" and len(expected) != len(pilot["treatment"]):
+        print(f"::warning::map pilot: {len(pilot['treatment']) - len(expected)} treatment ZIP(s) have no standard page")
+    print(f"map summary    : mode {pilot['mode']}{' (' + pilot['error'] + ')' if pilot.get('error') else ''}; "
+          f"{n_summary} /map/<zip>/ documents carry the static ZIP summary")
     dvp.annotate(dossiers, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
     dvp.link_pages(dossiers, pages, projects)
     npass = sum(1 for p in pages.values() if p["rule_f"])
