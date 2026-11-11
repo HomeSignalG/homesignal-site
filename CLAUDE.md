@@ -6883,10 +6883,10 @@ homesignal-ingest `scripts/zip_request_plan.py` (the decision, pure) + `zip_requ
 
 "i have no idea when i have to look at a session because you need me or stopped and need a prompt to continue."
 Every session says, in two places, whether it needs the founder. Same rule in homesignal-ingest CLAUDE.md.
-1. **Session title.** Keep it a short topic, prefixed with its state, set with `set_session_title` (claude-code-remote) whenever
+1. **Session title.** Keep it a short topic, prefixed with a color dot and its state (red = look now, yellow = leave it, green = finished), set with `set_session_title` (claude-code-remote) whenever
    the state changes:
-   `NEEDS YOU: <topic>` (a decision, a secret, an approval, or work stopped that only a new prompt restarts) ·
-   `WORKING: <topic>` (waiting on CI, a run or a PR event; nothing to do) · `DONE: <topic>` (finished; nothing to do).
+   `🔴 NEEDS YOU: <topic>` (a decision, a secret, an approval, or work stopped that only a new prompt restarts) ·
+   `🟡 WORKING: <topic>` (waiting on CI, a run or a PR event; nothing to do) · `🟢 DONE: <topic>` (finished; nothing to do).
 2. **First line of every final message** is exactly one of `NEEDS YOU: <what, one line>` or `NO ACTION NEEDED: <state>`.
 3. **Push notification** (`PushNotification`) only when the state becomes NEEDS YOU, one line leading with what to do. Never for
    routine progress, CI waits or completion that needs nothing.
