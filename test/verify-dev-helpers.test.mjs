@@ -36,6 +36,15 @@ ok(!validateTabsSite(tabsBad).ok, 'TABS mismatch fails');
 
 ok(validateTabsSite({ record_url: 'https://echo.epa.gov/x' }).skip, 'non-TABS skips');
 
+// Map 1's own reader (zipAuthSiteFromMarker) gives a TABS site its URL but no project_no.
+const tabsZipAuth = { record_url: 'https://www.tdlr.texas.gov/TABS/Projects/TABS2024022676', zip_authoritative: true };
+ok(validateTabsSite(tabsZipAuth).ok, 'ZIP-mode TABS site with a valid URL and no project_no passes');
+ok(!validateTabsSite({ record_url: tabsZipAuth.record_url }).ok, 'a report TABS site still needs project_no');
+ok(!validateTabsSite({ record_url: 'https://www.tdlr.texas.gov/TABS/Search', zip_authoritative: true }).ok,
+  'a ZIP-mode TABS site with a malformed URL still fails');
+ok(!validateTabsSite({ record_url: tabsZipAuth.record_url, zip_authoritative: true, project_no: 'TABS2024000001' }).ok,
+  'a ZIP-mode TABS site whose project_no disagrees with its URL still fails');
+
 const engine = {
   socrata_reports: [{
     registry_id: 'chicago-building-permits',

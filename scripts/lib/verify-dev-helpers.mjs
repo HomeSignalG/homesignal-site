@@ -117,6 +117,10 @@ export function validateTabsSite(site) {
   if (!m) return { ok: false, reason: `malformed TABS url: ${url}` };
   const suffix = m[1];
   const pno = site.project_no ? String(site.project_no).trim() : '';
+  // A ZIP-mode site built from Map 1's own reader (lib/zip-authoritative.js zipAuthSiteFromMarker)
+  // carries no project_no: app_zip_projects_markers returns no project-number field, only the
+  // record URL. The URL shape above is still required; a project_no, when present, must match.
+  if (!pno && site.zip_authoritative === true) return { ok: true, urlOnly: true };
   if (!pno) return { ok: false, reason: 'missing project_no on TABS site' };
   if (pno !== suffix) return { ok: false, reason: `project_no ${pno} !== url suffix ${suffix}` };
   return { ok: true };
