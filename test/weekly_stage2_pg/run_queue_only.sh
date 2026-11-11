@@ -66,4 +66,7 @@ P -f "$here/fixture.sql" >/dev/null
 echo "  preflight, release absent: go"
 P -f "$tmp/queue.sql" >/dev/null 2>&1
 python3 "$here/build_queue_only_flow.py" --check
+# the read-only production verification queries (docs/weekly-verify-after-1.sql, -2.sql) must be what these files
+# produce, pass on the clean release and fail on each tampered one (build_verify.py; it wipes and rebuilds the database)
+python3 "$here/build_verify.py" --check
 echo "PASS"

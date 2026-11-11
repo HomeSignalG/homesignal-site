@@ -56,3 +56,17 @@ a pasted answer would queue a run nothing picks up.
 - `test/weekly_stage2_pg/run_queue_only.sh`: files 1 and 2 alone; then files 1-7 applied on top, with every queue row unchanged.
 - `test/weekly_stage2_pg/run.sh` and `run_topic_queue.sh`: files 1-7, applied twice, with their mutation checks.
 - The order lives in one place: `test/weekly_stage2_pg/config.sh`.
+
+## Read-only checks around the application of files 1 and 2
+
+All three are single SELECTs, generated from a disposable database (never typed), run through `db-read.yml`:
+
+| When | File |
+|---|---|
+| Immediately before file 1 | `docs/weekly-preflight-queue-only.sql` |
+| After file 1, and immediately before file 2 | `docs/weekly-verify-after-1.sql` |
+| After file 2 | `docs/weekly-verify-after-2.sql` |
+
+The two verification files compare every weekly object in production (definitions, function body checksums, what anon
+and authenticated can reach) with the list the release files produce, and require every weekly table to be empty. They
+are built and tested by `test/weekly_stage2_pg/build_verify.py`, which also proves each fails on a tampered database.
