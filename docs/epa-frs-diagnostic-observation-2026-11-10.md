@@ -238,6 +238,22 @@ Only the edge logs, which are kept longer, cover those hours:
 
 The 546 responses carry no body this receipt reads; their cause is not recorded here.
 
+**What the retained evidence supports for 2026-11-10 18:15Z – 2026-11-11 09:58Z (about 15 h 43 min):**
+- Every `get-address-report` request in the edge logs was served by version 314 (no other version appears).
+- The counts above are all requests to the function, address mode and ZIP mode together. They are not
+  ZIP-mode EPA reads, and they say nothing about EPA results.
+
+**What cannot be counted for that interval:** ZIP-mode reads, failed EPA reads, reads carrying `diag`,
+diagnostic entries by name, stage, kind or attempt, the failure sequences, attempt timings, and whether any
+successful read carried `diag`. The responses that held them were deleted by the ~6-hour retention before
+they were read.
+
+**What stays unknown for that interval:** how many TypeError (or SyntaxError) entries occurred; whether the
+pattern seen before and after it (every TypeError after at least one 429, failing in the fetch stage within
+milliseconds) held throughout; whether any new error name, stage or kind appeared; and whether any entry carried
+an error code or OS error number. **Missing data is not zero events.** No total in this receipt includes that
+interval, and no comparison across it is made.
+
 ## Retained window: 2026-11-11 09:58Z – 15:56Z (read 15:56Z)
 
 `created` ≥ 09:58:00Z and < 15:56:00Z, HTTP 200, ZIP-mode. Everything here is after the pause.
