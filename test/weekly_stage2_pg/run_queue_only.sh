@@ -2,6 +2,7 @@
 # The QUEUE-ONLY release (docs/weekly-1-base.sql + docs/weekly-2-topic-queue.sql; config.sh) against a DISPOSABLE
 # Postgres (never production). Applies the two files twice (idempotent) and runs queue_only.sql. Then applies the FULL
 # configuration on top (the later upgrade path) and requires every captured lead, event and edition to be unchanged.
+# Last, it checks that test/fixtures/weekly-queue-only-flow.json is what this SQL produces (build_queue_only_flow.py).
 set -euo pipefail
 : "${PGHOST:?}" "${PGDATABASE:?}"
 here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
@@ -37,4 +38,9 @@ echo "  before the upgrade: $before"; echo "  after the upgrade:  $after"
 caps="$(psql -X -q -tA -c "select set_config('test.jwt', '{\"email\":\"founder@test.invalid\"}', false); set role authenticated; select public.hs_weekly_topic_queue() -> 'capabilities'" | tail -1)"
 echo "  capabilities after the upgrade: $caps"
 [ "$caps" = '{"version_linking": true, "answer_processing_installed": true}' ] || { echo "FAIL: the upgraded read model does not report the installed parts"; exit 1; }
+# the real-page browser test replays a recorded flow: that recording must be what the queue-only SQL produces
+P -c "drop schema if exists public cascade; drop schema if exists auth cascade; drop schema if exists vault cascade;
+      drop schema if exists net cascade; drop schema if exists storage cascade; create schema public;" >/dev/null 2>&1
+P -f "$here/fixture.sql" >/dev/null; P -f "$tmp/queue.sql" >/dev/null 2>&1
+python3 "$here/build_queue_only_flow.py" --check
 echo "PASS"
