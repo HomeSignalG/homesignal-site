@@ -2,7 +2,8 @@
 # The QUEUE-ONLY release (docs/weekly-1-base.sql + docs/weekly-2-topic-queue.sql; config.sh) against a DISPOSABLE
 # Postgres (never production). Applies the two files twice (idempotent) and runs queue_only.sql. Then applies the FULL
 # configuration on top (the later upgrade path) and requires every captured lead, event and edition to be unchanged.
-# Last, it checks that test/fixtures/weekly-queue-only-flow.json is what this SQL produces (build_queue_only_flow.py).
+# It also checks the read-only production preflight (docs/weekly-preflight-queue-only.sql; build_preflight.py), and
+# last that test/fixtures/weekly-queue-only-flow.json is what this SQL produces (build_queue_only_flow.py).
 set -euo pipefail
 : "${PGHOST:?}" "${PGDATABASE:?}"
 here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
@@ -15,7 +16,21 @@ P() { psql -X -q -v ON_ERROR_STOP=1 "$@"; }
 P -c "drop schema if exists public cascade; drop schema if exists auth cascade; drop schema if exists vault cascade;
       drop schema if exists net cascade; drop schema if exists storage cascade; create schema public;" >/dev/null 2>&1
 P -f "$here/fixture.sql" >/dev/null
+python3 "$here/build_preflight.py" --snapshot before "$tmp/before.json"
 P -f "$tmp/queue.sql" >/dev/null 2>"$tmp/err" || { cat "$tmp/err" >&2; echo FAIL; exit 1; }
+python3 "$here/build_preflight.py" --snapshot after "$tmp/after.json"
+# the production preflight (docs/weekly-preflight-queue-only.sql) must list exactly what these two files create, and,
+# run here WITH the release installed, must report every one of those objects as already existing
+python3 "$here/build_preflight.py" --check "$tmp/before.json" "$tmp/after.json"
+PRE="$WEEKLY_DOCS/weekly-preflight-queue-only.sql"
+psql -X -q -tA -v ON_ERROR_STOP=1 -f "$PRE" > "$tmp/with.json"
+python3 - "$tmp/with.json" <<'PY'
+import json, sys
+o = json.load(open(sys.argv[1]))
+seen = {k: len(v) for k, v in o["already_exists"].items()}
+assert o["verdict"].startswith("no-go") and seen == o["will_create"] and all(seen.values()), (o["verdict"], seen, o["will_create"])
+print("  preflight, release installed: no-go, and it sees all %d created objects" % sum(seen.values()))
+PY
 P -f "$tmp/queue.sql" >/dev/null 2>"$tmp/err" || { cat "$tmp/err" >&2; echo FAIL; exit 1; }
 out="$(psql -X -q -tA -v leads="$(cat "$LEADS")" -f "$here/queue_only.sql" 2>"$tmp/suite.err" | grep -E '^K[0-9]+[a-z]?\|' || true)"
 echo "$out" | sed 's/^/  /'
@@ -42,5 +57,13 @@ echo "  capabilities after the upgrade: $caps"
 P -c "drop schema if exists public cascade; drop schema if exists auth cascade; drop schema if exists vault cascade;
       drop schema if exists net cascade; drop schema if exists storage cascade; create schema public;" >/dev/null 2>&1
 P -f "$here/fixture.sql" >/dev/null; P -f "$tmp/queue.sql" >/dev/null 2>&1
+# on a database WITHOUT the release the same preflight must find every prerequisite and no conflict
+P -c "drop schema if exists public cascade; drop schema if exists auth cascade; drop schema if exists vault cascade;
+      drop schema if exists net cascade; drop schema if exists storage cascade; create schema public;" >/dev/null 2>&1
+P -f "$here/fixture.sql" >/dev/null
+[ "$(psql -X -q -tA -v ON_ERROR_STOP=1 -f "$PRE" | python3 -c 'import json,sys; print(json.load(sys.stdin)["verdict"])')" = "go" ] \
+  || { echo "FAIL: the preflight does not say go on a database that has the prerequisites and none of the objects"; exit 1; }
+echo "  preflight, release absent: go"
+P -f "$tmp/queue.sql" >/dev/null 2>&1
 python3 "$here/build_queue_only_flow.py" --check
 echo "PASS"

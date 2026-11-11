@@ -33,6 +33,14 @@ does any of those (`test/weekly_stage2_pg/queue_only.sql`, check K03).
   `capabilities.answer_processing_installed` (file 3). Installed is not the same as operational: research processing
   also needs the two homesignal-ingest workflows, which the database cannot see.
 
+## Before applying files 1 and 2: the read-only preflight
+
+`docs/weekly-preflight-queue-only.sql` is one SELECT that changes nothing. It checks the prerequisites (the admin
+helper and its admin list, the topic catalog, its `(stream, topic)` key and the report categories, the three roles) and
+reports any object files 1 and 2 would create that already exists: tables, sequences, indexes, functions, types,
+constraints and triggers. The object list is generated from a disposable database (`build_preflight.py`), never typed.
+It prints names and counts only. Run it through `db-read.yml` when approved; it has not been run against production.
+
 ## What is not separable
 
 Files 4, 5 and 6 are separate files, but **file 3 calls their functions at run time** (`hs_weekly_overview`,
