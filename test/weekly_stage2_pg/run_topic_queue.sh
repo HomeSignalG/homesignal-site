@@ -30,6 +30,9 @@ expected=$(grep -cE "^select 'Q[0-9]+[a-z]?\|" "$here/topic_queue.sql")
 echo "TOPIC QUEUE SHIPPED: $n of $expected checks printed, $f not true"
 [ "$n" -eq "$expected" ] && [ "$f" -eq 0 ] || { cat "$tmp/suite.err" >&2; echo FAIL; exit 1; }
 if grep -q ERROR "$tmp/suite.err"; then cat "$tmp/suite.err" >&2; echo "FAIL: the suite printed an SQL error (a check that errors is not a pass)"; exit 1; fi
+# the queue screen fixture must be what the prepared SQL produces
+reset_db; P -f "$SQL" >/dev/null 2>&1; python3 "$here/build_demo_fixture.py" --seed >/dev/null
+python3 "$here/build_topic_queue_fixture.py" --check
 if [ "${1:-}" = "--no-mutations" ]; then echo "PASS (mutations skipped)"; exit 0; fi
 # every mutation in topic_queue_mutations.py must apply to the queue file and make at least one check fail
 bad=0
