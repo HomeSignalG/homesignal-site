@@ -258,6 +258,16 @@ Record of the decision, in the founder's words: `docs/national-source-policy-202
   **Do not add a noindex rule or an exclusion criterion without explicit founder approval.**
 - Gate: `scripts/audit_index_all.py` runs in `pages.yml` against `_site` (public noindex, robots block, non-self canonical, missing from sitemap).
 
+### DEVELOPMENT MAP INDEXING PILOT (2026-11-11) — BUILT LOCALLY, NOT DEPLOYED
+Every `/map/<zip>/` document kept its whole page inside an inert `<template>` (6 visible words in the first HTML), and
+`page_semantics.projection` drops `<template>`, so a map's records never moved its fingerprint, `lastmod` or IndexNow.
+`scripts/map_zip_summary.py` writes `#hs-map-zip-summary` OUTSIDE the template from the Rule D plane count and the ZIP's
+project pages (links to `/project/…/`, `/community/<zip>/`, `/community/<zip>/projects/`); the runtime moves it under the
+map; treated project-list pages link back to the map. Who gets it: `data/seo-map-pilot.json` (`pilot` = 100 treatment
+ZIPs; `all` = nationwide rollout, not enabled; `off` = rollback; unreadable = off). Controls are byte-identical to a
+pilot-off build. Selection, audit, deployment, rollback and monitoring: `docs/seo/map-indexing-pilot/README.md`.
+Tests: `test/map-zip-summary.test.mjs`, `test/map-zip-summary.browser.test.mjs`. ⛔ Do not request indexing for either arm.
+
 ### GOOGLE SEARCH CONSOLE: GIVE THE FOUNDER FULL https://jodytracks.com URLS (founder, 2026-10-29)
 **The founder's Search Console box does not accept a bare path.** Every sitemap or page address given to the founder for
 Search Console is the full URL on the live host, one per copy block, e.g. `https://jodytracks.com/sitemaps/map.xml`. Never
