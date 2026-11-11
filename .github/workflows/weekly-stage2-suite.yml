@@ -1,24 +1,23 @@
 name: weekly-stage2-suite
 
-# docs/weekly-stage2-slice.sql (Tab 20 Stage 2 proof slice) and docs/weekly-topic-queue.sql (topic queue) against a DISPOSABLE Postgres. Never production:
+# The weekly SQL files (docs/weekly-1..7; docs/weekly-release-order.md), as the queue-only release and as the full
+# configuration, against a DISPOSABLE Postgres. Never production:
 # no secrets, no Supabase URL, and the job refuses to run if any Supabase credential is present.
 on:
   pull_request:
     paths:
-      - 'docs/weekly-stage2-slice.sql'
-      - 'docs/weekly-topic-queue.sql'
+      - 'docs/weekly-*.sql'
+      - 'lib/acq-weekly-slice.js'
       - 'test/weekly_stage2_pg/**'
-      - 'test/fixtures/weekly-workbench-*.json'
-      - 'test/fixtures/weekly-topic-*.json'
+      - 'test/fixtures/weekly-*.json'
       - '.github/workflows/weekly-stage2-suite.yml'
   push:
     branches: [main]
     paths:
-      - 'docs/weekly-stage2-slice.sql'
-      - 'docs/weekly-topic-queue.sql'
+      - 'docs/weekly-*.sql'
+      - 'lib/acq-weekly-slice.js'
       - 'test/weekly_stage2_pg/**'
-      - 'test/fixtures/weekly-workbench-*.json'
-      - 'test/fixtures/weekly-topic-*.json'
+      - 'test/fixtures/weekly-*.json'
       - '.github/workflows/weekly-stage2-suite.yml'
   workflow_dispatch: {}
 
@@ -56,7 +55,17 @@ jobs:
           fi
       - name: Install psql
         run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
-      - name: Slice rules hold; every prohibited mutation is killed
+      - name: Queue-only release (files 1 and 2) holds, survives the later upgrade, and matches the page test's recording
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: weekly_stage2_disposable
+        run: |
+          set -o pipefail
+          bash test/weekly_stage2_pg/run_queue_only.sh 2>&1 | grep -v NOTICE
+      - name: Full configuration - slice rules hold; every prohibited mutation is killed
         env:
           PGHOST: localhost
           PGPORT: '5432'
@@ -66,7 +75,7 @@ jobs:
         run: |
           set -o pipefail
           bash test/weekly_stage2_pg/run.sh 2>&1 | grep -v NOTICE
-      - name: Topic queue rules hold; every prohibited mutation is killed
+      - name: Full configuration - topic queue rules hold; every prohibited mutation is killed
         env:
           PGHOST: localhost
           PGPORT: '5432'
