@@ -740,6 +740,54 @@ select pg_temp.chk('12f4c no GitHub credential: the batch is failed with a reada
    and not has_function_privilege('authenticated', 'public._hs_is_fix_dispatch(uuid, text)', 'execute'));
 insert into vault.decrypted_secrets values ('github_actions_pat', 'test-pat');
 update public.impact_story_fix_batches set status = 'plan_queued', completed_at = null, summary = null where id = pg_temp.id('fb')::uuid;
+-- 12R: a fix run that never started is sent again by itself, at most 3 times, only inside 24 hours
+create temp table r12 as select count(*) as n, coalesce(max(id), 0) as last from net.requests where url like '%impact-fix-run.yml%';
+select pg_temp.chk('12R1 a batch sent a moment ago is left alone',
+   (public.impact_fix_redispatch_tick()->>'redispatched')::int = 0
+   and (select count(*) from net.requests where url like '%impact-fix-run.yml%') = (select n from r12) + 0);
+update public.impact_story_fix_batches set requested_at = now() - interval '20 minutes' where id = pg_temp.id('fb')::uuid;
+create temp table t12r2 as select public.impact_fix_redispatch_tick() as r;
+select pg_temp.chk('12R2 unclaimed for 15 minutes: the plan run is sent again, counted, and recorded as an event',
+   (select (r->>'redispatched')::int from t12r2) = 1
+   and (select count(*) from net.requests where url like '%impact-fix-run.yml%') = (select n from r12) + 1
+   and (select body from net.requests order by id desc limit 1) = jsonb_build_object('ref', 'main', 'inputs', jsonb_build_object('batch', pg_temp.id('fb'), 'mode', 'plan'))
+   and (select redispatched from public.impact_story_fix_batches where id = pg_temp.id('fb')::uuid) = 1
+   and exists (select 1 from public.impact_story_events where kind = 'fix_batch_redispatched' and actor = 'system:fix-redispatch'
+                and detail->>'batch' = pg_temp.id('fb') and detail->>'phase' = 'plan' and detail->>'try' = '1'));
+select pg_temp.chk('12R3 not again until 15 minutes after the last send',
+   (public.impact_fix_redispatch_tick()->>'redispatched')::int = 0
+   and (select count(*) from net.requests where url like '%impact-fix-run.yml%') = (select n from r12) + 1);
+update public.impact_story_fix_batches set redispatched_at = now() - interval '16 minutes' where id = pg_temp.id('fb')::uuid;
+select public.impact_fix_redispatch_tick();
+update public.impact_story_fix_batches set redispatched_at = now() - interval '16 minutes' where id = pg_temp.id('fb')::uuid;
+select public.impact_fix_redispatch_tick();
+update public.impact_story_fix_batches set redispatched_at = now() - interval '16 minutes', requested_at = now() - interval '70 minutes' where id = pg_temp.id('fb')::uuid;
+select pg_temp.chk('12R4 three tries at most: after that the batch waits for the Fix button',
+   (public.impact_fix_redispatch_tick()->>'redispatched')::int = 0
+   and (select redispatched from public.impact_story_fix_batches where id = pg_temp.id('fb')::uuid) = 3
+   and (select count(*) from net.requests where url like '%impact-fix-run.yml%') = (select n from r12) + 3
+   and public._hs_is_media(pg_temp.id('s')::uuid)->'fix_batch'->>'status' = 'stalled');
+update public.impact_story_fix_batches set redispatched = 0, redispatched_at = null, requested_at = now() - interval '25 hours' where id = pg_temp.id('fb')::uuid;
+select pg_temp.chk('12R5 a request older than 24 hours is never sent by itself',
+   (public.impact_fix_redispatch_tick()->>'redispatched')::int = 0
+   and (select count(*) from net.requests where url like '%impact-fix-run.yml%') = (select n from r12) + 3);
+update public.impact_story_fix_batches set requested_at = now() - interval '20 minutes', status = 'planning', claimed_at = now() where id = pg_temp.id('fb')::uuid;
+select pg_temp.chk('12R6 a batch a run already claimed is never sent again',
+   (public.impact_fix_redispatch_tick()->>'redispatched')::int = 0
+   and (select count(*) from net.requests where url like '%impact-fix-run.yml%') = (select n from r12) + 3);
+update public.impact_story_fix_batches set status = 'queued', claimed_at = null, confirmed_at = now() - interval '20 minutes' where id = pg_temp.id('fb')::uuid;
+create temp table t12r7 as select public.impact_fix_redispatch_tick() as r;
+select pg_temp.chk('12R7 a confirmed plan that never started is sent again as the WORK run',
+   (select (r->>'redispatched')::int from t12r7) = 1
+   and (select body from net.requests order by id desc limit 1) = jsonb_build_object('ref', 'main', 'inputs', jsonb_build_object('batch', pg_temp.id('fb'), 'mode', 'work')));
+select pg_temp.chk('12R8 only the system can run it',
+   not has_function_privilege('authenticated', 'public.impact_fix_redispatch_tick()', 'execute')
+   and not has_function_privilege('anon', 'public.impact_fix_redispatch_tick()', 'execute')
+   and has_function_privilege('service_role', 'public.impact_fix_redispatch_tick()', 'execute'));
+update public.impact_story_fix_batches set status = 'plan_queued', claimed_at = null, confirmed_at = null, requested_at = now(),
+       redispatched = 0, redispatched_at = null where id = pg_temp.id('fb')::uuid;
+-- leave the request and event logs as the later checks expect them
+delete from net.requests where id > (select last from r12);
 select pg_temp.chk('12f5 the fixer lists it as a plan run, with the story slug', public.impact_fix_batches_list()->0->>'id' = pg_temp.id('fb')
    and public.impact_fix_batches_list()->0->>'phase' = 'plan'
    and public.impact_fix_batches_list()->0->>'video_slug' is not null);
