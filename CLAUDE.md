@@ -6557,6 +6557,21 @@ publisher half (image post, shrunk under 1 MB) is homesignal-ingest #1071. ⚠�
 `docs/youtube-video-file-decide-queue-apply.sql` or `docs/youtube-video-outdated.sql` drops the thumbnail again: re-apply
 the thumbnail file after any of them. Tests: `test/video_bluesky_queue_pg` §13 + 4f/11g, `test/video-bluesky-queue.browser.test.mjs`.
 
+## TAB 12 QUEUE ORDER: SUBSCRIBER ZIPS FIRST, APPROVED LAST ⚖️ FOUNDER (2026-11-11)
+
+"i do not want the approved posts at the top anymore. i want the new subscriber zip code posts always at top."
+The post list in Tab 12 is three groups: **Subscriber ZIPs** (that ZIP's drafts newest first, then its approved posts,
+under one status line per subscriber ZIP, shown even when nothing is waiting) · **To review** (every other draft, newest
+first) · **Approved and scheduled** (by posting time, folded until opened). Before, the list was sorted by posting time,
+so 17 approved posts sat above 85 drafts.
+- Grouping: `lib/acq-bluesky-queue-order.js` (`HS.bskyQueueGroups`, a view only). Which ZIPs have a real subscriber:
+  admin-only `public.hs_bsky_subscriber_zips()` (`docs/bluesky-subscriber-zips.sql`, applied 2026-11-11), which reads
+  homesignal-ingest's `bsky_maps_priority_classification` (class `eligible`; test sign-ups are not subscribers) and
+  returns ZIPs and counts only. Do not decide "subscriber ZIP" anywhere else.
+- A failed read shows a red note and promotes nothing; it is never read as "no subscribers".
+- This is the review order only. Posting order is still homesignal-ingest's `bsky_maps_subscribers_first()`.
+- Test: `test/bluesky-queue-order.test.mjs`.
+
 ## BLUESKY PUBLISHING SCHEDULE (Tab 12) + MAPS vs SHORTS ⚖️ FOUNDER (2026-10-27)
 
 One schedule, two queues: 2 MAPS + 2 video posts a day, America/Los_Angeles (shown in Central too), never within 150 minutes.
