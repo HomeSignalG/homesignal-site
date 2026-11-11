@@ -228,8 +228,11 @@ jobs:
                       db_seen = "psql timed out"
                   except OSError:
                       db_seen = "psql not runnable"
-              row("C1b in BEGIN READ ONLY: select 1, the canonical ZIP count, transaction_read_only", "1,12744,on",
-                  db_seen, db_seen == "1,12744,on")
+              # The ZIP count grows when a Tab 14 request is built automatically (docs/zip-request-autobuild.sql);
+              # docs/verify-zip-universe checks the exact set. Here: a number at least 12,745.
+              _c1b = db_seen.split(",")
+              row("C1b in BEGIN READ ONLY: select 1, the canonical ZIP count, transaction_read_only", "1,>=12745,on",
+                  db_seen, len(_c1b) == 3 and _c1b[0] == "1" and _c1b[1].isdigit() and int(_c1b[1]) >= 12745 and _c1b[2] == "on")
               row("C1c port: 5432 (session pooler), never 6543 (transaction pooler)", "5432", port_seen,
                   port_seen == "5432")
 
