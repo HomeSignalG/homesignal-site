@@ -262,6 +262,15 @@ ok(await page.evaluate(() => ['s1/visuals/jv/preview-main-000.jpg', 's1/visuals/
    .every((p) => window.calls.some((c) => c[0] === 'download' && c[1] === 'impact-media' && c[2] === p))),
    'visuals: the previews on screen are downloaded with the admin session (blob links)');
 ok(await page.evaluate(() => !window.calls.some((c) => c[0] === 'download' && c[2] === 's1/visuals/jv/preview-short_a-000.jpg')), 'visuals: previews of other videos load only when opened');
+// Exceptions first (audit, 2026-11-11): only the shot that needs a look is drawn; the rest are counted and one click away.
+const showAll = async () => { if (await page.locator('#is [data-act=vall][aria-pressed=false]').count()) { await page.click('#is [data-act=vall]'); await page.waitForTimeout(80); } };
+ok(await page.locator('#is-vfilter').count() === 1 && await page.locator('#is figure.is-shot').count() < await page.evaluate(() => window.db.visuals.manifest.assets.main.shots.length)
+   && (await page.locator('#is').innerText()).includes('passed every check') && await page.locator('#is [data-act=vapprovegroup]').count() === 2,
+   'visuals: by default only the shots that need a look are drawn; every act keeps its Approve button');
+await showAll();
+ok(await page.locator('#is figure.is-shot').count() === await page.evaluate(() => window.db.visuals.manifest.assets.main.shots.length)
+   && await page.locator('#is [data-act=vall][aria-pressed=true]').count() === 1, 'visuals: Show every shot draws them all');
+await page.waitForTimeout(150);
 ok(await page.locator('#is img[src^="blob:"]').count() >= 3 && (await page.innerHTML('#is')).includes('A dock for &lt;fishers&gt;'), 'visuals: previews show from blob links; text is escaped');
 await page.click('#is [data-act=vtab][data-k=short_a]'); await page.waitForTimeout(120);
 ok((await page.locator('#is').innerText()).includes('short_a-hook') && await page.evaluate(() => window.calls.some((c) => c[0] === 'download' && c[2] === 's1/visuals/jv/preview-short_a-000.jpg')),
@@ -306,7 +315,7 @@ await page.waitForTimeout(120);
 // Approve / Reject / Need new photo under every shot (2026-10-30), and rejecting every photo of an act.
 await page.click('#is [data-act=vtab][data-k=main]'); await page.waitForTimeout(80);
 await page.evaluate(() => { window.db.visuals.manifest.assets.main.shots[0].subject_ref = 'oak-trees'; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
-await page.waitForTimeout(120);
+await page.waitForTimeout(120); await showAll();
 ok(await page.locator('#is [data-act=vshot][data-d=approved]').count() === 0 && await page.locator('#is [data-act=vshot][data-shot=a1-s1][data-d=rejected]').count() >= 1
    && await page.locator('#is [data-act=vshot][data-shot=a1-s1][data-d=new_photo]').count() >= 1,
    'visuals: every shot has Reject, and Need new photo when it is about a subject; approving is per act, not per shot');

@@ -6302,6 +6302,12 @@ one story went through 13 fix batches and 9 renders. The founder asked for the a
 - Apply file (generated from the DDL of record, guarded on the live bodies): `docs/impact-style-warnings-apply-2026-11-11.sql`.
 - Engine half (package-server outage, dead runners recorded): homesignal-ingest CLAUDE.md, same date.
 - Tests: pg 12r6, 12S0-12S5 (4 deliberate breaks caught); `test/impact-stories.browser.test.mjs` "style-only failure".
+- **Visuals shows the shots that need a look first (same audit).** When some shots of the open video passed every check and
+  some did not, each act draws only the ones that need a look (flagged, blocked, rejected, a new photo asked for, a request
+  on file) and counts the rest; "Show every shot" (`data-act="vall"`, `S.vall`) draws them all, and "Show it" in the
+  attention list does too. "Approve this act" still approves the whole act. Page only, no SQL.
+- **Approved pictures survive a code-only change** (engine, homesignal-ingest CLAUDE.md, same date): a render no longer
+  sends a story back to Prepare just because video code merged after the approval.
 
 ## IMPACT STORIES, TAB 17: "NOT ABOUT THIS STORY — CONTINUE PREPARING" (2026-11-07)
 
