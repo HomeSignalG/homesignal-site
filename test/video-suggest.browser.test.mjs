@@ -32,6 +32,8 @@ await page.evaluate(() => {
       r.run = { status: 'queued' }; return Promise.resolve({ data: { existing: false, run: r.run }, error: null }); }
     if (n === 'hs_youtube_video_suggestion_retry') { const r = window.rows.find((x) => x.id === a.p_id); r.status = 'waiting'; r.status_note = null;
       r.links = (r.links || []).concat(a.p_more.links); r.run = { status: 'queued' }; return Promise.resolve({ data: { existing: false, run: r.run }, error: null }); }
+    if (n === 'hs_youtube_video_suggestion_add_info') { const r = window.rows.find((x) => x.id === a.p_id);
+      r.links = (r.links || []).concat(a.p_more.links); r.note = (r.note ? r.note + '\n' : '') + a.p_more.note; return Promise.resolve({ data: r, error: null }); }
     if (n === 'hs_youtube_video_suggestion_withdraw') { const r = window.rows.find((x) => x.id === a.p_id); r.status = 'withdrawn'; return Promise.resolve({ data: r, error: null }); }
     return Promise.resolve({ data: null, error: { code: 'x' } });
   } };
@@ -99,6 +101,25 @@ await page.waitForFunction(() => /Starting the video run/.test(document.querySel
 const rt = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_youtube_video_suggestion_retry').pop()[1]);
 ok(rt.p_id === 'd1' && rt.p_more.links.join() === 'https://www.federalregister.gov/d/2025-21788' && rt.p_more.note === 'the 2024 rule',
   '2k Try again sends the extra link and words, and the run starts');
+
+// 2l: a waiting suggestion has Add information, which saves links and a note and starts nothing
+await page.evaluate(() => { window.rows.push({ id: 'w1', title: 'Cochise County AI data center', status: 'waiting', note: 'Brief.', links: [],
+  created_at: '2026-11-11T00:00:00Z' }, { id: 'p1', title: 'Menomonie data center', status: 'picked', links: [],
+  created_at: '2026-11-11T00:00:00Z', run: { status: 'working' } }); });
+await page.evaluate(() => window.HS.acqVideoSuggest.mount(window.client, document.getElementById('host')));
+ok((await page.innerHTML('.vs-item[data-id="w1"]')).includes('Add information') && (await page.innerHTML('.vs-item[data-id="w1"]')).includes('vs-make'),
+  '2l a waiting suggestion shows Add information beside Make video');
+ok(!(await page.innerHTML('.vs-item[data-id="p1"]')).includes('vs-addinfo'), '2m a suggestion being made has no Add information');
+await page.click('.vs-item[data-id="w1"] .vs-addinfo summary');
+await page.fill('.vs-item[data-id="w1"] .vs-info', 'https://www.cochise.az.gov/1014/Data-Centers\nHearing is December 9\nDocket SU26-22');
+const before = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_youtube_video_suggestion_make').length);
+await page.click('.vs-item[data-id="w1"] .vs-save-info');
+await page.waitForFunction(() => /Information added/.test(document.getElementById('host').textContent));
+const ai = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_youtube_video_suggestion_add_info').pop()[1]);
+ok(ai.p_id === 'w1' && ai.p_more.links.join() === 'https://www.cochise.az.gov/1014/Data-Centers' && ai.p_more.note === 'Hearing is December 9\nDocket SU26-22'
+  && (await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_youtube_video_suggestion_make').length)) === before,
+  '2n Save information sends the link and the note (line breaks kept) and does not start a video');
+ok((await page.innerHTML('.vs-item[data-id="w1"]')).includes('https://www.cochise.az.gov/1014/Data-Centers'), '2o the added link is listed');
 
 await page.setViewportSize({ width: 390, height: 800 });
 ok(await page.evaluate(() => document.documentElement.scrollWidth <= 390), '2i no sideways scroll at phone width');

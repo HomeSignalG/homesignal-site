@@ -151,5 +151,35 @@ update public.youtube_video_suggestions set status = 'declined' where title = 'A
 select pg_temp.chk('6g a suggestion that was not made can be removed',
   (public.hs_youtube_video_suggestion_withdraw((select id from public.youtube_video_suggestions where title = 'A record with no fetcher yet'))->>'status') = 'withdrawn');
 
+-- 7. Add information to a waiting suggestion (no run starts)
+select public.hs_youtube_video_suggest('{"title":"Cochise County AI data center","note":"Story brief."}');
+select pg_temp.as_user('stranger@example.com');
+select pg_temp.chk('7a a non-admin cannot add information',
+  pg_temp.err(format($q$select public.hs_youtube_video_suggestion_add_info(%L::uuid, '{"note":"x"}')$q$, (select id from public.youtube_video_suggestions where title = 'Cochise County AI data center'))) like '42501%');
+select pg_temp.as_user('founder@example.com');
+select pg_temp.chk('7b nothing to add is refused',
+  pg_temp.err(format($q$select public.hs_youtube_video_suggestion_add_info(%L::uuid, '{"note":"  "}')$q$, (select id from public.youtube_video_suggestions where title = 'Cochise County AI data center'))) like '22023%');
+select pg_temp.chk('7c a bad link is refused and nothing changes',
+  pg_temp.err(format($q$select public.hs_youtube_video_suggestion_add_info(%L::uuid, '{"links":["nope"]}')$q$, (select id from public.youtube_video_suggestions where title = 'Cochise County AI data center'))) like '22023%'
+  and (select links = '[]'::jsonb and note = 'Story brief.' from public.youtube_video_suggestions where title = 'Cochise County AI data center'));
+select public.hs_youtube_video_suggestion_add_info((select id from public.youtube_video_suggestions where title = 'Cochise County AI data center'),
+  '{"links":["https://www.cochise.az.gov/1014/Data-Centers"],"note":"Docket SU26-22"}');
+select public.hs_youtube_video_suggestion_add_info((select id from public.youtube_video_suggestions where title = 'Cochise County AI data center'),
+  '{"links":["https://www.cochise.az.gov/1014/Data-Centers"]}');
+select pg_temp.chk('7d information is added, the note on a new line, a repeated link kept once, and no run starts',
+  (select status = 'waiting' and links = '["https://www.cochise.az.gov/1014/Data-Centers"]'::jsonb and note = E'Story brief.\nDocket SU26-22'
+     from public.youtube_video_suggestions where title = 'Cochise County AI data center')
+  and not exists (select 1 from public.youtube_video_suggestion_runs r join public.youtube_video_suggestions x on x.id = r.suggestion_id
+                  where x.title = 'Cochise County AI data center'));
+select public.hs_youtube_video_suggestion_make((select id from public.youtube_video_suggestions where title = 'Cochise County AI data center'));
+select pg_temp.chk('7e information can be added while the run is queued, and the claim reads it',
+  (public.hs_youtube_video_suggestion_add_info((select id from public.youtube_video_suggestions where title = 'Cochise County AI data center'), '{"note":"Hearing Dec 9"}')->>'note') like '%Hearing Dec 9'
+  and (public.youtube_video_suggestion_claim((select r.id from public.youtube_video_suggestion_runs r join public.youtube_video_suggestions x on x.id = r.suggestion_id
+        where x.title = 'Cochise County AI data center' and r.status = 'queued'))->'suggestion'->>'note') like '%Hearing Dec 9');
+select pg_temp.chk('7f while Claude is reading it, adding is refused',
+  pg_temp.err(format($q$select public.hs_youtube_video_suggestion_add_info(%L::uuid, '{"note":"x"}')$q$, (select id from public.youtube_video_suggestions where title = 'Cochise County AI data center'))) like '55000%');
+select pg_temp.chk('7g a made suggestion cannot get information added',
+  pg_temp.err(format($q$select public.hs_youtube_video_suggestion_add_info(%L::uuid, '{"note":"x"}')$q$, (select id from _ids))) like '55000%');
+
 \o
 select count(*) || ' checks passed' from _res where ok;
