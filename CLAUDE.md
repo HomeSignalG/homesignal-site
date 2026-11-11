@@ -1948,6 +1948,20 @@ added by hand 2026-11-09). SQL of record `docs/maps-zip-order-subscriber-zips.sq
     Browser test `test/maps-zip-email.browser.test.mjs` §5.
   - The two 85083/64166 identities created 2026-11-09 14:41:49Z are an `admin_test` account, not new residents.
 
+## 7.04c TEST SIGN-UPS DO NOT KEEP A ZIP ON THE MAPS POST LIST ⚖️ FOUNDER (2026-11-11)
+
+"i want to remove pierce county zips now"; chosen: "Test sign-ups don't count". Narrows §7.04b: a ZIP is kept on
+`public.maps_zip_order` only for a subscriber who is NOT a known test identity. "Known test" is homesignal-ingest's
+`public.bsky_maps_known_test_identity(user)` (the posting-priority rule); it is not re-derived here.
+- **Why:** the 65 Pierce County ZIPs each carried one `admin_test` sign-up, so the list rule put them back whenever
+  they were removed. Measured 2026-11-11: 68 ZIPs on the list, 66 test-only (65 Pierce + Bend 97702), 2 real (85083, 64166).
+- **Rule:** `maps_zip_order_sync_subscribers()` in `docs/maps-zip-order-subscriber-zips.sql` (applied 2026-11-11, body md5
+  `5a74e481…`). **Alarm:** `docs/maps-subscriber-zips-monitor-real-only.sql` (applied, tick body `242beb32…` → `22400e90…`):
+  a ZIP missing from the list pages only when it has a real subscriber, and "test" asks the same function.
+- **One-time removal:** `docs/maps-zip-order-remove-test-only-2026-11-11.sql` (fail-closed on the measured 66-ZIP set;
+  leaves 85083, 64166). The test sign-ups themselves are untouched.
+- Tests: `test/maps_zip_order_subscribers_pg` S14-S16, `test/maps_subscriber_zips_monitor_pg` R01-R04 (+4 mutations).
+
 ## 7.04 THE DATA CENTER THEME BUTTON CREATES **AND** REFRESHES ⚖️ FOUNDER REQUIREMENT (2026-09-21)
 
 **The Acquisition Dashboard's "Create + refresh drafts" action does both halves: it creates

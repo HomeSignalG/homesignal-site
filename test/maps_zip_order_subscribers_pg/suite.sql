@@ -47,3 +47,13 @@ alter table maps_zip_order drop constraint zz_block;
 select 'S13 anon/authenticated cannot run the sync|' ||
   (not has_function_privilege('anon','public.maps_zip_order_sync_subscribers()','EXECUTE')
    and not has_function_privilege('authenticated','public.maps_zip_order_sync_subscribers()','EXECUTE'))::text;
+-- test sign-ups do not count (founder 2026-11-11)
+insert into communities (id, level, zip_codes) values ('00000000-0000-0000-0000-000000098401','zip','{98499}');
+insert into users (id, email, community_id, zip_code, referral_source) values ('10000000-0000-0000-0000-000000000006','f@x','00000000-0000-0000-0000-000000098401','98499','admin_test');
+insert into user_subscriptions values ('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000098401','maps','t','explicit',0,now());
+select 'S14 a test sign-up does not put its ZIP on the list|' || (not exists (select 1 from maps_zip_order where zip='98499'))::text;
+select count(*) from hs_set_maps_zip_order(array['98402']) \g /dev/null
+select 'S15 an upload does not bring a test-only ZIP back|' || (not exists (select 1 from maps_zip_order where zip='98499'))::text;
+insert into users (id, email, community_id, zip_code) values ('10000000-0000-0000-0000-000000000007','g@x','00000000-0000-0000-0000-000000098401','98499');
+insert into user_subscriptions values ('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000098401','maps','t','explicit',0,now());
+select 'S16 a real sign-up on the same ZIP adds it|' || exists (select 1 from maps_zip_order where zip='98499')::text;
