@@ -335,3 +335,24 @@ Run 1537 (43085866443), scheduled, created 19:17:51Z, on `c4c0ea20` (no change t
 function code since `a0c7d398`). From its log: `proof_passed: true` on the first poll (60 facilities before and
 after, at least 40 expected); Step 3 (repair) skipped; the disable step ran and failed silently as before. No
 repair batch was sent; the hourly proof request and the report issue (#2809) went out as usual.
+
+## Final window and removal deploy (2026-11-11)
+
+Removal merged as `b6cad11a` (#2770) and deployed by `deploy-edge-functions` run 43098932166 (dispatched from
+`main`, all steps green, including the registry exclusion reload). The function folder on `main` is
+`5cbf48c6…`, the same tree as before the diagnostic and as the v313 source.
+
+| | |
+|---|---|
+| live version after deploy | 315 (`list_edge_functions`) |
+| last request served by v314 (edge logs) | 21:02:21Z |
+| first request served by v315 (edge logs) | 21:04:03Z |
+| edge logs 20:55–21:20Z | v314: 32 × HTTP 200 · v315: 16 × HTTP 200 |
+
+Last v314 window, 19:50Z to 21:03:30Z (still retained when read): 295 EPA reads, 23 carrying `diag`,
+0 `diag` on a successful read, largest 148 bytes. Entries: TypeError / fetch, attempt 3: 17 · attempt 4: 4 ·
+SyntaxError / parse, attempt 1: 2. After the deploy (21:03:30Z–21:06Z): 16 reads, 0 carrying `diag`.
+
+The TypeErrors were observed after prior 429s on the same area; the mechanism is unknown. The HTTP 546 at
+15:59:32Z remains a separate unknown. `EPA_RECOVERY_REPAIR_PAUSED` stays `true`. This closes the observation
+plan: the diagnostic is no longer emitted, so there is nothing further to collect.
