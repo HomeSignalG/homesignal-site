@@ -267,6 +267,23 @@ grant execute on function public.youtube_video_suggestion_claim(uuid) to service
 grant execute on function public.youtube_video_suggestion_complete(uuid, jsonb) to service_role;
 
 
+-- More links and a note added to a suggestion: links checked by the Add suggestion rule (no duplicates, at most 20),
+-- the note appended on a new line (at most 12,000 characters). Shared by Try again and Add information, so the two can
+-- never accept different input. Returns {links, note}.
+create or replace function public._hs_yvs_merge_more(p_links jsonb, p_note text, p_more jsonb)
+returns jsonb language plpgsql immutable set search_path = public as $$
+declare add_links jsonb; add_note text; v_links jsonb; v_note text; cur jsonb := coalesce(p_links, '[]'::jsonb);
+begin
+  add_links := public._hs_yvs_clean_links(p_more->'links');
+  v_links := public._hs_yvs_clean_links(cur || coalesce((select jsonb_agg(x) from jsonb_array_elements(add_links) x
+                                                         where not cur @> jsonb_build_array(x)), '[]'::jsonb));
+  add_note := nullif(btrim(coalesce(p_more->>'note', '')), '');
+  v_note := case when add_note is null then p_note when p_note is null then add_note else p_note || E'\n' || add_note end;
+  if v_note is not null and char_length(v_note) > 12000 then raise exception 'The note is longer than 12,000 characters.' using errcode = '22023'; end if;
+  return jsonb_build_object('links', v_links, 'note', v_note);
+end $$;
+revoke all on function public._hs_yvs_merge_more(jsonb, text, jsonb) from public, anon, authenticated;
+
 -- ── Try again (founder, 2026-11-03: "you need buttons for this type of situation") ─────────────────────────────
 -- A suggestion that was not made (declined) can be tried again, optionally with more links and a note (for example the
 -- record numbers the decline asked for, or after a new kind of record was added to the fetcher). Its earlier reason is
@@ -275,7 +292,7 @@ grant execute on function public.youtube_video_suggestion_complete(uuid, jsonb) 
 create or replace function public.hs_youtube_video_suggestion_retry(p_id uuid, p_more jsonb default '{}'::jsonb)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare e text := public._hs_is_admin(); s public.youtube_video_suggestions%rowtype;
-        more jsonb := coalesce(p_more, '{}'::jsonb); add_links jsonb; add_note text; v_links jsonb; v_note text;
+        more jsonb := coalesce(p_more, '{}'::jsonb); m jsonb;
 begin
   if jsonb_typeof(more) <> 'object' then raise exception 'bad request' using errcode = '22023'; end if;
   select * into s from public.youtube_video_suggestions where id = p_id for update;
@@ -283,21 +300,47 @@ begin
   if s.status <> 'declined' then
     raise exception 'Only a suggestion that was not made can be tried again (this one is %).', s.status using errcode = '55000';
   end if;
-  add_links := public._hs_yvs_clean_links(more->'links');
-  v_links := public._hs_yvs_clean_links(s.links || coalesce((select jsonb_agg(x) from jsonb_array_elements(add_links) x
-                                                            where not s.links @> jsonb_build_array(x)), '[]'::jsonb));
-  add_note := nullif(btrim(coalesce(more->>'note', '')), '');
-  v_note := case when add_note is null then s.note when s.note is null then add_note else s.note || E'\n' || add_note end;
-  if v_note is not null and char_length(v_note) > 12000 then raise exception 'The note is longer than 12,000 characters.' using errcode = '22023'; end if;
+  m := public._hs_yvs_merge_more(s.links, s.note, more);
   if exists (select 1 from public.youtube_video_suggestions o
              where o.id <> s.id and lower(btrim(o.title)) = lower(btrim(s.title)) and o.status in ('waiting', 'picked')) then
     raise exception 'Another open suggestion has the same subject. Withdraw one of them first.' using errcode = '23505';
   end if;
   update public.youtube_video_suggestions
-     set status = 'waiting', status_note = null, links = v_links, note = v_note, updated_at = now()
+     set status = 'waiting', status_note = null, links = m->'links', note = m->>'note', updated_at = now()
    where id = s.id;
   return public.hs_youtube_video_suggestion_make(s.id);
 end $$;
 
 revoke all on function public.hs_youtube_video_suggestion_retry(uuid, jsonb) from public, anon;
 grant execute on function public.hs_youtube_video_suggestion_retry(uuid, jsonb) to authenticated;
+
+
+-- ── Add information (founder, 2026-11-11: "i need button to add information. i only have withdraw and make video") ──
+-- Add more links or a note to a suggestion that is waiting, before (or between) Make video presses. Nothing starts: the
+-- founder presses Make video when ready. A queued run has not read the suggestion yet (the run reads it when it is
+-- claimed), so it picks the new information up. While Claude is reading it (picked), it is refused: wait for the run.
+create or replace function public.hs_youtube_video_suggestion_add_info(p_id uuid, p_more jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); s public.youtube_video_suggestions%rowtype;
+        more jsonb := coalesce(p_more, '{}'::jsonb); m jsonb;
+begin
+  if jsonb_typeof(more) <> 'object' then raise exception 'bad request' using errcode = '22023'; end if;
+  select * into s from public.youtube_video_suggestions where id = p_id for update;
+  if not found then raise exception 'no such suggestion' using errcode = 'P0002'; end if;
+  if s.status = 'picked' then
+    raise exception 'Claude is reading this suggestion now. Add the information after the run finishes.' using errcode = '55000';
+  end if;
+  if s.status <> 'waiting' then
+    raise exception 'Information can be added only to a waiting suggestion (this one is %).', s.status using errcode = '55000';
+  end if;
+  if jsonb_array_length(public._hs_yvs_clean_links(more->'links')) = 0 and nullif(btrim(coalesce(more->>'note', '')), '') is null then
+    raise exception 'Type a link or a note to add.' using errcode = '22023';
+  end if;
+  m := public._hs_yvs_merge_more(s.links, s.note, more);
+  update public.youtube_video_suggestions set links = m->'links', note = m->>'note', updated_at = now()
+   where id = s.id returning * into s;
+  return to_jsonb(s);
+end $$;
+
+revoke all on function public.hs_youtube_video_suggestion_add_info(uuid, jsonb) from public, anon;
+grant execute on function public.hs_youtube_video_suggestion_add_info(uuid, jsonb) to authenticated;
