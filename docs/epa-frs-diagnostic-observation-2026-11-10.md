@@ -222,3 +222,59 @@ after deployment; mechanism unknown.
 
 So in three scheduled runs since the pause the proof passed and the repair batch was not sent. Each run still
 sent its one proof request and opened its report issue; the schedule stays on.
+
+## Missed window: 2026-11-10 18:15Z – 22:15Z (raw responses expired)
+
+The check scheduled for 22:15Z on 2026-11-10 reached this session at 2026-11-11 15:56Z, about 17.5 hours late.
+By then `net._http_response` held only rows from 2026-11-11 09:58:00Z onward (0 rows in the window), so the
+aggregate counts for 18:15Z–22:15Z, and for 22:15Z–09:58Z, **were not collected and cannot be recovered**.
+Only the edge logs, which are kept longer, cover those hours:
+
+| window | v314 requests, HTTP 200 | HTTP 546 | other versions |
+|---|---:|---:|---|
+| 2026-11-10 18:15Z – 22:15Z | 960 | 6 | none |
+| 2026-11-10 22:15Z – 2026-11-11 09:58Z | 2,800 | 1 | none |
+| 2026-11-11 09:58Z – 15:56Z | 1,434 | 3 | none |
+
+The 546 responses carry no body this receipt reads; their cause is not recorded here.
+
+## Retained window: 2026-11-11 09:58Z – 15:56Z (read 15:56Z)
+
+`created` ≥ 09:58:00Z and < 15:56:00Z, HTTP 200, ZIP-mode. Everything here is after the pause.
+
+| reads | `ok` false | with `diag` | `diag` on a successful read | largest `diag`, bytes |
+|---:|---:|---:|---:|---:|
+| 1,290 | 452 | 117 | 0 | 283 |
+
+| entry (name / stage / kind / attempt) | count |
+|---|---:|
+| TypeError / fetch / tls / attempt 3 | 64 |
+| TypeError / fetch / tls / attempt 4 | 47 |
+| SyntaxError / parse / invalid_json / attempt 1 | 8 |
+
+`code` and `os_error` null on every entry. TypeError attempts at most 48 ms; gap before them 2,001–5,012 ms.
+
+| failure sequence | count |
+|---|---:|
+| 429 > 429 > 429 | 186 |
+| process_limit > 429 > 429 > 429 | 145 |
+| 429 > 429 > TypeError | 61 |
+| process_limit > 429 > 429 > TypeError | 47 |
+| SyntaxError > 429 > 429 | 6 |
+| SyntaxError > 429 > TypeError | 2 |
+| process_limit > 429 > TypeError > 429 | 1 |
+| process_limit > 429 > 429 > 429 > 429 | 1 |
+| process_limit > 429 > 429 > 429 > 429 > 429 | 1 |
+| process_limit > 429 > 429 > process_limit > 429 > 429 > 429 | 1 |
+| process_limit > process_limit > process_limit > 429 > 429 > 429 | 1 |
+
+The pattern is unchanged from 2026-11-10: every TypeError follows at least one 429 on the same search area,
+fails in the fetch stage within milliseconds, and no successful read carries `diag`. Increase observed after
+deployment; mechanism unknown.
+
+### Recovery runs
+
+`main` moved to `1849b712` with no change to `.github/workflows/epa-recovery-watch.yml` or to the
+`get-address-report` / `_shared` folders since `a0c7d398`. The Step 3 condition is still present. Run 1533
+(43046903806, 2026-11-11 15:17:40Z) ran its proof, skipped Step 3, and ran the disable step (which runs only
+when the proof passed), so its repair batch was not sent. Runs 1512–1532 were not inspected individually.
