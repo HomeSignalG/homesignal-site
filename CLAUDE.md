@@ -6324,6 +6324,12 @@ one story went through 13 fix batches and 9 renders. The founder asked for the a
 - **A fix batch nobody claimed for 30 minutes reads `stalled`** (`_hs_is_fix_batch`), so the next step says to press Fix.
   Before, a batch whose GitHub run was cancelled in the queue said "Claude is making the fixes" for four days.
 - Apply file (generated from the DDL of record, guarded on the live bodies): `docs/impact-style-warnings-apply-2026-11-11.sql`.
+- **A fix run that never started is sent again by itself (2026-11-11).** `public.impact_fix_redispatch_tick()` (pg_cron
+  `impact-fix-redispatch`, every 10 minutes) re-sends a batch still `plan_queued` or `queued` that no run has claimed:
+  15 minutes after the last send, at most 3 times, only within 24 hours of the request (or the plan's confirm), never for
+  an archived story. Each send is a `fix_batch_redispatched` event. After 3 tries the batch reads `stalled` as before
+  and waits for Fix. Measured that day: three batches had sat unclaimed for up to four days after a lost dispatch.
+  pg checks 12R1-12R8 (4 deliberate breaks caught).
 - Engine half (package-server outage, dead runners recorded): homesignal-ingest CLAUDE.md, same date.
 - Tests: pg 12r6, 12S0-12S5 (4 deliberate breaks caught); `test/impact-stories.browser.test.mjs` "style-only failure".
 - **Visuals shows the shots that need a look first (same audit).** When some shots of the open video passed every check and
