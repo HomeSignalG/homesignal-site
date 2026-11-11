@@ -63,7 +63,7 @@ end $$;
 -- ── run queue ─────────────────────────────────────────────────────────────────────────────────────────────────────
 create table if not exists public.weekly_runs (
   id uuid primary key default gen_random_uuid(),
-  kind text not null check (kind in ('research_ingest', 'angles', 'outline', 'script', 'rewrite', 'titles', 'title_check', 'visual_check')),
+  kind text not null check (kind in ('research_ingest', 'angles', 'outline', 'script', 'rewrite', 'titles', 'title_check', 'visual_check', 'source_copy')),
   topic text not null,
   status text not null default 'queued' check (status in ('queued', 'running', 'done', 'failed')),
   input jsonb not null default '{}'::jsonb,
@@ -122,12 +122,25 @@ create table if not exists public.weekly_sources (
   export_permission text not null default 'record_only' check (export_permission in ('include', 'record_only', 'exclude')),
   terms_status text not null default 'not_reviewed',
   attribution text,
-  -- A stored copy of the source document (PDF or saved web page), kept only when its storage permission is full_copy.
-  -- A document-evidence cue (a segment's visual) can only point at a source with a stored copy; the checksum is what the
-  -- visual_check run compares the downloaded bytes against. Private bucket 'weekly-sources'.
-  document_path text check (document_path ~ '^weekly-sources/[A-Za-z0-9/_.-]+\.(pdf|html)$'),
+  -- FULL-COPY PERMISSION and the STORED COPY are two separate facts, each filled once (weekly_sources_guard):
+  --   1. a person grants permission to keep a full copy (copy_granted_*; storage_permission becomes full_copy).
+  --      Nothing is fetched or stored before this; the grant never changes afterwards.
+  --   2. a source_copy run fetches the document, the runner checks it, the record step uploads it to the private bucket
+  --      'weekly-sources' at <source id>/<sha256>.<kind>, and the database fills document_* only if that object exists in
+  --      storage with the same size. A failed or pending copy leaves document_* empty; a grant never implies a copy.
+  -- A document-evidence cue can only point at a source with a stored copy; visual_check re-verifies the checksum.
+  copy_kind text check (copy_kind in ('pdf', 'html')),
+  copy_granted_by text,
+  copy_granted_at timestamptz,
+  copy_grant_basis text check (char_length(copy_grant_basis) between 10 and 500),
+  document_path text check (document_path ~ '^weekly-sources/[0-9a-f-]{36}/[0-9a-f]{64}\.(pdf|html)$'),
   document_sha256 text check (document_sha256 ~ '^[0-9a-f]{64}$'),
   document_kind text check (document_kind in ('pdf', 'html')),
+  copy_size bigint check (copy_size between 1 and 20971520),
+  copy_verified_at timestamptz,
+  -- the finding quotes re-checked against the stored copy itself (apart from the page check, which may have read
+  -- another version of the page, or could not read a PDF at all)
+  copy_quote_match text check (copy_quote_match in ('found', 'not_found', 'no_quote')),
   created_at timestamptz not null default now(),
   -- An unknown or unstated date has no value; a stated one must have one. Never filled from the fetch date.
   constraint weekly_sources_date_ck check (
@@ -137,11 +150,39 @@ create table if not exists public.weekly_sources (
   constraint weekly_sources_unread_ck check (fetch_error is null or (quote_match = 'not_checked' and date_extraction = 'unknown')),
   -- A quote stored only as a link must not carry the quote text.
   constraint weekly_sources_storage_ck check (storage_permission not in ('link_only', 'none') or quote is null),
-  -- all three document fields or none, and a full copy only where storage of a full copy is permitted
+  -- the grant: all four fields or none, and full_copy exactly when a person granted it
+  constraint weekly_sources_grant_ck check (
+    (copy_granted_by is null) = (copy_granted_at is null) and (copy_granted_by is null) = (copy_grant_basis is null)
+    and (copy_granted_by is null) = (copy_kind is null) and (storage_permission = 'full_copy') = (copy_granted_by is not null)),
+  -- the stored copy: all fields or none, only after a grant, of the granted kind, at the one path its id and checksum give
   constraint weekly_sources_document_ck check (
-    ((document_path is null) = (document_sha256 is null) and (document_path is null) = (document_kind is null))
-    and (document_path is null or (storage_permission = 'full_copy' and document_path like '%.' || document_kind)))
+    (document_path is null) = (document_sha256 is null) and (document_path is null) = (document_kind is null)
+    and (document_path is null) = (copy_size is null) and (document_path is null) = (copy_verified_at is null)
+    and (document_path is null) = (copy_quote_match is null)
+    and (document_path is null or (copy_granted_by is not null and document_kind = copy_kind
+         and document_path = 'weekly-sources/' || id::text || '/' || document_sha256 || '.' || document_kind)))
 );
+
+-- weekly_sources is append-only except two one-time fills: the grant (once), then the stored copy (once). An accepted
+-- copy is never replaced and its bytes are never changed; any other update, and every delete, is refused.
+create or replace function public.weekly_sources_guard() returns trigger language plpgsql as $$
+declare grant_cols text[] := array['copy_kind', 'copy_granted_by', 'copy_granted_at', 'copy_grant_basis', 'storage_permission'];
+        copy_cols text[] := array['document_path', 'document_sha256', 'document_kind', 'copy_size', 'copy_verified_at', 'copy_quote_match'];
+begin
+  if tg_op = 'DELETE' then raise exception 'weekly_sources is append-only (no delete)' using errcode = '55000'; end if;
+  if old.copy_granted_by is null and new.copy_granted_by is not null and old.document_path is null and new.document_path is null
+     and (to_jsonb(new) - grant_cols) = (to_jsonb(old) - grant_cols) then
+    return new;   -- the grant
+  end if;
+  if old.copy_granted_by is not null and old.document_path is null and new.document_path is not null
+     and (to_jsonb(new) - copy_cols) = (to_jsonb(old) - copy_cols) then
+    return new;   -- the stored copy
+  end if;
+  if old.document_path is not null then
+    raise exception 'the stored copy of this source is accepted and is never replaced' using errcode = '55000';
+  end if;
+  raise exception 'weekly_sources is append-only (only the grant and then the stored copy are filled, once each)' using errcode = '55000';
+end $$;
 
 create table if not exists public.weekly_findings (
   id uuid primary key default gen_random_uuid(),
@@ -490,13 +531,16 @@ create table if not exists public.weekly_subscriptions (
 do $$
 declare t text;
 begin
-  foreach t in array array['weekly_research_requests', 'weekly_research_answers', 'weekly_sources', 'weekly_findings',
+  foreach t in array array['weekly_research_requests', 'weekly_research_answers', 'weekly_findings',
     'weekly_finding_sources', 'weekly_finding_decisions', 'weekly_editorial_profiles', 'weekly_profile_approvals',
     'weekly_scripts', 'weekly_script_approvals', 'weekly_lessons', 'weekly_lesson_decisions',
     'weekly_cost_entries', 'weekly_subscriptions'] loop
     execute format('drop trigger if exists %I_append_only on public.%I', t, t);
     execute format('create trigger %I_append_only before update or delete on public.%I for each row execute function public.weekly_append_only()', t, t);
   end loop;
+  drop trigger if exists weekly_sources_append_only on public.weekly_sources;
+  drop trigger if exists weekly_sources_guard on public.weekly_sources;
+  create trigger weekly_sources_guard before update or delete on public.weekly_sources for each row execute function public.weekly_sources_guard();
   foreach t in array array['weekly_runs', 'weekly_research_requests', 'weekly_research_answers', 'weekly_sources',
     'weekly_findings', 'weekly_finding_sources', 'weekly_finding_decisions', 'weekly_library_versions',
     'weekly_library_version_findings', 'weekly_editorial_profiles', 'weekly_profile_approvals', 'weekly_scripts',
@@ -791,6 +835,101 @@ begin
 end $$;
 
 -- Claim ids ("key@version") of the findings pinned in a library version.
+-- ── source copies: a person's grant, then a source_copy run ───────────────────────────────────────────────────────
+-- Three states, kept apart: granted (permission only) · pending or failed (a run is queued/running, or the newest run
+-- failed) · stored (the copy is in private storage and verified). A grant never implies a copy.
+create or replace function public.weekly_source_copy_state(p_source uuid) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select case
+    when w.id is null then null
+    when w.copy_granted_by is null then jsonb_build_object('state', 'not_granted')
+    else jsonb_build_object(
+      'state', case when w.document_path is not null then 'stored'
+                    when r.status in ('queued', 'running') then 'pending'
+                    when r.status = 'failed' then 'failed'
+                    else 'granted' end,
+      'granted_by', w.copy_granted_by, 'granted_at', w.copy_granted_at, 'basis', w.copy_grant_basis, 'kind', w.copy_kind,
+      'attempts', (select count(*) from public.weekly_runs x where x.kind = 'source_copy' and x.input ->> 'source_id' = w.id::text),
+      'last_error', case when w.document_path is null and r.status = 'failed' then r.error end,
+      'document_sha256', w.document_sha256, 'size', w.copy_size, 'verified_at', w.copy_verified_at, 'quote_match', w.copy_quote_match)
+    end
+  from (select p_source as sid) q
+  left join public.weekly_sources w on w.id = q.sid
+  left join lateral (select x.status, x.error from public.weekly_runs x where x.kind = 'source_copy' and x.input ->> 'source_id' = q.sid::text
+                     order by x.created_at desc, x.id desc limit 1) r on true
+$$;
+
+create or replace function public._wk_source_topic(p_source uuid) returns text
+language sql stable security definer set search_path = public as $$
+  select q.topic from public.weekly_sources w join public.weekly_research_answers a on a.id = w.answer_id
+    join public.weekly_research_requests q on q.id = a.request_id where w.id = p_source
+$$;
+
+-- A person grants permission to keep a full copy of ONE source (who, when, why, and the copy's type), then the first copy
+-- run is queued. The grant is recorded once and never changed.
+create or replace function public.hs_weekly_source_copy_grant(p_source uuid, p_kind text, p_basis text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); w public.weekly_sources; q jsonb;
+begin
+  select * into w from public.weekly_sources where id = p_source;
+  if w.id is null then raise exception 'unknown source' using errcode = '22023'; end if;
+  if w.copy_granted_by is not null then raise exception 'full-copy permission is already recorded for this source; it is not changed' using errcode = '22023'; end if;
+  if p_kind not in ('pdf', 'html') then raise exception 'the copy is a pdf or an html page' using errcode = '22023'; end if;
+  if char_length(btrim(coalesce(p_basis, ''))) not between 10 and 500 then
+    raise exception 'say why a full copy may be kept (10 to 500 characters)' using errcode = '22023';
+  end if;
+  update public.weekly_sources set storage_permission = 'full_copy', copy_kind = p_kind, copy_granted_by = e, copy_granted_at = now(),
+    copy_grant_basis = btrim(p_basis) where id = p_source;
+  q := public._wk_queue('source_copy', public._wk_source_topic(p_source), jsonb_build_object('source_id', p_source), e);
+  return jsonb_build_object('source_id', p_source, 'copy', public.weekly_source_copy_state(p_source)) || q;
+end $$;
+
+-- Try the copy again after a failure. The grant is not touched; a stored copy is never fetched again.
+create or replace function public.hs_weekly_source_copy_retry(p_source uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); st jsonb := public.weekly_source_copy_state(p_source); q jsonb;
+begin
+  if st is null then raise exception 'unknown source' using errcode = '22023'; end if;
+  if st ->> 'state' = 'not_granted' then raise exception 'no full-copy permission is recorded for this source' using errcode = '22023'; end if;
+  if st ->> 'state' = 'stored' then raise exception 'the copy is already stored; it is never fetched again' using errcode = '22023'; end if;
+  if st ->> 'state' = 'pending' then raise exception 'a copy run is already pending for this source' using errcode = '55006'; end if;
+  q := public._wk_queue('source_copy', public._wk_source_topic(p_source), jsonb_build_object('source_id', p_source), e);
+  return jsonb_build_object('source_id', p_source, 'copy', public.weekly_source_copy_state(p_source)) || q;
+end $$;
+
+-- The record step: the runner checked the bytes and uploaded them; the database accepts the copy only if the object it
+-- names is in private storage, at the one path the source id and checksum give, with the same size.
+create or replace function public.weekly_source_copy_record(p_run uuid, p_payload jsonb) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare r public.weekly_runs; w public.weekly_sources; sha text := p_payload ->> 'document_sha256'; k text := p_payload ->> 'document_kind';
+        sz bigint := (p_payload ->> 'size')::bigint; nm text; osz bigint;
+begin
+  select * into r from public.weekly_runs where id = p_run and kind = 'source_copy' and status = 'running';
+  if r.id is null then raise exception 'run is not a running source copy' using errcode = '55000'; end if;
+  select * into w from public.weekly_sources where id = (r.input ->> 'source_id')::uuid;
+  if w.copy_granted_by is null then raise exception 'no full-copy permission is recorded for this source' using errcode = '22023'; end if;
+  if w.document_path is not null then raise exception 'the stored copy of this source is accepted and is never replaced' using errcode = '55000'; end if;
+  if (p_payload ->> 'source_id') is distinct from w.id::text then raise exception 'the copy names another source' using errcode = '22023'; end if;
+  if k is distinct from w.copy_kind then raise exception 'the copy is not of the granted type (%)', w.copy_kind using errcode = '22023'; end if;
+  if sha !~ '^[0-9a-f]{64}$' then raise exception 'the copy has no sha256' using errcode = '22023'; end if;
+  nm := w.id::text || '/' || sha || '.' || k;
+  if (p_payload ->> 'document_path') is distinct from 'weekly-sources/' || nm then
+    raise exception 'the copy is stored at weekly-sources/<source id>/<sha256>.<kind>' using errcode = '22023';
+  end if;
+  if to_regclass('storage.objects') is null then raise exception 'storage is not available; nothing is recorded' using errcode = '55000'; end if;
+  execute 'select (metadata ->> ''size'')::bigint from storage.objects where bucket_id = ''weekly-sources'' and name = $1' into osz using nm;
+  if osz is null then raise exception 'the copy is not in private storage' using errcode = 'P0002'; end if;
+  if osz is distinct from sz then raise exception 'the stored object is % bytes, not %', osz, sz using errcode = '22023'; end if;
+  update public.weekly_sources set document_path = 'weekly-sources/' || nm, document_sha256 = sha, document_kind = k, copy_size = sz,
+    copy_verified_at = now(), copy_quote_match = p_payload ->> 'quote_match' where id = w.id;
+  insert into public.weekly_cost_entries (run_id, category, cost_type, scope, quantity, unit, note)
+    values (r.id, 'storage', 'storage_bytes', 'shared', sz, 'bytes', 'a stored source copy (private bucket weekly-sources)'),
+           (r.id, 'verification', 'runner_minutes', 'shared', null, null, 'source copy fetch and checks on a GitHub runner (no AI call)');
+  update public.weekly_runs set status = 'done', finished_at = now(), result = jsonb_build_object('source_id', w.id, 'document_sha256', sha, 'size', sz)
+    where id = r.id;
+  return public.weekly_source_copy_state(w.id);
+end $$;
+
 -- ── document-evidence cues (a segment's visual) ──────────────────────────────────────────────────────────────────
 -- A cue says: while this segment is spoken, show this page of this stored source with these words highlighted in yellow.
 -- It is resolved by homesignal-ingest weekly_slice/doc_cue.py with Tab 16's own document code (video/pdf_tools.find_quote,
@@ -1152,6 +1291,7 @@ begin
         'statement', s.statement, 'qualifiers', s.qualifiers, 'uncertainty', s.uncertainty, 'scope', s.scope, 'kind', s.kind,
         'human_decision', s.human_decision, 'is_latest', s.is_latest,
         'sources', (select coalesce(jsonb_agg(jsonb_build_object('id', w.id, 'document_kind', w.document_kind,
+            'storage_permission', w.storage_permission, 'copy', public.weekly_source_copy_state(w.id),
             'url', w.url, 'publisher', w.publisher, 'title', w.title,
             'quote', w.quote, 'quote_match', w.quote_match, 'date_extraction', w.date_extraction, 'published_date', w.published_date,
             'retrieved_at', w.retrieved_at, 'fetch_error', w.fetch_error, 'publication_permission', w.publication_permission)), '[]')
@@ -1246,6 +1386,13 @@ begin
       'answer', (select jsonb_build_object('id', a.id, 'raw_text', a.raw_text, 'raw_sha256', a.raw_sha256)
                  from public.weekly_research_answers a where a.id = (r.input ->> 'answer_id')::uuid));
   end if;
+  if r.kind = 'source_copy' then
+    return (select jsonb_build_object('run', r.id, 'kind', r.kind, 'mode', r.kind, 'topic', r.topic,
+      'source', jsonb_build_object('source_id', w.id, 'url', w.url, 'final_url', w.final_url, 'kind', w.copy_kind,
+        'content_sha256', w.content_sha256, 'granted', w.copy_granted_by is not null, 'stored', w.document_path is not null,
+        'quotes', case when w.quote is null then '[]'::jsonb else jsonb_build_array(w.quote) end))
+      from public.weekly_sources w where w.id = (r.input ->> 'source_id')::uuid);
+  end if;
   if r.kind in ('title_check', 'visual_check') then
     select v.* into tv from public.weekly_scripts v where v.id = (r.input ->> 'version_id')::uuid;
     r.input := r.input || jsonb_build_object('library_version_id', tv.library_version_id, 'profile_id', tv.profile_id, 'depends_on', tv.depends_on);
@@ -1309,14 +1456,12 @@ begin
   if r.id is null then raise exception 'run is not a running research ingest' using errcode = '55000'; end if;
   a := (r.input ->> 'answer_id')::uuid;
   for s in select * from jsonb_array_elements(coalesce(p_payload -> 'sources', '[]')) loop
-    -- A stored copy of the document (document_path/sha256/kind) is recorded only with storage_permission full_copy (the table's
-    -- check refuses it otherwise). The fetcher does not store copies yet; until it does, no source carries one.
+    -- Research never grants full-copy permission and never stores a copy: every source starts as an excerpt. A person grants
+    -- a copy afterwards (hs_weekly_source_copy_grant) and a source_copy run stores it.
     insert into public.weekly_sources (answer_id, url, final_url, publisher, title, quote, retrieved_at, content_sha256, fetch_error,
-                                       quote_match, date_extraction, published_date, storage_permission,
-                                       document_path, document_sha256, document_kind)
+                                       quote_match, date_extraction, published_date)
       values (a, s ->> 'url', s ->> 'final_url', s ->> 'publisher', s ->> 'title', s ->> 'quote', (s ->> 'retrieved_at')::timestamptz,
-              s ->> 'content_sha256', s ->> 'fetch_error', s ->> 'quote_match', s ->> 'date_extraction', (s ->> 'published_date')::date,
-              coalesce(s ->> 'storage_permission', 'excerpt'), s ->> 'document_path', s ->> 'document_sha256', s ->> 'document_kind')
+              s ->> 'content_sha256', s ->> 'fetch_error', s ->> 'quote_match', s ->> 'date_extraction', (s ->> 'published_date')::date)
       returning id into sid;
     ids := ids || jsonb_build_object(s ->> 'ref', sid);
   end loop;
@@ -1430,6 +1575,8 @@ begin
     'hs_weekly_title_publication_approve(uuid,text)', 'weekly_title_check_record(uuid,text,jsonb)',
     'weekly_without_visuals(jsonb)', 'weekly_cue_count(jsonb)', 'weekly_visual_checks(uuid)',
     'hs_weekly_doc_cue_set(uuid,integer,jsonb)', 'weekly_visual_check_record(uuid,text,jsonb)',
+    'weekly_sources_guard()', 'weekly_source_copy_state(uuid)', '_wk_source_topic(uuid)', 'hs_weekly_source_copy_grant(uuid,text,text)',
+    'hs_weekly_source_copy_retry(uuid)', 'weekly_source_copy_record(uuid,jsonb)',
     'hs_weekly_angles_request(uuid,uuid,uuid)', 'hs_weekly_outline_request(uuid,uuid)', 'hs_weekly_version_approve(uuid,integer,jsonb,boolean,text)',
     'hs_weekly_passage_review(uuid,integer,text,text,text,text[],text,text)',
     'hs_weekly_request_research(text,text)', 'hs_weekly_paste_answer(uuid,text)', 'hs_weekly_finding_decide(uuid,text,text)',
@@ -1447,13 +1594,14 @@ begin
     'hs_weekly_passage_review(uuid,integer,text,text,text,text[],text,text)', 'hs_weekly_correction_save(uuid,integer,text,text,text)',
     'hs_weekly_title_propose(uuid,jsonb,uuid,uuid)', 'hs_weekly_title_refit(uuid,uuid)', 'hs_weekly_titles_request(uuid,uuid)',
     'hs_weekly_title_decide(uuid,integer,text,text)', 'hs_weekly_title_evidence_review(uuid,text,text,boolean)',
-    'hs_weekly_title_publication_approve(uuid,text)', 'hs_weekly_doc_cue_set(uuid,integer,jsonb)', 'hs_weekly_lesson_propose(uuid,text,jsonb)',
+    'hs_weekly_title_publication_approve(uuid,text)', 'hs_weekly_doc_cue_set(uuid,integer,jsonb)',
+    'hs_weekly_source_copy_grant(uuid,text,text)', 'hs_weekly_source_copy_retry(uuid)', 'hs_weekly_lesson_propose(uuid,text,jsonb)',
     'hs_weekly_lesson_decide(uuid,text)', 'hs_weekly_lesson_use_review(bigint,text,text)',
     'hs_weekly_subscription_record(text,text,numeric,text,boolean)', 'hs_weekly_overview(text)', 'hs_weekly_export(text)'] loop
     execute format('grant execute on function public.%s to authenticated', f);
   end loop;
   foreach f in array array['weekly_run_claim(uuid)', 'weekly_run_fail(uuid,text)', 'weekly_research_record(uuid,jsonb)',
-    'weekly_script_record(uuid,jsonb)', 'weekly_title_check_record(uuid,text,jsonb)', 'weekly_visual_check_record(uuid,text,jsonb)'] loop
+    'weekly_script_record(uuid,jsonb)', 'weekly_title_check_record(uuid,text,jsonb)', 'weekly_visual_check_record(uuid,text,jsonb)', 'weekly_source_copy_record(uuid,jsonb)'] loop
     execute format('grant execute on function public.%s to service_role', f);
   end loop;
 end $$;

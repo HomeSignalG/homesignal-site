@@ -31,3 +31,20 @@ create schema if not exists net;
 create table net.calls (id bigserial primary key, url text, body jsonb, headers jsonb);
 create or replace function net.http_post(url text, body jsonb, headers jsonb, timeout_milliseconds integer) returns bigint
 language sql as $$ insert into net.calls (url, body, headers) values (url, body, headers) returning id $$;
+-- Supabase Storage stand-in: the two tables the storage server reads and writes, with RLS on, as in Supabase. The storage
+-- server decides a read by querying storage.objects AS THE CALLER'S ROLE, so the bucket policy in the migration is what
+-- allows or refuses it. hs_is_dashboard_admin is a stand-in (the production helper is not copied into this repo).
+create schema if not exists storage;
+create table storage.buckets (id text primary key, name text not null, public boolean not null default false,
+  file_size_limit bigint, allowed_mime_types text[]);
+create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text references storage.buckets (id),
+  name text not null, owner uuid, metadata jsonb, created_at timestamptz not null default now(), unique (bucket_id, name));
+alter table storage.objects enable row level security;
+grant usage on schema storage to anon, authenticated, service_role;
+grant select on storage.objects to anon, authenticated;
+grant all on storage.objects, storage.buckets to service_role;
+alter table storage.objects force row level security;
+create policy service_all on storage.objects for all to service_role using (true) with check (true);
+create or replace function public.hs_is_dashboard_admin() returns boolean language sql stable security definer set search_path = public as
+  $$ select exists (select 1 from public.dashboard_admins where email = auth.jwt() ->> 'email') $$;
+grant execute on function public.hs_is_dashboard_admin() to anon, authenticated;

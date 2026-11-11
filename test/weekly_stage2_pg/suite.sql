@@ -406,24 +406,156 @@ select 'T17|' || ((select depends_on = :'s5'::uuid and parent_id = :'t3'::uuid a
 -- DOCUMENT CUES (a segment's visual). A cue points at a stored copy of a source of a finding the segment cites; setting one
 -- makes a new version (only the cue changes); a visual_check run resolves it against the document; an unresolved or
 -- unchecked cue blocks approval. TEST DATA.
+-- SOURCE COPIES. Permission and the stored copy are separate facts: a person grants permission (once, never changed), a
+-- source_copy run fetches the document, and the database records it only when the named object is in private storage
+-- with the same size. A failed copy can be retried without touching the grant; an accepted copy is never replaced.
 select 'V01|' || (pg_temp.raises($q$insert into public.weekly_sources (answer_id, url, quote_match, date_extraction, document_path, document_sha256, document_kind)
   select id, 'https://example.test/doc', 'not_checked', 'unknown', 'weekly-sources/t/a.pdf', repeat('c', 64), 'pdf' from public.weekly_research_answers limit 1$q$, '23514')
-  and pg_temp.raises($q$insert into public.weekly_sources (answer_id, url, quote_match, date_extraction, storage_permission, document_path, document_sha256, document_kind)
-  select id, 'https://example.test/doc', 'not_checked', 'unknown', 'full_copy', 'weekly-sources/t/a.html', repeat('c', 64), 'pdf' from public.weekly_research_answers limit 1$q$, '23514')
-  and pg_temp.raises($q$insert into public.weekly_sources (answer_id, url, quote_match, date_extraction, storage_permission, document_path, document_kind)
-  select id, 'https://example.test/doc', 'not_checked', 'unknown', 'full_copy', 'weekly-sources/t/a.pdf', 'pdf' from public.weekly_research_answers limit 1$q$, '23514'));
+  and pg_temp.raises($q$insert into public.weekly_sources (answer_id, url, quote_match, date_extraction, storage_permission)
+  select id, 'https://example.test/doc', 'not_checked', 'unknown', 'full_copy' from public.weekly_research_answers limit 1$q$, '23514'));
+select id as ans from public.weekly_research_answers limit 1 \gset
+insert into public.weekly_sources (answer_id, url, title, quote, quote_match, date_extraction)
+  values (:'ans', 'https://example.test/copy.pdf', 'TEST copy', 'TEST the quoted words', 'not_checked', 'unknown') returning id as dcp \gset
+set role authenticated;
+select set_config('test.jwt', :'other', false);
+select 'S01|' || pg_temp.raises(format('select public.hs_weekly_source_copy_grant(%L::uuid, %L, %L)', :'dcp', 'pdf', 'TEST published federal record'), '42501');
+select set_config('test.jwt', :'admin', false);
+select 'S02|' || (pg_temp.raises(format('select public.hs_weekly_source_copy_grant(%L::uuid, %L, %L)', :'dcp', 'docx', 'TEST published federal record'), '22023')
+  and pg_temp.raises(format('select public.hs_weekly_source_copy_grant(%L::uuid, %L, %L)', :'dcp', 'pdf', 'short'), '22023')
+  and pg_temp.raises(format('select public.hs_weekly_source_copy_retry(%L::uuid)', :'dcp'), '22023'));
+select public.hs_weekly_source_copy_grant(:'dcp', 'pdf', 'TEST published federal record, public domain')::text as g1 \gset
+reset role;
+select copy_granted_by as gby, copy_granted_at::text as gat, copy_grant_basis as gbasis from public.weekly_sources where id = :'dcp' \gset
+select (:'g1'::jsonb ->> 'run_id') as cr1 \gset
+-- granted is not stored: the copy is pending, nothing is in storage, no document field is set
+select 'S03|' || ((:'g1'::jsonb -> 'copy' ->> 'state') = 'pending'
+  and (select storage_permission = 'full_copy' and copy_kind = 'pdf' and document_path is null and document_sha256 is null and copy_size is null
+       from public.weekly_sources where id = :'dcp')
+  and (select kind = 'source_copy' and status = 'queued' and input ->> 'source_id' = :'dcp' from public.weekly_runs where id = :'cr1'::uuid));
+set role authenticated;
+select set_config('test.jwt', :'admin', false);
+select 'S04|' || (pg_temp.raises(format('select public.hs_weekly_source_copy_grant(%L::uuid, %L, %L)', :'dcp', 'html', 'TEST a second, different grant'), '22023')
+  and pg_temp.raises(format('select public.hs_weekly_source_copy_retry(%L::uuid)', :'dcp'), '55006'));
+reset role;
+-- the copy fails (e.g. the site did not answer): the state is failed with the reason, the grant is unchanged
+set role service_role;
+select public.weekly_run_claim(:'cr1')::text as cc1 \gset
+select 'S05|' || ((:'cc1'::jsonb -> 'source' ->> 'granted') = 'true' and (:'cc1'::jsonb -> 'source' ->> 'stored') = 'false'
+  and (:'cc1'::jsonb -> 'source' ->> 'kind') = 'pdf' and (:'cc1'::jsonb -> 'source' -> 'quotes') = '["TEST the quoted words"]'::jsonb
+  and (:'cc1'::jsonb ->> 'mode') = 'source_copy');
+select public.weekly_run_fail(:'cr1', 'copy not fetched: HTTP 503');
+reset role;
+select 'S06|' || ((public.weekly_source_copy_state(:'dcp') ->> 'state') = 'failed'
+  and (public.weekly_source_copy_state(:'dcp') ->> 'last_error') = 'copy not fetched: HTTP 503'
+  and (select copy_granted_by = :'gby' and copy_granted_at::text = :'gat' and copy_grant_basis = :'gbasis' and document_path is null
+       from public.weekly_sources where id = :'dcp'));
+set role authenticated;
+select set_config('test.jwt', :'admin', false);
+select (public.hs_weekly_source_copy_retry(:'dcp') ->> 'run_id') as cr2 \gset
+reset role;
+select 'S07|' || ((public.weekly_source_copy_state(:'dcp') ->> 'state') = 'pending' and (public.weekly_source_copy_state(:'dcp') ->> 'attempts') = '2'
+  and (select copy_granted_by = :'gby' and copy_granted_at::text = :'gat' and copy_grant_basis = :'gbasis' from public.weekly_sources where id = :'dcp'));
+-- the record step: refused unless the run is running and the named object is in storage with the same size
+\set csha 'aaaa111122223333444455556666777788889999aaaabbbbccccddddeeeeffff'
+select format('{"source_id":"%s","document_sha256":"%s","document_kind":"pdf","size":1234,"document_path":"weekly-sources/%s/%s.pdf","quote_match":"found"}',
+  :'dcp', :'csha', :'dcp', :'csha') as cpay \gset
+set role service_role;
+select 'S08|' || pg_temp.raises(format('select public.weekly_source_copy_record(%L::uuid, %L::jsonb)', :'cr2', :'cpay'), '55000');
+select public.weekly_run_claim(:'cr2') is not null as ok \gset
+-- nothing in storage yet: refused as "not in private storage" (its own error code)
+select 'S09|' || (pg_temp.raises(format('select public.weekly_source_copy_record(%L::uuid, %L::jsonb)', :'cr2', :'cpay'), 'P0002')
+  and pg_temp.raises(format('select public.weekly_source_copy_record(%L::uuid, %L::jsonb)', :'cr2', jsonb_set(:'cpay'::jsonb, '{document_sha256}', '"nothex"')), '22023')
+  and pg_temp.raises(format('select public.weekly_source_copy_record(%L::uuid, %L::jsonb)', :'cr2', jsonb_set(:'cpay'::jsonb, '{source_id}', to_jsonb(:'ans'::text))), '22023'));
+reset role;
+-- the object is now there (and an html object of the same checksum too): still refused for a wrong size, kind or path
+insert into storage.objects (bucket_id, name, metadata) values ('weekly-sources', :'dcp' || '/' || :'csha' || '.pdf', '{"size":1234}'),
+  ('weekly-sources', :'dcp' || '/' || :'csha' || '.html', '{"size":1234}');
+set role service_role;
+select 'S10|' || (pg_temp.raises(format('select public.weekly_source_copy_record(%L::uuid, %L::jsonb)', :'cr2', jsonb_set(:'cpay'::jsonb, '{size}', '999')), '22023')
+  and pg_temp.raises(format('select public.weekly_source_copy_record(%L::uuid, %L::jsonb)', :'cr2',
+        jsonb_set(jsonb_set(:'cpay'::jsonb, '{document_kind}', '"html"'), '{document_path}', to_jsonb('weekly-sources/' || :'dcp' || '/' || :'csha' || '.html'))), '22023')
+  and pg_temp.raises(format('select public.weekly_source_copy_record(%L::uuid, %L::jsonb)', :'cr2', jsonb_set(:'cpay'::jsonb, '{document_path}', '"weekly-sources/other.pdf"')), '22023'));
+select public.weekly_source_copy_record(:'cr2', :'cpay'::jsonb)::text as st1 \gset
+reset role;
+select 'S11|' || ((:'st1'::jsonb ->> 'state') = 'stored' and (:'st1'::jsonb ->> 'document_sha256') = :'csha' and (:'st1'::jsonb ->> 'size') = '1234'
+  and (select document_path = 'weekly-sources/' || :'dcp' || '/' || :'csha' || '.pdf' and copy_quote_match = 'found' and copy_verified_at is not null
+         and copy_granted_by = :'gby' and copy_granted_at::text = :'gat' from public.weekly_sources where id = :'dcp')
+  and (select status = 'done' from public.weekly_runs where id = :'cr2'::uuid)
+  and (select count(*) from public.weekly_cost_entries where run_id = :'cr2'::uuid and cost_type in ('storage_bytes', 'runner_minutes')) = 2);
+-- an accepted copy is never replaced, re-fetched, or re-granted; the grant is never changed or removed
+set role authenticated;
+select set_config('test.jwt', :'admin', false);
+select 'S12|' || (pg_temp.raises(format('select public.hs_weekly_source_copy_retry(%L::uuid)', :'dcp'), '22023')
+  and pg_temp.raises(format('select public.hs_weekly_source_copy_grant(%L::uuid, %L, %L)', :'dcp', 'pdf', 'TEST published federal record'), '22023'));
+reset role;
+select 'S13|' || (pg_temp.raises(format($q$update public.weekly_sources set document_sha256 = %L, document_path = %L where id = %L$q$,
+      repeat('b', 64), 'weekly-sources/' || :'dcp' || '/' || repeat('b', 64) || '.pdf', :'dcp'), '55000')
+  and pg_temp.raises(format($q$update public.weekly_sources set copy_grant_basis = 'TEST changed basis text' where id = %L$q$, :'dcp'), '55000')
+  and pg_temp.raises(format($q$update public.weekly_sources set copy_granted_by = null, copy_granted_at = null, copy_grant_basis = null, copy_kind = null,
+      storage_permission = 'excerpt', document_path = null, document_sha256 = null, document_kind = null, copy_size = null, copy_verified_at = null,
+      copy_quote_match = null where id = %L$q$, :'dcp'), '55000')
+  and pg_temp.raises(format($q$delete from public.weekly_sources where id = %L$q$, :'dcp'), '55000')
+  and pg_temp.raises(format($q$update public.weekly_sources set title = 'TEST renamed' where id = %L$q$, :'dcp'), '55000'));
+-- private storage: anon and a signed-in non-admin read nothing in the bucket; an admin reads the copy; nobody but the
+-- service role writes; the function grants are as intended
+set role anon;
+select set_config('test.jwt', '', false);
+select count(*) as n_anon from storage.objects where bucket_id = 'weekly-sources' \gset
+reset role;
+set role authenticated;
+select set_config('test.jwt', :'other', false);
+select count(*) as n_other from storage.objects where bucket_id = 'weekly-sources' \gset
+select 'S14b|' || pg_temp.raises($q$insert into storage.objects (bucket_id, name, metadata) values ('weekly-sources', 'x/y.pdf', '{"size":1}')$q$, '42501');
+select set_config('test.jwt', :'admin', false);
+select count(*) as n_admin from storage.objects where bucket_id = 'weekly-sources' \gset
+reset role;
+select 'S14|' || (:'n_anon' = '0' and :'n_other' = '0' and :'n_admin' = '2'
+  and (select not public from storage.buckets where id = 'weekly-sources') and (select not public from storage.buckets where id = 'weekly-visuals'));
+select 'S15|' || (has_function_privilege('authenticated', 'public.hs_weekly_source_copy_grant(uuid,text,text)', 'execute')
+  and has_function_privilege('authenticated', 'public.hs_weekly_source_copy_retry(uuid)', 'execute')
+  and not has_function_privilege('anon', 'public.hs_weekly_source_copy_grant(uuid,text,text)', 'execute')
+  and not has_function_privilege('authenticated', 'public.weekly_source_copy_record(uuid,jsonb)', 'execute')
+  and not has_function_privilege('anon', 'public.weekly_source_copy_record(uuid,jsonb)', 'execute')
+  and has_function_privilege('service_role', 'public.weekly_source_copy_record(uuid,jsonb)', 'execute'));
+
+-- DOCUMENT CUES. Every source a cue may point at gets its copy through the same grant, run and record (pg_temp.store).
+create or replace function pg_temp.store(p_src uuid, p_kind text, p_sha text, p_admin text) returns void language plpgsql as $$
+declare g jsonb; run uuid;
+begin
+  perform set_config('test.jwt', p_admin, true);
+  g := public.hs_weekly_source_copy_grant(p_src, p_kind, 'TEST a public record, kept as a full copy');
+  run := (g ->> 'run_id')::uuid;
+  perform public.weekly_run_claim(run);
+  insert into storage.objects (bucket_id, name, metadata) values ('weekly-sources', p_src || '/' || p_sha || '.' || p_kind, '{"size":100}');
+  perform public.weekly_source_copy_record(run, jsonb_build_object('source_id', p_src, 'document_sha256', p_sha, 'document_kind', p_kind,
+    'size', 100, 'document_path', 'weekly-sources/' || p_src || '/' || p_sha || '.' || p_kind, 'quote_match', 'no_quote'));
+end $$;
 select f.id as fps from public.weekly_findings f join public.weekly_library_version_findings x on x.finding_id = f.id
   where x.library_version_id = (select library_version_id from public.weekly_scripts where id = :'s5') and f.finding_key = 'air-proposal-status' \gset
-select id as ans from public.weekly_research_answers limit 1 \gset
-insert into public.weekly_sources (answer_id, url, title, quote_match, date_extraction, storage_permission, document_path, document_sha256, document_kind)
-  values (:'ans', 'https://example.test/rule.pdf', 'TEST rule', 'not_checked', 'unknown', 'full_copy', 'weekly-sources/t/rule.pdf', repeat('d', 64), 'pdf') returning id as dpdf \gset
-insert into public.weekly_sources (answer_id, url, title, quote_match, date_extraction, storage_permission, document_path, document_sha256, document_kind)
-  values (:'ans', 'https://example.test/page', 'TEST page', 'not_checked', 'unknown', 'full_copy', 'weekly-sources/t/page.html', repeat('e', 64), 'html') returning id as dhtml \gset
+insert into public.weekly_sources (answer_id, url, title, quote_match, date_extraction)
+  values (:'ans', 'https://example.test/rule.pdf', 'TEST rule', 'not_checked', 'unknown') returning id as dpdf \gset
+insert into public.weekly_sources (answer_id, url, title, quote_match, date_extraction)
+  values (:'ans', 'https://example.test/page', 'TEST page', 'not_checked', 'unknown') returning id as dhtml \gset
 insert into public.weekly_sources (answer_id, url, quote, quote_match, date_extraction)
   values (:'ans', 'https://example.test/excerpt', 'TEST excerpt only', 'not_checked', 'unknown') returning id as dexc \gset
-insert into public.weekly_sources (answer_id, url, quote_match, date_extraction, storage_permission, document_path, document_sha256, document_kind)
-  values (:'ans', 'https://example.test/other.pdf', 'not_checked', 'unknown', 'full_copy', 'weekly-sources/t/other.pdf', repeat('f', 64), 'pdf') returning id as doth \gset
-insert into public.weekly_finding_sources values (:'fps', :'dpdf'), (:'fps', :'dhtml'), (:'fps', :'dexc');
+insert into public.weekly_sources (answer_id, url, quote_match, date_extraction)
+  values (:'ans', 'https://example.test/other.pdf', 'not_checked', 'unknown') returning id as doth \gset
+-- a source with permission granted but no stored copy yet: a cue may not point at it
+insert into public.weekly_sources (answer_id, url, quote_match, date_extraction)
+  values (:'ans', 'https://example.test/granted.pdf', 'not_checked', 'unknown') returning id as dgr \gset
+select pg_temp.store(:'dpdf', 'pdf', repeat('d', 64), :'admin');
+select pg_temp.store(:'dhtml', 'html', repeat('e', 64), :'admin');
+select pg_temp.store(:'doth', 'pdf', repeat('f', 64), :'admin');
+select set_config('test.jwt', :'admin', false);
+select public.hs_weekly_source_copy_grant(:'dgr', 'pdf', 'TEST granted, not yet copied') is not null as ok \gset
+reset role;
+select 'S16|' || (pg_temp.raises(format($q$update public.weekly_sources set copy_grant_basis = 'TEST a different reason' where id = %L$q$, :'dgr'), '55000')
+  and pg_temp.raises(format($q$update public.weekly_sources set copy_kind = 'html' where id = %L$q$, :'dgr'), '55000')
+  -- a copy without any grant is refused by the table itself, even at the one correct path
+  and pg_temp.raises(format($q$insert into public.weekly_sources (id, answer_id, url, quote_match, date_extraction, document_path, document_sha256, document_kind,
+      copy_size, copy_verified_at, copy_quote_match) values (%L, %L, 'https://example.test/x.pdf', 'not_checked', 'unknown', %L, %L, 'pdf', 10, now(), 'no_quote')$q$,
+      '11111111-2222-3333-4444-555555555555', :'ans', 'weekly-sources/11111111-2222-3333-4444-555555555555/' || repeat('a', 64) || '.pdf', repeat('a', 64)), '23514'));
+insert into public.weekly_finding_sources values (:'fps', :'dpdf'), (:'fps', :'dhtml'), (:'fps', :'dexc'), (:'fps', :'dgr');
 insert into public.weekly_finding_sources select f.id, :'doth' from public.weekly_findings f where f.finding_key = 'air-estimate-scope' limit 1;
 select jsonb_build_object('type', 'doc', 'claim_id', 'air-proposal-status@1', 'source_id', :'dpdf', 'page', 1,
   'quote', 'TEST: the agency proposes to rescind the program.', 'highlight', 'yellow')::text as cue0 \gset
@@ -437,6 +569,7 @@ select 'V03|' || (pg_temp.raises(format('select public.hs_weekly_doc_cue_set(%L:
   and pg_temp.raises(format('select public.hs_weekly_doc_cue_set(%L::uuid, 0, %L::jsonb)', :'s5',
         jsonb_set(jsonb_set(:'cue0'::jsonb, '{claim_id}', '"air-estimate-scope@1"'), '{source_id}', to_jsonb(:'doth'::text))), '22023')
   and pg_temp.raises(format('select public.hs_weekly_doc_cue_set(%L::uuid, 0, %L::jsonb)', :'s5', jsonb_set(:'cue0'::jsonb, '{source_id}', to_jsonb(:'dexc'::text))), '22023')
+  and pg_temp.raises(format('select public.hs_weekly_doc_cue_set(%L::uuid, 0, %L::jsonb)', :'s5', jsonb_set(:'cue0'::jsonb, '{source_id}', to_jsonb(:'dgr'::text))), '22023')
   and pg_temp.raises(format('select public.hs_weekly_doc_cue_set(%L::uuid, 0, %L::jsonb)', :'s5', jsonb_set(:'cue0'::jsonb, '{highlight}', '"red"')), '22023')
   and pg_temp.raises(format('select public.hs_weekly_doc_cue_set(%L::uuid, 0, %L::jsonb)', :'s5', jsonb_set(:'cue0'::jsonb, '{page}', '0')), '22023')
   and pg_temp.raises(format('select public.hs_weekly_doc_cue_set(%L::uuid, 0, %L::jsonb)', :'s5', jsonb_set(:'cue0'::jsonb, '{page}', '1.5')), '22023')
@@ -479,8 +612,9 @@ set role service_role;
 select public.weekly_run_claim(:'vr1')::text as vclaim \gset
 select 'V07|' || ((:'vclaim'::jsonb -> 'cue_version' ->> 'id') = :'s6' and (:'vclaim'::jsonb -> 'cue_version' ->> 'body_sha256') = :'s6sha'
   and (select count(*) from jsonb_array_elements(:'vclaim'::jsonb -> 'sources') x where x ->> 'source_id' in (:'dpdf', :'dhtml')
-       and x ->> 'document_path' like 'weekly-sources/t/%' and x -> 'finding_ids' ? 'air-proposal-status@1') = 2
-  and not exists (select 1 from jsonb_array_elements(:'vclaim'::jsonb -> 'sources') x where x ->> 'source_id' in (:'dexc'))
+       and x ->> 'document_path' = 'weekly-sources/' || (x ->> 'source_id') || '/' || (x ->> 'document_sha256') || '.' || (x ->> 'document_kind')
+       and x -> 'finding_ids' ? 'air-proposal-status@1') = 2
+  and not exists (select 1 from jsonb_array_elements(:'vclaim'::jsonb -> 'sources') x where x ->> 'source_id' in (:'dexc', :'dgr'))
   and (:'vclaim'::jsonb ->> 'mode') = 'visual_check' and jsonb_array_length(:'vclaim'::jsonb -> 'findings') > 0);
 select 'V08|' || (pg_temp.raises(format('select public.weekly_visual_check_record(%L::uuid, %L, %L::jsonb)', :'vr1', repeat('0', 64), '{"ok":true,"segments":[]}'), '22023')
   and pg_temp.raises(format('select public.weekly_visual_check_record(%L::uuid, %L, %L::jsonb)', :'vr1', :'s6sha', '{"segments":[]}'), '22023'));
@@ -632,7 +766,7 @@ select 'W27b|' || ((select count(*) from public.weekly_cost_entries where catego
   and (select count(*) from public.weekly_cost_entries where category = 'verification' and cost_type = 'no_incremental_api_charge')
     = (select count(*) from public.weekly_scripts where run_id is not null)
   and (select count(*) from public.weekly_cost_entries where category = 'verification' and cost_type = 'runner_minutes')
-    = (select count(*) from public.weekly_runs where kind in ('title_check', 'visual_check') and status = 'done')
+    = (select count(*) from public.weekly_runs where kind in ('title_check', 'visual_check', 'source_copy') and status = 'done')
   and not exists (select 1 from public.weekly_cost_entries where cost_type = 'no_incremental_api_charge' and amount_usd is not null));
 set role authenticated;
 select set_config('test.jwt', :'admin', false);

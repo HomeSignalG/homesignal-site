@@ -59,6 +59,19 @@
    "scope": "federal",
    "sources": [
     {
+     "copy": {
+      "attempts": 1,
+      "basis": "TEST DATA: a U.S. government record, kept as a full copy",
+      "document_sha256": "faa7045eb0c311e8795dafcf7744b2d5db6f6f297fe29ef76f2d64d1923c5758",
+      "granted_at": "2026-11-10T12:00:00Z",
+      "granted_by": "founder@test.invalid",
+      "kind": "pdf",
+      "last_error": null,
+      "quote_match": "found",
+      "size": 3321258,
+      "state": "stored",
+      "verified_at": "2026-11-10T12:01:00Z"
+     },
      "date_extraction": "not_stated",
      "document_kind": "pdf",
      "fetch_error": null,
@@ -68,7 +81,8 @@
      "publisher": "U.S. EPA (Federal Register)",
      "quote": "TEST DATA: this action proposes to amend the rule",
      "quote_match": "exact",
-     "retrieved_at": "2026-11-10T12:00:00Z",
+     "retrieved_at": "2026-11-10T12:02:00Z",
+     "storage_permission": "full_copy",
      "title": "EPA, Proposed Rule, 91 FR 68234 (October 29, 2026)",
      "url": "https://www.govinfo.gov/content/pkg/FR-2026-10-29/pdf/2026-22082.pdf"
     }
@@ -89,6 +103,9 @@
    "scope": "federal",
    "sources": [
     {
+     "copy": {
+      "state": "not_granted"
+     },
      "date_extraction": "not_stated",
      "document_kind": null,
      "fetch_error": null,
@@ -98,7 +115,8 @@
      "publisher": "TEST Publisher",
      "quote": "TEST DATA: notifications from third parties would no longer be submitted to the agency",
      "quote_match": "exact",
-     "retrieved_at": "2026-11-10T12:01:00Z",
+     "retrieved_at": "2026-11-10T12:03:00Z",
+     "storage_permission": "excerpt",
      "title": "TEST page",
      "url": "https://example.test/source-1"
     }
@@ -200,7 +218,7 @@
  ],
  "requests": [
   {
-   "created_at": "2026-11-10T12:02:00Z",
+   "created_at": "2026-11-10T12:04:00Z",
    "id": "id-14",
    "request_text": "TEST DATA: research the October 2026 EPA proposal (fixture)"
   }
@@ -226,51 +244,58 @@
  },
  "runs": [
   {
-   "created_at": "2026-11-10T12:03:00Z",
+   "created_at": "2026-11-10T12:05:00Z",
    "error": null,
    "id": "id-15",
    "kind": "title_check",
    "status": "done"
   },
   {
-   "created_at": "2026-11-10T12:04:00Z",
+   "created_at": "2026-11-10T12:06:00Z",
    "error": null,
    "id": "id-16",
    "kind": "visual_check",
    "status": "done"
   },
   {
-   "created_at": "2026-11-10T12:05:00Z",
+   "created_at": "2026-11-10T12:07:00Z",
    "error": null,
    "id": "id-17",
    "kind": "rewrite",
    "status": "done"
   },
   {
-   "created_at": "2026-11-10T12:06:00Z",
+   "created_at": "2026-11-10T12:08:00Z",
    "error": null,
    "id": "id-18",
    "kind": "script",
    "status": "done"
   },
   {
-   "created_at": "2026-11-10T12:07:00Z",
+   "created_at": "2026-11-10T12:09:00Z",
    "error": null,
    "id": "id-19",
    "kind": "outline",
    "status": "done"
   },
   {
-   "created_at": "2026-11-10T12:08:00Z",
+   "created_at": "2026-11-10T12:10:00Z",
    "error": null,
    "id": "id-20",
    "kind": "angles",
    "status": "done"
   },
   {
-   "created_at": "2026-11-10T12:09:00Z",
+   "created_at": "2026-11-10T12:11:00Z",
    "error": null,
    "id": "id-21",
+   "kind": "source_copy",
+   "status": "done"
+  },
+  {
+   "created_at": "2026-11-10T12:12:00Z",
+   "error": null,
+   "id": "id-22",
    "kind": "research_ingest",
    "status": "done"
   }
@@ -280,9 +305,9 @@
   {
    "approvals": [
     {
-     "approved_at": "2026-11-10T12:10:00Z",
+     "approved_at": "2026-11-10T12:13:00Z",
      "approved_by": "founder@test.invalid",
-     "body_sha256": "sha-26",
+     "body_sha256": "sha-27",
      "high_risk_ack": false,
      "kind": "editorial",
      "note": "TEST DATA: lead with the residents",
@@ -346,16 +371,16 @@
      }
     ]
    },
-   "body_sha256": "sha-26",
+   "body_sha256": "sha-27",
    "checks": {
     "certifies_accuracy": false,
     "label": "mechanical checks passed",
     "ok": true
    },
-   "created_at": "2026-11-10T12:11:00Z",
+   "created_at": "2026-11-10T12:14:00Z",
    "cues": 0,
    "depends_on": null,
-   "id": "id-22",
+   "id": "id-23",
    "kind": "ai_draft",
    "lesson_uses": [],
    "lessons_included": [],
@@ -370,7 +395,7 @@
     "approved": true,
     "approved_earlier_version": false,
     "current": true,
-    "id": "id-22",
+    "id": "id-23",
     "outdated": false,
     "outdated_reason": null,
     "stage": "angles",
@@ -381,9 +406,9 @@
   {
    "approvals": [
     {
-     "approved_at": "2026-11-10T12:12:00Z",
+     "approved_at": "2026-11-10T12:15:00Z",
      "approved_by": "founder@test.invalid",
-     "body_sha256": "sha-27",
+     "body_sha256": "sha-28",
      "high_risk_ack": false,
      "kind": "editorial",
      "note": null,
@@ -418,16 +443,16 @@
      }
     ]
    },
-   "body_sha256": "sha-27",
+   "body_sha256": "sha-28",
    "checks": {
     "certifies_accuracy": false,
     "label": "mechanical checks passed",
     "ok": true
    },
-   "created_at": "2026-11-10T12:13:00Z",
+   "created_at": "2026-11-10T12:16:00Z",
    "cues": 0,
-   "depends_on": "id-22",
-   "id": "id-23",
+   "depends_on": "id-23",
+   "id": "id-24",
    "kind": "ai_draft",
    "lesson_uses": [],
    "lessons_included": [],
@@ -442,7 +467,7 @@
     "approved": true,
     "approved_earlier_version": false,
     "current": true,
-    "id": "id-23",
+    "id": "id-24",
     "outdated": false,
     "outdated_reason": null,
     "stage": "outline",
@@ -475,7 +500,7 @@
      }
     ]
    },
-   "body_sha256": "sha-28",
+   "body_sha256": "sha-29",
    "checks": {
     "ceiling_words": 750,
     "certifies_accuracy": false,
@@ -512,9 +537,9 @@
     },
     "words": 106
    },
-   "created_at": "2026-11-10T12:14:00Z",
+   "created_at": "2026-11-10T12:17:00Z",
    "cues": 0,
-   "depends_on": "id-23",
+   "depends_on": "id-24",
    "id": "id-03",
    "kind": "ai_draft",
    "lesson_uses": [],
@@ -563,7 +588,7 @@
      }
     ]
    },
-   "body_sha256": "sha-29",
+   "body_sha256": "sha-30",
    "checks": {
     "ceiling_words": 750,
     "certifies_accuracy": false,
@@ -593,9 +618,9 @@
     },
     "words": 92
    },
-   "created_at": "2026-11-10T12:15:00Z",
+   "created_at": "2026-11-10T12:18:00Z",
    "cues": 0,
-   "depends_on": "id-23",
+   "depends_on": "id-24",
    "id": "id-02",
    "kind": "ai_draft",
    "lesson_uses": [],
@@ -652,7 +677,7 @@
      }
     ]
    },
-   "body_sha256": "sha-30",
+   "body_sha256": "sha-31",
    "checks": {
     "ceiling_words": 750,
     "certifies_accuracy": false,
@@ -683,10 +708,10 @@
     },
     "words": 92
    },
-   "created_at": "2026-11-10T12:16:00Z",
+   "created_at": "2026-11-10T12:19:00Z",
    "cues": 1,
-   "depends_on": "id-23",
-   "id": "id-24",
+   "depends_on": "id-24",
+   "id": "id-25",
    "kind": "human_reviewed",
    "lesson_uses": [],
    "lessons_included": [],
@@ -701,7 +726,7 @@
     "approved": false,
     "approved_earlier_version": false,
     "current": false,
-    "id": "id-24",
+    "id": "id-25",
     "outdated": false,
     "outdated_reason": null,
     "stage": "script",
@@ -726,7 +751,7 @@
       },
       "match": "first the epa proposes to rescind the super emitter program",
       "page": 1,
-      "preview_path": "weekly-visuals/id-24/pages/id-07_pdf_dfc3cf9a_p1.png",
+      "preview_path": "weekly-visuals/id-25/pages/id-07_pdf_dfc3cf9a_p1.png",
       "problems": [],
       "scene": {
        "doc": {
@@ -771,9 +796,9 @@
   {
    "approvals": [
     {
-     "approved_at": "2026-11-10T12:17:00Z",
+     "approved_at": "2026-11-10T12:20:00Z",
      "approved_by": "founder@test.invalid",
-     "body_sha256": "sha-31",
+     "body_sha256": "sha-32",
      "high_risk_ack": false,
      "kind": "editorial",
      "note": "FIXTURE: approved by the founder in a conversation on 2026-11-10; not a dashboard action",
@@ -807,15 +832,15 @@
     ],
     "origin": "person"
    },
-   "body_sha256": "sha-31",
+   "body_sha256": "sha-32",
    "checks": {
     "certifies_accuracy": false,
     "label": "title checks not run yet"
    },
-   "created_at": "2026-11-10T12:18:00Z",
+   "created_at": "2026-11-10T12:21:00Z",
    "cues": 0,
-   "depends_on": "id-24",
-   "id": "id-25",
+   "depends_on": "id-25",
+   "id": "id-26",
    "kind": "human_reviewed",
    "lesson_uses": [],
    "lessons_included": [],
@@ -831,7 +856,7 @@
     "approved_earlier_version": false,
     "current": true,
     "evidence_review": "ready_for_review",
-    "id": "id-25",
+    "id": "id-26",
     "outdated": false,
     "outdated_reason": null,
     "publication": "not_approved",

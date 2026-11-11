@@ -28,7 +28,9 @@ def q(t):
     return "'" + str(t).replace("'", "''") + "'"
 
 
-def sql(e):
+def sql(e, parts=("research", "copy", "draft", "cue", "title")):
+    """The demonstration as psql input. `parts` lets homesignal-ingest's Level A test seed only the research and draft parts
+    here and then run the copy and the cue through the real engine commands instead of these recorded stand-ins."""
     dc = e["doc_cue"]
     f = e["findings"]
     findings = [{"finding_key": x["claim_id"].split("@")[0], "statement": x["statement"], "qualifiers": x["qualifiers"],
@@ -37,13 +39,12 @@ def sql(e):
     sources = [{"ref": "s%d" % i, "url": "https://example.test/source-%d" % i, "publisher": "TEST Publisher", "title": "TEST page",
                 "quote": x["quotes"][0], "retrieved_at": "2026-11-10T12:00:00Z", "content_sha256": "ab", "quote_match": "exact",
                 "date_extraction": "not_stated"} for i, x in enumerate(f) if x["quotes"]]
-    # the source behind the cue's finding carries a stored copy: the real EPA proposed rule (the research ingest does not
-    # store copies yet; this fixture records one as the ingest would once it does)
+    # the source behind the cue's finding is the real EPA proposed rule; it gets its stored copy the way production would:
+    # a person's grant, a source_copy run, the object in (stand-in) private storage, then the database's record step
     for src, x in zip(sources, [x for x in f if x["quotes"]]):
         if x["claim_id"] == dc["cue"]["claim_id"]:
-            src.update(url=dc["document"]["url"], title=dc["document"]["label"], publisher="U.S. EPA (Federal Register)",
-                       storage_permission="full_copy", document_path="weekly-sources/fixture/fr_2026-22082.pdf",
-                       document_sha256=dc["document"]["sha256"], document_kind="pdf")
+            src.update(url=dc["document"]["url"], title=dc["document"]["label"], publisher="U.S. EPA (Federal Register)")
+    dsha, dsize = dc["document"]["sha256"], dc["document"].get("size") or 1
     ids = [x["claim_id"] for x in f]
     cards = [{"claim": "TEST DATA: EPA says the proposal keeps methane rules workable.", "category": c,
               "finding_ids": ids, "public_stakes": s, "editorial_position": p, "context": "TEST DATA: EPA's stated rationale; the change is proposed.",
@@ -61,8 +62,9 @@ def sql(e):
         ("landing", "proposed, not final", [ids[1]])]]
     ok = '{"ok": true, "label": "mechanical checks passed", "certifies_accuracy": false}'
     rv = e["review"]
-    return "\n".join([
+    lines = [
         "\\set ON_ERROR_STOP 1",
+        "-- PART research",
         "select set_config('test.jwt', %s, false);" % ("'" + ADMIN + "'"),
         "set role authenticated;",
         "select public.hs_weekly_request_research('Air Quality', 'TEST DATA: research the October 2026 EPA proposal (fixture)') as req \\gset",
@@ -70,6 +72,20 @@ def sql(e):
         "reset role; set role service_role;",
         "select public.weekly_run_claim(:'r1') is not null as c \\gset",
         "select public.weekly_research_record(:'r1', %s);" % lit({"sources": sources, "findings": findings}),
+        "-- PART copy",
+        "reset role;",
+        "select id as dsrc from public.weekly_sources where url = %s \\gset" % q(dc["document"]["url"]),
+        "set role authenticated;",
+        "select (public.hs_weekly_source_copy_grant(:'dsrc', 'pdf', 'TEST DATA: a U.S. government record, kept as a full copy') ->> 'run_id') as rc \\gset",
+        "reset role; set role service_role;",
+        "select public.weekly_run_claim(:'rc') is not null as c \\gset",
+        "reset role;",
+        "insert into storage.objects (bucket_id, name, metadata) values ('weekly-sources', :'dsrc' || '/' || %s || '.pdf', %s);"
+        % (q(dsha), q(json.dumps({"size": dsize}))),
+        "set role service_role;",
+        "select public.weekly_source_copy_record(:'rc', jsonb_build_object('source_id', :'dsrc', 'document_sha256', %s, 'document_kind', 'pdf', 'size', %d,"
+        " 'document_path', 'weekly-sources/' || :'dsrc' || '/' || %s || '.pdf', 'quote_match', 'found')) is not null as c \\gset" % (q(dsha), dsize, q(dsha)),
+        "-- PART draft",
         "reset role; set role authenticated;",
         "select public.hs_weekly_finding_decide((x ->> 'id')::uuid, 'approved') from jsonb_array_elements(public.hs_weekly_overview('Air Quality') -> 'findings') x;",
         "select (public.hs_weekly_library_seal('Air Quality') ->> 'library_version_id') as lv \\gset",
@@ -103,6 +119,7 @@ def sql(e):
         "select public.weekly_script_record(:'rw', jsonb_build_object('provider','claude-plan','prompt_sha256',repeat('6',64),'checks',%s,'body',%s));"
         % (lit(e["after_checks"]), lit(e["after_body"])),
         "reset role;",
+        "-- PART cue",
         # A document cue on segment 0 of version 2: a person sets the cue on the stored source of air-proposal-status@1, and
         # the visual_check run records the engine's own result (homesignal-ingest weekly_slice/doc_cue.py on that PDF).
         "select fs.source_id as src0 from public.weekly_finding_sources fs join public.weekly_findings f on f.id = fs.finding_id"
@@ -120,6 +137,7 @@ def sql(e):
         "select public.weekly_visual_check_record(:'vr', :'s3sha', replace(replace(%s, 'SOURCE_ID', :'src0'), 'VERSION_ID', :'s3')::jsonb);"
         % q(json.dumps(dc["checks"], ensure_ascii=False)),
         "reset role;",
+        "-- PART title",
         # the Air title: wording approved IN A CONVERSATION, recorded here by the test identity as fixture data only;
         # its mechanical checks are recorded; the evidence review and publication are left undone.
         "select (v ->> 'id') as s2 from jsonb_array_elements(public.hs_weekly_overview('Air Quality') -> 'versions') v"
@@ -134,10 +152,19 @@ def sql(e):
         "set role service_role;",
         "select public.weekly_run_claim(:'tcr') is not null as c \\gset",
         "select public.weekly_title_check_record(:'tcr', :'tsha', %s);" % lit(e["title"]["checks"]),
+        "-- PART tail",
         "reset role;",
         "select set_config('test.jwt', %s, false);" % ("'" + ADMIN + "'"),
         "\\pset tuples_only on", "\\pset format unaligned",
-        "select public.hs_weekly_overview('Air Quality')::text;"])
+        "select public.hs_weekly_overview('Air Quality')::text;"]
+    out, part = [], "head"
+    for ln in lines:
+        if ln.startswith("-- PART "):
+            part = ln[len("-- PART "):]
+            continue
+        if part in ("head", "tail") or part in parts:
+            out.append(ln)
+    return "\n".join(out)
 
 
 UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
