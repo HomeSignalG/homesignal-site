@@ -1,4 +1,4 @@
--- docs/weekly-stage2-slice.sql on a DISPOSABLE database. Prints one "Wnn|true/false" line per check.
+-- The full weekly configuration (docs/weekly-1..7) on a DISPOSABLE database. Prints one "Wnn|true/false" line per check.
 -- Everything here is TEST DATA; no line is real research.
 \set ON_ERROR_STOP 0
 create or replace function pg_temp.raises(q text, code text) returns boolean language plpgsql as $$
@@ -14,7 +14,7 @@ select 'W01|' || not exists (
     and (has_table_privilege('anon', c.oid, 'select,insert,update,delete')
          or has_table_privilege('authenticated', c.oid, 'select,insert,update,delete')));
 select 'W01b|' || ((select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
-  where n.nspname = 'public' and c.relname like 'weekly\_%' and c.relkind = 'r' and c.relrowsecurity) = 19);
+  where n.nspname = 'public' and c.relname like 'weekly\_%' and c.relkind = 'r' and c.relrowsecurity) = 22);   -- 19 workbench tables + the topic queue's 3 (full configuration)
 -- W02 service functions: service_role yes, authenticated and anon no; admin functions: authenticated yes, anon no
 select 'W02|' || (has_function_privilege('service_role', 'public.weekly_research_record(uuid,jsonb)', 'execute')
   and not has_function_privilege('authenticated', 'public.weekly_research_record(uuid,jsonb)', 'execute')

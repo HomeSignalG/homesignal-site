@@ -1,26 +1,25 @@
 #!/usr/bin/env bash
-# docs/weekly-topic-queue.sql against a DISPOSABLE Postgres (never production). Applies the Stage 2 file, then the
-# queue file twice (idempotent), seeds the demonstration, runs topic_queue.sql, then checks that each mutation of the
-# queue file makes at least one check fail.
+# The topic queue in the FULL weekly configuration (docs/weekly-1..7, in order; config.sh) against a DISPOSABLE Postgres
+# (never production). Applies all seven files twice (idempotent), seeds the demonstration, runs topic_queue.sql, then
+# checks that each mutation of the queue files (2 and 7) makes at least one check fail.
+# The queue-only release (files 1 and 2) has its own runner: run_queue_only.sh.
 set -euo pipefail
 : "${PGHOST:?}" "${PGDATABASE:?}"
 here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
-STAGE2="$root/docs/weekly-stage2-slice.sql"; SQL="$root/docs/weekly-topic-queue.sql"
 LEADS="$root/test/fixtures/weekly-topic-leads.json"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+. "$here/config.sh"
+SQL="$tmp/full.sql"; weekly_combine "$SQL" "$WEEKLY_DOCS" "${WEEKLY_FULL[@]}"
 P() { psql -X -q -v ON_ERROR_STOP=1 "$@"; }
 reset_db() {
   P -c "drop schema if exists public cascade; drop schema if exists auth cascade; drop schema if exists vault cascade;
         drop schema if exists net cascade; drop schema if exists storage cascade; create schema public;" >/dev/null 2>&1
   P -f "$here/fixture.sql" >/dev/null
-  P -f "$STAGE2" >/dev/null 2>&1
 }
 run_once() {
   reset_db
   P -f "$1" >/dev/null 2>"$tmp/err" || { cat "$tmp/err" >&2; return 2; }
   P -f "$1" >/dev/null 2>"$tmp/err" || { cat "$tmp/err" >&2; return 2; }
-  # the Stage 2 file applied again afterwards must not undo anything here
-  P -f "$STAGE2" >/dev/null 2>&1
   python3 "$here/build_demo_fixture.py" --seed >/dev/null 2>"$tmp/err" || { cat "$tmp/err" >&2; return 2; }
   psql -X -q -tA -v leads="$(cat "$LEADS")" -f "$here/topic_queue.sql" 2>"$tmp/suite.err" | grep -E '^Q[0-9]+[a-z]?\|' || true
 }
@@ -38,7 +37,9 @@ if [ "${1:-}" = "--no-mutations" ]; then echo "PASS (mutations skipped)"; exit 0
 bad=0
 count=$(python3 "$here/topic_queue_mutations.py" count)
 for i in $(seq 0 $((count - 1))); do
-  name=$(python3 "$here/topic_queue_mutations.py" apply "$i" "$SQL" "$tmp/m.sql")
+  rm -rf "$tmp/m"; cp -r "$WEEKLY_DOCS" "$tmp/m"
+  name=$(python3 "$here/topic_queue_mutations.py" apply "$i" "$tmp/m/weekly-2-topic-queue.sql" "$tmp/m/weekly-7-topic-queue-gate.sql")
+  weekly_combine "$tmp/m.sql" "$tmp/m" "${WEEKLY_FULL[@]}"
   set +e; mo="$(run_once "$tmp/m.sql" 2>/dev/null)"; rc=$?; set -e
   if [ $rc -ne 0 ] || grep -vq '|true$' <<<"$mo" || [ "$(grep -c '|' <<<"$mo")" -lt "$n" ]; then echo "  killed: $name"; else echo "  SURVIVED: $name"; bad=1; fi
 done

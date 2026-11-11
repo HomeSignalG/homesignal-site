@@ -1,6 +1,11 @@
--- Tab 20 · Weekly Report, TOPIC QUEUE AND RESEARCH HANDOFF: DDL of record. PREPARED, NOT APPLIED TO PRODUCTION.
--- Apply AFTER docs/weekly-stage2-slice.sql (it uses that file's tables and helpers). Idempotent: safe to apply twice.
--- Re-applying the Stage 2 file afterwards changes nothing here (this file touches no Stage 2 table or function).
+-- Tab 20 · Weekly Report, 2 of 7: TOPIC QUEUE AND RESEARCH HANDOFF. DDL of record. PREPARED, NOT APPLIED TO PRODUCTION.
+-- Needs ONLY 1 (base), public._hs_is_admin (docs/impact-stories.sql) and public.alert_topic_catalog. Files 1 and 2 are
+-- the QUEUE-ONLY RELEASE: no workflow dispatch, no engine run, no storage, no script. A research handoff here writes a
+-- research request a person can copy; nothing submits it for processing (that is file 3, with the ingest workflows).
+-- The approval gate and the version link (which need script versions) are in 7.
+-- Application order (docs/weekly-release-order.md): 1 base · 2 topic queue  [the queue-only release ends here]
+--   · 3 workbench · 4 source copies · 5 titles · 6 document cues · 7 topic-queue approval gate.
+-- Each file is one transaction and is idempotent; re-applying an earlier file after a later one changes nothing.
 --
 -- Why it exists: a story lead, or a public promise to cover something, was kept nowhere between a social post and the
 -- research for a video. This file keeps them, and ties each one to the report edition and the research request it led to.
@@ -107,7 +112,7 @@ create table if not exists public.weekly_topic_lead_events (
   lead_id uuid references public.weekly_topic_leads (id),
   edition_id uuid references public.weekly_editions (id),
   request_id uuid references public.weekly_research_requests (id),
-  version_id uuid references public.weekly_scripts (id),
+  version_id uuid,   -- a script or title version; its foreign key is added by 7 (the approval gate), where weekly_scripts exists
   disposition text check (disposition in ('included', 'deferred', 'dropped')),
   reason text check (char_length(reason) <= 1000),
   detail jsonb,
@@ -263,40 +268,7 @@ language sql stable security definer set search_path = public as $$
   order by a.id
 $$;
 
--- The edition a version belongs to: the one explicitly linked to it, or to the nearest version it descends from
--- (its parent, or the version it was written from). Never read from a title or a date.
-create or replace function public.weekly_version_edition(p_version uuid) returns uuid
-language sql stable security definer set search_path = public as $$
-  with recursive up (id, depth) as (
-    select p_version, 0
-    union
-    select x.pid, up.depth + 1 from up join public.weekly_scripts s on s.id = up.id
-      cross join lateral (values (s.parent_id), (s.depends_on)) x (pid) where x.pid is not null and up.depth < 60)
-  select e.edition_id from up join public.weekly_topic_lead_events e on e.kind = 'version_linked' and e.version_id = up.id
-  order by up.depth, e.id limit 1
-$$;
 
--- ── the approval gate ────────────────────────────────────────────────────────────────────────────────────────────
--- A script approval, or a title's publication approval, is refused while a lead assigned to that version's edition has
--- no disposition. A version with no linked edition is not gated.
-create or replace function public.weekly_edition_approval_gate() returns trigger language plpgsql security definer set search_path = public as $$
-declare st text; ed uuid; n integer; names text; k text;
-begin
-  select stage into st from public.weekly_scripts where id = new.script_id;
-  if not (st = 'script' or (st = 'title' and new.approval_kind = 'publication')) then return new; end if;
-  ed := public.weekly_version_edition(new.script_id);
-  if ed is null then return new; end if;
-  select count(*), string_agg(u.title, '; ') into n, names from public.weekly_edition_unresolved(ed) u;
-  if n > 0 then
-    select edition_key into k from public.weekly_editions where id = ed;
-    raise exception '% lead(s) assigned to edition % have no disposition yet (included, deferred or dropped): %', n, k, left(names, 600)
-      using errcode = '22023';
-  end if;
-  return new;
-end $$;
-drop trigger if exists weekly_edition_approval_gate on public.weekly_script_approvals;
-create trigger weekly_edition_approval_gate before insert on public.weekly_script_approvals
-  for each row execute function public.weekly_edition_approval_gate();
 
 -- ── admin functions ──────────────────────────────────────────────────────────────────────────────────────────────
 create or replace function public._wk_urls(p jsonb, p_what text) returns text[]
@@ -515,26 +487,6 @@ begin
   return jsonb_build_object('lead_id', p_lead, 'edition_id', p_edition, 'state', public.weekly_lead_state(p_lead));
 end $$;
 
--- Link a script or title version to an edition, explicitly. Versions made from it later belong to the same edition.
-create or replace function public.hs_weekly_edition_link_version(p_edition uuid, p_version uuid) returns jsonb
-language plpgsql security definer set search_path = public as $$
-declare e text := public._hs_is_admin(); ed public.weekly_editions; v public.weekly_scripts; has uuid;
-begin
-  select * into ed from public.weekly_editions where id = p_edition;
-  if ed.id is null then raise exception 'unknown edition' using errcode = '22023'; end if;
-  select * into v from public.weekly_scripts where id = p_version;
-  if v.id is null then raise exception 'unknown version' using errcode = '22023'; end if;
-  if v.topic <> ed.topic then raise exception 'that version is a "%" draft; edition % is a "%" report', v.topic, ed.edition_key, ed.topic using errcode = '22023'; end if;
-  has := public.weekly_version_edition(p_version);
-  if has = p_edition then return jsonb_build_object('edition_id', p_edition, 'version_id', p_version, 'existing', true); end if;
-  if has is not null then
-    raise exception 'that version already belongs to edition %', (select edition_key from public.weekly_editions where id = has) using errcode = '22023';
-  end if;
-  if ed.closed_at is not null then raise exception 'edition % is closed', ed.edition_key using errcode = '55000'; end if;
-  insert into public.weekly_topic_lead_events (kind, edition_id, version_id, actor) values ('version_linked', p_edition, p_version, e);
-  return jsonb_build_object('edition_id', p_edition, 'version_id', p_version, 'existing', false);
-end $$;
-
 -- Close an edition: its editorial decisions are final. Every assigned lead needs a disposition first. An edition may
 -- close with no published video; a reason is required then. Deferred leads stay in carry-forward.
 create or replace function public.hs_weekly_edition_close(p_edition uuid, p_reason text default null) returns jsonb
@@ -584,8 +536,14 @@ end $$;
 -- Read model for the queue screen. p_edition picks the edition for the "assigned to this edition" view.
 create or replace function public.hs_weekly_topic_queue(p_edition uuid default null) returns jsonb
 language plpgsql stable security definer set search_path = public as $$
-declare e text := public._hs_is_admin(); leads jsonb;
+declare e text := public._hs_is_admin(); leads jsonb; linked jsonb := '{}'::jsonb;
+  -- optional parts, detected by what is installed (this file works without them)
+  has_gate boolean := to_regprocedure('public.weekly_edition_linked_versions(uuid)') is not null;
+  has_processing boolean := to_regprocedure('public.hs_weekly_paste_answer(uuid,text)') is not null;
 begin
+  if has_gate then
+    execute 'select coalesce(jsonb_object_agg(ed.id::text, public.weekly_edition_linked_versions(ed.id)), ''{}''::jsonb) from public.weekly_editions ed' into linked;
+  end if;
   select coalesce(jsonb_agg(jsonb_build_object('id', l.id, 'title', l.title, 'topic', l.topic, 'location', l.location,
       'source_urls', to_jsonb(l.source_urls), 'social_post_url', l.social_post_url, 'notes', l.notes, 'why_it_matters', l.why_it_matters,
       'questions', to_jsonb(l.questions), 'intended_edition_id', l.intended_edition_id, 'intended_date', l.intended_date,
@@ -599,13 +557,14 @@ begin
   return jsonb_build_object(
     'note', 'Statuses are derived from what was recorded. A lead, a source story or a social post is not evidence, and none of them shows that our video was published.',
     'selected_edition', p_edition,
+    -- version_linking: file 7 is installed. answer_processing_installed: file 3 is installed. Installed is not the same
+    -- as operational: research processing also needs the homesignal-ingest workflows, which this database cannot see.
+    'capabilities', jsonb_build_object('version_linking', has_gate, 'answer_processing_installed', has_processing),
     'categories', (select coalesce(jsonb_agg(c.topic order by c.topic), '[]'::jsonb) from public.alert_topic_catalog c where c.stream = 'news'),
     'editions', (select coalesce(jsonb_agg(public.weekly_edition_json(ed.id) || jsonb_build_object(
         'assigned', (select count(*) from public.weekly_topic_lead_events a where a.kind = 'assigned' and a.edition_id = ed.id),
         'unresolved', (select coalesce(jsonb_agg(jsonb_build_object('lead_id', u.lead_id, 'title', u.title)), '[]'::jsonb) from public.weekly_edition_unresolved(ed.id) u),
-        'linked_versions', (select coalesce(jsonb_agg(jsonb_build_object('version_id', v.version_id, 'stage', w.stage, 'linked_at', v.created_at) order by v.id), '[]'::jsonb)
-                            from public.weekly_topic_lead_events v join public.weekly_scripts w on w.id = v.version_id
-                            where v.kind = 'version_linked' and v.edition_id = ed.id))
+        'linked_versions', coalesce(linked -> ed.id::text, '[]'::jsonb))
         order by ed.period_start desc, ed.created_at desc), '[]'::jsonb) from public.weekly_editions ed),
     'leads', leads,
     'views', jsonb_build_object(
@@ -630,16 +589,16 @@ declare f text;
 begin
   foreach f in array array['weekly_editions_guard()', 'weekly_topic_leads_guard()', 'weekly_lead_assignments(uuid)',
     'weekly_request_research_status(uuid)', 'weekly_edition_json(uuid)', 'weekly_lead_state(uuid)', 'weekly_edition_unresolved(uuid)',
-    'weekly_version_edition(uuid)', 'weekly_edition_approval_gate()', '_wk_urls(jsonb,text)', '_wk_lead_assign(uuid,uuid,text)',
+    '_wk_urls(jsonb,text)', '_wk_lead_assign(uuid,uuid,text)',
     'weekly_lead_request_text(uuid,uuid,text)', 'hs_weekly_lead_save(uuid,jsonb)', 'hs_weekly_edition_create(text,date,date,text,text)',
     'hs_weekly_lead_assign(uuid,uuid)', 'hs_weekly_lead_send_to_research(uuid,uuid,text)', 'hs_weekly_lead_disposition(uuid,uuid,text,text)',
-    'hs_weekly_edition_link_version(uuid,uuid)', 'hs_weekly_edition_close(uuid,text)', 'hs_weekly_edition_publish(uuid,text,date)',
+    'hs_weekly_edition_close(uuid,text)', 'hs_weekly_edition_publish(uuid,text,date)',
     'hs_weekly_topic_queue(uuid)'] loop
     execute format('revoke all on function public.%s from public, anon, authenticated', f);
   end loop;
   foreach f in array array['hs_weekly_lead_save(uuid,jsonb)', 'hs_weekly_edition_create(text,date,date,text,text)',
     'hs_weekly_lead_assign(uuid,uuid)', 'hs_weekly_lead_send_to_research(uuid,uuid,text)', 'hs_weekly_lead_disposition(uuid,uuid,text,text)',
-    'hs_weekly_edition_link_version(uuid,uuid)', 'hs_weekly_edition_close(uuid,text)', 'hs_weekly_edition_publish(uuid,text,date)',
+    'hs_weekly_edition_close(uuid,text)', 'hs_weekly_edition_publish(uuid,text,date)',
     'hs_weekly_topic_queue(uuid)'] loop
     execute format('grant execute on function public.%s to authenticated', f);
   end loop;

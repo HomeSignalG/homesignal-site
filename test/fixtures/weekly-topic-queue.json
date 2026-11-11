@@ -1,5 +1,9 @@
 {
- "_note": "TEST DATA built by test/weekly_stage2_pg/build_topic_queue_fixture.py from docs/weekly-topic-queue.sql on a disposable database. The two founder leads are UNVERIFIED and carry no address and no commitment. This is not a durable live queue.",
+ "_note": "TEST DATA built by test/weekly_stage2_pg/build_topic_queue_fixture.py from the prepared SQL (docs/weekly-1..7) on a disposable database. The two founder leads are UNVERIFIED and carry no address and no commitment. This is not a durable live queue.",
+ "capabilities": {
+  "answer_processing_installed": true,
+  "version_linking": true
+ },
  "categories": [
   "Air Quality",
   "Data Centers",

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Build the topic-queue screen fixture (test/fixtures/weekly-topic-queue.json) from the prepared SQL itself, so the
-browser test shows exactly what docs/weekly-topic-queue.sql produces.
+browser test shows exactly what the prepared SQL (docs/weekly-1..7, the full configuration) produces.
 
 Run by run_topic_queue.sh on a DISPOSABLE Postgres that already holds the fixture, both SQL files and the demonstration
 seed (build_demo_fixture.py --seed). It plays one small story through the real functions and prints the read model:
@@ -97,7 +97,7 @@ def main():
         sys.exit(out.stderr)
     line = [l for l in out.stdout.splitlines() if l.startswith("{")][-1]
     o = normalize(json.loads(line))
-    o["_note"] = ("TEST DATA built by test/weekly_stage2_pg/build_topic_queue_fixture.py from docs/weekly-topic-queue.sql on a "
+    o["_note"] = ("TEST DATA built by test/weekly_stage2_pg/build_topic_queue_fixture.py from the prepared SQL (docs/weekly-1..7) on a "
                   "disposable database. The two founder leads are UNVERIFIED and carry no address and no commitment. "
                   "This is not a durable live queue.")
     text = json.dumps(o, indent=1, sort_keys=True, ensure_ascii=False) + "\n"

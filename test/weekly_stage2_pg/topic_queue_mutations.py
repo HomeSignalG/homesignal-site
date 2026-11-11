@@ -1,8 +1,9 @@
-"""Prohibited weakenings of docs/weekly-topic-queue.sql. run_topic_queue.sh applies each one to a copy of the file and
-requires at least one check in topic_queue.sql to fail.
+"""Prohibited weakenings of the topic queue (docs/weekly-2-topic-queue.sql and docs/weekly-7-topic-queue-gate.sql).
+run_topic_queue.sh applies each one to a copy of those files and requires at least one check in topic_queue.sql to fail.
 
   python3 topic_queue_mutations.py count
-  python3 topic_queue_mutations.py apply <index> <queue.sql> <out.sql>     (prints the mutation's name)
+  python3 topic_queue_mutations.py apply <index> <file>...   rewrites, in place, the first file the mutation applies to
+                                                              (prints the mutation's name)
 """
 import sys
 
@@ -69,10 +70,14 @@ def main():
         print(len(MUTATIONS))
         return
     name, old, new = MUTATIONS[int(sys.argv[2])]
-    s = open(sys.argv[3], encoding="utf-8").read()
-    t = s.replace(old, new, 1)
-    assert t != s, "mutation did not apply: " + name
-    open(sys.argv[4], "w", encoding="utf-8").write(t)
+    for path in sys.argv[3:]:
+        s = open(path, encoding="utf-8").read()
+        t = s.replace(old, new, 1)
+        if t != s:
+            open(path, "w", encoding="utf-8").write(t)
+            break
+    else:
+        raise AssertionError("mutation did not apply: " + name)
     print(name)
 
 

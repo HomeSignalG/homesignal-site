@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# The QUEUE-ONLY release (docs/weekly-1-base.sql + docs/weekly-2-topic-queue.sql; config.sh) against a DISPOSABLE
+# Postgres (never production). Applies the two files twice (idempotent) and runs queue_only.sql. Then applies the FULL
+# configuration on top (the later upgrade path) and requires every captured lead, event and edition to be unchanged.
+set -euo pipefail
+: "${PGHOST:?}" "${PGDATABASE:?}"
+here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
+LEADS="$root/test/fixtures/weekly-topic-leads.json"
+tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+. "$here/config.sh"
+weekly_combine "$tmp/queue.sql" "$WEEKLY_DOCS" "${WEEKLY_QUEUE_ONLY[@]}"
+weekly_combine "$tmp/full.sql" "$WEEKLY_DOCS" "${WEEKLY_FULL[@]}"
+P() { psql -X -q -v ON_ERROR_STOP=1 "$@"; }
+P -c "drop schema if exists public cascade; drop schema if exists auth cascade; drop schema if exists vault cascade;
+      drop schema if exists net cascade; drop schema if exists storage cascade; create schema public;" >/dev/null 2>&1
+P -f "$here/fixture.sql" >/dev/null
+P -f "$tmp/queue.sql" >/dev/null 2>"$tmp/err" || { cat "$tmp/err" >&2; echo FAIL; exit 1; }
+P -f "$tmp/queue.sql" >/dev/null 2>"$tmp/err" || { cat "$tmp/err" >&2; echo FAIL; exit 1; }
+out="$(psql -X -q -tA -v leads="$(cat "$LEADS")" -f "$here/queue_only.sql" 2>"$tmp/suite.err" | grep -E '^K[0-9]+[a-z]?\|' || true)"
+echo "$out" | sed 's/^/  /'
+n=$(grep -c '|' <<<"$out" || true); f=$(grep -vc '|true$' <<<"$out" || true)
+expected=$(grep -cE "^select 'K[0-9]+[a-z]?\|" "$here/queue_only.sql")
+echo "QUEUE-ONLY RELEASE: $n of $expected checks printed, $f not true"
+[ "$n" -eq "$expected" ] && [ "$f" -eq 0 ] || { cat "$tmp/suite.err" >&2; echo FAIL; exit 1; }
+if grep -q ERROR "$tmp/suite.err"; then cat "$tmp/suite.err" >&2; echo "FAIL: the suite printed an SQL error (a check that errors is not a pass)"; exit 1; fi
+# the upgrade path: the other five files applied later must leave the queue's rows exactly as they were
+fp="select (select count(*) from public.weekly_topic_leads) || ' leads, ' || (select count(*) from public.weekly_topic_lead_events) || ' events, ' ||
+     (select count(*) from public.weekly_editions) || ' editions, ' || (select count(*) from public.weekly_research_requests) || ' requests, md5 ' ||
+     md5((select string_agg(to_jsonb(l)::text, ',' order by l.id::text collate \"C\") from public.weekly_topic_leads l) ||
+         (select string_agg(to_jsonb(e)::text, ',' order by e.id) from public.weekly_topic_lead_events e) ||
+         (select string_agg(to_jsonb(d)::text, ',' order by d.id::text collate \"C\") from public.weekly_editions d))"
+before="$(psql -X -q -tA -c "$fp")"
+P -f "$tmp/full.sql" >/dev/null 2>"$tmp/err" || { cat "$tmp/err" >&2; echo "FAIL: the full configuration did not apply over the queue-only release"; exit 1; }
+after="$(psql -X -q -tA -c "$fp")"
+echo "  before the upgrade: $before"; echo "  after the upgrade:  $after"
+[ -n "$before" ] && [ "$before" = "$after" ] || { echo "FAIL: applying the other files changed the queue's rows"; exit 1; }
+caps="$(psql -X -q -tA -c "select set_config('test.jwt', '{\"email\":\"founder@test.invalid\"}', false); set role authenticated; select public.hs_weekly_topic_queue() -> 'capabilities'" | tail -1)"
+echo "  capabilities after the upgrade: $caps"
+[ "$caps" = '{"version_linking": true, "answer_processing_installed": true}' ] || { echo "FAIL: the upgraded read model does not report the installed parts"; exit 1; }
+echo "PASS"

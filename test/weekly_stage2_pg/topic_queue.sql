@@ -1,4 +1,4 @@
--- docs/weekly-topic-queue.sql on a DISPOSABLE Postgres (never production), after the Stage 2 file and the demonstration
+-- The topic queue in the FULL configuration (docs/weekly-1..7) on a DISPOSABLE Postgres (never production), after the demonstration
 -- seed (test/weekly_stage2_pg/build_demo_fixture.py --seed: an Air Quality library, script versions and a title).
 -- Every line 'Qnn|true' is one check. Run by run_topic_queue.sh with -v leads=<test/fixtures/weekly-topic-leads.json>.
 \set ON_ERROR_STOP 0

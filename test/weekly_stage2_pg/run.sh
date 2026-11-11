@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# docs/weekly-stage2-slice.sql against a DISPOSABLE Postgres (never production). Applies the file twice
-# (idempotent), runs suite.sql, then checks that each mutation makes at least one check fail.
+# The FULL weekly configuration (docs/weekly-1..7, in order; config.sh) against a DISPOSABLE Postgres (never production).
+# Applies all seven files twice (idempotent, and an earlier file re-applied after a later one changes nothing), runs
+# suite.sql, then checks that each mutation makes at least one check fail.
 set -euo pipefail
 : "${PGHOST:?}" "${PGDATABASE:?}"
 here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
-SQL="$root/docs/weekly-stage2-slice.sql"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+. "$here/config.sh"
+SQL="$tmp/full.sql"; weekly_combine "$SQL" "$WEEKLY_DOCS" "${WEEKLY_FULL[@]}"
 P() { psql -X -q -v ON_ERROR_STOP=1 "$@"; }
 run_once() {
   P -c "drop schema if exists public cascade; drop schema if exists auth cascade; drop schema if exists vault cascade;
@@ -27,7 +29,7 @@ P -c "drop schema if exists public cascade; drop schema if exists auth cascade; 
 P -f "$here/fixture.sql" >/dev/null; P -f "$SQL" >/dev/null 2>&1
 python3 "$here/build_demo_fixture.py" --check
 MUT=(
- "findings-not-append-only|s.replace(\"'weekly_research_answers', 'weekly_findings',\n\",\"'weekly_research_answers',\n\",1)"
+ "findings-not-append-only|s.replace(\"  foreach t in array array['weekly_findings',\n\",\"  foreach t in array array[\n\",1)"
  "quote-match-approves|s.replace(\"limit 1), 'pending') as human_decision\",\"limit 1), (select case when bool_or(w.quote_match = 'exact') then 'approved' end from public.weekly_finding_sources fs join public.weekly_sources w on w.id = fs.source_id where fs.finding_id = f.id), 'pending') as human_decision\",1)"
  "seal-takes-pending|s.replace(\"s.is_latest and s.human_decision = 'approved'\",\"s.is_latest and s.human_decision <> 'rejected'\")"
  "sealed-version-open|s.replace(\"    raise exception 'library version is sealed' using errcode = '55000';\",\"    null;\")"

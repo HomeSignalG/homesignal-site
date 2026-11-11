@@ -1,4 +1,4 @@
--- Minimal stand-in for what docs/weekly-stage2-slice.sql needs from production. DISPOSABLE DATABASE ONLY.
+-- Minimal stand-in for what the weekly SQL files (docs/weekly-1..7) need from production. DISPOSABLE DATABASE ONLY.
 -- _hs_is_admin is copied verbatim from docs/impact-stories.sql; alert_topic_catalog has its real key (stream, topic).
 do $$ begin
   if not exists (select 1 from pg_roles where rolname='anon') then create role anon; end if;
