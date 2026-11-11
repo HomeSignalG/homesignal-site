@@ -18,14 +18,15 @@ run_once() {  # $1 = file to apply; prints check lines
 out="$(run_once "$SQL")"; echo "$out" | sed 's/^/  /'
 n=$(grep -c '|' <<<"$out" || true); f=$(grep -c '|false$' <<<"$out" || true)
 echo "SHIPPED: $n checks, $f failed"
-[ "$n" -ge 15 ] && [ "$f" -eq 0 ] || { echo FAIL; exit 1; }   # every check in suite.sql printed
+[ "$n" -ge 18 ] && [ "$f" -eq 0 ] || { echo FAIL; exit 1; }   # every check in suite.sql printed
 # mutations: name|python expression on the text s
 MUT=(
  "no-insert-trigger|s.replace('after insert or update on public.user_subscriptions','after delete on public.user_subscriptions')"
  "no-users-trigger|s.replace('after update of unsubscribed, alert_email_consent, community_id on public.users','after delete on public.users')"
- "ignores-subscribed|s.replace(\"where s.stream = 'maps' and s.subscribed\\n        and c.level\",\"where s.stream = 'maps'\\n        and c.level\",1)"
+ "ignores-subscribed|s.replace(\"where s.stream = 'maps' and s.subscribed\\n        and not public\",\"where s.stream = 'maps'\\n        and not public\",1)"
  "upload-drops-subscribers|s.replace('  perform public.maps_zip_order_sync_subscribers();\n\n  return query','  return query')"
  "no-exception-guard|s.replace('exception when others then','exception when division_by_zero then')"
+ "test-signups-count|s.replace(\"        and not public.bsky_maps_known_test_identity(s.user_id)\\n        and c.level\",\"        and c.level\",1)"
  "prepends|s.replace('next_pos := next_pos + 1;','next_pos := 1000 - next_pos;')"
 )
 bad=0

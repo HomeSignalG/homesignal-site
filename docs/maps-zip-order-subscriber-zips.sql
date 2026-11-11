@@ -30,10 +30,17 @@
 --   4. once, when this file is applied (backfill).
 -- The triggers can never block a sign-up: a failure is a WARNING and the sign-up commits.
 --
+-- ⚖️ TEST SIGN-UPS DO NOT COUNT (founder, 2026-11-11: "Test sign-ups don't count"). A ZIP is
+-- kept on the list only for a subscriber who is not a known test identity. "Known test" is
+-- decided by homesignal-ingest's public.bsky_maps_known_test_identity(user) (the same rule that
+-- decides posting priority); it is not re-derived here. Why: the 65 Pierce County ZIPs each
+-- carried one admin_test sign-up, so the founder could not take them off the list.
+--
 -- It does NOT create drafts. Drafts still come from "Create + refresh drafts" in the
 -- dashboard's All Maps view (or a maps_order dispatch), exactly as before.
 --
--- Idempotent. Apply after docs/maps-zip-order.sql and docs/alert-subscription-canonical-a12.sql.
+-- Idempotent. Apply after docs/maps-zip-order.sql, docs/alert-subscription-canonical-a12.sql and
+-- homesignal-ingest's 20261110180000_bsky_maps_priority_eligibility.sql (the test-identity rule).
 -- Test: test/maps_zip_order_subscribers_pg (disposable Postgres).
 -- ============================================================================
 
@@ -58,6 +65,7 @@ begin
       from public.alert_subscription_state s
       join public.communities c on c.id = s.community_id
       where s.stream = 'maps' and s.subscribed
+        and not public.bsky_maps_known_test_identity(s.user_id)
         and c.level = 'zip' and cardinality(c.zip_codes) = 1
         and c.zip_codes[1] ~ '^[0-9]{5}$'
         and not exists (select 1 from public.maps_zip_order o where o.zip = c.zip_codes[1])
@@ -176,6 +184,7 @@ begin
   from public.alert_subscription_state s
   join public.communities c on c.id = s.community_id
   where s.stream = 'maps' and s.subscribed and c.level = 'zip' and cardinality(c.zip_codes) = 1
+    and not public.bsky_maps_known_test_identity(s.user_id)
     and not exists (select 1 from public.maps_zip_order o where o.zip = c.zip_codes[1]);
   if missing <> 0 then
     raise exception 'after sync, % subscriber ZIP(s) are still missing from maps_zip_order', missing;

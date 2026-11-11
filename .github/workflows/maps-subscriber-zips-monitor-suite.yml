@@ -7,6 +7,7 @@ on:
     paths:
       - 'docs/maps-zip-order-subscriber-zips.sql'
       - 'docs/maps-subscriber-zips-monitor.sql'
+      - 'docs/maps-subscriber-zips-monitor-real-only.sql'
       - 'test/maps_zip_order_subscribers_pg/fixture.sql'
       - 'test/maps_subscriber_zips_monitor_pg/**'
       - '.github/workflows/maps-subscriber-zips-monitor-suite.yml'
@@ -15,6 +16,7 @@ on:
     paths:
       - 'docs/maps-zip-order-subscriber-zips.sql'
       - 'docs/maps-subscriber-zips-monitor.sql'
+      - 'docs/maps-subscriber-zips-monitor-real-only.sql'
       - 'test/maps_zip_order_subscribers_pg/fixture.sql'
       - 'test/maps_subscriber_zips_monitor_pg/**'
       - '.github/workflows/maps-subscriber-zips-monitor-suite.yml'

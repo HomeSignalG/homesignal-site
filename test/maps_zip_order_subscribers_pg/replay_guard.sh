@@ -31,6 +31,7 @@ create view public.alert_subscription_state as
   select u.id as user_id, u.community_id, s.stream, s.topic,
          ((u.community_id is not null) and u.alert_email_consent and not u.unsubscribed and s.origin = 'explicit') as subscribed
     from public.users u join public.user_subscriptions s on s.user_id = u.id and s.community_id = u.community_id;
+create function public.bsky_maps_known_test_identity(p_user uuid) returns boolean language sql stable as $$ select false $$;
 SQL
 P -v ON_ERROR_STOP=1 -f "$root/docs/maps-zip-order-subscriber-zips.sql" >/dev/null 2>&1 || { echo "FAIL G2 the subscriber rule does not apply"; exit 1; }
 before="$(md5)"
