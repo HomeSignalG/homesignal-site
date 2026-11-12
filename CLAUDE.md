@@ -6918,3 +6918,21 @@ Every session says, in two places, whether it needs the founder. Same rule in ho
    Never for routine progress, CI waits or completion that needs nothing.
 5. **A turn never ends idle.** WORKING names the event that wakes it. NEEDS YOU names the question. STUCK names the blocker.
    "Stopped, waiting for a prompt" is not a state.
+
+## YOUR RECORDED ENDINGS, IN TABS 16, 17 AND 20 ⚖️ FOUNDER (2026-11-12)
+
+"i will prerecord different endings and i want a button in tab 16, 17 and 20 to be able to upload the recording and have
+it seamed at end of video"; "video of me and voice of me speaking"; main videos and Shorts, chosen per file; it
+REPLACES the generated closing line. SQL of record `docs/video-endings.sql` (apply AFTER homesignal-ingest's
+`video/ending.py` is on main): private bucket `video-endings` (admin may add `<uuid>.<mp4|mov|webm|m4v>`, nothing may
+replace or delete one), `video_endings` (label, sha256, size), append-only `video_ending_choices` (newest per tab /
+target / file wins; null = the generated line).
+- Page: `lib/acq-video-endings.js` (`HS.acqVideoEndings.mount(client, host, {tab})`), its own box in Tab 16
+  (`#ve-youtube-host`) and Tab 17 (`#ve-impact-host`; the Impact Stories workspace moved into `#is-host`). It uploads
+  with the founder's session, sends the browser-computed sha256 to `hs_video_ending_register`, and lists a picker per
+  main video / Short. It decides nothing.
+- **Tab 16:** `hs_video_ending_choose('youtube', slug, file, ending)` starts a Full-rebuild revision whose settings carry
+  the ending; refused while that file is being built. **Tab 17:** the choice only; the engine reads
+  `video_endings_current` (service role only) and the visuals must be prepared again. **Tab 20:** mount with
+  `{tab:'weekly', targets}` once the weekly report (PR #2772) renders videos; until then nothing is mounted.
+- Tests: `test/video_endings_pg` (`video-endings-suite.yml`, 24 checks), `test/video-endings.browser.test.mjs`.
