@@ -32,7 +32,7 @@ async function open(slug) {
       const d = {
         hs_impact_story_catalog: [],
         hs_impact_story_list: [{ id: 's1', title: story.title, video_slug: f.slug, updated_at: '2026-11-05T20:00:00Z', status }],
-        hs_impact_story_get: { story, status, pack: f.pack, version: { version: 3, body: f.body, validation: f.validation, derived: { ledger: [] } },
+        hs_impact_story_get: { story, status, pack: f.pack, version: { version: 3, body: f.body, validation: f.validation, checked: true, derived: { ledger: [] } },
           visuals: { state: 'none' }, media: {}, line_notes: [], events: [] },
       }[n];
       return Promise.resolve(d === undefined ? { data: null, error: { message: 'not stubbed: ' + n } } : { data: d, error: null });
@@ -44,19 +44,25 @@ async function open(slug) {
   await page.waitForTimeout(150);
   await page.click('#is [data-act=step][data-step=script]');
   await page.waitForTimeout(80);
-  return { page, errs };
+  // Script review (2026-11-12) opens on the script and its review list; record what it says, then show the storyboard
+  const review = { next: await page.locator('#is #is-rv-next').innerText(), side: await page.locator('#is .is-rv-side').innerText(),
+    primaries: await page.locator('#is #is-rv-next .is-btn.primary').count() };
+  await page.click('#is [data-act=doc][data-doc=board]');
+  await page.waitForTimeout(80);
+  return { page, errs, review };
 }
 
 // 1. House Speaker: public affairs, with a brief
 {
-  const { page, errs } = await open('house-democratic-leadership-vote-secret-ballot');
+  const { page, errs, review } = await open('house-democratic-leadership-vote-secret-ballot');
+  ok(review.primaries <= 1 && /Must fix \(\d+\)/.test(review.side), 'House: Script review names its next step with at most one primary button and counts what must be fixed');
   const all = await page.locator('#is').innerText();
   ok(await page.locator('#is .is-sbitem').count() >= 18, 'House: the navigator lists every scene of the real script');
   ok(await page.locator('#is [data-act=doc][data-doc=qol]').count() === 0, 'House: a public-affairs story shows no Quality-of-Life tab');
   ok(!/quality.of.life/i.test(await page.locator('#is .is-read, #is .is-sb').first().innerText()), 'House: no quality-of-life wording in the storyboard');
-  ok((await page.locator('#is .is-review > summary').innerText()).includes('10 of 10 pass') && !(await page.locator('#is details.is-review').getAttribute('open') !== null),
+  ok((await page.locator('#is #is-rv-more > summary').innerText()).includes('10 of 10 pass') && (await page.locator('#is #is-rv-more').getAttribute('open')) === null,
      'House: a passing audit folds to one line');
-  await page.click('#is .is-review > summary');
+  await page.click('#is #is-rv-more > summary');
   const audit = await page.locator('#is .is-two').innerText();
   ok(audit.includes('Production audit') && (audit.match(/Pass/g) || []).length === 10, 'House: all ten audit checks pass on the rewritten script');
   ok(audit.includes('Your brief, topic by topic') && audit.includes('Ocasio-Cortez') && audit.includes('Left out') && audit.includes('petition'),
@@ -79,9 +85,10 @@ async function open(slug) {
 
 // 2. Stratos: development story written before the audit
 {
-  const { page, errs } = await open('stratos-data-center-water-box-elder');
+  const { page, errs, review } = await open('stratos-data-center-water-box-elder');
   ok(await page.locator('#is [data-act=doc][data-doc=qol]').count() === 1, 'Stratos: a development story keeps its Quality-of-Life chart');
-  await page.click('#is .is-review > summary');
+  ok(review.primaries <= 1 && review.next.length > 0, 'Stratos: Script review has one next step');
+  await page.click('#is #is-rv-more > summary');
   const audit = await page.locator('#is .is-two').innerText();
   ok(audit.includes('Written before the audit') && audit.includes('Next:'), 'Stratos: the audit runs as warnings, each with what to change');
   ok(!audit.includes('Your brief, topic by topic'), 'Stratos: no brief panel for a story with no brief');
