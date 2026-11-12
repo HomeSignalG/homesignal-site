@@ -31,7 +31,9 @@ await page.goto('http://127.0.0.1:' + srv.address().port + '/');
 await page.addScriptTag({ content: lib });
 await page.evaluate(() => {
   window.calls = []; window.uploads = [];
-  window.endings = [{ id: 'e1', label: 'Sign-off <A>', bytes: 3145728, path: 'e1.mp4' }];
+  window.endings = [{ id: 'e1', label: 'Sign-off <A>', bytes: 3145728, path: 'e1.mp4' },
+    { id: 'ev', label: 'Upright', bytes: 10, path: 'ev.mp4', shape: 'vertical' },
+    { id: 'eh', label: 'Sideways', bytes: 10, path: 'eh.mp4', shape: 'horizontal' }];
   window.choices = { v1: { short1: { id: 'e1', label: 'Sign-off <A>' } } };
   window.client = {
     storage: { from: (b) => ({ upload: (p, f, o) => { window.uploads.push([b, p, f.size, o]); return Promise.resolve({ data: {}, error: null }); } }) },
@@ -42,7 +44,7 @@ await page.evaluate(() => {
       if (n === 'hs_youtube_videos_list') return ret([{ slug: 'v1', title: 'Video one', files: { final: {}, short1: {} } }]);
       if (n === 'hs_impact_story_list') return ret([{ id: 7, story_number: 3001, title: 'Story', archived: null }, { id: 8, title: 'Old', archived: '2026-01-01' }]);
       if (n === 'hs_video_ending_choices') return ret(window.choices[a.p_target] || {});
-      if (n === 'hs_video_ending_register') { window.endings.unshift({ id: 'e2', label: a.p_label, bytes: 10, path: a.p_path }); return ret({ id: 'e2' }); }
+      if (n === 'hs_video_ending_register') { window.endings.unshift({ id: 'e2', label: a.p_label, bytes: 10, path: a.p_path, shape: a.p_shape }); return ret({ id: 'e2' }); }
       if (n === 'hs_video_ending_choose') return ret({ changed: true, revision_id: 'r1' });
       if (n === 'hs_video_ending_archive') { window.endings = window.endings.filter((e) => e.id !== a.p_id); return ret({ archived: true }); }
       return Promise.resolve({ data: null, error: { code: 'x', message: 'unexpected ' + n } });
@@ -56,6 +58,13 @@ ok(html.includes('Sign-off &lt;A&gt;') && !html.includes('<A>'), '2a the library
 ok((await page.$eval('select[data-asset="short1"]', (s) => s.value)) === 'e1', '2b the current choice is selected');
 ok(await page.$eval('select[data-asset="short2"]', (s) => s.disabled), '2c a file not made yet cannot be chosen for');
 ok(await page.$eval('select[data-asset="final"] option', (o) => o.textContent === 'Generated closing line'), '2d "Generated closing line" is the default');
+const opts = (a) => page.$$eval('select[data-asset="' + a + '"] option', (os) => os.map((o) => o.value));
+ok((await opts('short1')).join() === ',e1,ev' && (await opts('final')).join() === ',e1,eh',
+  '2e a Short lists only vertical recordings and a main video only horizontal ones (an untagged one fits either)');
+const btns = await page.$$eval('.ve-upload button[type=submit]', (bs) => bs.map((b) => b.textContent));
+ok(btns.join('|') === 'Upload ending for Shorts (vertical)|Upload ending for main videos (horizontal)', '2f two upload buttons, one per shape');
+html = await page.innerHTML('#host');
+ok(html.includes('Shorts · vertical') && html.includes('Main videos · horizontal'), '2g the library says which kind each recording is');
 
 // choose
 await page.click('details.ve-card summary');
@@ -69,22 +78,40 @@ c = await page.evaluate(() => window.calls.filter((x) => x[0] === 'hs_video_endi
 ok(c.p_ending === null, '3c choosing the generated line sends null');
 
 // upload
-await page.setInputFiles('.ve-upload input[type=file]', { name: 'me.mov', mimeType: 'video/quicktime', buffer: Buffer.from('hello video') });
-await page.fill('.ve-upload input[name=label]', 'Thanks for watching');
-await page.click('.ve-upload button[type=submit]');
-await page.waitForFunction(() => document.querySelector('.ve-msg, .ve-err') && !/Uploading/.test(document.querySelector('.ve-upload button').textContent));
+const V = '.ve-upload[data-shape="vertical"] ';
+await page.setInputFiles(V + 'input[type=file]', { name: 'me.mov', mimeType: 'video/quicktime', buffer: Buffer.from('hello video') });
+await page.fill(V + 'input[name=label]', 'Thanks for watching');
+await page.click(V + 'button[type=submit]');
+await page.waitForFunction(() => /Uploaded "Thanks for watching"/.test((document.querySelector('.ve-msg') || {}).textContent || ''), null, { timeout: 15000 });
 const up = await page.evaluate(() => window.uploads[0]);
 const reg = await page.evaluate(() => window.calls.find((x) => x[0] === 'hs_video_ending_register')[1]);
 const want = crypto.createHash('sha256').update('hello video').digest('hex');
 ok(up[0] === 'video-endings' && /^[0-9a-f-]{36}\.mov$/.test(up[1]) && up[3].upsert === false, '4a the file goes to the private bucket under <uuid>.mov, never replacing one');
-ok(reg.p_path === up[1] && reg.p_sha256 === want && reg.p_label === 'Thanks for watching', '4b it is registered with its sha256');
+ok(reg.p_path === up[1] && reg.p_sha256 === want && reg.p_label === 'Thanks for watching' && reg.p_shape === 'vertical',
+  '4b it is registered with its sha256 and its shape');
 ok((await page.innerHTML('#host')).includes('Thanks for watching'), '4c the new recording is listed');
 
 // refusals
-await page.setInputFiles('.ve-upload input[type=file]', { name: 'me.txt', mimeType: 'text/plain', buffer: Buffer.from('x') });
-await page.fill('.ve-upload input[name=label]', 'Bad');
-await page.click('.ve-upload button[type=submit]');
+await page.setInputFiles(V + 'input[type=file]', { name: 'me.txt', mimeType: 'text/plain', buffer: Buffer.from('x') });
+await page.fill(V + 'input[name=label]', 'Bad');
+await page.click(V + 'button[type=submit]');
 ok(/MP4, MOV, WebM or M4V/.test(await page.textContent('.ve-err')), '5a a non-video is refused before upload');
+// a real horizontal video (320x180) on the Shorts button is refused before anything is uploaded
+const nUp = await page.evaluate(() => window.uploads.length);
+await page.setInputFiles(V + 'input[type=file]', { name: 'wide.webm', mimeType: 'video/webm',
+  buffer: fs.readFileSync(new URL('./fixtures/video-endings/horizontal-320x180.webm', import.meta.url)) });
+await page.fill(V + 'input[name=label]', 'Wide');
+await page.click(V + 'button[type=submit]');
+await page.waitForFunction(() => /horizontal \(320×180\)/.test((document.querySelector('.ve-err') || {}).textContent || ''), null, { timeout: 15000 });
+ok(await page.evaluate((n) => window.uploads.length === n, nUp), '5b a horizontal recording on the Shorts button is refused before upload');
+const H = '.ve-upload[data-shape="horizontal"] ';
+await page.setInputFiles(H + 'input[type=file]', { name: 'wide.webm', mimeType: 'video/webm',
+  buffer: fs.readFileSync(new URL('./fixtures/video-endings/horizontal-320x180.webm', import.meta.url)) });
+await page.fill(H + 'input[name=label]', 'Wide');
+await page.click(H + 'button[type=submit]');
+await page.waitForFunction(() => window.calls.some((x) => x[0] === 'hs_video_ending_register' && x[1].p_label === 'Wide'), null, { timeout: 15000 });
+ok(await page.evaluate(() => window.calls.find((x) => x[0] === 'hs_video_ending_register' && x[1].p_label === 'Wide')[1].p_shape === 'horizontal'),
+  '5c the same recording on the main-video button is uploaded as horizontal');
 
 // archive
 await page.click('[data-archive="e1"]');
@@ -98,7 +125,7 @@ await page.waitForSelector('select[data-asset="short_a"]', { state: 'attached' }
 html = await page.innerHTML('#host');
 ok(html.includes('3001 Story') && !html.includes('Old'), '7a Tab 17 lists open stories only');
 await page.click('details.ve-card summary');
-await page.selectOption('select[data-asset="short_a"][data-target="7"]', 'e2');
+await page.selectOption('select[data-asset="short_a"][data-target="7"]', 'ev');
 await page.waitForFunction(() => /Prepare the visuals again/.test((document.querySelector('.ve-msg') || {}).textContent || ''));
 ok(true, '7b a Tab 17 choice says to prepare the visuals again');
 
