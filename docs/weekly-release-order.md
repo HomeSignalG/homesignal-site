@@ -12,6 +12,9 @@ Re-applying an earlier file after a later one changes nothing.
 | 5 | `docs/weekly-5-titles.sql` | Title versions and their three decisions | 1, 3 |
 | 6 | `docs/weekly-6-doc-cues.sql` | Document-evidence cues | 1, 3, 4 |
 | 7 | `docs/weekly-7-topic-queue-gate.sql` | The version-to-edition link and the approval gate | 1, 2, 3 |
+| 8 | `docs/weekly-8-edition-sequence.sql` | The edition's video: an ordered sequence of approved script segments, its digest-bound approval, and the render export. An entry must belong to this edition (7) and be of a topic it covers; every lead of the edition needs a disposition. A published or closed edition's sequence, approvals and content are locked (two triggers on `weekly_scripts` and `weekly_script_approvals`) | 1, 2, 3, 6, 7 |
+| 9 | `docs/weekly-9-edition-topics.sql` | An edition may cover several topics, and a published edition refuses new assignments, research requests, dispositions, topics and links. GENERATED from 2 and 7 (`build_edition_topics_sql.py`); replaces five of their functions. **Proposed to the topic-queue session; not to be adopted without its agreement.** | 1, 2, 3, 7 |
+| 10 | `docs/weekly-10-edition-render.sql` | The private review render of an approved edition: a render job table, the private bucket `weekly-media` (dashboard admins read, service role writes), a request function that dispatches homesignal-ingest `weekly-render.yml` on main, and the worker's claim, finish and fail functions. **This file dispatches.** Apply it only after `weekly-render.yml` is on homesignal-ingest `main`. | 1, 2, 3, 6, 7, 8, vault, `pg_net`, Storage |
 
 ## The queue-only release: files 1 and 2
 
@@ -70,3 +73,31 @@ All three are single SELECTs, generated from a disposable database (never typed)
 The two verification files compare every weekly object in production (definitions, function body checksums, what anon
 and authenticated can reach) with the list the release files produce, and require every weekly table to be empty. They
 are built and tested by `test/weekly_stage2_pg/build_verify.py`, which also proves each fails on a tampered database.
+
+## Files 8 and 9: the edition's video (prepared, not applied)
+
+- **Re-apply hazard.** File 9 replaces `_wk_lead_assign`, `weekly_lead_request_text`, `hs_weekly_lead_send_to_research`,
+  `hs_weekly_lead_disposition` (file 2) and `hs_weekly_edition_link_version` (file 7). Re-applying file 2 or 7 after 9
+  restores their own versions of those five, which also drops the publication lock; re-apply 9 after any re-application of 2 or 7. `run_release_1_9.sh` shows both halves.
+- **Tests.** `run_edition_sequence.sh` (files 8 and 9, with their mutations); `run_release_1_9.sh` (the catalog delta
+  1-7 -> 1-9 object by object, idempotence, the upgrade over seeded rows, the re-apply hazard, negative controls); and
+  the three existing runners with `WEEKLY_WITH_VIDEO=1`, which run their unchanged checks on files 1-9.
+- **Changing a published report** is refused, not supported: a separate, explicitly authorized revision workflow would be
+  needed and does not exist. A follow-up topic in a later edition is the way forward.
+- **Test data.** The Water Quality script in these tests is the Air Quality demonstration with its topic renamed: a
+  technical fixture for ordering, topics and gates, not Water reporting.
+
+## File 10: the private review render (prepared, not applied)
+
+- A person asks for a render of the sequence they reviewed (`hs_weekly_edition_render(edition, digest)`). It is refused for an
+  unapproved, closed or published edition, or a digest other than the current approved one (40001). One render per edition
+  runs at a time; asking again for content already rendered returns that render instead of rendering twice.
+- The worker (`weekly-render.yml` -> `weekly_slice/render_job.py`) claims it. The claim re-checks the approval: if the
+  content changed after the request, the render is failed there and nothing is handed out. The worker then recomputes
+  every hash and the digest itself (`edition_bundle.export`) before rendering.
+- Files go to `weekly-media/<edition>/<render>/`. A render is recorded as done only with a video, captions and a thumbnail,
+  each present in the bucket with the stated size. Nothing is published, and the edition's `video_url` is never written.
+- The bucket's per-file limit is 50 MB, the project's upload limit. A longer video that exceeds it is refused before
+  any upload and recorded as failed; raising it is a project setting.
+- Tests: `test/weekly_stage2_pg/run_edition_render.sh` (files 1-10 on a disposable database; 35 checks; 25 mutations,
+  each caught). The CI job `edition-video` in `weekly-stage2-suite.yml` runs it with the files 8-9 suites.

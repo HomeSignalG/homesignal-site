@@ -15,7 +15,7 @@ run_once() {
   P -f "$here/fixture.sql" >/dev/null
   P -f "$1" >/dev/null 2>"$tmp/err" || { cat "$tmp/err" >&2; return 2; }
   P -f "$1" >/dev/null 2>"$tmp/err" || { cat "$tmp/err" >&2; return 2; }
-  psql -X -q -tA -f "$here/suite.sql" 2>"$tmp/suite.err" | grep -E '^[A-Z][0-9]+[a-z]?\|' || true
+  psql -X -q -tA -v rls_tables="$WEEKLY_RLS_TABLES" -f "$here/suite.sql" 2>"$tmp/suite.err" | grep -E '^[A-Z][0-9]+[a-z]?\|' || true
 }
 out="$(run_once "$SQL")"; echo "$out" | sed 's/^/  /'
 n=$(grep -c '|' <<<"$out" || true); f=$(grep -vc '|true$' <<<"$out" || true)
