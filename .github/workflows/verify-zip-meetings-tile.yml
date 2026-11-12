@@ -32,4 +32,4 @@ jobs:
           SITE_BASE: https://jodytracks.com
           ZIPS: ${{ inputs.zips }}
           MIN: ${{ inputs.min }}
-        run: node scripts/verify-zip-meetings-tile.mjs
+        run: node scripts/probe-zip-page-live.mjs
