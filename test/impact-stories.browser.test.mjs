@@ -132,12 +132,40 @@ ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_
 ok((await page.locator('#is').innerText()).includes('Revision note saved'), 'outline: the revision note is confirmed');
 
 await page.click('#is [data-act=step][data-step=script]');
+// Script review (2026-11-12): the default view is the script beside its review list, under ONE next-action panel
+ok(await page.locator('#is .is-rv-title').innerText().then((t) => t === 'Script review') && (await page.locator('#is .is-rv-project').innerText()).includes('Gig Harbor <dock>')
+   && (await page.locator('#is #is-rv-save').innerText()).includes('All changes saved'), 'script review: header names the workspace, the project and the real save state');
+ok(await page.locator('#is #is-tab-main[aria-selected=true]').count() === 1 && await page.locator('#is .is-rv-grid .is-rv-editor').count() === 1 && await page.locator('#is .is-rv-grid .is-rv-side').count() === 1,
+   'script review: Main script opens by default, editor and review list side by side');
+txt = await page.locator('#is #is-rv-next').innerText();
+ok(/1 problem to fix before you can approve/.test(txt) && await page.locator('#is #is-rv-next .is-btn.primary').count() === 1
+   && await page.locator('#is #is-rv-next [data-act=rvfirst]').count() === 1, 'script review: the next-action panel names the one blocking problem and offers ONE primary action');
+ok(await page.locator('#is-next-box .is-btn.primary').count() === 0, 'script review: the page-top box does not compete with a second primary button on this step');
+txt = await page.locator('#is .is-rv-side').innerText();
+ok(txt.includes('Must fix (1)') && txt.includes('Short A · next beat, line 1') && txt.includes('promises a link.') && txt.includes('In the script now: next line'),
+   'script review: the blocking finding shows its part, its line, the explanation and the line as it stands');
+const callsBeforeSel = await page.evaluate(() => window.calls.length);
+await page.click('#is [data-act=rvfirst]');
+ok(await page.locator('#is #is-tab-short_a[aria-selected=true]').count() === 1 && await page.locator('#is .is-line.is-target textarea[data-ed="shorts.a.beats.3.narration.0.text"]').count() === 1
+   && await page.locator('#is .is-rv-fsel[aria-pressed=true]').count() === 1, 'script review: "Show the first problem" opens Short A and marks exactly that line');
+ok(await page.evaluate((n) => window.calls.length === n, callsBeforeSel) && await page.locator('#is textarea[data-ed="shorts.a.beats.3.narration.0.text"]').inputValue() === 'next line',
+   'script review: selecting a finding calls nothing and changes no text');
+await page.click('#is [data-act=rvedit][data-id=b0]');
+ok(await page.evaluate(() => document.activeElement && document.activeElement.getAttribute('data-ed') === 'shorts.a.beats.3.narration.0.text'), 'script review: "Edit this line" puts the cursor in that line');
+ok(await page.locator('#is #is-rv-more').getAttribute('open') === null && await page.locator('#is #is-rv-more .is-gates').count() === 1, 'script review: readiness gates and full checks are folded under Technical validation details');
+ok(await page.locator('#is #is-rv-approve [data-act=decide][data-d=approved]').isDisabled()
+   && (await page.locator('#is #is-rv-approve').innerText()).includes('starts preparing the pictures for the Visuals step')
+   && (await page.locator('#is #is-rv-approve [data-act=decide][data-d=approved]').getAttribute('aria-describedby')).includes('is-dec-blocked-narrative'),
+   'script review: approval says what it does, and why it is off, next to the button');
+await page.focus('#is #is-tab-short_a'); await page.keyboard.press('ArrowRight');
+ok(await page.evaluate(() => document.activeElement && document.activeElement.id === 'is-tab-short_b') && await page.locator('#is #is-tab-short_b[aria-selected=true]').count() === 1, 'script review: arrow keys move between the views');
+await page.click('#is [data-act=doc][data-doc=board]');
 // the storyboard workspace (2026-11-05): navigator, selected scene, production intelligence; read mode; full screen; gates
 ok(await page.locator('#is .is-sb .is-sbnav .is-sbitem').count() >= 8, 'storyboard: the navigator lists every scene');
 ok(await page.locator('#is .is-sbitem.on[data-key="a1-s1"]').count() === 1, 'storyboard: the first scene is selected by default');
 ok(await page.locator('#is .is-sbside').innerText().then((t) => t.includes('Records this scene cites') && t.includes('Pictures and rights') && t.includes('Open issues')),
    'storyboard: the right panel shows records, pictures and rights, and issues');
-txt = await page.locator('#is .is-gates').innerText();
+txt = await page.locator('#is .is-gates').textContent();   // folded under Technical validation details
 ok(['Evidence verified', 'Script editorial review', 'Visual rights cleared', 'Required assets acquired', 'Production audit', 'Production ready'].every((g) => txt.includes(g)),
    'gates: the five gates and Production ready are shown separately');
 ok(!/✓ Production ready/.test(txt), 'gates: never Production ready while an earlier gate is open');
@@ -204,8 +232,9 @@ ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_
 // a blocked script: Approve is off and says why, and the next-step button is about fixing it, not approving it
 ok(await page.locator('#is [data-act=decide][data-a=narrative][data-d=approved]').isDisabled()
    && (await page.locator('#is #is-dec-blocked-narrative').innerText()).includes('Approve turns on once the script passes')
-   && (await page.locator('#is #is-next-box').innerText()).includes('See what needs fixing')
-   && !(await page.locator('#is #is-next-box button').allInnerTexts()).some((t) => /approve/i.test(t)),
+   && (await page.locator('#is #is-rv-next').innerText()).includes('to fix before you can approve')
+   && !(await page.locator('#is #is-next-box button').allInnerTexts()).some((t) => /approve/i.test(t))
+   && !(await page.locator('#is #is-rv-next button').allInnerTexts()).some((t) => /approve/i.test(t)),
    'blocked script: Approve is off with the reason, and the next step says to fix it');
 await page.evaluate(() => { window.db.nstate = 'pending'; window.db.nwhy = 'Ready for your decision.'; });
 await page.click('#is [data-act=step][data-step=intake]'); await page.click('#is [data-act=step][data-step=script]');
