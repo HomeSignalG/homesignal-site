@@ -6906,18 +6906,28 @@ Every session says, in two places, whether it needs the founder. Same rule in ho
 1. **Work until everything asked is done.** The founder never types "keep going". Do not stop to ask permission to continue, to
    report progress, or because a step is long. A turn ends only when all of the work is done, or it is waiting on an event that
    wakes the session by itself (a PR check, a run, a scheduled wake), or one of the two states below.
-2. **Session title.** Keep it a short topic, prefixed with a color dot and its state, set with `set_session_title`
-   (claude-code-remote) whenever the state changes:
-   `🔴 NEEDS YOU: <topic>` (a decision, a secret, or an approval only the founder can give; the founder opens it and answers) ·
-   `🟠 STUCK: <topic>` (tried everything reasonable and cannot proceed; say what was tried and what is blocking) ·
-   `🟡 WORKING: <topic>` (waiting on CI, a run or a PR event that wakes it; nothing to do) ·
-   `🟢 DONE: <topic>` (finished; nothing to do).
+2. **Session title, set the INSTANT the state changes, not at the end of the turn.** Keep it a short topic prefixed with a
+   color dot and its state, set with `set_session_title` (claude-code-remote). Set it (a) as the FIRST action of every turn
+   (`🟡 WORKING: <topic>`), (b) again the moment the state changes, and (c) as the LAST action before the final message. A
+   session that skips (a) shows a stale color for the whole turn, which is the bug this rule exists to stop.
+   - `🔴 NEEDS YOU: <topic>`: ONLY when the founder must decide, supply something, or approve before work can continue. Name the
+     ask in the title when it fits ("🔴 NEEDS YOU: pick A or B for the permit feed").
+   - `🟠 STUCK: <topic>`: tried everything reasonable and cannot proceed; say what was tried and what blocks.
+   - `🟡 WORKING: <topic>`: running, or waiting on an event that wakes the session by itself (CI, a run, a scheduled wake).
+     Nothing is needed from the founder.
+   - `🟢 DONE: <topic>`: finished; nothing is needed. A turn that ended with no question, no approval and no open decision is
+     DONE, never red. "Idle" is not "needs you".
 3. **First line of every final message** is exactly one of `NEEDS YOU: <what, one line>`, `STUCK: <blocker, one line>` or
-   `NO ACTION NEEDED: <state>`.
+   `NO ACTION NEEDED: <state>`. The title and this line must agree.
 4. **Push notification** (`PushNotification`) only when the state becomes NEEDS YOU or STUCK, one line leading with what to do.
    Never for routine progress, CI waits or completion that needs nothing.
 5. **A turn never ends idle.** WORKING names the event that wakes it. NEEDS YOU names the question. STUCK names the blocker.
    "Stopped, waiting for a prompt" is not a state.
+6. **A question in prose is a NEEDS YOU.** If the final message asks the founder anything, the title is red. The app cannot see
+   this (its summary may say nothing is needed), so the session must set it. Never end a message with a question under a green
+   or yellow title.
+7. **Backstop, not a substitute.** A founder-run routine re-colors titles from the app's own status about every 10 minutes
+   and hourly. It cannot know that a question was asked, so it never replaces rule 2 and rule 6.
 
 ## YOUR RECORDED ENDINGS, IN TABS 16, 17 AND 20 ⚖️ FOUNDER (2026-11-12)
 
