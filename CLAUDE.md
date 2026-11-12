@@ -3230,6 +3230,26 @@ Receipt: `docs/dc-atlas-phase-a-deploy-receipt-2026-09-25.md`.
   switch on the NEW replica. The earlier "25 removed / 1 added" is stale; today's data has 2,216 Atlas
   records.
 
+## 7.13c COMPUTE ATLAS STAYS LIVE; NEW DATA-CENTRE SOURCES ONLY ADD ⚖️ FOUNDER RULE (2026-11-12)
+
+**Keep the existing Compute Atlas data live until a replacement is verified and explicitly approved. Its age is
+not a reason to remove it.** The upstream file answers 404 since 2026-11-07; the current set is still run_seq 2675,
+3,025 records, publisher edition 2026-11-05 (measured 2026-11-12). Plan, gaps and tests:
+`docs/dc-atlas-baseline-additive-enrichment-plan-2026-11-12.md`.
+- ⛔ **Do not** retire, hide or clear Atlas records, or replace them wholesale with a less complete dataset. No
+  destructive migration is authorized.
+- A source that lacks a field never overwrites a populated field with null, blank, zero or "unknown". Absence from
+  another dataset never deletes a facility or implies it closed.
+- Every assertion keeps its source, evidence and dates. Atlas-only fields keep Atlas attribution and age. One updated
+  field never makes a whole record look freshly verified.
+- A new verified value is displayed only under an explicit field-selection rule; the old value stays in history and
+  competing assertions are kept with the reason for the choice.
+- Before any source switch or selection-rule change, run the comparison in the plan's §4.5 (coverage, field coverage,
+  attribution, history).
+- ⚠️ **Known gap G1:** `dc_current_observation` takes the newest complete run per distribution, so a later, smaller
+  Atlas release would replace the whole set. Not triggered yet. Fix it (plan §4.3) before any Atlas re-read can succeed.
+- Replacement is a separate founder decision. This rule approves no merge, SQL, deploy, schedule or alert change.
+
 ## 7.14 THE OPENSTREETMAP LAYER IS CHECKED WITH THE SHARED RULES AND NEVER MERGED ⚖️ FOUNDER RULING (2026-09-26 — C3a BUILT, NOT YET APPLIED)
 
 **OpenStreetMap is an approved, active data-centre source and stays a SEPARATE layer** (founder,
