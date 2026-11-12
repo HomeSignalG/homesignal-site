@@ -11,7 +11,8 @@ assert.match(tpl, /miniCardLink[\s\S]{0,400}rel="noopener noreferrer"/, 'externa
 // ZIP-coverage branch (a ZIP with no Census-drawn area, 2026-10-03); the news list there reuses localNewsSection.
 assert.equal((page.match(/HS\.tpl\.miniCardLink\(n, n\.category, HS\.tpl\.recordHref\(n\)\)/g)||[]).length, 4, 'notice + news cards');
 assert.match(page, /var ph = HS\.tpl\.recordHref\(p\)/, 'development cards');
-assert.match(page, /var mh = ''; meetings\.some/, 'civic card');
+// the civic card lists each meeting with its own record link (2026-11-12; it used to be one card linking the first)
+assert.match(page, /var href = HS\.tpl\.recordHref\(m\);[\s\S]{0,400}rel="noopener noreferrer"/, 'each listed meeting links its own record');
 assert.doesNotMatch(page, /HS\.tpl\.miniCard\(n, n\.category\)/, 'no non-interactive card left');
 // a record without a link stays a plain card (no fabricated href)
 assert.match(tpl, /if \(!href\) return tpl\.miniCard/);
