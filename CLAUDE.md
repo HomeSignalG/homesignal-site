@@ -6915,3 +6915,8 @@ Every session says, in two places, whether it needs the founder. Same rule in ho
    Never for routine progress, CI waits or completion that needs nothing.
 5. **A turn never ends idle.** WORKING names the event that wakes it. NEEDS YOU names the question. STUCK names the blocker.
    "Stopped, waiting for a prompt" is not a state.
+6. **A question in prose is a NEEDS YOU.** If the final message asks the founder anything, its first line is `NEEDS YOU`. The app
+   cannot see this (its summary may say nothing is needed), so the session must say it. Never end a message with a question under
+   `NO ACTION NEEDED`.
+7. **Backstop, not a substitute.** Any founder-run routine that re-colors titles is the founder's own; sessions never set titles.
+   It cannot know that a question was asked, so it never replaces rule 6.
