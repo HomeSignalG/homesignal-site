@@ -1,5 +1,10 @@
 -- MAP 1 vs THE ZIP DEVELOPMENT LISTS, platform-wide (2026-11-12). Read-only.
--- Run: db-read.yml (ref=main, sql_file=scripts/audits/map-list-parity.sql).
+-- Run with the service role (the database tool), in chunks by first ZIP digit if needed: db-read's read-only role
+-- may not execute map1_dc_zip_members (42501, run 43322803351), and one national pass exceeds 60 s.
+--
+-- MEASURED 2026-11-12 (10 chunks, control 12,746 ZIP pages = the registry): 2,049 national member rows on 898 ZIP
+-- pages, 210 of them Proposed, were drawn on Map 1 and absent from the ZIP page and development.html lists before
+-- zipDevelopment. 0 app_projects rows carry a dc: key.
 --
 -- Map 1 in ZIP mode draws two development planes: app_projects members (app_projects_for_zip) and the
 -- national data-centre plane (map1_dc_zip_members). Until lib/data.js zipDevelopment (2026-11-12) the ZIP
