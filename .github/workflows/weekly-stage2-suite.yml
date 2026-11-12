@@ -65,6 +65,16 @@ jobs:
         run: |
           set -o pipefail
           bash test/weekly_stage2_pg/run_queue_only.sh 2>&1 | grep -v NOTICE
+      - name: Publication lock (file 2a) refuses work on a published edition; every prohibited mutation is caught
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: weekly_stage2_disposable
+        run: |
+          set -o pipefail
+          bash test/weekly_stage2_pg/run_publication_lock.sh 2>&1 | grep -v NOTICE
       - name: Full configuration - slice rules hold; every prohibited mutation is killed
         env:
           PGHOST: localhost

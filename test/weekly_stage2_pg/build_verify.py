@@ -2,7 +2,8 @@
 """Build the READ-ONLY production verification queries for the queue-only release:
 
   docs/weekly-verify-after-1.sql   after docs/weekly-1-base.sql alone (also the recheck immediately before file 2)
-  docs/weekly-verify-after-2.sql   after docs/weekly-2-topic-queue.sql as well
+  docs/weekly-verify-after-2.sql   after docs/weekly-2-topic-queue.sql as well (also the recheck immediately before 2a)
+  docs/weekly-verify-after-2a.sql  after docs/weekly-2a-publication-lock.sql as well (the queue-only release complete)
 
 Each is one SELECT. It describes every object in schema public whose name is in the weekly namespace (tables, columns,
 indexes, sequences, constraints, triggers, policies, functions with md5 of their bodies, and what anon / authenticated /
@@ -18,6 +19,8 @@ e-mail address and no secret, because the workflow that runs them (db-read.yml) 
   python3 build_verify.py --check     fail if the committed files differ, then run the controls:
                                         after-1 passes on file 1 alone and fails once file 2 is there
                                         after-2 passes on files 1+2 and fails on file 1 alone
+                                        after-2a passes on files 1+2+2a and fails on files 1+2 alone, and after file 2 is
+                                        re-applied over 2a, and with one lock line removed
                                         after-2 fails on: a grant to anon, a replaced function body, a function that calls
                                         out, an inserted row, a dropped trigger, row security switched off, an extra table
 """
@@ -30,7 +33,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 DOCS = os.path.join(ROOT, "docs")
 FILE1, FILE2 = os.path.join(DOCS, "weekly-1-base.sql"), os.path.join(DOCS, "weekly-2-topic-queue.sql")
-OUT = {1: os.path.join(DOCS, "weekly-verify-after-1.sql"), 2: os.path.join(DOCS, "weekly-verify-after-2.sql")}
+FILE2A = os.path.join(DOCS, "weekly-2a-publication-lock.sql")
+OUT = {1: os.path.join(DOCS, "weekly-verify-after-1.sql"), 2: os.path.join(DOCS, "weekly-verify-after-2.sql"),
+       "2a": os.path.join(DOCS, "weekly-verify-after-2a.sql")}
 
 # Supabase's own default privileges for objects created in public by postgres (CLAUDE.md, "A revoke from public on a
 # Supabase function is not a lock"). Emulated so the expected access is measured under the same starting grants.
@@ -154,7 +159,9 @@ select jsonb_pretty(jsonb_build_object(
     then 'pass' else 'fail: see missing, unexpected and the lists above' end)) as verification
 from chk k;
 """
-TITLES = {1: "after docs/weekly-1-base.sql (and before docs/weekly-2-topic-queue.sql)", 2: "after docs/weekly-2-topic-queue.sql (queue-only release complete)"}
+TITLES = {1: "after docs/weekly-1-base.sql (and before docs/weekly-2-topic-queue.sql)",
+          2: "after docs/weekly-2-topic-queue.sql (and before docs/weekly-2a-publication-lock.sql)",
+          "2a": "after docs/weekly-2a-publication-lock.sql (queue-only release complete)"}
 
 
 def psql(*args, check=True, stdin=None):
@@ -197,13 +204,15 @@ def main():
     s1 = state()
     psql("-f", FILE2)
     s2 = state()
-    text = {1: build(1, s1), 2: build(2, s2)}
+    psql("-f", FILE2A)
+    s2a = state()
+    text = {1: build(1, s1), 2: build(2, s2), "2a": build("2a", s2a)}
     if mode == "--write":
-        for n in (1, 2):
+        for n, st in ((1, s1), (2, s2), ("2a", s2a)):
             open(OUT[n], "w").write(text[n])
-            print("wrote", os.path.relpath(OUT[n], ROOT), "(%d expected items)" % len(s1 if n == 1 else s2))
+            print("wrote", os.path.relpath(OUT[n], ROOT), "(%d expected items)" % len(st))
         return
-    for n in (1, 2):
+    for n in (1, 2, "2a"):
         if open(OUT[n]).read() != text[n]:
             sys.exit("FAIL: %s is not what the release files produce; run build_verify.py --write" % os.path.relpath(OUT[n], ROOT))
 
@@ -215,11 +224,27 @@ def main():
             sys.exit("FAIL: %s: the %s list is empty, so that check did not see it" % (label, show))
         print("  verify: %s -> %s" % (label, "pass" if ok else "fail, as it must"))
 
-    # database now holds files 1+2 (applied once). Applying both again must not move anything.
+    # database now holds files 1+2+2a (applied once). Applying them again must not move anything.
     psql("-f", FILE1)
     psql("-f", FILE2)
-    want("after-2 on files 1+2, applied twice", OUT[2], True)
+    psql("-f", FILE2A)
+    want("after-2a on files 1+2+2a, applied twice", OUT["2a"], True)
+    want("after-2 once 2a is there", OUT[2], False, "unexpected")
     want("after-1 once file 2 is there", OUT[1], False)
+    psql("-f", FILE2)
+    want("after-2a once file 2 is re-applied over 2a (the lock is gone)", OUT["2a"], False, "unexpected")
+    psql("-f", FILE2A)
+    want("after-2a once 2a is applied again", OUT["2a"], True)
+    src = psql("-c", "select pg_get_functiondef('public.hs_weekly_lead_disposition(uuid,uuid,text,text)'::regprocedure)").stdout
+    lock = "  if ed.video_url is not null then raise exception 'edition % is published; its decisions stand', ed.edition_key using errcode = '55000'; end if;\n"
+    assert src.count(lock) == 1, "the lock line is not in the disposition function"
+    psql("-c", src.replace(lock, ""))
+    want("after-2a with one lock line removed", OUT["2a"], False, "unexpected")
+    reset()
+    psql("-f", FILE1)
+    psql("-f", FILE2)
+    want("after-2 on files 1+2", OUT[2], True)
+    want("after-2a on files 1+2 alone", OUT["2a"], False, "missing")
     reset()
     psql("-f", FILE1)
     want("after-1 on file 1 alone", OUT[1], True)

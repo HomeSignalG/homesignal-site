@@ -9,7 +9,7 @@ const read = (p) => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 const js = read('lib/acq-weekly-slice.js');
 const code = js.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 // the full configuration, in application order (docs/weekly-release-order.md)
-const SQL_FILES = ['weekly-1-base.sql', 'weekly-2-topic-queue.sql', 'weekly-3-workbench.sql', 'weekly-4-source-copy.sql', 'weekly-5-titles.sql', 'weekly-6-doc-cues.sql', 'weekly-7-topic-queue-gate.sql'];
+const SQL_FILES = ['weekly-1-base.sql', 'weekly-2-topic-queue.sql', 'weekly-2a-publication-lock.sql', 'weekly-3-workbench.sql', 'weekly-4-source-copy.sql', 'weekly-5-titles.sql', 'weekly-6-doc-cues.sql', 'weekly-7-topic-queue-gate.sql'];
 const sql = SQL_FILES.map((f) => read('docs/' + f)).join('\n');
 
 // 1. the editorial workbench is not on any page: acquisition.html loads this file as a LIBRARY (the research answer format
