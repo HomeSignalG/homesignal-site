@@ -72,6 +72,7 @@ ok(/Nothing here posts, publishes or starts a job/.test(await T('.tq-root')), '1
 // 2 inbox: the founder's two leads are unverified, with no address and no promise
 let inbox = await T('#tq-list');
 ok((await page.locator('#tq-list .tq-lead').count()) === 3 && inbox.includes(L2.title) && inbox.includes(LQ.title) && inbox.includes(LD.title) && !inbox.includes(L1.title), '2a inbox lists the unassigned topics only');
+await card(L2).locator('.tq-details > summary').click();   // the long text sits under Details
 const c2 = await card(L2).innerText();
 ok(c2.includes('Captured') && c2.includes('UNVERIFIED LEAD') && c2.includes('No source address recorded') && !c2.includes('Promised publicly')
   && c2.includes('Which lake is it?') && (await card(L2).locator('a').count()) === 0, '2b the Oregon lead: captured, unverified, no address, not promised');
@@ -155,6 +156,7 @@ ok(pasted.p_request === L1.request.id && pasted.p_raw_text === 'TEST pasted answ
 
 // 6 promised publicly: its own flag, at every stage; and the earlier deferral stays on record
 await view('promised');
+await card(LP).locator('.tq-details > summary').click();
 const cp = await card(LP).innerText();
 ok((await page.locator('#tq-list .tq-lead').count()) === 1 && (await card(LP).locator('.tq-promised').count()) === 1 && cp.includes('Queued for research'), '6a the promised topic shows its flag beside its status');
 ok(cp.includes('“TEST: we will look into this next week.”') && cp.includes('This records the promise. It is not evidence for the story.'), '6b the commitment is shown as a promise, not as evidence');

@@ -154,6 +154,9 @@ ok((await card(ID.lq).count()) === 1 && (await card(ID.lq).innerText()).includes
 // ── 3 Water and Data Centers leads (the founder's two, unverified) ──
 await capture(F.steps[1].args.p_fields); await wait(2, /Topic captured/);
 await capture(F.steps[2].args.p_fields); await wait(3, /Topic captured/);
+// the notes, questions, sources and edition history sit under each card's Details
+const openDetails = async (c) => { if (!(await c.locator('.tq-details').evaluate((d) => d.open))) await c.locator('.tq-details > summary').click(); };
+await openDetails(card(ID.l2)); await openDetails(card(ID.l1));
 const cW = await card(ID.l2).innerText(), cD = await card(ID.l1).innerText();
 ok(at === 3 && /Water Quality/.test(cW) && /UNVERIFIED LEAD/.test(cW) && /No source address recorded/.test(cW) && !/Promised publicly/.test(cW)
   && /Data Centers/.test(cD) && /Cochise County, Arizona/.test(cD) && /UNVERIFIED LEAD/.test(cD), '3a the Water and Data Centers leads are captured, unverified, with no address and no promise');
@@ -234,6 +237,7 @@ await view('deferred');
 await cp.locator('.tq-send-edition').selectOption(ID.ew2);
 await cp.locator('button[data-tq="send"]').click(); await wait(16, /Research request prepared/);
 await view('promised');
+await openDetails(cp);
 const carried = await cp.innerText();
 ok(at === 16 && /water-quality-2026-11-09: deferred — TEST: the record is not public yet/.test(carried) && /water-quality-2026-11-16 \(current assignment\): no decision yet/.test(carried)
   && (await cp.locator('.tq-promised').count()) === 1, '7a carried into the next edition: the earlier deferral and reason are kept apart from the current assignment');
