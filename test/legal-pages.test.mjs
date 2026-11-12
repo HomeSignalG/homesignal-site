@@ -56,8 +56,8 @@ ok(/\/terms\.html/.test(read('scripts/gen_sitemap.py')) && /\/refund-policy\.htm
 
 const da = read('development-activity.html');
 const dat = text(da);
-ok(JSON.stringify(dat.match(/\$\d[^\s]*( \w+){0,2}/g) || []) === JSON.stringify(['$78/month after beta']) && /Currently free during beta\. No payment required\./.test(dat),
-  'plan page shows only the planned "$78/month after beta" and says the beta is free with no payment required (founder, 2026-11-12; supersedes free-only 2026-10-15)');
+ok(!/\$\d/.test(dat) && /Free during beta/.test(dat) && /Paid plans coming after beta/.test(dat) && /You won’t be charged unless you choose a paid plan\./.test(dat),
+  'plan page shows no price, labels free access as a beta offer, says paid plans come after beta, and says nothing is charged unless a paid plan is chosen (founder, 2026-11-12)');
 ok(/100 Development Activity reports free/.test(dat), 'plan page publishes the 100 free reports');
 for (const h of ['privacy.html', 'terms.html', 'refund-policy.html']) ok(da.includes('href="' + h + '"'), 'plan page links ' + h + ' in its own content');
 const customer = [read('development-activity.html'), read('development-activity-reports.html')].map(text).join(' ');
