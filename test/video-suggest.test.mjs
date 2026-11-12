@@ -16,7 +16,7 @@ const sql = read('docs/youtube-video-suggestions.sql');
 // 1. structure
 const key = crypto.createHash('sha256').update(lib).digest('hex').slice(0, 8);
 ok(page0.includes('lib/acq-video-suggest.js?v=' + key), '1a acquisition.html loads the module with its content key');
-ok(/<div class="tab" id="tab-youtubevideos"><div id="yv-suggest-host"><\/div><div id="yv-list-host"><\/div><\/div>/.test(page0),
+ok(/<div class="tab" id="tab-youtubevideos"><div id="yv-suggest-host"><\/div><div id="ve-youtube-host"><\/div><div id="yv-list-host"><\/div><\/div>/.test(page0),
   '1b Tab 16 has its own suggestion box beside the video list, so the list refresh never wipes typing');
 ok(/acqVideoSuggest\.mount\(window\.hsClient, sg\)/.test(page0) && /getElementById\('yv-list-host'\)[\s\S]{0,120}acqYoutubeVideos\.load/.test(page0),
   '1c the tab mounts the box and loads the list into its own host');
