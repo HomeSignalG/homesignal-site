@@ -1,0 +1,1827 @@
+{
+ "note": "Development Map indexing pilot baseline, recorded 2026-11-12 ~13:45 UTC from the live site (jodytracks.com). Read-only.",
+ "deploy": {
+  "commit": "f65a0f7f0173040de85dc24026f537e2d78b7bcd",
+  "pr": "HomeSignalG/homesignal-site#2808",
+  "pages_run": "43085990172",
+  "deployed_utc": "2026-11-11T19:29:35Z"
+ },
+ "indexnow": {
+  "run": "43085990172",
+  "job": "130756293523",
+  "submitted_utc": "2026-11-11T19:29:48Z",
+  "submitted": 100,
+  "batches": [
+   {
+    "urls": 100,
+    "http_status": 200,
+    "attempts": 1
+   }
+  ],
+  "baseline_state": "9a56f400ab7e3677b20f3eac5e629b5f",
+  "candidate_state": "5e883203b2cbdeb855ef7964bf1c5f50",
+  "receipt_artifact": "13887631519 (90-day retention)"
+ },
+ "urls": [
+  {
+   "url": "https://jodytracks.com/map/02466/",
+   "zip": "02466",
+   "arm": "treatment",
+   "state": "MA",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/02668/",
+   "zip": "02668",
+   "arm": "treatment",
+   "state": "MA",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-12T05:46:20Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/02826/",
+   "zip": "02826",
+   "arm": "treatment",
+   "state": "RI",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/02852/",
+   "zip": "02852",
+   "arm": "treatment",
+   "state": "RI",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/02881/",
+   "zip": "02881",
+   "arm": "treatment",
+   "state": "RI",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/03234/",
+   "zip": "03234",
+   "arm": "treatment",
+   "state": "NH",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/04030/",
+   "zip": "04030",
+   "arm": "treatment",
+   "state": "ME",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/04282/",
+   "zip": "04282",
+   "arm": "treatment",
+   "state": "ME",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/05031/",
+   "zip": "05031",
+   "arm": "treatment",
+   "state": "VT",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/05355/",
+   "zip": "05355",
+   "arm": "treatment",
+   "state": "VT",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/05403/",
+   "zip": "05403",
+   "arm": "treatment",
+   "state": "VT",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/05405/",
+   "zip": "05405",
+   "arm": "treatment",
+   "state": "VT",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/06268/",
+   "zip": "06268",
+   "arm": "treatment",
+   "state": "CT",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/10468/",
+   "zip": "10468",
+   "arm": "treatment",
+   "state": "NY",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/11743/",
+   "zip": "11743",
+   "arm": "treatment",
+   "state": "NY",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/17342/",
+   "zip": "17342",
+   "arm": "treatment",
+   "state": "PA",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/18074/",
+   "zip": "18074",
+   "arm": "treatment",
+   "state": "PA",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/18976/",
+   "zip": "18976",
+   "arm": "treatment",
+   "state": "PA",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/19801/",
+   "zip": "19801",
+   "arm": "treatment",
+   "state": "DE",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/19952/",
+   "zip": "19952",
+   "arm": "treatment",
+   "state": "DE",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/20625/",
+   "zip": "20625",
+   "arm": "treatment",
+   "state": "MD",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/20639/",
+   "zip": "20639",
+   "arm": "treatment",
+   "state": "MD",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/20781/",
+   "zip": "20781",
+   "arm": "treatment",
+   "state": "MD",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/21120/",
+   "zip": "21120",
+   "arm": "treatment",
+   "state": "MD",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/22303/",
+   "zip": "22303",
+   "arm": "treatment",
+   "state": "VA",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/22931/",
+   "zip": "22931",
+   "arm": "treatment",
+   "state": "VA",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/25060/",
+   "zip": "25060",
+   "arm": "treatment",
+   "state": "WV",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/25915/",
+   "zip": "25915",
+   "arm": "treatment",
+   "state": "WV",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/27583/",
+   "zip": "27583",
+   "arm": "treatment",
+   "state": "NC",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/28465/",
+   "zip": "28465",
+   "arm": "treatment",
+   "state": "NC",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/29375/",
+   "zip": "29375",
+   "arm": "treatment",
+   "state": "SC",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/29431/",
+   "zip": "29431",
+   "arm": "treatment",
+   "state": "SC",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-12T05:46:20Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/29904/",
+   "zip": "29904",
+   "arm": "treatment",
+   "state": "SC",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/30038/",
+   "zip": "30038",
+   "arm": "treatment",
+   "state": "GA",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/30272/",
+   "zip": "30272",
+   "arm": "treatment",
+   "state": "GA",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/31411/",
+   "zip": "31411",
+   "arm": "treatment",
+   "state": "GA",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/32837/",
+   "zip": "32837",
+   "arm": "treatment",
+   "state": "FL",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/33304/",
+   "zip": "33304",
+   "arm": "treatment",
+   "state": "FL",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-12T05:46:20Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/33931/",
+   "zip": "33931",
+   "arm": "treatment",
+   "state": "FL",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/37350/",
+   "zip": "37350",
+   "arm": "treatment",
+   "state": "TN",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/38134/",
+   "zip": "38134",
+   "arm": "treatment",
+   "state": "TN",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/38654/",
+   "zip": "38654",
+   "arm": "treatment",
+   "state": "MS",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/38801/",
+   "zip": "38801",
+   "arm": "treatment",
+   "state": "MS",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/40177/",
+   "zip": "40177",
+   "arm": "treatment",
+   "state": "KY",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/41074/",
+   "zip": "41074",
+   "arm": "treatment",
+   "state": "KY",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/41094/",
+   "zip": "41094",
+   "arm": "treatment",
+   "state": "KY",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/43081/",
+   "zip": "43081",
+   "arm": "treatment",
+   "state": "OH",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/45248/",
+   "zip": "45248",
+   "arm": "treatment",
+   "state": "OH",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/46208/",
+   "zip": "46208",
+   "arm": "treatment",
+   "state": "IN",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/47968/",
+   "zip": "47968",
+   "arm": "treatment",
+   "state": "IN",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/48895/",
+   "zip": "48895",
+   "arm": "treatment",
+   "state": "MI",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/48911/",
+   "zip": "48911",
+   "arm": "treatment",
+   "state": "MI",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/49503/",
+   "zip": "49503",
+   "arm": "treatment",
+   "state": "MI",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/50277/",
+   "zip": "50277",
+   "arm": "treatment",
+   "state": "IA",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/50313/",
+   "zip": "50313",
+   "arm": "treatment",
+   "state": "IA",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/53186/",
+   "zip": "53186",
+   "arm": "treatment",
+   "state": "WI",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/53517/",
+   "zip": "53517",
+   "arm": "treatment",
+   "state": "WI",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/53718/",
+   "zip": "53718",
+   "arm": "treatment",
+   "state": "WI",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/55105/",
+   "zip": "55105",
+   "arm": "treatment",
+   "state": "MN",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/55407/",
+   "zip": "55407",
+   "arm": "treatment",
+   "state": "MN",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-12T05:46:20Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/57014/",
+   "zip": "57014",
+   "arm": "treatment",
+   "state": "SD",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/57108/",
+   "zip": "57108",
+   "arm": "treatment",
+   "state": "SD",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/57201/",
+   "zip": "57201",
+   "arm": "treatment",
+   "state": "SD",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/58504/",
+   "zip": "58504",
+   "arm": "treatment",
+   "state": "ND",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/59018/",
+   "zip": "59018",
+   "arm": "treatment",
+   "state": "MT",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/59808/",
+   "zip": "59808",
+   "arm": "treatment",
+   "state": "MT",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/59868/",
+   "zip": "59868",
+   "arm": "treatment",
+   "state": "MT",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/60467/",
+   "zip": "60467",
+   "arm": "treatment",
+   "state": "IL",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/60827/",
+   "zip": "60827",
+   "arm": "treatment",
+   "state": "IL",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/64128/",
+   "zip": "64128",
+   "arm": "treatment",
+   "state": "MO",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/66604/",
+   "zip": "66604",
+   "arm": "treatment",
+   "state": "KS",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/68307/",
+   "zip": "68307",
+   "arm": "treatment",
+   "state": "NE",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/68504/",
+   "zip": "68504",
+   "arm": "treatment",
+   "state": "NE",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/68653/",
+   "zip": "68653",
+   "arm": "treatment",
+   "state": "NE",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/70129/",
+   "zip": "70129",
+   "arm": "treatment",
+   "state": "LA",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/72167/",
+   "zip": "72167",
+   "arm": "treatment",
+   "state": "AR",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/73006/",
+   "zip": "73006",
+   "arm": "treatment",
+   "state": "OK",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/80634/",
+   "zip": "80634",
+   "arm": "treatment",
+   "state": "CO",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/82061/",
+   "zip": "82061",
+   "arm": "treatment",
+   "state": "WY",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/82833/",
+   "zip": "82833",
+   "arm": "treatment",
+   "state": "WY",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/83641/",
+   "zip": "83641",
+   "arm": "treatment",
+   "state": "ID",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/83646/",
+   "zip": "83646",
+   "arm": "treatment",
+   "state": "ID",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/83657/",
+   "zip": "83657",
+   "arm": "treatment",
+   "state": "ID",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/84092/",
+   "zip": "84092",
+   "arm": "treatment",
+   "state": "UT",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/84510/",
+   "zip": "84510",
+   "arm": "treatment",
+   "state": "UT",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/85301/",
+   "zip": "85301",
+   "arm": "treatment",
+   "state": "AZ",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/85934/",
+   "zip": "85934",
+   "arm": "treatment",
+   "state": "AZ",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/87113/",
+   "zip": "87113",
+   "arm": "treatment",
+   "state": "NM",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/88325/",
+   "zip": "88325",
+   "arm": "treatment",
+   "state": "NM",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/89314/",
+   "zip": "89314",
+   "arm": "treatment",
+   "state": "NV",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/89403/",
+   "zip": "89403",
+   "arm": "treatment",
+   "state": "NV",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/94565/",
+   "zip": "94565",
+   "arm": "treatment",
+   "state": "CA",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/95037/",
+   "zip": "95037",
+   "arm": "treatment",
+   "state": "CA",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/96814/",
+   "zip": "96814",
+   "arm": "treatment",
+   "state": "HI",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/97233/",
+   "zip": "97233",
+   "arm": "treatment",
+   "state": "OR",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/97305/",
+   "zip": "97305",
+   "arm": "treatment",
+   "state": "OR",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/98116/",
+   "zip": "98116",
+   "arm": "treatment",
+   "state": "WA",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-12T05:46:20Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/99630/",
+   "zip": "99630",
+   "arm": "treatment",
+   "state": "AK",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/99703/",
+   "zip": "99703",
+   "arm": "treatment",
+   "state": "AK",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/99901/",
+   "zip": "99901",
+   "arm": "treatment",
+   "state": "AK",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-11-11T19:23:16Z",
+   "live_summary_present_2026_11_12": true
+  },
+  {
+   "url": "https://jodytracks.com/map/01607/",
+   "zip": "01607",
+   "arm": "control",
+   "state": "MA",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/02537/",
+   "zip": "02537",
+   "arm": "control",
+   "state": "MA",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/02802/",
+   "zip": "02802",
+   "arm": "control",
+   "state": "RI",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/02835/",
+   "zip": "02835",
+   "arm": "control",
+   "state": "RI",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/02905/",
+   "zip": "02905",
+   "arm": "control",
+   "state": "RI",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/03883/",
+   "zip": "03883",
+   "arm": "control",
+   "state": "NH",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/04287/",
+   "zip": "04287",
+   "arm": "control",
+   "state": "ME",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/04683/",
+   "zip": "04683",
+   "arm": "control",
+   "state": "ME",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/05401/",
+   "zip": "05401",
+   "arm": "control",
+   "state": "VT",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/05487/",
+   "zip": "05487",
+   "arm": "control",
+   "state": "VT",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/05652/",
+   "zip": "05652",
+   "arm": "control",
+   "state": "VT",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/05655/",
+   "zip": "05655",
+   "arm": "control",
+   "state": "VT",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/06354/",
+   "zip": "06354",
+   "arm": "control",
+   "state": "CT",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/10504/",
+   "zip": "10504",
+   "arm": "control",
+   "state": "NY",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/14428/",
+   "zip": "14428",
+   "arm": "control",
+   "state": "NY",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/17572/",
+   "zip": "17572",
+   "arm": "control",
+   "state": "PA",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/17978/",
+   "zip": "17978",
+   "arm": "control",
+   "state": "PA",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/19067/",
+   "zip": "19067",
+   "arm": "control",
+   "state": "PA",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/19931/",
+   "zip": "19931",
+   "arm": "control",
+   "state": "DE",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/19950/",
+   "zip": "19950",
+   "arm": "control",
+   "state": "DE",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/20186/",
+   "zip": "20186",
+   "arm": "control",
+   "state": "VA",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/20744/",
+   "zip": "20744",
+   "arm": "control",
+   "state": "MD",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/20905/",
+   "zip": "20905",
+   "arm": "control",
+   "state": "MD",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/21051/",
+   "zip": "21051",
+   "arm": "control",
+   "state": "MD",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/21402/",
+   "zip": "21402",
+   "arm": "control",
+   "state": "MD",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/22308/",
+   "zip": "22308",
+   "arm": "control",
+   "state": "VA",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/25506/",
+   "zip": "25506",
+   "arm": "control",
+   "state": "WV",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/26404/",
+   "zip": "26404",
+   "arm": "control",
+   "state": "WV",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/27349/",
+   "zip": "27349",
+   "arm": "control",
+   "state": "NC",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/28715/",
+   "zip": "28715",
+   "arm": "control",
+   "state": "NC",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/29369/",
+   "zip": "29369",
+   "arm": "control",
+   "state": "SC",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/29469/",
+   "zip": "29469",
+   "arm": "control",
+   "state": "SC",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/29683/",
+   "zip": "29683",
+   "arm": "control",
+   "state": "SC",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/30234/",
+   "zip": "30234",
+   "arm": "control",
+   "state": "GA",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/30319/",
+   "zip": "30319",
+   "arm": "control",
+   "state": "GA",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/30567/",
+   "zip": "30567",
+   "arm": "control",
+   "state": "GA",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/33063/",
+   "zip": "33063",
+   "arm": "control",
+   "state": "FL",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/33122/",
+   "zip": "33122",
+   "arm": "control",
+   "state": "FL",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/33125/",
+   "zip": "33125",
+   "arm": "control",
+   "state": "FL",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/37204/",
+   "zip": "37204",
+   "arm": "control",
+   "state": "TN",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/37772/",
+   "zip": "37772",
+   "arm": "control",
+   "state": "TN",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/38671/",
+   "zip": "38671",
+   "arm": "control",
+   "state": "MS",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/39503/",
+   "zip": "39503",
+   "arm": "control",
+   "state": "MS",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/40206/",
+   "zip": "40206",
+   "arm": "control",
+   "state": "KY",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/40509/",
+   "zip": "40509",
+   "arm": "control",
+   "state": "KY",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/42356/",
+   "zip": "42356",
+   "arm": "control",
+   "state": "KY",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/45219/",
+   "zip": "45219",
+   "arm": "control",
+   "state": "OH",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/45242/",
+   "zip": "45242",
+   "arm": "control",
+   "state": "OH",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/46773/",
+   "zip": "46773",
+   "arm": "control",
+   "state": "IN",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/46799/",
+   "zip": "46799",
+   "arm": "control",
+   "state": "IN",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/48161/",
+   "zip": "48161",
+   "arm": "control",
+   "state": "MI",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/48239/",
+   "zip": "48239",
+   "arm": "control",
+   "state": "MI",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/49404/",
+   "zip": "49404",
+   "arm": "control",
+   "state": "MI",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/52302/",
+   "zip": "52302",
+   "arm": "control",
+   "state": "IA",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/52352/",
+   "zip": "52352",
+   "arm": "control",
+   "state": "IA",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/53207/",
+   "zip": "53207",
+   "arm": "control",
+   "state": "WI",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/53515/",
+   "zip": "53515",
+   "arm": "control",
+   "state": "WI",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/53714/",
+   "zip": "53714",
+   "arm": "control",
+   "state": "WI",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/55031/",
+   "zip": "55031",
+   "arm": "control",
+   "state": "MN",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/55430/",
+   "zip": "55430",
+   "arm": "control",
+   "state": "MN",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/57053/",
+   "zip": "57053",
+   "arm": "control",
+   "state": "SD",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/57110/",
+   "zip": "57110",
+   "arm": "control",
+   "state": "SD",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/57238/",
+   "zip": "57238",
+   "arm": "control",
+   "state": "SD",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/58501/",
+   "zip": "58501",
+   "arm": "control",
+   "state": "ND",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/59414/",
+   "zip": "59414",
+   "arm": "control",
+   "state": "MT",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/59465/",
+   "zip": "59465",
+   "arm": "control",
+   "state": "MT",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/59801/",
+   "zip": "59801",
+   "arm": "control",
+   "state": "MT",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/60191/",
+   "zip": "60191",
+   "arm": "control",
+   "state": "IL",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/60606/",
+   "zip": "60606",
+   "arm": "control",
+   "state": "IL",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/64111/",
+   "zip": "64111",
+   "arm": "control",
+   "state": "MO",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/67212/",
+   "zip": "67212",
+   "arm": "control",
+   "state": "KS",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/68007/",
+   "zip": "68007",
+   "arm": "control",
+   "state": "NE",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/68063/",
+   "zip": "68063",
+   "arm": "control",
+   "state": "NE",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/68507/",
+   "zip": "68507",
+   "arm": "control",
+   "state": "NE",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/70770/",
+   "zip": "70770",
+   "arm": "control",
+   "state": "LA",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/72730/",
+   "zip": "72730",
+   "arm": "control",
+   "state": "AR",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/73070/",
+   "zip": "73070",
+   "arm": "control",
+   "state": "OK",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/80642/",
+   "zip": "80642",
+   "arm": "control",
+   "state": "CO",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/82510/",
+   "zip": "82510",
+   "arm": "control",
+   "state": "WY",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/82801/",
+   "zip": "82801",
+   "arm": "control",
+   "state": "WY",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/83344/",
+   "zip": "83344",
+   "arm": "control",
+   "state": "ID",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/83537/",
+   "zip": "83537",
+   "arm": "control",
+   "state": "ID",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/83660/",
+   "zip": "83660",
+   "arm": "control",
+   "state": "ID",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/84533/",
+   "zip": "84533",
+   "arm": "control",
+   "state": "UT",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/84779/",
+   "zip": "84779",
+   "arm": "control",
+   "state": "UT",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/85224/",
+   "zip": "85224",
+   "arm": "control",
+   "state": "AZ",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/85605/",
+   "zip": "85605",
+   "arm": "control",
+   "state": "AZ",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/87109/",
+   "zip": "87109",
+   "arm": "control",
+   "state": "NM",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/87508/",
+   "zip": "87508",
+   "arm": "control",
+   "state": "NM",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/89128/",
+   "zip": "89128",
+   "arm": "control",
+   "state": "NV",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/89833/",
+   "zip": "89833",
+   "arm": "control",
+   "state": "NV",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/94618/",
+   "zip": "94618",
+   "arm": "control",
+   "state": "CA",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/94952/",
+   "zip": "94952",
+   "arm": "control",
+   "state": "CA",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/96825/",
+   "zip": "96825",
+   "arm": "control",
+   "state": "HI",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/97227/",
+   "zip": "97227",
+   "arm": "control",
+   "state": "OR",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/97239/",
+   "zip": "97239",
+   "arm": "control",
+   "state": "OR",
+   "group": "g2_3to20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/98405/",
+   "zip": "98405",
+   "arm": "control",
+   "state": "WA",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/99501/",
+   "zip": "99501",
+   "arm": "control",
+   "state": "AK",
+   "group": "g3_over20",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/99577/",
+   "zip": "99577",
+   "arm": "control",
+   "state": "AK",
+   "group": "g0_none",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  },
+  {
+   "url": "https://jodytracks.com/map/99701/",
+   "zip": "99701",
+   "arm": "control",
+   "state": "AK",
+   "group": "g1_1to2",
+   "sitemap_lastmod_2026_11_12": "2026-10-27T18:43:05Z",
+   "live_summary_present_2026_11_12": false
+  }
+ ]
+}
