@@ -1,0 +1,355 @@
+{
+ "_note": "TEST DATA. public.weekly_edition_render_export and one visual_check claim from a disposable database (docs/weekly-1..8). Not production.",
+ "claims": [
+  {
+   "angle": null,
+   "cue_version": {
+    "body": {
+     "segments": [
+      {
+       "beat": "collision",
+       "claim_ids": [
+        "air-third-party-reports@1",
+        "air-program-background@1",
+        "air-warning-effect@1",
+        "air-proposal-status@1"
+       ],
+       "story": "air",
+       "text": "Under an EPA proposal, reports of company emissions detected by third parties would stop reaching the agency, and residents near oil and gas sites could lose an early warning about large methane releases, an estimated effect. The change is proposed, not final. The Super Emitter Program behind those reports started in 2024. It is one of several monitoring tools the agency uses, and officials say it can find problems that routine monitoring misses.",
+       "visual": {
+        "claim_id": "air-proposal-status@1",
+        "highlight": "yellow",
+        "page": 1,
+        "quote": "First, the EPA proposes to rescind the Super Emitter Program.",
+        "source_id": "f1097a25-9971-493a-bd12-e30c9ebb3930",
+        "type": "doc"
+       }
+      },
+      {
+       "beat": "landing",
+       "claim_ids": [
+        "air-proposal-status@1"
+       ],
+       "story": "air",
+       "text": "TEST DATA: For now this is a proposal, not a final rule, and residents can still comment on it."
+      }
+     ]
+    },
+    "body_sha256": "d79539c940bcc5084debaa77d2d0bf3871303463a3e29cbe974bf673ec19cfe1",
+    "id": "df6a39f6-06bb-4fa3-8cb8-4c9bd7f81fe5"
+   },
+   "findings": [
+    {
+     "claim_id": "air-cost-estimate@1",
+     "qualifiers": [
+      "estimated"
+     ],
+     "quotes": [],
+     "scope": "federal",
+     "statement": "TEST DATA: EPA estimates the proposal would reduce oil and gas industry compliance costs by about $45 billion over its analysis period.",
+     "uncertainty": "TEST DATA: an agency estimate over many years, not a payment"
+    },
+    {
+     "claim_id": "air-program-background@1",
+     "qualifiers": [],
+     "quotes": [],
+     "scope": "federal",
+     "statement": "TEST DATA: The Super Emitter Program started in 2024 and is one of several EPA monitoring tools that officials say can find problems routine monitoring misses.",
+     "uncertainty": null
+    },
+    {
+     "claim_id": "air-proposal-status@1",
+     "qualifiers": [
+      "proposed"
+     ],
+     "quotes": [
+      "TEST DATA: this action proposes to amend the rule"
+     ],
+     "scope": "federal",
+     "statement": "TEST DATA: The EPA change is proposed, not final.",
+     "uncertainty": null
+    },
+    {
+     "claim_id": "air-third-party-reports@1",
+     "qualifiers": [
+      "proposed"
+     ],
+     "quotes": [
+      "TEST DATA: notifications from third parties would no longer be submitted to the agency"
+     ],
+     "scope": "federal",
+     "statement": "TEST DATA: Under the proposal, reports of company emissions detected by third parties would stop reaching EPA.",
+     "uncertainty": null
+    },
+    {
+     "claim_id": "air-warning-effect@1",
+     "qualifiers": [
+      "estimated"
+     ],
+     "quotes": [],
+     "scope": "local",
+     "statement": "TEST DATA: Residents near oil and gas sites could lose an early warning about large methane releases.",
+     "uncertainty": "TEST DATA: depends on how often reports led to action"
+    }
+   ],
+   "kind": "visual_check",
+   "lessons": [],
+   "library_version": 1,
+   "mode": "visual_check",
+   "outline": {
+    "beats": [
+     {
+      "beat": "collision",
+      "finding_ids": [
+       "air-proposal-status@1",
+       "air-warning-effect@1"
+      ],
+      "purpose": "TEST DATA: the proposal and what residents could lose"
+     },
+     {
+      "beat": "mechanism",
+      "finding_ids": [
+       "air-program-background@1"
+      ],
+      "purpose": "TEST DATA: how third-party reports work today"
+     },
+     {
+      "beat": "landing",
+      "finding_ids": [
+       "air-third-party-reports@1"
+      ],
+      "purpose": "TEST DATA: proposed, not final"
+     }
+    ]
+   },
+   "parent": null,
+   "profile": [
+    "Keep qualifications and uncertainty.",
+    "Attribute forecasts; distinguish proposed changes from final rules."
+   ],
+   "profile_version": 1,
+   "run": "3a6c8854-f45a-4958-8648-61438fafc576",
+   "script": null,
+   "sources": [
+    {
+     "document_kind": "pdf",
+     "document_path": "weekly-sources/f1097a25-9971-493a-bd12-e30c9ebb3930/faa7045eb0c311e8795dafcf7744b2d5db6f6f297fe29ef76f2d64d1923c5758.pdf",
+     "document_sha256": "faa7045eb0c311e8795dafcf7744b2d5db6f6f297fe29ef76f2d64d1923c5758",
+     "finding_ids": [
+      "air-proposal-status@1"
+     ],
+     "label": "EPA, Proposed Rule, 91 FR 68234 (October 29, 2026)",
+     "publisher": "U.S. EPA (Federal Register)",
+     "source_id": "f1097a25-9971-493a-bd12-e30c9ebb3930",
+     "title": "EPA, Proposed Rule, 91 FR 68234 (October 29, 2026)",
+     "url": "https://www.govinfo.gov/content/pkg/FR-2026-10-29/pdf/2026-22082.pdf"
+    }
+   ],
+   "title_version": null,
+   "topic": "Air Quality"
+  }
+ ],
+ "export": {
+  "approval": {
+   "approved_at": "2026-11-12T19:33:36.989636+00:00",
+   "approved_by": "founder@test.invalid",
+   "digest": "47b08d3ae36e08a41fe9315b0b5459bde30e7cb9f6a909b9d6a8298cfcb69a3a",
+   "sequence_id": 1
+  },
+  "approved": true,
+  "digest": "47b08d3ae36e08a41fe9315b0b5459bde30e7cb9f6a909b9d6a8298cfcb69a3a",
+  "edition_id": "5fc9569b-b624-4d1e-9320-90e8b8c4843e",
+  "edition_key": "air-quality-2026-11-09",
+  "items": [
+   {
+    "from": 0,
+    "n": 1,
+    "section_card": true,
+    "segments": [
+     {
+      "beat": "collision",
+      "claim_ids": [
+       "air-third-party-reports@1",
+       "air-program-background@1",
+       "air-warning-effect@1",
+       "air-proposal-status@1"
+      ],
+      "story": "air",
+      "text": "Under an EPA proposal, reports of company emissions detected by third parties would stop reaching the agency, and residents near oil and gas sites could lose an early warning about large methane releases, an estimated effect. The change is proposed, not final. The Super Emitter Program behind those reports started in 2024. It is one of several monitoring tools the agency uses, and officials say it can find problems that routine monitoring misses.",
+      "visual": {
+       "claim_id": "air-proposal-status@1",
+       "highlight": "yellow",
+       "page": 1,
+       "quote": "First, the EPA proposes to rescind the Super Emitter Program.",
+       "source_id": "f1097a25-9971-493a-bd12-e30c9ebb3930",
+       "type": "doc"
+      }
+     }
+    ],
+    "to": 0,
+    "topic": "Air Quality",
+    "version_id": "df6a39f6-06bb-4fa3-8cb8-4c9bd7f81fe5"
+   },
+   {
+    "from": 0,
+    "n": 2,
+    "section_card": true,
+    "segments": [
+     {
+      "beat": "collision",
+      "claim_ids": [
+       "water-third-party-reports@1",
+       "water-program-background@1",
+       "water-warning-effect@1",
+       "water-proposal-status@1"
+      ],
+      "story": "air",
+      "text": "Under an EPA proposal, reports of company emissions detected by third parties would stop reaching the agency, and residents near oil and gas sites could lose an early warning about large methane releases, an estimated effect. The change is proposed, not final. The Super Emitter Program behind those reports started in 2024. It is one of several monitoring tools the agency uses, and officials say it can find problems that routine monitoring misses."
+     },
+     {
+      "beat": "landing",
+      "claim_ids": [
+       "water-proposal-status@1"
+      ],
+      "story": "air",
+      "text": "TEST DATA: For now this is a proposal, not a final rule, and residents can still comment on it."
+     }
+    ],
+    "to": 1,
+    "topic": "Water Quality",
+    "version_id": "fd8316ff-4d60-401b-9c1f-fdb34d314939"
+   },
+   {
+    "from": 1,
+    "n": 3,
+    "section_card": true,
+    "segments": [
+     {
+      "beat": "landing",
+      "claim_ids": [
+       "air-proposal-status@1"
+      ],
+      "story": "air",
+      "text": "TEST DATA: For now this is a proposal, not a final rule, and residents can still comment on it."
+     }
+    ],
+    "to": 1,
+    "topic": "Air Quality",
+    "version_id": "df6a39f6-06bb-4fa3-8cb8-4c9bd7f81fe5"
+   }
+  ],
+  "period_end": "2026-11-15",
+  "period_start": "2026-11-09",
+  "problems": [],
+  "sequence": {
+   "entries": [
+    {
+     "from": 0,
+     "to": 0,
+     "version_id": "df6a39f6-06bb-4fa3-8cb8-4c9bd7f81fe5"
+    },
+    {
+     "from": 0,
+     "to": 1,
+     "version_id": "fd8316ff-4d60-401b-9c1f-fdb34d314939"
+    },
+    {
+     "from": 1,
+     "to": 1,
+     "version_id": "df6a39f6-06bb-4fa3-8cb8-4c9bd7f81fe5"
+    }
+   ],
+   "id": 1,
+   "set_at": "2026-11-12T19:33:36.981792+00:00",
+   "set_by": "founder@test.invalid"
+  },
+  "series": "QUALITY-of-LIFE Weekly Report",
+  "topics": [
+   "Air Quality",
+   "Water Quality"
+  ],
+  "versions": [
+   {
+    "approvals": [
+     {
+      "approved_at": "2026-11-12T19:33:36.832304+00:00",
+      "approved_by": "founder@test.invalid",
+      "body_sha256": "d79539c940bcc5084debaa77d2d0bf3871303463a3e29cbe974bf673ec19cfe1",
+      "kind": "editorial"
+     }
+    ],
+    "body": {
+     "segments": [
+      {
+       "beat": "collision",
+       "claim_ids": [
+        "air-third-party-reports@1",
+        "air-program-background@1",
+        "air-warning-effect@1",
+        "air-proposal-status@1"
+       ],
+       "story": "air",
+       "text": "Under an EPA proposal, reports of company emissions detected by third parties would stop reaching the agency, and residents near oil and gas sites could lose an early warning about large methane releases, an estimated effect. The change is proposed, not final. The Super Emitter Program behind those reports started in 2024. It is one of several monitoring tools the agency uses, and officials say it can find problems that routine monitoring misses.",
+       "visual": {
+        "claim_id": "air-proposal-status@1",
+        "highlight": "yellow",
+        "page": 1,
+        "quote": "First, the EPA proposes to rescind the Super Emitter Program.",
+        "source_id": "f1097a25-9971-493a-bd12-e30c9ebb3930",
+        "type": "doc"
+       }
+      },
+      {
+       "beat": "landing",
+       "claim_ids": [
+        "air-proposal-status@1"
+       ],
+       "story": "air",
+       "text": "TEST DATA: For now this is a proposal, not a final rule, and residents can still comment on it."
+      }
+     ]
+    },
+    "body_sha256": "d79539c940bcc5084debaa77d2d0bf3871303463a3e29cbe974bf673ec19cfe1",
+    "id": "df6a39f6-06bb-4fa3-8cb8-4c9bd7f81fe5",
+    "topic": "Air Quality"
+   },
+   {
+    "approvals": [
+     {
+      "approved_at": "2026-11-12T19:33:36.931765+00:00",
+      "approved_by": "founder@test.invalid",
+      "body_sha256": "17cbce70e94f11e4639dd50363e2454a429257b8a8e82497c0e9762167734fdc",
+      "kind": "editorial"
+     }
+    ],
+    "body": {
+     "segments": [
+      {
+       "beat": "collision",
+       "claim_ids": [
+        "water-third-party-reports@1",
+        "water-program-background@1",
+        "water-warning-effect@1",
+        "water-proposal-status@1"
+       ],
+       "story": "air",
+       "text": "Under an EPA proposal, reports of company emissions detected by third parties would stop reaching the agency, and residents near oil and gas sites could lose an early warning about large methane releases, an estimated effect. The change is proposed, not final. The Super Emitter Program behind those reports started in 2024. It is one of several monitoring tools the agency uses, and officials say it can find problems that routine monitoring misses."
+      },
+      {
+       "beat": "landing",
+       "claim_ids": [
+        "water-proposal-status@1"
+       ],
+       "story": "air",
+       "text": "TEST DATA: For now this is a proposal, not a final rule, and residents can still comment on it."
+      }
+     ]
+    },
+    "body_sha256": "17cbce70e94f11e4639dd50363e2454a429257b8a8e82497c0e9762167734fdc",
+    "id": "fd8316ff-4d60-401b-9c1f-fdb34d314939",
+    "topic": "Water Quality"
+   }
+  ],
+  "why_not": null
+ }
+}
