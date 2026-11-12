@@ -109,6 +109,8 @@ QUERY = r"""-- Tab 20 · Weekly Report: READ-ONLY PRODUCTION VERIFICATION, %(tit
 -- function bodies, same access for anon and authenticated), every weekly table is empty, nothing reachable by a visitor,
 -- every definer function pins its search path, every admin function still checks the admin list, and no weekly function
 -- calls out, reads a secret or touches storage. Anything else lists what is missing or unexpected.
+-- "reader.bypasses_row_security" must be true for the row counts to mean empty: RLS is on and has no policy, so a reader
+-- subject to it counts 0 whatever the table holds.
 -- (the expected items are plain string literals: standard_conforming_strings must be on, which the query checks)
 with expected(item) as (
   select unnest(%(expected)s)
@@ -137,6 +139,8 @@ with expected(item) as (
     -- informational: the migration runner's own ledger (not part of files 1 and 2)
     jsonb_build_object('migration_runs', to_regclass('public.migration_runs') is not null, 'migration_totp_used', to_regclass('public.migration_totp_used') is not null,
                        'migration_state', to_regprocedure('public.migration_state(text)') is not null) as runner_ledger_present,
+    -- the row counts above prove emptiness only if this reader is not filtered by row security (RLS is on, no policy)
+    jsonb_build_object('role', current_user, 'bypasses_row_security', (select rolbypassrls from pg_roles where rolname = current_user)) as reader,
     -- still true before file 2 is applied
     (to_regprocedure('public._hs_is_admin()') is not null and to_regclass('public.alert_topic_catalog') is not null
       and exists (select 1 from pg_constraint c where c.conrelid = to_regclass('public.alert_topic_catalog') and c.contype in ('p', 'u')
@@ -149,7 +153,7 @@ select jsonb_pretty(jsonb_build_object(
   'tables_without_row_security', k.tables_without_row_security, 'definer_without_search_path', k.definer_without_search_path,
   'admin_functions_without_admin_check', k.admin_functions_without_admin_check, 'admin_functions_not_definer', k.admin_functions_not_definer,
   'functions_that_call_out_or_read_secrets', k.functions_that_call_out_or_read_secrets,
-  'runner_ledger_present', k.runner_ledger_present, 'prerequisites_still_present', k.prerequisites_still_present,
+  'runner_ledger_present', k.runner_ledger_present, 'reader', k.reader, 'prerequisites_still_present', k.prerequisites_still_present,
   'verdict', case when k.missing = '[]'::jsonb and k.unexpected = '[]'::jsonb and k.expected_items = k.actual_items
       and not exists (select 1 from jsonb_each_text(k.row_counts) r where r.value <> '0')
       and k.anon_can_reach = '[]'::jsonb and k.tables_without_row_security = '[]'::jsonb and k.definer_without_search_path = '[]'::jsonb
