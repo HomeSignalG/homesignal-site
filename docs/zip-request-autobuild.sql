@@ -231,9 +231,15 @@ begin
   if p_report->>'zip' is distinct from p_zip or jsonb_typeof(p_report->'sites') <> 'array' then
     raise exception 'refusing: the report is not a ZIP-mode report for %', p_zip;
   end if;
-  insert into public.development_reports (zip, home_lat, home_lng, counts, sites, paywall, source_vintage, refreshed_at, facilities_refreshed_at)
+  -- An EPA read that failed (epa.ok missing or false) is stored as an UNKNOWN facility count, never a zero:
+  -- facilities_unavailable is set and the facility clock is not started. Found on 78521 (2026-11-12): FRS
+  -- answered 429 and the page would have read "0 regulated facilities" where EPA lists 82.
+  insert into public.development_reports (zip, home_lat, home_lng, counts, sites, paywall, source_vintage, refreshed_at,
+                                          facilities_refreshed_at, facilities_unavailable)
   values (p_zip, (p_report->'home'->>'lat')::float8, (p_report->'home'->>'lng')::float8, p_report->'counts', p_report->'sites',
-          coalesce((p_report->>'paywall')::bool, false), 'get-address-report ZIP mode; Tab 14 area request, built automatically', now(), now())
+          coalesce((p_report->>'paywall')::bool, false), 'get-address-report ZIP mode; Tab 14 area request, built automatically', now(),
+          case when coalesce((p_report->'epa'->>'ok')::bool, false) then now() end,
+          not coalesce((p_report->'epa'->>'ok')::bool, false))
   on conflict (zip) do nothing;
   perform public.app_refresh_zip(p_zip);
   return (select jsonb_build_object('counts', counts) from public.development_reports where zip = p_zip);
