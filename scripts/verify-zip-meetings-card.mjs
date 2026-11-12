@@ -2,7 +2,8 @@
 // phone widths and check the Government & civic meetings card shipped in #2840:
 //   * it lists min(N, 6) meetings, N being the count in the group heading;
 //   * each row has a date and its own meeting-record link (no two rows share a link);
-//   * the Cancelled badge appears only on rows whose title says cancelled;
+//   * the Cancelled badge appears exactly on rows whose meeting the page's own data marks
+//     is_cancelled (read from the page's /rest/v1/meetings responses, matched by record link);
 //   * "<N-6> more upcoming|recent meetings" when N > 6, and no such line otherwise;
 //   * the card's sentence makes no claim about agenda contents;
 //   * no console error, page error, failed request or HTTP >= 400; no horizontal overflow.
@@ -26,6 +27,11 @@ for (const zip of ZIPS) {
     const ctx = await browser.newContext(opts);
     const page = await ctx.newPage();
     const errs = [];
+    const flags = new Map();   // source_url -> is_cancelled, from the page's own meetings reads
+    page.on('response', async (r) => {
+      if (!/\/rest\/v1\/meetings\b/.test(r.url()) || r.status() !== 200) return;
+      try { const j = await r.json(); if (Array.isArray(j)) for (const m of j) if (m && m.source_url) flags.set(m.source_url, m.is_cancelled === true); } catch { /* not JSON */ }
+    });
     page.on('console', (m) => { if (m.type() === 'error') errs.push('console: ' + m.text().slice(0, 200)); });
     page.on('pageerror', (e) => errs.push('pageerror: ' + String(e).slice(0, 200)));
     page.on('requestfailed', (r) => errs.push('requestfailed: ' + r.url().slice(0, 160) + ' ' + ((r.failure() || {}).errorText || '')));
@@ -57,8 +63,8 @@ for (const zip of ZIPS) {
         r.rows.forEach((row, i) => {
           if (!/\d{4}/.test(row.date)) problems.push(`row ${i + 1} has no date: ${row.text}`);
           if (!row.href || !/^https?:\/\//.test(row.href)) problems.push(`row ${i + 1} has no record link`);
-          const says = /cancel/i.test(row.title);
-          if (row.badge !== says) problems.push(`row ${i + 1} badge ${row.badge} but title "${row.title}"`);
+          if (!flags.has(row.href)) problems.push(`row ${i + 1} link not found in the page's meetings data: ${row.href}`);
+          else if (row.badge !== flags.get(row.href)) problems.push(`row ${i + 1} badge ${row.badge} but is_cancelled ${flags.get(row.href)}`);
         });
         const hrefs = r.rows.map((x) => x.href).filter(Boolean);
         if (new Set(hrefs).size !== hrefs.length) problems.push('two rows share a link');
@@ -73,7 +79,7 @@ for (const zip of ZIPS) {
     } catch (e) { problems.push(String(e.message).split('\n')[0]); }
     problems.push(...errs);
     if (problems.length) failed++;
-    const out = { zip, view: label, ok: !problems.length, head: r && r.head, rows: r && r.rows, card_text: r && r.ps, scroll: r && `${r.scrollW}/${r.innerW}`, problems };
+    const out = { zip, view: label, ok: !problems.length, meetings_read: flags.size, head: r && r.head, rows: r && r.rows, card_text: r && r.ps, scroll: r && `${r.scrollW}/${r.innerW}`, problems };
     console.log(JSON.stringify(out, null, 1));
     lines.push(`- ${problems.length ? '✗' : '✓'} ${zip} ${label}: ${r ? r.head : ''}${problems.length ? ' — ' + problems.join('; ') : ''}`);
     await ctx.close();
