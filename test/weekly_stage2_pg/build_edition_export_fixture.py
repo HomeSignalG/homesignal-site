@@ -1,7 +1,8 @@
 """Build test/fixtures/weekly-edition-render-export.json on a DISPOSABLE database (never production). TEST DATA.
 
-Files 1-8 must already be applied to an empty database. Runs the edition-sequence seed (Air with its document cue,
-Water), keeps Air's visual_check claim, sets the sequence Air segment 0 -> Water segments 0-1 -> Air segment 1, approves
+Files 1-9 must already be applied to an empty database. Runs the edition-sequence seed (Air with its document cue,
+Water), keeps Air's visual_check claim, creates an Air edition that also covers Water (9) and links both approved versions
+to it (7), sets the sequence Air segment 0 -> Water segments 0-1 -> Air segment 1, approves
 it with the digest the database computed, and writes {claims, export}: export is public.weekly_edition_render_export, the
 service read a render job uses. homesignal-ingest's edition bundle reads this file.
 
@@ -36,6 +37,9 @@ select id as water from public.weekly_scripts where stage = 'script' and topic =
 select set_config('test.jwt', '%s', false);
 set role authenticated;
 select (public.hs_weekly_edition_create('Air Quality', '2026-11-09') ->> 'id') as ed \gset
+select public.hs_weekly_edition_add_topic(:'ed', 'Water Quality') \gset
+select public.hs_weekly_edition_link_version(:'ed', :'air') \gset
+select public.hs_weekly_edition_link_version(:'ed', :'water') \gset
 \set seq '[{"version_id": "' :air '", "from": 0, "to": 0}, {"version_id": "' :water '", "from": 0, "to": 1}, {"version_id": "' :air '", "from": 1, "to": 1}]'
 select (public.hs_weekly_edition_sequence_set(:'ed', :'seq'::jsonb) ->> 'digest') as dg \gset
 select public.hs_weekly_edition_sequence_approve(:'ed', :'dg') is not null as ok \gset
@@ -48,7 +52,7 @@ select 'EXPORT ' || public.weekly_edition_render_export(:'ed')::text;
     out = psql(script)
     export = json.loads([ln for ln in out.splitlines() if ln.startswith("EXPORT ")][-1][len("EXPORT "):])
     doc = {"_note": "TEST DATA. public.weekly_edition_render_export and one visual_check claim from a disposable database"
-                    " (docs/weekly-1..8). Not production.", "claims": [claim], "export": export}
+                    " (docs/weekly-1..9). Not production.", "claims": [claim], "export": export}
     open(OUT, "w", encoding="utf-8").write(json.dumps(doc, indent=1, sort_keys=True, ensure_ascii=False) + "\n")
     print("wrote", OUT, "approved:", export["approved"], "topics:", export["topics"])
 

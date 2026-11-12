@@ -3,7 +3,7 @@
 -- Needs: 1 (base: weekly_sha256, weekly_append_only), 2 (topic queue: weekly_editions), 3 (workbench: weekly_scripts,
 --   weekly_version_status, _hs_is_admin), 6 (document cues: weekly_cue_count, weekly_visual_checks), 7 (weekly_version_edition).
 -- Application order (docs/weekly-release-order.md): 1 · 2 · 3 · 4 · 5 · 6 · 7 · 8. Additive: it creates two tables and
---   seven functions, changes no object of files 1-7, and is one transaction that is safe to apply twice.
+--   eight functions, changes no object of files 1-7, and is one transaction that is safe to apply twice.
 --
 -- The model, kept apart on purpose:
 --   research and edition membership   files 2-3, unchanged: leads, their dispositions ("included" means kept for this
@@ -14,6 +14,11 @@
 --   The topic of an entry is the version's own weekly_scripts.topic, never a segment's free-text "story" label.
 --   A segment is used at most once in a sequence, so no narration repeats. Segments a person leaves out are simply
 --   not in the video; an included lead is not required to appear.
+--   MEMBERSHIP: an entry may name only a version that belongs to THIS edition through the explicit version link (7):
+--   a version linked to no edition, or to another edition, is refused. So the sequence is never a way round edition
+--   membership, and every version in it is subject to the approval gate (7). The sequence is also refused while any
+--   lead assigned to the edition has no disposition, so content approved before it was linked cannot skip that gate.
+--   Which topics an edition may link is decided by 7 (its one topic) or, once 9 is applied, by the topics it covers.
 --   The display derived from the sequence: the opening and thumbnail list each topic once, in order of first appearance;
 --   a section card is shown wherever the topic differs from the previous entry's.
 --
@@ -24,9 +29,9 @@
 --   metadata leaves the newest approval naming a different digest (or a non-current version), so the edition reads NOT
 --   approved. Document cues keep their existing rule: a version is approved only when its cues were checked against the
 --   stored document (6); this file also refuses an entry whose segments carry a cue without a passing visual check.
--- NOT in this file (coordination with the topic-queue release, files 1-2): an edition still has its one queue topic
---   (weekly_editions.topic) for research hand-off and lead assignment. Letting one edition's research span topics needs
---   that queue model changed; this file does not touch it.
+-- NOT in this file: letting one edition cover several topics (lead assignment, the research request's topic and
+--   version linking). That is file 9, proposed to the topic-queue session. With 8 alone an edition's video can only hold
+--   its own topic, because 7 links only that topic.
 
 begin;
 
@@ -93,10 +98,16 @@ begin
       end if;
     end if;
     linked := public.weekly_version_edition(v.id);
-    if linked is not null and linked <> s.edition_id then
+    if linked is null then
+      probs := probs || ('entry ' || i || ': that version is not linked to this edition; link it first');
+    elsif linked <> s.edition_id then
       probs := probs || ('entry ' || i || ': that version belongs to another edition');
     end if;
   end loop;
+  select count(*), string_agg(u.title, '; ') into n, k from public.weekly_edition_unresolved(s.edition_id) u;
+  if n > 0 then
+    probs := probs || (n || ' lead(s) assigned to this edition have no disposition yet: ' || left(k, 300));
+  end if;
   return probs;
 end $$;
 
@@ -190,12 +201,27 @@ begin
   return public.weekly_edition_video(p_edition);
 end $$;
 
--- The admin read of one edition's video, and the service read a render job uses (adds each version's body and approvals).
+-- What a person may put in this edition's video: the current approved script versions that belong to it (7), with their
+-- segments. A segment's "story" label is shown for orientation only; nothing reads it as a topic.
+create or replace function public.weekly_edition_candidates(p_edition uuid) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(jsonb_build_object('version_id', v.id, 'topic', v.topic, 'created_at', v.created_at,
+           'segments', (select coalesce(jsonb_agg(jsonb_build_object('n', g.n - 1, 'story', g.s ->> 'story', 'text', g.s ->> 'text',
+                          'document_cue', jsonb_typeof(g.s -> 'visual') = 'object') order by g.n), '[]'::jsonb)
+                        from jsonb_array_elements(v.body -> 'segments') with ordinality g (s, n)))
+         order by v.topic, v.created_at, v.id), '[]'::jsonb)
+  from public.weekly_scripts v
+  where v.stage = 'script' and public.weekly_version_edition(v.id) = p_edition
+    and coalesce((public.weekly_version_status(v.id) ->> 'current')::boolean, false)
+$$;
+
+-- The admin read of one edition's video (with what may be put in it), and the service read a render job uses (adds each
+-- version's body and approvals).
 create or replace function public.hs_weekly_edition_video(p_edition uuid) returns jsonb
 language plpgsql stable security definer set search_path = public as $$
 declare e text := public._hs_is_admin();
 begin
-  return public.weekly_edition_video(p_edition);
+  return public.weekly_edition_video(p_edition) || jsonb_build_object('candidates', public.weekly_edition_candidates(p_edition));
 end $$;
 create or replace function public.weekly_edition_render_export(p_edition uuid) returns jsonb
 language sql stable security definer set search_path = public as $$
@@ -219,7 +245,7 @@ begin
     execute format('revoke all on public.%I from public, anon, authenticated', t);
   end loop;
   foreach f in array array['weekly_edition_sequence_problems(bigint)', 'weekly_edition_sequence_digest(bigint)',
-    'weekly_edition_video(uuid)', 'hs_weekly_edition_sequence_set(uuid,jsonb)', 'hs_weekly_edition_sequence_approve(uuid,text)',
+    'weekly_edition_video(uuid)', 'weekly_edition_candidates(uuid)', 'hs_weekly_edition_sequence_set(uuid,jsonb)', 'hs_weekly_edition_sequence_approve(uuid,text)',
     'hs_weekly_edition_video(uuid)', 'weekly_edition_render_export(uuid)'] loop
     execute format('revoke all on function public.%s from public, anon, authenticated', f);
   end loop;

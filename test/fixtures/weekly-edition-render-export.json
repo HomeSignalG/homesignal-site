@@ -1,5 +1,5 @@
 {
- "_note": "TEST DATA. public.weekly_edition_render_export and one visual_check claim from a disposable database (docs/weekly-1..8). Not production.",
+ "_note": "TEST DATA. public.weekly_edition_render_export and one visual_check claim from a disposable database (docs/weekly-1..9). Not production.",
  "claims": [
   {
    "angle": null,
@@ -21,7 +21,7 @@
         "highlight": "yellow",
         "page": 1,
         "quote": "First, the EPA proposes to rescind the Super Emitter Program.",
-        "source_id": "f1097a25-9971-493a-bd12-e30c9ebb3930",
+        "source_id": "bc12c17e-027e-41e4-a5be-81d18f205a6e",
         "type": "doc"
        }
       },
@@ -35,8 +35,8 @@
       }
      ]
     },
-    "body_sha256": "d79539c940bcc5084debaa77d2d0bf3871303463a3e29cbe974bf673ec19cfe1",
-    "id": "df6a39f6-06bb-4fa3-8cb8-4c9bd7f81fe5"
+    "body_sha256": "58f1cca44bc60cc4c08ffad5ff93b6c8ba5e8910b114fb8dee14d182d4bb446d",
+    "id": "ccb40a14-5469-4cc9-8aa0-52f081a6c4f9"
    },
    "findings": [
     {
@@ -128,19 +128,19 @@
     "Attribute forecasts; distinguish proposed changes from final rules."
    ],
    "profile_version": 1,
-   "run": "3a6c8854-f45a-4958-8648-61438fafc576",
+   "run": "dba56e5a-84d5-4819-af06-e4be8d421f26",
    "script": null,
    "sources": [
     {
      "document_kind": "pdf",
-     "document_path": "weekly-sources/f1097a25-9971-493a-bd12-e30c9ebb3930/faa7045eb0c311e8795dafcf7744b2d5db6f6f297fe29ef76f2d64d1923c5758.pdf",
+     "document_path": "weekly-sources/bc12c17e-027e-41e4-a5be-81d18f205a6e/faa7045eb0c311e8795dafcf7744b2d5db6f6f297fe29ef76f2d64d1923c5758.pdf",
      "document_sha256": "faa7045eb0c311e8795dafcf7744b2d5db6f6f297fe29ef76f2d64d1923c5758",
      "finding_ids": [
       "air-proposal-status@1"
      ],
      "label": "EPA, Proposed Rule, 91 FR 68234 (October 29, 2026)",
      "publisher": "U.S. EPA (Federal Register)",
-     "source_id": "f1097a25-9971-493a-bd12-e30c9ebb3930",
+     "source_id": "bc12c17e-027e-41e4-a5be-81d18f205a6e",
      "title": "EPA, Proposed Rule, 91 FR 68234 (October 29, 2026)",
      "url": "https://www.govinfo.gov/content/pkg/FR-2026-10-29/pdf/2026-22082.pdf"
     }
@@ -151,14 +151,14 @@
  ],
  "export": {
   "approval": {
-   "approved_at": "2026-11-12T19:33:36.989636+00:00",
+   "approved_at": "2026-11-12T20:01:24.366139+00:00",
    "approved_by": "founder@test.invalid",
-   "digest": "47b08d3ae36e08a41fe9315b0b5459bde30e7cb9f6a909b9d6a8298cfcb69a3a",
+   "digest": "c39efb7b9572ec99ddd2fc74fc331c9b81155d825387c29475b65187c31d5bd2",
    "sequence_id": 1
   },
   "approved": true,
-  "digest": "47b08d3ae36e08a41fe9315b0b5459bde30e7cb9f6a909b9d6a8298cfcb69a3a",
-  "edition_id": "5fc9569b-b624-4d1e-9320-90e8b8c4843e",
+  "digest": "c39efb7b9572ec99ddd2fc74fc331c9b81155d825387c29475b65187c31d5bd2",
+  "edition_id": "b2971e18-cd80-463e-941c-ef04f7608cfb",
   "edition_key": "air-quality-2026-11-09",
   "items": [
    {
@@ -181,14 +181,14 @@
        "highlight": "yellow",
        "page": 1,
        "quote": "First, the EPA proposes to rescind the Super Emitter Program.",
-       "source_id": "f1097a25-9971-493a-bd12-e30c9ebb3930",
+       "source_id": "bc12c17e-027e-41e4-a5be-81d18f205a6e",
        "type": "doc"
       }
      }
     ],
     "to": 0,
     "topic": "Air Quality",
-    "version_id": "df6a39f6-06bb-4fa3-8cb8-4c9bd7f81fe5"
+    "version_id": "ccb40a14-5469-4cc9-8aa0-52f081a6c4f9"
    },
    {
     "from": 0,
@@ -217,7 +217,7 @@
     ],
     "to": 1,
     "topic": "Water Quality",
-    "version_id": "fd8316ff-4d60-401b-9c1f-fdb34d314939"
+    "version_id": "9bc258ba-ea56-4fdd-a3ad-81ba7b9836c5"
    },
    {
     "from": 1,
@@ -235,7 +235,7 @@
     ],
     "to": 1,
     "topic": "Air Quality",
-    "version_id": "df6a39f6-06bb-4fa3-8cb8-4c9bd7f81fe5"
+    "version_id": "ccb40a14-5469-4cc9-8aa0-52f081a6c4f9"
    }
   ],
   "period_end": "2026-11-15",
@@ -246,21 +246,21 @@
     {
      "from": 0,
      "to": 0,
-     "version_id": "df6a39f6-06bb-4fa3-8cb8-4c9bd7f81fe5"
+     "version_id": "ccb40a14-5469-4cc9-8aa0-52f081a6c4f9"
     },
     {
      "from": 0,
      "to": 1,
-     "version_id": "fd8316ff-4d60-401b-9c1f-fdb34d314939"
+     "version_id": "9bc258ba-ea56-4fdd-a3ad-81ba7b9836c5"
     },
     {
      "from": 1,
      "to": 1,
-     "version_id": "df6a39f6-06bb-4fa3-8cb8-4c9bd7f81fe5"
+     "version_id": "ccb40a14-5469-4cc9-8aa0-52f081a6c4f9"
     }
    ],
    "id": 1,
-   "set_at": "2026-11-12T19:33:36.981792+00:00",
+   "set_at": "2026-11-12T20:01:24.349882+00:00",
    "set_by": "founder@test.invalid"
   },
   "series": "QUALITY-of-LIFE Weekly Report",
@@ -272,51 +272,7 @@
    {
     "approvals": [
      {
-      "approved_at": "2026-11-12T19:33:36.832304+00:00",
-      "approved_by": "founder@test.invalid",
-      "body_sha256": "d79539c940bcc5084debaa77d2d0bf3871303463a3e29cbe974bf673ec19cfe1",
-      "kind": "editorial"
-     }
-    ],
-    "body": {
-     "segments": [
-      {
-       "beat": "collision",
-       "claim_ids": [
-        "air-third-party-reports@1",
-        "air-program-background@1",
-        "air-warning-effect@1",
-        "air-proposal-status@1"
-       ],
-       "story": "air",
-       "text": "Under an EPA proposal, reports of company emissions detected by third parties would stop reaching the agency, and residents near oil and gas sites could lose an early warning about large methane releases, an estimated effect. The change is proposed, not final. The Super Emitter Program behind those reports started in 2024. It is one of several monitoring tools the agency uses, and officials say it can find problems that routine monitoring misses.",
-       "visual": {
-        "claim_id": "air-proposal-status@1",
-        "highlight": "yellow",
-        "page": 1,
-        "quote": "First, the EPA proposes to rescind the Super Emitter Program.",
-        "source_id": "f1097a25-9971-493a-bd12-e30c9ebb3930",
-        "type": "doc"
-       }
-      },
-      {
-       "beat": "landing",
-       "claim_ids": [
-        "air-proposal-status@1"
-       ],
-       "story": "air",
-       "text": "TEST DATA: For now this is a proposal, not a final rule, and residents can still comment on it."
-      }
-     ]
-    },
-    "body_sha256": "d79539c940bcc5084debaa77d2d0bf3871303463a3e29cbe974bf673ec19cfe1",
-    "id": "df6a39f6-06bb-4fa3-8cb8-4c9bd7f81fe5",
-    "topic": "Air Quality"
-   },
-   {
-    "approvals": [
-     {
-      "approved_at": "2026-11-12T19:33:36.931765+00:00",
+      "approved_at": "2026-11-12T20:01:24.29921+00:00",
       "approved_by": "founder@test.invalid",
       "body_sha256": "17cbce70e94f11e4639dd50363e2454a429257b8a8e82497c0e9762167734fdc",
       "kind": "editorial"
@@ -346,8 +302,52 @@
      ]
     },
     "body_sha256": "17cbce70e94f11e4639dd50363e2454a429257b8a8e82497c0e9762167734fdc",
-    "id": "fd8316ff-4d60-401b-9c1f-fdb34d314939",
+    "id": "9bc258ba-ea56-4fdd-a3ad-81ba7b9836c5",
     "topic": "Water Quality"
+   },
+   {
+    "approvals": [
+     {
+      "approved_at": "2026-11-12T20:01:24.210541+00:00",
+      "approved_by": "founder@test.invalid",
+      "body_sha256": "58f1cca44bc60cc4c08ffad5ff93b6c8ba5e8910b114fb8dee14d182d4bb446d",
+      "kind": "editorial"
+     }
+    ],
+    "body": {
+     "segments": [
+      {
+       "beat": "collision",
+       "claim_ids": [
+        "air-third-party-reports@1",
+        "air-program-background@1",
+        "air-warning-effect@1",
+        "air-proposal-status@1"
+       ],
+       "story": "air",
+       "text": "Under an EPA proposal, reports of company emissions detected by third parties would stop reaching the agency, and residents near oil and gas sites could lose an early warning about large methane releases, an estimated effect. The change is proposed, not final. The Super Emitter Program behind those reports started in 2024. It is one of several monitoring tools the agency uses, and officials say it can find problems that routine monitoring misses.",
+       "visual": {
+        "claim_id": "air-proposal-status@1",
+        "highlight": "yellow",
+        "page": 1,
+        "quote": "First, the EPA proposes to rescind the Super Emitter Program.",
+        "source_id": "bc12c17e-027e-41e4-a5be-81d18f205a6e",
+        "type": "doc"
+       }
+      },
+      {
+       "beat": "landing",
+       "claim_ids": [
+        "air-proposal-status@1"
+       ],
+       "story": "air",
+       "text": "TEST DATA: For now this is a proposal, not a final rule, and residents can still comment on it."
+      }
+     ]
+    },
+    "body_sha256": "58f1cca44bc60cc4c08ffad5ff93b6c8ba5e8910b114fb8dee14d182d4bb446d",
+    "id": "ccb40a14-5469-4cc9-8aa0-52f081a6c4f9",
+    "topic": "Air Quality"
    }
   ],
   "why_not": null

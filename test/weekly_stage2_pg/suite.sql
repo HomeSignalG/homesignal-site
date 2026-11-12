@@ -6,6 +6,10 @@ begin execute q; return false; exception when others then return code is null or
 grant execute on function pg_temp.raises(text, text) to anon, authenticated, service_role;
 \set admin '{"email":"founder@test.invalid"}'
 \set other '{"email":"someone@test.invalid"}'
+\if :{?rls_tables}
+\else
+\set rls_tables 22
+\endif
 
 -- W01 no direct table/view access for anon or authenticated
 select 'W01|' || not exists (
@@ -14,7 +18,7 @@ select 'W01|' || not exists (
     and (has_table_privilege('anon', c.oid, 'select,insert,update,delete')
          or has_table_privilege('authenticated', c.oid, 'select,insert,update,delete')));
 select 'W01b|' || ((select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
-  where n.nspname = 'public' and c.relname like 'weekly\_%' and c.relkind = 'r' and c.relrowsecurity) = 22);   -- 19 workbench tables + the topic queue's 3 (full configuration)
+  where n.nspname = 'public' and c.relname like 'weekly\_%' and c.relkind = 'r' and c.relrowsecurity) = :rls_tables);   -- 1-7: 19 workbench tables + the topic queue's 3; 1-9 adds 3 (release_catalog.py names them)
 -- W02 service functions: service_role yes, authenticated and anon no; admin functions: authenticated yes, anon no
 select 'W02|' || (has_function_privilege('service_role', 'public.weekly_research_record(uuid,jsonb)', 'execute')
   and not has_function_privilege('authenticated', 'public.weekly_research_record(uuid,jsonb)', 'execute')

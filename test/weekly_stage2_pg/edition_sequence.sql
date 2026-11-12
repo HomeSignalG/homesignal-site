@@ -1,4 +1,4 @@
--- docs/weekly-8-edition-sequence.sql on a DISPOSABLE database seeded by build_edition_sequence_state.py (TEST DATA).
+-- docs/weekly-8-edition-sequence.sql and weekly-9-edition-topics.sql on a DISPOSABLE database seeded by build_edition_sequence_state.py (TEST DATA).
 -- Prints one "Qnn|true/false" line per check.
 \set ON_ERROR_STOP 0
 create or replace function pg_temp.raises(q text, code text) returns boolean language plpgsql as $$
@@ -24,6 +24,48 @@ select set_config('test.jwt', :'admin', false);
 set role authenticated;
 select (public.hs_weekly_edition_create('Air Quality', '2026-11-09') ->> 'id') as ed \gset
 \set seq '[{"version_id": "' :air '", "from": 0, "to": 0}, {"version_id": "' :water '", "from": 0, "to": 1}, {"version_id": "' :air '", "from": 1, "to": 1}]'
+
+-- ── membership (files 7, 8, 9) ──────────────────────────────────────────────────────────────────────────────────
+-- Q20 an approved version linked to no edition is refused: the sequence is not a way round edition membership
+select 'Q20|' || coalesce((pg_temp.err(format('select public.hs_weekly_edition_sequence_set(%L, %L::jsonb)', :'ed', :'seq'))
+  like '%not linked to this edition; link it first%'), false);
+-- Q21 an edition covers only its first topic until a person adds another: linking Water is refused, Air is accepted
+select 'Q21|' || coalesce((pg_temp.err(format('select public.hs_weekly_edition_link_version(%L, %L)', :'ed', :'water')) like '%edition % covers Air Quality%'), false);
+select 'Q21b|' || coalesce((public.hs_weekly_edition_link_version(:'ed', :'air') ->> 'existing') = 'false', false);
+-- Q22 adding a topic: catalog topics only, idempotent, the first topic stays first
+select 'Q22|' || pg_temp.raises(format('select public.hs_weekly_edition_add_topic(%L, %L)', :'ed', 'Not A Category'), '22023');
+select public.hs_weekly_edition_add_topic(:'ed', 'Water Quality') as t1 \gset
+select 'Q22b|' || ((:'t1'::jsonb -> 'topics') = '["Air Quality", "Water Quality"]'::jsonb and (:'t1'::jsonb ->> 'existing') = 'false'
+  and (public.hs_weekly_edition_add_topic(:'ed', 'Water Quality') ->> 'existing') = 'true'
+  and (public.hs_weekly_edition_add_topic(:'ed', 'Air Quality') ->> 'existing') = 'true');
+select 'Q22c|' || coalesce((public.hs_weekly_edition_link_version(:'ed', :'water') ->> 'existing') = 'false', false);
+-- Q23 a covered topic's lead is assignable, and its research request is filed under the LEAD's topic (per-topic research)
+select (public.hs_weekly_lead_save(null, '{"title": "TEST DATA Water lead", "topic": "Water Quality"}'::jsonb) ->> 'lead_id') as lw \gset
+select public.hs_weekly_lead_send_to_research(:'lw', :'ed', 'TEST FORMAT') as hw \gset
+reset role;
+select 'Q23|' || coalesce((select r.topic = 'Water Quality' and r.request_text like '%(Water Quality), edition %'
+  from public.weekly_research_requests r where r.id = (:'hw'::jsonb ->> 'request_id')::uuid), false);
+set role authenticated;
+-- Q24 a lead of a topic the edition does not cover is still refused, and so is a lead already live in another edition
+select (public.hs_weekly_lead_save(null, '{"title": "TEST DATA Data-centre lead", "topic": "Data Centers"}'::jsonb) ->> 'lead_id') as ld \gset
+select 'Q24|' || coalesce((pg_temp.err(format('select public.hs_weekly_lead_assign(%L, %L)', :'ld', :'ed')) like '%is filed under "Data Centers"; edition % covers Air Quality, Water Quality%'), false);
+select (public.hs_weekly_edition_create('Water Quality', '2026-11-09') ->> 'id') as ed2 \gset
+select 'Q24b|' || pg_temp.raises(format('select public.hs_weekly_lead_assign(%L, %L)', :'lw', :'ed2'), '55006');
+-- Q25 a version can belong to one edition only; another edition's sequence cannot use it
+select 'Q25|' || coalesce((pg_temp.err(format('select public.hs_weekly_edition_link_version(%L, %L)', :'ed2', :'water')) like '%already belongs to edition%'), false);
+\set other_seq '[{"version_id": "' :water '", "from": 0, "to": 0}]'
+select 'Q25b|' || coalesce((pg_temp.err(format('select public.hs_weekly_edition_sequence_set(%L, %L::jsonb)', :'ed2', :'other_seq')) like '%belongs to another edition%'), false);
+-- Q26 a lead assigned to the edition with no disposition blocks the sequence (approved content cannot skip that gate)
+select 'Q26|' || coalesce((pg_temp.err(format('select public.hs_weekly_edition_sequence_set(%L, %L::jsonb)', :'ed', :'seq')) like '%1 lead(s) assigned to this edition have no disposition yet%'), false);
+-- Q29 what the editor may offer: exactly the current approved script versions linked to this edition, with segments
+select public.hs_weekly_edition_video(:'ed') as cv \gset
+select 'Q29|' || ((select jsonb_agg(c ->> 'version_id' order by c ->> 'version_id') from jsonb_array_elements(:'cv'::jsonb -> 'candidates') c)
+  = (select jsonb_agg(x order by x) from (values (:'air'), (:'water')) t (x))
+  and (select bool_and(jsonb_array_length(c -> 'segments') >= 2) from jsonb_array_elements(:'cv'::jsonb -> 'candidates') c)
+  and (select (c -> 'segments' -> 0 ->> 'document_cue')::boolean from jsonb_array_elements(:'cv'::jsonb -> 'candidates') c where c ->> 'version_id' = :'air'));
+-- Q27 "included" means kept for the edition's reporting; it does not require the lead's content to be in the video
+select public.hs_weekly_lead_disposition(:'lw', :'ed', 'included') is not null as disp \gset
+select 'Q27|' || (:'disp' = 't');
 
 -- Q01 Air story 1 -> Water -> Air story 2 is accepted: a topic may return
 select public.hs_weekly_edition_sequence_set(:'ed', :'seq'::jsonb) as v1 \gset
@@ -116,7 +158,15 @@ select 'Q17b|' || (not has_table_privilege('authenticated', 'public.weekly_editi
   and not has_table_privilege('anon', 'public.weekly_edition_approvals', 'select')
   and not has_function_privilege('authenticated', 'public.weekly_edition_render_export(uuid)', 'execute')
   and has_function_privilege('service_role', 'public.weekly_edition_render_export(uuid)', 'execute')
-  and (select relrowsecurity from pg_class where oid = 'public.weekly_edition_sequences'::regclass));
+  and (select relrowsecurity from pg_class where oid = 'public.weekly_edition_sequences'::regclass)
+  and not has_table_privilege('authenticated', 'public.weekly_edition_topic_events', 'select,insert,update,delete')
+  and not has_function_privilege('anon', 'public.hs_weekly_edition_add_topic(uuid,text)', 'execute'));
 -- Q18 history is append-only
 select 'Q18|' || (pg_temp.raises('delete from public.weekly_edition_sequences', null)
-  and pg_temp.raises('update public.weekly_edition_approvals set digest = repeat(''b'', 64)', null));
+  and pg_temp.raises('update public.weekly_edition_approvals set digest = repeat(''b'', 64)', null)
+  and pg_temp.raises('delete from public.weekly_edition_topic_events', null));
+-- Q28 a non-admin cannot add a topic
+select set_config('test.jwt', '{"email":"someone@test.invalid"}', false);
+set role authenticated;
+select 'Q28|' || pg_temp.raises(format('select public.hs_weekly_edition_add_topic(%L, %L)', :'ed', 'Data Centers'), '42501');
+reset role;

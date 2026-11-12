@@ -39,6 +39,9 @@ count=$(python3 "$here/topic_queue_mutations.py" count)
 for i in $(seq 0 $((count - 1))); do
   rm -rf "$tmp/m"; cp -r "$WEEKLY_DOCS" "$tmp/m"
   name=$(python3 "$here/topic_queue_mutations.py" apply "$i" "$tmp/m/weekly-2-topic-queue.sql" "$tmp/m/weekly-7-topic-queue-gate.sql")
+  # file 9 replaces four functions of 2 and 7 with generated copies: regenerate it from the mutated files, so a weakening
+  # of those functions reaches the combined release instead of being overwritten by the unmutated copy
+  if [ -n "${WEEKLY_WITH_VIDEO:-}" ]; then python3 "$here/build_edition_topics_sql.py" --docs "$tmp/m" >/dev/null; fi
   weekly_combine "$tmp/m.sql" "$tmp/m" "${WEEKLY_FULL[@]}"
   set +e; mo="$(run_once "$tmp/m.sql" 2>/dev/null)"; rc=$?; set -e
   if [ $rc -ne 0 ] || grep -vq '|true$' <<<"$mo" || [ "$(grep -c '|' <<<"$mo")" -lt "$n" ]; then echo "  killed: $name"; else echo "  SURVIVED: $name"; bad=1; fi
