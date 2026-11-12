@@ -1,0 +1,1074 @@
+{
+ "_note": "TEST DATA only. The answers of public.weekly_run_claim (visual_check) and public.hs_weekly_overview on a disposable database, from the prepared SQL (docs/weekly-1..7). Not production.",
+ "claim": {
+  "angle": null,
+  "cue_version": {
+   "body": {
+    "segments": [
+     {
+      "beat": "collision",
+      "claim_ids": [
+       "air-third-party-reports@1",
+       "air-program-background@1",
+       "air-warning-effect@1",
+       "air-proposal-status@1"
+      ],
+      "story": "air",
+      "text": "Under an EPA proposal, reports of company emissions detected by third parties would stop reaching the agency, and residents near oil and gas sites could lose an early warning about large methane releases, an estimated effect. The change is proposed, not final. The Super Emitter Program behind those reports started in 2024. It is one of several monitoring tools the agency uses, and officials say it can find problems that routine monitoring misses.",
+      "visual": {
+       "claim_id": "air-proposal-status@1",
+       "highlight": "yellow",
+       "page": 1,
+       "quote": "First, the EPA proposes to rescind the Super Emitter Program.",
+       "source_id": "a4667739-d680-465d-859e-ba0750ffd2fc",
+       "type": "doc"
+      }
+     },
+     {
+      "beat": "landing",
+      "claim_ids": [
+       "air-proposal-status@1"
+      ],
+      "story": "air",
+      "text": "TEST DATA: For now this is a proposal, not a final rule, and residents can still comment on it."
+     }
+    ]
+   },
+   "body_sha256": "2307f48930016f1caface82c980317feec054457b2d466e6368310370e6be423",
+   "id": "41cb58b5-4c81-4aa4-93e7-5d9faaf5160c"
+  },
+  "findings": [
+   {
+    "claim_id": "air-cost-estimate@1",
+    "qualifiers": [
+     "estimated"
+    ],
+    "quotes": [],
+    "scope": "federal",
+    "statement": "TEST DATA: EPA estimates the proposal would reduce oil and gas industry compliance costs by about $45 billion over its analysis period.",
+    "uncertainty": "TEST DATA: an agency estimate over many years, not a payment"
+   },
+   {
+    "claim_id": "air-program-background@1",
+    "qualifiers": [],
+    "quotes": [],
+    "scope": "federal",
+    "statement": "TEST DATA: The Super Emitter Program started in 2024 and is one of several EPA monitoring tools that officials say can find problems routine monitoring misses.",
+    "uncertainty": null
+   },
+   {
+    "claim_id": "air-proposal-status@1",
+    "qualifiers": [
+     "proposed"
+    ],
+    "quotes": [
+     "TEST DATA: this action proposes to amend the rule"
+    ],
+    "scope": "federal",
+    "statement": "TEST DATA: The EPA change is proposed, not final.",
+    "uncertainty": null
+   },
+   {
+    "claim_id": "air-third-party-reports@1",
+    "qualifiers": [
+     "proposed"
+    ],
+    "quotes": [
+     "TEST DATA: notifications from third parties would no longer be submitted to the agency"
+    ],
+    "scope": "federal",
+    "statement": "TEST DATA: Under the proposal, reports of company emissions detected by third parties would stop reaching EPA.",
+    "uncertainty": null
+   },
+   {
+    "claim_id": "air-warning-effect@1",
+    "qualifiers": [
+     "estimated"
+    ],
+    "quotes": [],
+    "scope": "local",
+    "statement": "TEST DATA: Residents near oil and gas sites could lose an early warning about large methane releases.",
+    "uncertainty": "TEST DATA: depends on how often reports led to action"
+   }
+  ],
+  "kind": "visual_check",
+  "lessons": [],
+  "library_version": 1,
+  "mode": "visual_check",
+  "outline": {
+   "beats": [
+    {
+     "beat": "collision",
+     "finding_ids": [
+      "air-proposal-status@1",
+      "air-warning-effect@1"
+     ],
+     "purpose": "TEST DATA: the proposal and what residents could lose"
+    },
+    {
+     "beat": "mechanism",
+     "finding_ids": [
+      "air-program-background@1"
+     ],
+     "purpose": "TEST DATA: how third-party reports work today"
+    },
+    {
+     "beat": "landing",
+     "finding_ids": [
+      "air-third-party-reports@1"
+     ],
+     "purpose": "TEST DATA: proposed, not final"
+    }
+   ]
+  },
+  "parent": null,
+  "profile": [
+   "Keep qualifications and uncertainty.",
+   "Attribute forecasts; distinguish proposed changes from final rules."
+  ],
+  "profile_version": 1,
+  "run": "26e320c2-8c9b-4f3d-ae21-0f7127c80f46",
+  "script": null,
+  "sources": [
+   {
+    "document_kind": "pdf",
+    "document_path": "weekly-sources/a4667739-d680-465d-859e-ba0750ffd2fc/faa7045eb0c311e8795dafcf7744b2d5db6f6f297fe29ef76f2d64d1923c5758.pdf",
+    "document_sha256": "faa7045eb0c311e8795dafcf7744b2d5db6f6f297fe29ef76f2d64d1923c5758",
+    "finding_ids": [
+     "air-proposal-status@1"
+    ],
+    "label": "EPA, Proposed Rule, 91 FR 68234 (October 29, 2026)",
+    "publisher": "U.S. EPA (Federal Register)",
+    "source_id": "a4667739-d680-465d-859e-ba0750ffd2fc",
+    "title": "EPA, Proposed Rule, 91 FR 68234 (October 29, 2026)",
+    "url": "https://www.govinfo.gov/content/pkg/FR-2026-10-29/pdf/2026-22082.pdf"
+   }
+  ],
+  "title_version": null,
+  "topic": "Air Quality"
+ },
+ "overview": {
+  "corrections": [
+   {
+    "action": "conflict_first",
+    "after_text": "Under an EPA proposal, reports of company emissions detected by third parties would stop reaching the agency, and residents near oil and gas sites could lose an early warning about large methane releases, an estimated effect. The change is proposed, not final. The Super Emitter Program behind those reports started in 2024. It is one of several monitoring tools the agency uses, and officials say it can find problems that routine monitoring misses.",
+    "before_text": "For several years the Environmental Protection Agency has run a program that collects reports about large methane releases at oil and gas sites across the country. The Super Emitter Program started in 2024. It is one of several monitoring tools the agency uses, and officials say it can find problems that routine monitoring misses. Under the proposal, reports of company emissions detected by third parties would stop reaching EPA. Residents near these sites could lose an early warning, an estimated effect. The change is proposed, not final.",
+    "decision": "rewrite",
+    "finding_ids": [
+     "air-third-party-reports@1",
+     "air-warning-effect@1"
+    ],
+    "id": "cc4651b7-3060-4586-9f9e-026b0cd66e38",
+    "lesson_scope": "reusable",
+    "note": null,
+    "reason": "The conflict arrives after more than 50 words of background, so a listener does not yet know why it matters.",
+    "result_script_id": "0e972045-47fc-4398-8599-a3bd9ed1ba69",
+    "script_id": "f508b0fd-7009-472d-a7c6-1df2a4d306e3",
+    "segment_index": 0
+   }
+  ],
+  "findings": [
+   {
+    "finding_key": "air-cost-estimate",
+    "human_decision": "approved",
+    "id": "f7de4133-3d70-47b0-a989-7c77a33632bf",
+    "is_latest": true,
+    "kind": "ai_draft",
+    "qualifiers": [
+     "estimated"
+    ],
+    "scope": "federal",
+    "sources": [],
+    "statement": "TEST DATA: EPA estimates the proposal would reduce oil and gas industry compliance costs by about $45 billion over its analysis period.",
+    "uncertainty": "TEST DATA: an agency estimate over many years, not a payment",
+    "version": 1
+   },
+   {
+    "finding_key": "air-program-background",
+    "human_decision": "approved",
+    "id": "9bb70e56-5df5-46a6-9a71-365672173738",
+    "is_latest": true,
+    "kind": "ai_draft",
+    "qualifiers": [],
+    "scope": "federal",
+    "sources": [],
+    "statement": "TEST DATA: The Super Emitter Program started in 2024 and is one of several EPA monitoring tools that officials say can find problems routine monitoring misses.",
+    "uncertainty": null,
+    "version": 1
+   },
+   {
+    "finding_key": "air-proposal-status",
+    "human_decision": "approved",
+    "id": "138f6308-9133-4937-a079-5a51de3c9719",
+    "is_latest": true,
+    "kind": "ai_draft",
+    "qualifiers": [
+     "proposed"
+    ],
+    "scope": "federal",
+    "sources": [
+     {
+      "copy": {
+       "attempts": 1,
+       "basis": "TEST DATA: a U.S. government record, kept as a full copy",
+       "document_sha256": "faa7045eb0c311e8795dafcf7744b2d5db6f6f297fe29ef76f2d64d1923c5758",
+       "granted_at": "2026-11-12T16:26:11.665544+00:00",
+       "granted_by": "founder@test.invalid",
+       "kind": "pdf",
+       "last_error": null,
+       "quote_match": "found",
+       "size": 3321258,
+       "state": "stored",
+       "verified_at": "2026-11-12T16:26:11.66925+00:00"
+      },
+      "date_extraction": "not_stated",
+      "document_kind": "pdf",
+      "fetch_error": null,
+      "id": "a4667739-d680-465d-859e-ba0750ffd2fc",
+      "publication_permission": "to_confirm",
+      "published_date": null,
+      "publisher": "U.S. EPA (Federal Register)",
+      "quote": "TEST DATA: this action proposes to amend the rule",
+      "quote_match": "exact",
+      "retrieved_at": "2026-11-10T12:00:00+00:00",
+      "storage_permission": "full_copy",
+      "title": "EPA, Proposed Rule, 91 FR 68234 (October 29, 2026)",
+      "url": "https://www.govinfo.gov/content/pkg/FR-2026-10-29/pdf/2026-22082.pdf"
+     }
+    ],
+    "statement": "TEST DATA: The EPA change is proposed, not final.",
+    "uncertainty": null,
+    "version": 1
+   },
+   {
+    "finding_key": "air-third-party-reports",
+    "human_decision": "approved",
+    "id": "f631253c-b42a-4255-a03a-04d71ac909c7",
+    "is_latest": true,
+    "kind": "ai_draft",
+    "qualifiers": [
+     "proposed"
+    ],
+    "scope": "federal",
+    "sources": [
+     {
+      "copy": {
+       "state": "not_granted"
+      },
+      "date_extraction": "not_stated",
+      "document_kind": null,
+      "fetch_error": null,
+      "id": "3011e20f-cbbf-4625-97cf-c6caf2b15dc7",
+      "publication_permission": "to_confirm",
+      "published_date": null,
+      "publisher": "TEST Publisher",
+      "quote": "TEST DATA: notifications from third parties would no longer be submitted to the agency",
+      "quote_match": "exact",
+      "retrieved_at": "2026-11-10T12:00:00+00:00",
+      "storage_permission": "excerpt",
+      "title": "TEST page",
+      "url": "https://example.test/source-1"
+     }
+    ],
+    "statement": "TEST DATA: Under the proposal, reports of company emissions detected by third parties would stop reaching EPA.",
+    "uncertainty": null,
+    "version": 1
+   },
+   {
+    "finding_key": "air-warning-effect",
+    "human_decision": "approved",
+    "id": "5fa3f796-5c0d-406f-8d72-2fd2a0531970",
+    "is_latest": true,
+    "kind": "ai_draft",
+    "qualifiers": [
+     "estimated"
+    ],
+    "scope": "local",
+    "sources": [],
+    "statement": "TEST DATA: Residents near oil and gas sites could lose an early warning about large methane releases.",
+    "uncertainty": "TEST DATA: depends on how often reports led to action",
+    "version": 1
+   }
+  ],
+  "lessons": [],
+  "library_versions": [
+   {
+    "findings": 5,
+    "id": "e3ebaa2f-01c4-4fb2-ae11-790539185643",
+    "n": 1,
+    "sealed": true
+   }
+  ],
+  "measurement": {
+   "audience": {
+    "status": "not_collected"
+   },
+   "editing": {
+    "note": "Clock time between versions is not active editing time.",
+    "reviews": 1,
+    "rewrites": 1
+   },
+   "human": {
+    "approvals": 1,
+    "rubric_totals": [
+     22
+    ]
+   },
+   "mechanical": {
+    "checks_passed": 3,
+    "script_versions": 3
+   }
+  },
+  "profiles": [
+   {
+    "approved": true,
+    "id": "09e18317-414b-4f02-b0cb-710f79eb2dc4",
+    "rules": [
+     "Keep qualifications and uncertainty.",
+     "Attribute forecasts; distinguish proposed changes from final rules."
+    ],
+    "scope": "script",
+    "version": 1
+   },
+   {
+    "approved": false,
+    "id": "54875d7c-4092-4106-bf88-5224b707907a",
+    "rules": [
+     {
+      "origin": "inferred",
+      "text": "Concrete benefit first when the story supports one."
+     },
+     {
+      "origin": "inferred",
+      "text": "Name the beneficiary."
+     },
+     {
+      "origin": "inferred",
+      "text": "Plain language."
+     },
+     {
+      "origin": "inferred",
+      "text": "Short two-part contrast."
+     },
+     {
+      "origin": "inferred",
+      "text": "Direct public stake."
+     },
+     {
+      "origin": "inferred",
+      "text": "Forceful editorial characterization."
+     },
+     {
+      "origin": "inferred",
+      "text": "Declarative wording by default."
+     }
+    ],
+    "scope": "title",
+    "version": 1
+   }
+  ],
+  "requests": [
+   {
+    "created_at": "2026-11-12T16:26:11.653894+00:00",
+    "id": "c817d663-9a63-44c3-8c8e-320148c5b962",
+    "request_text": "TEST DATA: research the October 2026 EPA proposal (fixture)"
+   }
+  ],
+  "rubric": {
+   "dimensions": [
+    "hook_conflict",
+    "human_stakes",
+    "emotional_force",
+    "argument_coherence",
+    "factual_discipline",
+    "spoken_clarity",
+    "closing"
+   ],
+   "gates": [
+    "total at least 21/28",
+    "factual discipline = 4",
+    "hook, emotional force and coherence each at least 3",
+    "no unresolved material factual issue",
+    "explicit human approval"
+   ],
+   "label": "Provisional internal criteria, not validated performance benchmarks"
+  },
+  "runs": [
+   {
+    "created_at": "2026-11-12T16:26:11.722894+00:00",
+    "error": null,
+    "id": "0f8ea912-82d6-47a5-90c1-18f559ab9277",
+    "kind": "title_check",
+    "status": "done"
+   },
+   {
+    "created_at": "2026-11-12T16:26:11.710124+00:00",
+    "error": null,
+    "id": "26e320c2-8c9b-4f3d-ae21-0f7127c80f46",
+    "kind": "visual_check",
+    "status": "done"
+   },
+   {
+    "created_at": "2026-11-12T16:26:11.699165+00:00",
+    "error": null,
+    "id": "1d159a09-1f06-4f56-bfae-87b7964fff3b",
+    "kind": "rewrite",
+    "status": "done"
+   },
+   {
+    "created_at": "2026-11-12T16:26:11.694604+00:00",
+    "error": null,
+    "id": "35eefe8d-895d-4a1e-9caa-7ba545d3c5ca",
+    "kind": "script",
+    "status": "done"
+   },
+   {
+    "created_at": "2026-11-12T16:26:11.689202+00:00",
+    "error": null,
+    "id": "aa06303c-55fb-47b5-a1f6-ad6b89aa4d6a",
+    "kind": "outline",
+    "status": "done"
+   },
+   {
+    "created_at": "2026-11-12T16:26:11.680419+00:00",
+    "error": null,
+    "id": "719bdf1a-8d5b-447c-951d-e573e8e7fb81",
+    "kind": "angles",
+    "status": "done"
+   },
+   {
+    "created_at": "2026-11-12T16:26:11.665544+00:00",
+    "error": null,
+    "id": "3c859d5f-e721-4485-9d5e-199cf1e69745",
+    "kind": "source_copy",
+    "status": "done"
+   },
+   {
+    "created_at": "2026-11-12T16:26:11.657442+00:00",
+    "error": null,
+    "id": "68805e70-0634-4f26-8a96-b375d894b5c4",
+    "kind": "research_ingest",
+    "status": "done"
+   }
+  ],
+  "topic": "Air Quality",
+  "versions": [
+   {
+    "approvals": [
+     {
+      "approved_at": "2026-11-12T16:26:11.68767+00:00",
+      "approved_by": "founder@test.invalid",
+      "body_sha256": "00cd716d838ae7d5764419c998f2fd1c3d4c304e53d56d7fb1d72c251f58812a",
+      "high_risk_ack": false,
+      "kind": "editorial",
+      "note": "TEST DATA: lead with the residents",
+      "rubric": null,
+      "selected_index": 0,
+      "this_version": true
+     }
+    ],
+    "body": {
+     "angles": [
+      {
+       "category": "contradiction",
+       "claim": "TEST DATA: EPA says the proposal keeps methane rules workable.",
+       "context": "TEST DATA: EPA's stated rationale; the change is proposed.",
+       "editorial_position": "TEST DATA: the stated aim and the effect pull apart.",
+       "evidence_limits": "TEST DATA: how often reports led to action is not established.",
+       "finding_ids": [
+        "air-proposal-status@1",
+        "air-third-party-reports@1",
+        "air-program-background@1",
+        "air-warning-effect@1",
+        "air-cost-estimate@1"
+       ],
+       "opening": "TEST DATA: A warning system for large leaks could go quiet.",
+       "public_stakes": "TEST DATA: residents near sites could lose an early warning.",
+       "why_different": "TEST DATA: leads with the residents' warning."
+      },
+      {
+       "category": "public_interest",
+       "claim": "TEST DATA: EPA says the proposal keeps methane rules workable.",
+       "context": "TEST DATA: EPA's stated rationale; the change is proposed.",
+       "editorial_position": "TEST DATA: explain the reporting chain plainly.",
+       "evidence_limits": "TEST DATA: how often reports led to action is not established.",
+       "finding_ids": [
+        "air-proposal-status@1",
+        "air-third-party-reports@1",
+        "air-program-background@1",
+        "air-warning-effect@1",
+        "air-cost-estimate@1"
+       ],
+       "opening": "TEST DATA: Who tells EPA about a methane plume?",
+       "public_stakes": "TEST DATA: who reports a large release, and who hears about it.",
+       "why_different": "TEST DATA: same evidence; opens on the mechanism, not the conflict."
+      },
+      {
+       "category": "misleading_framing",
+       "claim": "TEST DATA: EPA says the proposal keeps methane rules workable.",
+       "context": "TEST DATA: EPA's stated rationale; the change is proposed.",
+       "editorial_position": "TEST DATA: the headline number needs context.",
+       "evidence_limits": "TEST DATA: how often reports led to action is not established.",
+       "finding_ids": [
+        "air-proposal-status@1",
+        "air-third-party-reports@1",
+        "air-program-background@1",
+        "air-warning-effect@1",
+        "air-cost-estimate@1"
+       ],
+       "opening": "TEST DATA: The figure is not a payment.",
+       "public_stakes": "TEST DATA: what the $45 billion figure is and is not.",
+       "why_different": "TEST DATA: same evidence; the money framing comes first."
+      }
+     ]
+    },
+    "body_sha256": "00cd716d838ae7d5764419c998f2fd1c3d4c304e53d56d7fb1d72c251f58812a",
+    "checks": {
+     "certifies_accuracy": false,
+     "label": "mechanical checks passed",
+     "ok": true
+    },
+    "created_at": "2026-11-12T16:26:11.683949+00:00",
+    "cues": 0,
+    "depends_on": null,
+    "id": "bfae7bcb-fcf2-4571-9ccd-5d0323408e4b",
+    "kind": "ai_draft",
+    "lesson_uses": [],
+    "lessons_included": [],
+    "library_version_id": "e3ebaa2f-01c4-4fb2-ae11-790539185643",
+    "model": null,
+    "parent_id": null,
+    "profile_id": "09e18317-414b-4f02-b0cb-710f79eb2dc4",
+    "provider": "claude-plan",
+    "selected_index": null,
+    "stage": "angles",
+    "status": {
+     "approved": true,
+     "approved_earlier_version": false,
+     "current": true,
+     "id": "bfae7bcb-fcf2-4571-9ccd-5d0323408e4b",
+     "outdated": false,
+     "outdated_reason": null,
+     "stage": "angles",
+     "superseded": false
+    },
+    "visual_checks": null
+   },
+   {
+    "approvals": [
+     {
+      "approved_at": "2026-11-12T16:26:11.693295+00:00",
+      "approved_by": "founder@test.invalid",
+      "body_sha256": "b4f3235bdef49e4a8b92b1180c2116117e999d4c824363211596a6379b61044f",
+      "high_risk_ack": false,
+      "kind": "editorial",
+      "note": null,
+      "rubric": null,
+      "selected_index": null,
+      "this_version": true
+     }
+    ],
+    "body": {
+     "beats": [
+      {
+       "beat": "collision",
+       "finding_ids": [
+        "air-proposal-status@1",
+        "air-warning-effect@1"
+       ],
+       "purpose": "TEST DATA: the proposal and what residents could lose"
+      },
+      {
+       "beat": "mechanism",
+       "finding_ids": [
+        "air-program-background@1"
+       ],
+       "purpose": "TEST DATA: how third-party reports work today"
+      },
+      {
+       "beat": "landing",
+       "finding_ids": [
+        "air-third-party-reports@1"
+       ],
+       "purpose": "TEST DATA: proposed, not final"
+      }
+     ]
+    },
+    "body_sha256": "b4f3235bdef49e4a8b92b1180c2116117e999d4c824363211596a6379b61044f",
+    "checks": {
+     "certifies_accuracy": false,
+     "label": "mechanical checks passed",
+     "ok": true
+    },
+    "created_at": "2026-11-12T16:26:11.691779+00:00",
+    "cues": 0,
+    "depends_on": "bfae7bcb-fcf2-4571-9ccd-5d0323408e4b",
+    "id": "25f9017c-2324-422b-837b-28fd256788c7",
+    "kind": "ai_draft",
+    "lesson_uses": [],
+    "lessons_included": [],
+    "library_version_id": "e3ebaa2f-01c4-4fb2-ae11-790539185643",
+    "model": null,
+    "parent_id": null,
+    "profile_id": "09e18317-414b-4f02-b0cb-710f79eb2dc4",
+    "provider": "claude-plan",
+    "selected_index": 0,
+    "stage": "outline",
+    "status": {
+     "approved": true,
+     "approved_earlier_version": false,
+     "current": true,
+     "id": "25f9017c-2324-422b-837b-28fd256788c7",
+     "outdated": false,
+     "outdated_reason": null,
+     "stage": "outline",
+     "superseded": false
+    },
+    "visual_checks": null
+   },
+   {
+    "approvals": [],
+    "body": {
+     "segments": [
+      {
+       "beat": "collision",
+       "claim_ids": [
+        "air-third-party-reports@1",
+        "air-program-background@1",
+        "air-warning-effect@1",
+        "air-proposal-status@1"
+       ],
+       "story": "air",
+       "text": "For several years the Environmental Protection Agency has run a program that collects reports about large methane releases at oil and gas sites across the country. The Super Emitter Program started in 2024. It is one of several monitoring tools the agency uses, and officials say it can find problems that routine monitoring misses. Under the proposal, reports of company emissions detected by third parties would stop reaching EPA. Residents near these sites could lose an early warning, an estimated effect. The change is proposed, not final."
+      },
+      {
+       "beat": "landing",
+       "claim_ids": [
+        "air-proposal-status@1"
+       ],
+       "story": "air",
+       "text": "TEST DATA: For now this is a proposal, not a final rule, and residents can still comment on it."
+      }
+     ]
+    },
+    "body_sha256": "1cc8e8045872a9842b92923d8d6fc7eb11f0363025992a9fb5349b2f42343a8c",
+    "checks": {
+     "ceiling_words": 750,
+     "certifies_accuracy": false,
+     "disclaimer": "Automated checks; not a certification of factual accuracy.",
+     "estimated_seconds_from_words": 42,
+     "high_risk": [],
+     "label": "mechanical checks passed",
+     "material_issues": [],
+     "ok": true,
+     "opening": {
+      "conflict_at_word": 54,
+      "limit": 45,
+      "stake_at_word": 69
+     },
+     "problems": [],
+     "quotes": [],
+     "runtime_note": "An estimate from word count, not a measured narration time.",
+     "target_words": 450,
+     "warnings": [
+      {
+       "detail": "the conflict starts at word 54 (aim: within 45)",
+       "kind": "automated assessment, not a factual finding",
+       "type": "delayed_conflict"
+      },
+      {
+       "detail": "no public stake named in the first 45 words",
+       "kind": "automated assessment, not a factual finding",
+       "type": "late_public_stake"
+      }
+     ],
+     "word_counts": {
+      "notes_and_source_words": 0,
+      "spoken_words": 106
+     },
+     "words": 106
+    },
+    "created_at": "2026-11-12T16:26:11.697278+00:00",
+    "cues": 0,
+    "depends_on": "25f9017c-2324-422b-837b-28fd256788c7",
+    "id": "f508b0fd-7009-472d-a7c6-1df2a4d306e3",
+    "kind": "ai_draft",
+    "lesson_uses": [],
+    "lessons_included": [],
+    "library_version_id": "e3ebaa2f-01c4-4fb2-ae11-790539185643",
+    "model": null,
+    "parent_id": null,
+    "profile_id": "09e18317-414b-4f02-b0cb-710f79eb2dc4",
+    "provider": "claude-plan",
+    "selected_index": 0,
+    "stage": "script",
+    "status": {
+     "approved": false,
+     "approved_earlier_version": false,
+     "current": false,
+     "id": "f508b0fd-7009-472d-a7c6-1df2a4d306e3",
+     "outdated": false,
+     "outdated_reason": null,
+     "stage": "script",
+     "superseded": true
+    },
+    "visual_checks": null
+   },
+   {
+    "approvals": [],
+    "body": {
+     "segments": [
+      {
+       "beat": "collision",
+       "claim_ids": [
+        "air-third-party-reports@1",
+        "air-program-background@1",
+        "air-warning-effect@1",
+        "air-proposal-status@1"
+       ],
+       "story": "air",
+       "text": "Under an EPA proposal, reports of company emissions detected by third parties would stop reaching the agency, and residents near oil and gas sites could lose an early warning about large methane releases, an estimated effect. The change is proposed, not final. The Super Emitter Program behind those reports started in 2024. It is one of several monitoring tools the agency uses, and officials say it can find problems that routine monitoring misses."
+      },
+      {
+       "beat": "landing",
+       "claim_ids": [
+        "air-proposal-status@1"
+       ],
+       "story": "air",
+       "text": "TEST DATA: For now this is a proposal, not a final rule, and residents can still comment on it."
+      }
+     ]
+    },
+    "body_sha256": "0578e2c30cbd397850e2c475a5e587438c67deef3c940d4c3d64a06787eb99f7",
+    "checks": {
+     "ceiling_words": 750,
+     "certifies_accuracy": false,
+     "disclaimer": "Automated checks; not a certification of factual accuracy.",
+     "estimated_seconds_from_words": 37,
+     "high_risk": [],
+     "label": "mechanical checks passed",
+     "material_issues": [],
+     "ok": true,
+     "opening": {
+      "conflict_at_word": 0,
+      "limit": 45,
+      "stake_at_word": 18
+     },
+     "problems": [],
+     "quotes": [],
+     "rewrite": {
+      "action": "conflict_first",
+      "segment_index": 0
+     },
+     "runtime_note": "An estimate from word count, not a measured narration time.",
+     "target_words": 450,
+     "warnings": [],
+     "word_counts": {
+      "notes_and_source_words": 0,
+      "spoken_words": 92
+     },
+     "words": 92
+    },
+    "created_at": "2026-11-12T16:26:11.702855+00:00",
+    "cues": 0,
+    "depends_on": "25f9017c-2324-422b-837b-28fd256788c7",
+    "id": "0e972045-47fc-4398-8599-a3bd9ed1ba69",
+    "kind": "ai_draft",
+    "lesson_uses": [],
+    "lessons_included": [],
+    "library_version_id": "e3ebaa2f-01c4-4fb2-ae11-790539185643",
+    "model": null,
+    "parent_id": "f508b0fd-7009-472d-a7c6-1df2a4d306e3",
+    "profile_id": "09e18317-414b-4f02-b0cb-710f79eb2dc4",
+    "provider": "claude-plan",
+    "selected_index": 0,
+    "stage": "script",
+    "status": {
+     "approved": false,
+     "approved_earlier_version": false,
+     "current": false,
+     "id": "0e972045-47fc-4398-8599-a3bd9ed1ba69",
+     "outdated": false,
+     "outdated_reason": null,
+     "stage": "script",
+     "superseded": true
+    },
+    "visual_checks": null
+   },
+   {
+    "approvals": [
+     {
+      "approved_at": "2026-11-12T16:26:11.736455+00:00",
+      "approved_by": "founder@test.invalid",
+      "body_sha256": "2307f48930016f1caface82c980317feec054457b2d466e6368310370e6be423",
+      "high_risk_ack": false,
+      "kind": "editorial",
+      "note": "TEST DATA: approved in the local render harness",
+      "rubric": {
+       "argument_coherence": 3,
+       "closing": 3,
+       "emotional_force": 3,
+       "factual_discipline": 4,
+       "hook_conflict": 3,
+       "human_stakes": 3,
+       "spoken_clarity": 3
+      },
+      "selected_index": null,
+      "this_version": true
+     }
+    ],
+    "body": {
+     "segments": [
+      {
+       "beat": "collision",
+       "claim_ids": [
+        "air-third-party-reports@1",
+        "air-program-background@1",
+        "air-warning-effect@1",
+        "air-proposal-status@1"
+       ],
+       "story": "air",
+       "text": "Under an EPA proposal, reports of company emissions detected by third parties would stop reaching the agency, and residents near oil and gas sites could lose an early warning about large methane releases, an estimated effect. The change is proposed, not final. The Super Emitter Program behind those reports started in 2024. It is one of several monitoring tools the agency uses, and officials say it can find problems that routine monitoring misses.",
+       "visual": {
+        "claim_id": "air-proposal-status@1",
+        "highlight": "yellow",
+        "page": 1,
+        "quote": "First, the EPA proposes to rescind the Super Emitter Program.",
+        "source_id": "a4667739-d680-465d-859e-ba0750ffd2fc",
+        "type": "doc"
+       }
+      },
+      {
+       "beat": "landing",
+       "claim_ids": [
+        "air-proposal-status@1"
+       ],
+       "story": "air",
+       "text": "TEST DATA: For now this is a proposal, not a final rule, and residents can still comment on it."
+      }
+     ]
+    },
+    "body_sha256": "2307f48930016f1caface82c980317feec054457b2d466e6368310370e6be423",
+    "checks": {
+     "ceiling_words": 750,
+     "certifies_accuracy": false,
+     "disclaimer": "Automated checks; not a certification of factual accuracy.",
+     "estimated_seconds_from_words": 37,
+     "high_risk": [],
+     "label": "mechanical checks passed",
+     "material_issues": [],
+     "ok": true,
+     "opening": {
+      "conflict_at_word": 0,
+      "limit": 45,
+      "stake_at_word": 18
+     },
+     "problems": [],
+     "quotes": [],
+     "rewrite": {
+      "action": "conflict_first",
+      "segment_index": 0
+     },
+     "runtime_note": "An estimate from word count, not a measured narration time.",
+     "target_words": 450,
+     "text_checks_from": "0e972045-47fc-4398-8599-a3bd9ed1ba69",
+     "warnings": [],
+     "word_counts": {
+      "notes_and_source_words": 0,
+      "spoken_words": 92
+     },
+     "words": 92
+    },
+    "created_at": "2026-11-12T16:26:11.710124+00:00",
+    "cues": 1,
+    "depends_on": "25f9017c-2324-422b-837b-28fd256788c7",
+    "id": "41cb58b5-4c81-4aa4-93e7-5d9faaf5160c",
+    "kind": "human_reviewed",
+    "lesson_uses": [],
+    "lessons_included": [],
+    "library_version_id": "e3ebaa2f-01c4-4fb2-ae11-790539185643",
+    "model": null,
+    "parent_id": "0e972045-47fc-4398-8599-a3bd9ed1ba69",
+    "profile_id": "09e18317-414b-4f02-b0cb-710f79eb2dc4",
+    "provider": null,
+    "selected_index": 0,
+    "stage": "script",
+    "status": {
+     "approved": true,
+     "approved_earlier_version": false,
+     "current": true,
+     "id": "41cb58b5-4c81-4aa4-93e7-5d9faaf5160c",
+     "outdated": false,
+     "outdated_reason": null,
+     "stage": "script",
+     "superseded": false
+    },
+    "visual_checks": {
+     "certifies_accuracy": false,
+     "cued": 1,
+     "disclaimer": "Mechanical document checks: the highlighted words are in the stored document. Not a check that the finding is true.",
+     "download_errors": [],
+     "label": "document cue checks",
+     "ok": true,
+     "segments": [
+      {
+       "cue": {
+        "claim_id": "air-proposal-status@1",
+        "highlight": "yellow",
+        "page": 1,
+        "quote": "First, the EPA proposes to rescind the Super Emitter Program.",
+        "source_id": "a4667739-d680-465d-859e-ba0750ffd2fc",
+        "type": "doc"
+       },
+       "match": "first the epa proposes to rescind the super emitter program",
+       "page": 1,
+       "preview_path": "weekly-visuals/41cb58b5-4c81-4aa4-93e7-5d9faaf5160c/pages/a4667739-d680-465d-859e-ba0750ffd2fc_pdf_dfc3cf9a_p1.png",
+       "problems": [],
+       "scene": {
+        "doc": {
+         "focusSentence": 0,
+         "highlights": [
+          {
+           "h": 0.011329545454545453,
+           "w": 0.17538823529411765,
+           "x": 0.15188954248366013,
+           "y": 0.5306539141414142
+          },
+          {
+           "h": 0.011329545454545453,
+           "w": 0.2374764705882353,
+           "x": 0.07354248366013072,
+           "y": 0.5432789141414142
+          }
+         ],
+         "image": "pages/a4667739-d680-465d-859e-ba0750ffd2fc_pdf_dfc3cf9a_p1.png",
+         "note": null,
+         "page": 1,
+         "pageHeightPx": 1650,
+         "pageWidthPx": 1275,
+         "quote": "First, the EPA proposes to rescind the Super Emitter Program.",
+         "source": "EPA, Proposed Rule, 91 FR 68234 (October 29, 2026)",
+         "status": "confirmed",
+         "title": "EPA, Proposed Rule, 91 FR 68234 (October 29, 2026)"
+        },
+        "type": "doc"
+       },
+       "segment": 0,
+       "status": "resolved"
+      },
+      {
+       "segment": 1,
+       "status": "none"
+      }
+     ],
+     "unresolved": 0
+    }
+   },
+   {
+    "approvals": [
+     {
+      "approved_at": "2026-11-12T16:26:11.730155+00:00",
+      "approved_by": "founder@test.invalid",
+      "body_sha256": "507988658f22e7a96b06ef9f23d46637841710cdb5a1fecca0bf40907bb8d803",
+      "high_risk_ack": false,
+      "kind": "editorial",
+      "note": "FIXTURE: approved by the founder in a conversation on 2026-11-10; not a dashboard action",
+      "rubric": null,
+      "selected_index": 0,
+      "this_version": true
+     }
+    ],
+    "body": {
+     "candidates": [
+      {
+       "input": {
+        "amount_meaning": "EPA's estimate of reduced industry compliance costs over its analysis period, not a cash payment",
+        "beneficiary_label": "oil and gas industry",
+        "benefit_frame": "lower compliance costs for the industry",
+        "headline_amount": "$45B",
+        "policy_status": "proposed",
+        "profile_version": 1,
+        "public_cost_basis": "air-warning-effect@1",
+        "public_cost_frame": "residents near sites could lose an early warning",
+        "selected_angle_id": "angle-0",
+        "supporting_claim_ids": [
+         "air-cost-estimate@1",
+         "air-warning-effect@1",
+         "air-proposal-status@1"
+        ]
+       },
+       "rationale": "FIXTURE: wording approved by the founder in a conversation; not a dashboard approval, not evidence clearance.",
+       "title": "$45B Gift to Oil—At Your Expense"
+      }
+     ],
+     "origin": "person"
+    },
+    "body_sha256": "507988658f22e7a96b06ef9f23d46637841710cdb5a1fecca0bf40907bb8d803",
+    "checks": {
+     "certifies_accuracy": false,
+     "label": "title checks not run yet"
+    },
+    "created_at": "2026-11-12T16:26:11.722894+00:00",
+    "cues": 0,
+    "depends_on": "41cb58b5-4c81-4aa4-93e7-5d9faaf5160c",
+    "id": "b38c6ddf-f438-4eb4-b5a7-d3c534de67fd",
+    "kind": "human_reviewed",
+    "lesson_uses": [],
+    "lessons_included": [],
+    "library_version_id": "e3ebaa2f-01c4-4fb2-ae11-790539185643",
+    "model": null,
+    "parent_id": null,
+    "profile_id": "54875d7c-4092-4106-bf88-5224b707907a",
+    "provider": null,
+    "selected_index": null,
+    "stage": "title",
+    "status": {
+     "approved": true,
+     "approved_earlier_version": false,
+     "current": true,
+     "evidence_review": "ready_for_review",
+     "id": "b38c6ddf-f438-4eb4-b5a7-d3c534de67fd",
+     "outdated": false,
+     "outdated_reason": null,
+     "publication": "not_approved",
+     "script": {
+      "approved": true,
+      "superseded": false
+     },
+     "selected_index": 0,
+     "selected_title": "$45B Gift to Oil—At Your Expense",
+     "stage": "title",
+     "superseded": false,
+     "title_checks": {
+      "candidates": [
+       {
+        "characterizations": [
+         {
+          "basis": "supported",
+          "kind": "editorial characterization, not an allegation of a crime",
+          "term": "gift"
+         }
+        ],
+        "characters": 32,
+        "flags": [],
+        "needs_research": false,
+        "problems": [],
+        "title": "$45B Gift to Oil—At Your Expense",
+        "warnings": [],
+        "words": 7
+       }
+      ],
+      "certifies_accuracy": false,
+      "disclaimer": "Mechanical title checks; not evidence clearance. A person's evidence review decides.",
+      "label": "title checks passed",
+      "needs_research": false,
+      "ok": true,
+      "problems": []
+     }
+    },
+    "visual_checks": null
+   }
+  ]
+ },
+ "version_id": "41cb58b5-4c81-4aa4-93e7-5d9faaf5160c"
+}
