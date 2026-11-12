@@ -109,13 +109,43 @@ which only a runner can read (the `pages` workflow's build job on the PR builds 
   the project-list links; the 100 maps change back and IndexNow is told once.
 - Full: revert the PR. The runtime edit is inert without the section, so a partial revert is safe too.
 
-## Monitoring (after an approved deploy)
+## Monitoring handoff (updated 2026-11-12; supersedes the earlier list)
 
-- Search Console, weekly: indexed vs. not indexed for the 100 treatment and 100 control `/map/` URLs
-  (Pages report, URL filter; or URL Inspection without requesting indexing). Also Google-selected canonical.
-- Bing Webmaster: the same 200 URLs.
-- Supabase API logs (renders only, 24-hour window, POST bodies not logged): Googlebot / bingbot calls to
-  `app_zip_projects_markers` per day. These are not crawler access logs: GitHub Pages provides none.
-- `sitemaps/map.xml`: treated lastmods move when their records change; controls should not.
-- Compare arms after 4–6 weeks. A difference is evidence, not a guarantee; indexing is Google's and Bing's
-  decision.
+**Deployment.** Commit `f65a0f7` (#2808), merged 2026-11-11 13:18 CST. `pages` push run succeeded 19:18:37Z to 19:29:52Z,
+so treatment pages are live from about 2026-11-11 19:30Z. "Post-deployment crawl" means a crawl dated after that.
+**Manifests.** Treatment and control (100 each) are `data/seo-map-pilot.json`, selection in `selection-output-2026-11-11.json`.
+98402 is in neither arm and is outside the experiment.
+
+**Baselines (Search Console, observed 2026-11-12, map-filtered).** 12,732 discovered, not indexed; 6 crawled, not
+indexed; 3 excluded by noindex; about 1 indexed. 98116 (treatment): URL unknown to Google at about 08:09 CST 2026-11-12.
+98402 (not in the pilot): crawled, not indexed, last crawl 2026-11-10 14:57, before deployment. Discovery path for 98116
+(map sitemap, `sitemap.xml`, `robots.txt`, anchors on `/community/98116/` and `/community/98116/projects/`) was intact.
+
+**Exclusions.** One map URL was manually requested for indexing by the owner more than a week before 2026-11-12 and is the
+one indexed map. Its identity is not recorded here; add it to the manifest with this reason when known. Keep it in the
+manifest, exclude it from unassisted-success metrics. Search-engine submissions, kept apart:
+(1) IndexNow (automatic, by the `pages` job, step 3 above): per the owner's baseline, the 100 treatment map URLs were
+submitted on 2026-11-11 after the deploy, followed by five later updates. Those are the owner's recorded facts; the
+exact timestamps and the five later updates' contents are in the owner's baseline and were not re-verified or
+reproduced in this session. This is an automatic notification, not a manual indexing request, but it means Bing (and
+other IndexNow engines) were told about the treatment URLs, so Bing results for them are not unprompted discovery.
+Control URLs were not part of it unless a later update says so; check against the owner's baseline before using Bing data.
+(2) The daily Bing reminder (routine "Daily 100 Bing URLs") only prints a list of `/community/<zip>/` URLs for the owner
+to paste. It lists no `/map/` URLs, and whether the owner actually submitted any of them has not been verified.
+Neither item affects the Google measurements, which depend on Search Console only.
+
+**Review dates (reminders created 2026-11-12, 10:00 America/Chicago):** 2026-11-19, 2026-11-26, 2026-12-10, 2026-12-24.
+They remind only. No indexing requests, resubmissions, repository work or production changes follow from them.
+
+**Procedure at each review**
+1. Authorized Search Console API access: inspect all 200 URLs. Otherwise a fixed, documented sample with its actual size.
+   Neither: list the manual checks needed. Never invent results.
+2. Record per URL, separately: unknown to Google; discovered, not indexed; crawled, not indexed; excluded by noindex;
+   indexed. Keep any other returned status as returned.
+3. Per arm, with the eligible denominator (manual-request URLs excluded): count in each status; pages with a first
+   observed post-deployment crawl; pages with none (no group median from crawled pages only); indexed pages with date;
+   pages indexed earlier and still indexed (retention). Record indexing even if no separate crawl was observed.
+4. Compare with the baseline totals above. Keep 98116 in treatment if eligible; draw no group conclusion from one page.
+5. Equal crawl rates, even at 14 days, are inconclusive and do not identify a cause or rule out content effects.
+6. Also: Bing Webmaster for the same URLs; `sitemaps/map.xml` lastmods (treated move with their records, controls do not).
+   Never request indexing or submit URLs for any of the 200.
