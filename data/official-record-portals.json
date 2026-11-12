@@ -1,0 +1,66 @@
+{
+  "_readme": [
+    "OFFICIAL PLANNING / PERMIT SYSTEMS, per jurisdiction, recorded whether or not HomeSignal reads them (2026-11-12).",
+    "Why: source discovery used to look only at a jurisdiction's open-data catalog, so a city whose catalog has no",
+    "permit dataset was recorded as having no permit records (Oakland CA, docs/source-registry.md 'Alameda CA' row),",
+    "while the city runs a public planning and permit portal. A missing catalog dataset is not a missing record system.",
+    "",
+    "Every state below is a fact about what WE checked, never a claim about what the jurisdiction holds:",
+    "  discovery_state  not_investigated | portal_found | automated_search_verified | manual_only | access_restricted | integrated",
+    "  record_coverage  not_verified | search_only | bulk_verified | integrated",
+    "  document_coverage not_verified | not_public | public_verified",
+    "Record coverage and document coverage are separate: a working search does not prove bulk access or attachments.",
+    "Each check carries the date, the URL, what came back and the method. A finding of 'no matching record' names the",
+    "query and the sources checked; it never says that no application exists.",
+    "Validated by test/official-record-portals.test.mjs. Pure data: adding a jurisdiction is adding an entry."
+  ],
+  "portals": [
+    {
+      "id": "oakland-ca-accela",
+      "jurisdiction": "City of Oakland",
+      "state": "CA",
+      "county": "Alameda",
+      "vendor": "accela-citizen-access",
+      "urls": {
+        "portal": "https://aca-prod.accela.com/OAKLAND/Default.aspx",
+        "planning_search": "https://aca-prod.accela.com/OAKLAND/Cap/CapHome.aspx?module=Planning&TabName=Home",
+        "global_search": "https://aca-prod.accela.com/OAKLAND/Cap/GlobalSearchResults.aspx?QueryText="
+      },
+      "open_data_catalog": {
+        "url": "https://data.oaklandca.gov",
+        "finding": "No permit or planning ledger in the catalog (docs/source-registry.md, Alameda CA row). Not re-checked 2026-11-12."
+      },
+      "discovery_state": "automated_search_verified",
+      "record_coverage": "search_only",
+      "document_coverage": "not_verified",
+      "access_notes": "Anonymous GET of the global search returns a results page (10 rows a page). Record numbers are links that run an ASP.NET postback, so a search result carries no stable per-record URL; record detail and attachments were not opened. Not integrated: no connector reads this portal.",
+      "supplementary": [
+        {
+          "kind": "applications_on_file",
+          "url": "https://www.oaklandca.gov/resources/applications-on-file",
+          "state": "access_restricted",
+          "finding": "HTTP 403 'Access Denied' to the database's outbound HTTP (pg_net request 23491, 2026-11-12). Not worked around."
+        },
+        {
+          "kind": "public_records_request",
+          "url": "https://oaklandca.nextrequest.com/",
+          "state": "not_investigated",
+          "finding": "HTTP 204 with no body to pg_net (request 23518, 2026-11-12); the request system was not examined further."
+        }
+      ],
+      "checks": [
+        { "date": "2026-11-12", "method": "pg_net GET", "request": 23489, "url": "https://aca-prod.accela.com/OAKLAND/Cap/CapHome.aspx?module=Planning&TabName=Home", "http": 200, "finding": "Accela Citizen Access planning search page, 225,807 bytes, served without sign-in." },
+        { "date": "2026-11-12", "method": "pg_net GET", "request": 23490, "url": "https://aca-prod.accela.com/OAKLAND/Default.aspx", "http": 200, "finding": "Title 'Oakland Online Portal'." },
+        { "date": "2026-11-12", "method": "pg_net GET", "request": 23519, "url": "https://aca-prod.accela.com/OAKLAND/Cap/GlobalSearchResults.aspx?QueryText=415%2020th%20St", "http": 200, "finding": "'Showing 1-10 of 100+'. First page held Fire Building inspections FDB24/25/26-02835 at '415 20TH ST - BERKELEY LAB OAKLAND SCIENCE FACILITY' (inspections, not applications), plus SL2601772, DET260105 (Letter of Determination, Under Review), E2600639, DET250106, X2500852, X2300728, X2300729 whose addresses the results page does not show. Only the first page was read." },
+        { "date": "2026-11-12", "method": "pg_net GET", "request": 23493, "url": "https://aca-prod.accela.com/OAKLAND/Cap/GlobalSearchResults.aspx?QueryText=Behring", "http": 200, "finding": "B2602989 (Demolition, Final Check - On Hold, 07/27/2026, cross-references DET260105), B2601574, B2504006, B2503850, DS250341. Addresses not shown on the results page; none is matched to a project." }
+      ],
+      "project_matches": [
+        {
+          "project": "Behring 415 20th Street Data Center (canonical entity e59b8d43-9ec7-436f-a180-378d1ecfbbec, Compute Atlas)",
+          "result": "no_match_in_checked_sources",
+          "detail": "No planning application for a data center at 415 20th Street was identified on the first results page of the two searches above. DET260105 and the Behring-named building permits are leads whose address and subject were not confirmed, so none is linked. The search does not establish whether an application was filed."
+        }
+      ]
+    }
+  ]
+}
