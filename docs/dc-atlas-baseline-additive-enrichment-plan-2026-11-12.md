@@ -102,16 +102,24 @@ This table is the field-coverage baseline the comparison gate in §4.5 measures 
   `dc_current_observation`, the canonical entities and Map 1 byte-identical.
 - These pass today; they exist so a later change cannot weaken them quietly.
 
-### 4.3 Close G1: records absent from a newer release stay current (design; needs its own review)
-- Change "current" from *newest complete run per distribution* to *each publisher record's newest
-  observation from any complete run of that distribution*, keyed on `(source, distribution,
-  publisher_record_id)`. This keeps the duplicate-entity protection §1 of step 3A exists for (one current
-  observation per record), and a record missing from a later release keeps its last observation.
-- Each such record carries `last_seen_edition` and `last_seen_run`, and the page says "not in the
-  publisher's latest edition" rather than nothing. Absence never sets a closed or cancelled status.
-- A record the publisher explicitly marks cancelled or withdrawn is a stated fact and is shown as such.
-- Proof: replica dry run (§7.11 shape: copy out read-only, change a replica, prove parity) with a
-  synthetic smaller release: 0 Atlas records lost from Map 1, 0 populated fields lost.
+### 4.3 Close G1: keep history apart from what is displayed now (design; needs its own review)
+*Revised 2026-11-12 (founder correction 5): an older assertion is not automatically current.*
+- **History** never changes: every observation of every edition stays, as today.
+- **Current display** is a separate, explicit rule per case, not "newest run wins" and not "keep
+  everything forever":
+
+  | case | history | displayed now |
+  |---|---|---|
+  | record absent from a newer edition of the same source | kept, with `last_seen_edition` | still shown, labelled "not in the publisher's latest edition (last seen <edition date>)"; never shown as closed |
+  | publisher states cancelled / withdrawn / decommissioned | kept | the stated status, with its edition |
+  | field changed in a newer edition | both values kept | the newer edition's value, dated to that edition |
+  | field missing in a newer edition (absent, not stated as null) | prior value kept | prior value, labelled with the edition that stated it |
+  | verified correction from a primary record | Atlas value kept as a superseded assertion | the primary value, with its evidence and the reason |
+  | another source lacks the facility | nothing | unchanged; absence elsewhere is never evidence |
+
+- Whether a record absent for many editions should eventually be hidden is a founder decision, not a default.
+- Proof: replica dry run (§7.11 shape) with a synthetic smaller edition: 0 records lost from history,
+  every display change attributable to one row of the table above.
 
 ### 4.4 Close G2 and G4: field-level assertions with an explicit selection rule (design)
 - One view, `dc_field_assertion` (entity, field, value, source, observation, publisher edition date,
@@ -163,6 +171,177 @@ Each test must be shown to fail on the current code where the gap exists (G1, G2
 Not proposed. If one is ever proposed, it comes with the §4.5 report showing the candidate matches or
 exceeds Atlas on coverage, field completeness, freshness and provenance, and works with the history
 system. Record count alone is not a reason.
+
+## 4b. Revision 2 (2026-11-12, after the approved read-only inventory A1 and documentation research A2)
+
+### Stored Atlas history (A1, `dc_acquisition_run`, read-only)
+- 53 Atlas runs: 47 `SUCCESS_COMPLETE`, 6 `FETCH_FAILED`. The 47 complete runs stored **37 distinct
+  files** (distinct `artifact_sha256`), each with its own publisher edition timestamp, from edition
+  2026-09-21 (release 1.34.0, 2,087 records) to edition 2026-11-05 18:24 UTC (release 1.35.1,
+  3,025 records, 8,764,907 bytes, sha256 `724a6259ed4b…`, read 2026-11-06 09:45:01 UTC, run 2675).
+- Record counts mostly grow, but not always: the 2026-09-27 edition has 2,241 against 2,242 the day
+  before, and two consecutive pairs have equal counts with different bytes (2,879 / 2,879 and
+  2,923 / 2,923). The stored history already contains absences and in-place edits to test on, with no
+  new capture.
+
+### Citations in the current Atlas set (A1)
+- 3,025 records, all with at least one citation: **9,544 citations, 2,410 distinct domains, 0 without a URL.**
+- Publisher's own `kind`: press 4,715 · other 2,994 · osm 691 · permit 473 · filing 440 · subsidy 218 · iso_queue 13.
+- By publisher type (domain rules, approximate: two commercial `.us` domains, dcmap.us 24 and edged.us 7, fell
+  in the government bucket):
+
+  | type | citations | facilities |
+  |---|---:|---:|
+  | news, operator and other web | 6,038 | 2,560 |
+  | state and local government | 875 | 641 |
+  | commercial aggregators (Baxtel 408, DataCenterMap 43, Cleanview 55, others) | 794 | 707 |
+  | OpenStreetMap / Nominatim | 691 | 680 |
+  | hosted ArcGIS maps | 324 | 320 |
+  | PeeringDB | 232 | 226 |
+  | press wires | 196 | 160 |
+  | SEC | 152 | 115 |
+  | EIA / DOE / FERC / EPA | 90 | 66 |
+  | utilities | 86 | 65 |
+  | ISO / RTO | 8 | 8 |
+
+- 795 facilities cite at least one government record (SEC, federal, state, local or ISO).
+- 188 cite only aggregators, OpenStreetMap or PeeringDB.
+- Largest state and local domains: puc.sd.gov 30, dceo.illinois.gov 28, maps.puco.ohio.gov 26, mn.gov 26,
+  le.utah.gov 20, dwee.nebraska.gov 19, gis.franklincountyohio.gov 19.
+
+### Geography (A1)
+- Every record has a state and a point. **44 have no county** (38 of them data centres). They are reported,
+  not filled in.
+- Types: data_center 2,303 · power_generation 494 · crypto_mining 228.
+
+### Access and licences (A2 and GitHub-hosted files only: the official sites are still refused by the cloud environment's network policy, which allows only jodytracks.com and three phoenix.gov hosts besides package registries)
+- **Compute Atlas, read from the publisher's own GitHub files:**
+  - The final open edition is frozen at older commits.
+  - The live site reads the publisher's database.
+  - README: dataset files are "free for students, educators and academics, and by subscription for
+    everyone else".
+  - `LICENSE-DATA`: CC BY 4.0, "for any purpose, even commercially", with "Attribution — You must give
+    appropriate credit, provide a link to this license, and indicate if changes were made… not in any way
+    that suggests Compute Atlas endorses you".
+  - It also says underlying sources "remain the property of their respective publishers".
+  - The `/api/*` routes are admin-only.
+  - The subscription terms and robots.txt are UNVERIFIED.
+- **PeeringDB** (its Acceptable Use Policy template in its own repository): no reproduction or storage
+  "without prior permission"; operational use "would not include… any other commercial application".
+  **Not usable without permission.** The 232 Atlas citations to it stay Atlas's compilation; we do not
+  refresh them from PeeringDB.
+- **OpenStreetMap** (copyright page text in its own repository): share-alike confirmed. It stays a separate layer.
+- **UNVERIFIED** (the pages could not be read): Epoch AI, EIA, SEC EDGAR fair access, ERCOT, FERC,
+  Good Jobs First, EPA ECHO, and the commercial aggregators.
+- **No suitable free replacement has been verified within the research completed so far.** The
+  strategy is additive either way.
+
+### Atlas credit: what we change (for review; nothing is changed yet)
+- **Stored unchanged:** the original file (sha256-addressed) and every record's `raw_payload`.
+- **Our own transformations:**
+  - facility type → our classification;
+  - matching records across sources into one facility;
+  - location checks (geocoding the stated address; withholding town-centre, multi-site or contradicted points);
+  - status → our map stages;
+  - ZIP assignment;
+  - hiding an OpenStreetMap pin that duplicates an Atlas building;
+  - choosing which fields to show.
+- Current credit strings (`compute_atlas.py` `ATTRIBUTION`, `dc_source.source_name` / `licence`) do not
+  say that changes were made.
+- Proposed wording, for review only: "Facility data from Compute Atlas by Edward Kubiak
+  (compute-atlas.com), edition of November 5, 2026, licensed CC BY 4.0 (link to the licence). Jody Tracks
+  has modified it: we classify facility types, combine records from several sources, check and sometimes
+  withhold locations, map statuses to our stages and assign ZIP codes. Compute Atlas does not endorse
+  Jody Tracks."
+
+### Decision history: what survives a re-run (resolves the contradiction between the two reports)
+Both reports were half right.
+- **Entities survive.** `dc_canonical_entity` rows are never deleted. A merged entity gets `superseded_by`
+  set (step 3A, around line 1189). But `superseded_by` and `supersede_reason` are single columns,
+  overwritten when the target changes.
+- **Links are overwritten.** `dc_entity_observation` has one row per observation (unique index). A relink
+  updates `canonical_entity_id`, `link_rule_key` and `linked_at` in place (around line 1176). Where evidence
+  splits back out, no supersession records where it was linked before.
+- **Matching decisions are overwritten.** `dc_identity_decision` is upserted on
+  `(observation_a, observation_b, candidate_rule_key)`, replacing `decision_state`, `rule_version`,
+  `evidence` and `decided_at` (around line 1242).
+- **Location decisions are overwritten.** `dc_entity_geography` has one row per entity, upserted
+  (step 3B, around line 635).
+- **Concrete case:** the Atlas address-check admission (2026-09-26) rewrote **2,240** location rows in place.
+  26 entities went from published points to `SOURCES_DISAGREE`, and 22 moved to derived address points. The
+  earlier values exist only in that day's one-off snapshots and the receipt
+  (`docs/dc-atlas-admission-receipt-2026-09-26.md` §3), not in a history table.
+- **Append-only today:** runs, observations, artifacts and `dc_address_geocode`.
+- **Proposed fix (needs schema approval):** append-only history tables written by the same statements
+  (link, decision, geography), each row carrying rule version and time. Nothing existing changes shape.
+
+### Editions and change events (design)
+- **File identity** stays the exact `artifact_sha256`. It is never replaced and no source field is dropped.
+- **Content fingerprint v1 (new, versioned separately):**
+  - parse the file;
+  - sort records by `publisher_record_id` (`collate "C"`);
+  - canonical JSON per record: object keys sorted, arrays kept in publisher order.
+- **Arrays:** an array may be re-keyed only by a declared rule. `sources[]` is keyed by `url`, and if a
+  `url` appears twice its original order is kept. `statusHistory[]` keeps its order. All other arrays are
+  order-sensitive.
+- **Edition** = a distinct content fingerprint. A repeat download of identical content is the same edition.
+- **Field changes** between consecutive editions are computed per record.
+  - Volatile fields (`lastUpdated`, `sources[].retrievedAt`, top-level `asOf`) are kept and shown, but
+    counted as timestamp-only changes, never as substantive.
+  - A record missing from an edition becomes "absent from edition", never a closure.
+  - Only `SUCCESS_COMPLETE` runs take part.
+- **Four times, never merged:**
+  - publisher edition time (`asOf`);
+  - our acquisition time (run);
+  - event time, only from an explicit dated field such as `statusHistory[].date` or `announcedDate`,
+    **otherwise unknown**;
+  - when we first observed it (the first edition that carries it).
+
+### Pilot counties (A1 counts are Atlas data-centre records; feeds from the repos)
+
+| county | Atlas DC records | location resolved | our permit sources | gov notices / meetings feeds |
+|---|---:|---:|---|---|
+| **Maricopa, AZ** (recommended) | 43 | 38 | Phoenix, Mesa, Gilbert, Scottsdale, Tempe, Peoria + ADOT | 1 / 7 |
+| **Loudoun, VA** (recommended contrast) | 45 | 44 | residential permits only, plus VDOT | 1 / 7 |
+| Clark, NV (alternate) | 32 | 31 | Henderson ×2, Las Vegas planning, Clark active projects + NDOT | 1 / 1 |
+| Cook, IL (alternate) | 47 | 43 | Chicago permits, Cook highway program | 1 / 7 |
+
+- **Maricopa** tests updates and discovery where our own permit records are densest.
+- **Loudoun** is the densest data-centre county with almost no matching permit coverage. It tests that
+  Atlas-only facts survive untouched, and discovery through Board of Supervisors meetings and notices.
+- Franklin and Licking, Ohio (23 and 20 records) have no active government feeds, so they are not first.
+
+### Retain / consolidate / close (recommendation; no action taken)
+
+| PR | content | recommendation |
+|---|---|---|
+| ingest #1105 | Atlas only: a failed read exits 3; a dry run still exits 0 | close, superseded by #1108 |
+| ingest #1108 | Atlas and Epoch: a failed read exits 3 after recording; a dry run that would fail exits 3; the probe stops requesting `/api/` | retain |
+| site #2832 | freshness reader `map1_datacentre_freshness` + panel, **plus the indexing-pilot baseline** | split: the pilot baseline goes to its own PR, owned by the pilot work; the freshness half closes as superseded by #2838 |
+| site #2838 | `dc_source_freshness` reader, three separate dates, popup line | retain |
+| site #2844 / ingest #1109 | this plan and the CLAUDE.md rule | plan-only; keep separate from deployable PRs |
+
+#2832 and #2838 edit the same files (`homesignalmap.html`, `lib/dc-freshness.js`), so only one can merge.
+Note for approval: with #1108 merged, the Atlas workflow shows red every day while the 404 lasts.
+
+### Acceptance tests (revised; all on disposable databases, each shown failing on today's code where a gap exists)
+1. Two identical files → one edition, zero changes.
+2. Same records, reordered or reformatted → one content fingerprint, zero substantive changes; both
+   files' sha256 kept.
+3. Only `lastUpdated` / `retrievedAt` differ → timestamp-only change, zero substantive; values retained.
+4. A failed or partial run → zero changes, zero absences, displayed set unchanged.
+5. A record missing from a newer edition → "absent from edition", not closed; still displayed with its label.
+6. A newer edition stating `cancelled` → displayed status changes; the prior status stays in history.
+7. A field present before and absent now → prior value displayed with its edition; never null or zero.
+8. An incoming null, blank or "unknown" from another source → never replaces an Atlas value; never stored as 0.
+9. A verified primary-source value → displayed under the field rule; the Atlas value stays as a superseded
+   assertion with its evidence and the recorded reason.
+10. Two disagreeing sources → both stored; the choice and its reason recorded.
+11. One field updated → other fields keep their Atlas edition date; no record-level "verified" date.
+12. A re-run that changes a match or location → the prior decision is readable in history.
+13. An event with no explicit date → event time unknown, never the edition or acquisition time.
+14. An application or permit record → displayed as an application or a permit, never as approved,
+    built or operating.
 
 ## 5. Not authorized by this plan
 Retiring, hiding or clearing Atlas data; a wholesale replacement; a destructive migration; merging the
