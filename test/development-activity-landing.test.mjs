@@ -81,7 +81,7 @@ const COPY = [
   'Click Type or Stage',
   'What’s changing near your next property?', 'Enter an address or ZIP code to check available development activity.', 'Enter property address or ZIP', 'Check coverage',
   'Pricing', 'Free', '100 Development Activity reports free', 'No credit card required.', 'Start Free',
-  'Professional', 'Individual Agents', 'Paid plans coming soon', 'For agents who need ongoing property intelligence.',
+  'Professional', 'Individual Agents', '$78/month after beta', '100 Development Activity reports per month.', 'Currently free during beta. No payment required.',
   'Brokerage & Enterprise', 'Custom Pricing', 'Tailored reporting for teams, brokerages, and enterprise organizations.', 'Request a Quote',
   'Brokerage or enterprise? Contact us'
 ];
@@ -139,7 +139,10 @@ const REMOVED = [
   ['an invented replacement price, crossed-out price, or urgency', /\$129|normally \$|<s>|<del>|limited time|only \d+ (spots|left)|ends (soon|today)/i]
 ];
 REMOVED.forEach(([label, re]) => ok(!re.test(text), 'the page does not bring back ' + label, (text.match(re) || [])[0]));
-ok((text.match(/\$\d+/g) || []).length === 0, 'FREE-ONLY (founder, 2026-10-15): no price appears anywhere on the page until a payment processor is connected', text.match(/\$\d+/g));
+// Founder, 2026-11-12: the Professional card shows its PLANNED price, "$78/month after beta", and says the beta is free. It supersedes
+// FREE-ONLY (2026-10-15). The one price on the page must read as after-beta, and nothing may make it chargeable today.
+ok(JSON.stringify(text.match(/\$\d+[^\s]*( \w+){0,2}/g) || []) === JSON.stringify(['$78/month after beta']) && text.includes('Currently free during beta. No payment required.'),
+  'the only price on the page is the planned "$78/month after beta", beside "Currently free during beta. No payment required." (founder, 2026-11-12)', text.match(/\$\d+[^\s]*( \w+){0,2}/g));
 ok(!/Walk into the conversation|Show them the record|Clear enough for your client|before your client asks/i.test(text), 'founder, 2026-10-18: the use-case, trust and closing sections are gone');
 ok(['Free', 'Professional', 'Brokerage &amp; Enterprise'].every((b) => new RegExp('<p class="da-plan-name">' + b + '</p>').test(markup)), 'the pricing hierarchy is Free / Professional / Brokerage / Enterprise');
 const coverageAt = at(/id="coverage"/), pricingAt = at(/id="pricing"/);
@@ -170,8 +173,10 @@ ok(cta.length === 2 && cta.every((c) => c.cta === 'start-free'),
   'the hero and pricing "Start free — 100 reports" buttons are present (Join for $79/month is a link now, checked below)', cta.map((c) => c.cta));
 // Founder, 2026-10-15: FREE-ONLY. The "Join for $79/month" link is gone with the price; no page link goes to a Billing card or a checkout.
 const joins = [...markup.matchAll(/<a\b[^>]*data-cta="join"[^>]*>([^<]*)<\/a>/g)];
-ok(joins.length === 0 && !/Join for|Cancel anytime|\/month/.test(text), 'there is no Join link, no price, no "/month" and no "Cancel anytime" on the landing page (free-only)', joins.map((j) => j[0]));
-ok(/Paid plans (are )?(coming|on the way)/i.test(text), 'the page says paid plans are coming');
+ok(joins.length === 0 && !/Join for|Cancel anytime|Subscribe|Buy now|Pay now|credit card information|card details/i.test(text) && (text.match(/\/month/g) || []).length === 1,
+  'there is no Join link, no subscribe/pay action and no "Cancel anytime"; "/month" appears once, in the planned after-beta price (founder, 2026-11-12)', joins.map((j) => j[0]));
+ok(/\$78\/month after beta/.test(text) && /Currently free during beta\. No payment required\./.test(text) && !/launch(es|ing)? (on|in) |starting (on )?\w+ \d|from (january|february|march|april|may|june|july|august|september|october|november|december)/i.test(text),
+  'the price is stated as after beta with no launch date, and the beta is stated as free');
 ok(cta.every((c) => /aria-disabled="true"/.test(c.tag) && !/\shref=|onclick=|type="submit"/.test(c.tag)),
   'each commerce button is inert (aria-disabled, no href, no handler): the 10-report entitlement and the $79 checkout do not exist yet', cta.map((c) => c.tag));
 const scriptCode = (noComments.match(/<script>[\s\S]*?<\/script>/g) || []).join('\n').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
