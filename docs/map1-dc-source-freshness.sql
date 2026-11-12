@@ -1,0 +1,76 @@
+-- map1_dc_source_freshness: when each data-centre source was last refreshed, and when we last tried.
+--
+-- Founder, 2026-11-12: "Show the data-centre layer's last successful refresh date and its age.
+-- Clearly distinguish that from when our workflow last attempted a fetch. Do not imply that each
+-- facility was individually verified on the refresh date."
+--
+-- WHY: Compute Atlas moved its bulk files behind a subscription on 2026-11-07. Every daily read
+-- since then is FETCH_FAILED (HTTP 404). Map 1 keeps serving the newest complete read (release
+-- 1.35.1, read 2026-11-06 09:45 UTC), which is correct, but nothing on the page said how old it was.
+--
+-- ONE RULE FOR "LAST SUCCESSFUL REFRESH": the same one dc_current_observation uses to choose the
+-- records Map 1 shows (newest run per source with completeness_state SUCCESS_COMPLETE and
+-- advanced_observations). So the date shown is the date of the records shown, by construction.
+--
+-- What this returns, per ACTIVE dc_source:
+--   last_success_at        when the run that supplied the records on the map completed
+--   last_success_release   the publisher's own release key for that read (e.g. 1.35.1)
+--   publisher_edition_at   the publisher's own as-of date for that edition, else the newest
+--                          record date in it. Never ours.
+--   last_attempt_at        when our newest read of this source started, whatever its outcome
+--   last_attempt_refreshed true only when that newest read is the successful one above
+--   as_of                  the database clock, so the page computes ages from one clock
+--   scheduled              false for the OpenStreetMap rows, which were loaded ONCE into
+--                          national_dc_records (2026-09-15) and have no recurring read; their
+--                          last_success_at is that load and last_attempt_at is null.
+-- It returns no failure detail, URL, error text or artifact reference.
+--
+-- STATUS: NOT APPLIED. The page (homesignalmap.html) calls it and renders nothing when it is
+-- absent, so either order is safe. Apply only with the founder's go.
+
+create or replace function public.map1_dc_source_freshness()
+returns table(source_key text, publisher text, dataset_name text, licence text,
+              last_success_at timestamptz, last_success_release text,
+              publisher_edition_at timestamptz, last_attempt_at timestamptz,
+              last_attempt_refreshed boolean, scheduled boolean, as_of timestamptz)
+language sql
+stable
+security definer
+set search_path to 'public', 'pg_temp'
+as $function$
+  with ok as (
+    select distinct on (a.source_key) a.source_key, a.id, a.completed_at, a.source_release_key,
+           coalesce(a.source_declared_freshness, a.observed_freshness) as edition
+      from public.dc_acquisition_run a
+     where a.completeness_state = 'SUCCESS_COMPLETE' and a.advanced_observations
+     order by a.source_key, a.run_seq desc
+  ), last as (
+    select distinct on (a.source_key) a.source_key, a.id, a.started_at
+      from public.dc_acquisition_run a
+     order by a.source_key, a.run_seq desc
+  ), rows as (
+  select s.source_key, s.publisher, s.dataset_name, s.licence,
+         ok.completed_at, ok.source_release_key, ok.edition,
+         last.started_at, (last.id is not distinct from ok.id) and ok.id is not null,
+         true, now()
+    from public.dc_source s
+    left join ok on ok.source_key = s.source_key
+    left join last on last.source_key = s.source_key
+   where s.active_state = 'ACTIVE'
+  union all
+  -- The OpenStreetMap compatibility layer: a one-time load, named as such (source_name
+  -- 'OpenStreetMap' on map1_dc_zip_members rows).
+  select 'openstreetmap', 'OpenStreetMap', 'OpenStreetMap data centres (one-time load)',
+         'ODbL', max(n.imported_at), null, null, null, null, false, now()
+    from public.national_dc_records n
+  having count(*) > 0
+  )
+  select * from rows order by source_key collate "C";
+$function$;
+
+comment on function public.map1_dc_source_freshness() is
+  'Per active data-centre source: last successful refresh (the run whose records Map 1 shows), '
+  'the publisher''s edition date, and our last attempt. docs/map1-dc-source-freshness.sql.';
+
+revoke all on function public.map1_dc_source_freshness() from public;
+grant execute on function public.map1_dc_source_freshness() to anon, authenticated, service_role;
