@@ -24,9 +24,9 @@
      HS.zipAuthOutcome, and this page renders HS.zipAuthUnmeasuredFact instead of a
      verified-absence claim. Fails CLOSED if absent (outcome 'unavailable', no claim). -->
 <script src="lib/zip-authoritative.js?v=20261029a"></script>
-<script src="lib/data.js?v=65b0cd6d"></script>
+<script src="lib/data.js?v=2ceef7e0"></script>
 <script src="lib/topic-prefs.js?v=fe87d99b"></script>
-<script src="lib/templates.js?v=6bbb33ed"></script>
+<script src="lib/templates.js?v=0418fd07"></script>
 <script src="lib/project-type.js?v=ed9e58be"></script>
 <script src="lib/coverage-copy.js"></script>
 <script src="lib/impact.js"></script>
@@ -56,7 +56,9 @@ HS.onReady(async function () {
   var community = null, projects = [], facilities = [];
   try {
     community = await HS.data.community(S.zip);
-    projects = await HS.data.projects(S.zip, home);        // DEVELOPMENT only (permits / planning)
+    // DEVELOPMENT only, and the SAME set Map 1 draws: official records plus national
+    // data-centre listings, each labelled third-party (lib/data.js zipDevelopment, 2026-11-12).
+    projects = await (HS.data.zipDevelopment && S.zip ? HS.data.zipDevelopment(S.zip, home) : HS.data.projects(S.zip, home));
     facilities = await HS.data.facilities(S.zip, home);    // EPA/ECHO regulated facilities — env context, own section
   } catch (e) {
     console.warn('[development] data load failed', e);
@@ -234,8 +236,12 @@ HS.onReady(async function () {
     }
     function dataTable(a){
       return '<table class="data-table"><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Stage</th>' + (zipPlace ? '' : '<th>Distance</th>') + '<th>' + HS.tpl.qolImpactScoreBrand + '</th></tr></thead><tbody>'
-        + a.map(function(p){ return '<tr onclick="location.href=\'development.html?id=' + p.id + '\'" onkeydown="if(event.key===\'Enter\')location.href=\'development.html?id=' + p.id + '\'" tabindex="0" style="cursor:pointer">'
-          + '<td><b>' + HS.esc(p.name) + '</b></td><td>' + HS.esc(p.type) + '</td><td>' + HS.esc(p.status) + '</td>'
+        + a.map(function(p){
+          // A third-party listing has no dossier here; its row opens the source's own page.
+          var tp = HS.tpl.isThirdPartyListing && HS.tpl.isThirdPartyListing(p);
+          var go = tp ? (HS.tpl.recordHref(p) ? 'window.open(' + JSON.stringify(HS.tpl.recordHref(p)).replace(/"/g, '&quot;') + ',\'_blank\',\'noopener\')' : '') : 'location.href=\'development.html?id=' + encodeURIComponent(p.id) + '\'';
+          return '<tr' + (go ? ' onclick="' + go + '" onkeydown="if(event.key===\'Enter\')' + go + '" tabindex="0" style="cursor:pointer"' : '') + '>'
+          + '<td><b>' + HS.esc(p.name) + '</b></td><td>' + HS.esc(p.type) + '</td><td>' + HS.esc(HS.tpl.browsingStatusLabel(p)) + '</td>'
           + '<td>' + HS.esc(p.stage||'') + '</td>' + (zipPlace ? '' : '<td>' + HS.esc(p.dist||'') + '</td>') + '<td>' + HS.esc((HS.impactScoreValue && HS.impactScoreValue(p.impact_score)) || '') + '</td></tr>'; }).join('')
         + '</tbody></table>';
     }
@@ -251,6 +257,13 @@ HS.onReady(async function () {
   }
   async function renderDetail(pid) {
     var p = projects.find(function(x){return String(x.id)===String(pid);});
+    // A third-party listing has no dossier (its fields are its publisher's, not an official
+    // record's): show its card, which names the source and links to it, and nothing more.
+    if (p && HS.tpl.isThirdPartyListing && HS.tpl.isThirdPartyListing(p)) {
+      page.innerHTML = '<button class="backbtn" onclick="location.href=\'development.html\'">← Back to development</button>'
+        + '<div class="devgrid">' + HS.tpl.devCard(p) + '</div>';
+      return;
+    }
     // Facilities share this route/page but branch to their own dossier template —
     // a regulated facility is an EXISTING CONDITION, not development activity, so the
     // header/labels read "Regulated facility" throughout (spec §7).

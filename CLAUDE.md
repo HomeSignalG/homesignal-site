@@ -6942,3 +6942,25 @@ target / file wins; null = the generated line).
   video's only horizontal ones, and `hs_video_ending_choose` refuses the other kind. The browser reads the file's width and
   height and refuses a clip on the wrong button before uploading. A recording with no shape (none exist) fits either.
 - Tests: `test/video_endings_pg` (`video-endings-suite.yml`, 31 checks), `test/video-endings.browser.test.mjs`.
+
+## THE ZIP DEVELOPMENT LISTS HOLD WHAT MAP 1 DRAWS; OFFICIAL PORTALS ARE RECORDED (2026-11-12)
+
+Map 1 in ZIP mode draws app_projects members AND the national data-centre plane (`map1_dc_zip_members`). The ZIP
+page (`lib/community-page.js`) and `development.html` listed only app_projects, so a data centre drawn as Proposed
+was missing from both lists and from the Development tile (Behring 415 20th Street, 94612, canonical entity
+`e59b8d43…`, Compute Atlas). `lib/data.js` `nationalDataCenters()` had been written for this and had no caller.
+- **One combiner, `HS.data.zipDevelopment(zip, home)`**, read by both list pages: authoritative rows + the server's
+  `member` rows, nothing merged across planes (0 app_projects rows carry a `dc:` key, measured 2026-11-12). The
+  geography verdict (`complete`/`outcome`) stays the authoritative read's, so no absence sentence is unlocked by
+  national rows; a failed national read is `national.complete === false`, never "none". Dashboard, property and
+  index pages still read `projects()` only (not changed here).
+- **A national row is a third-party listing, stamped on the row** (`provenance_kind`, `provenance_source`). Cards say
+  "<Status> · third-party listing", credit the source and licence, say it is not an official application, approval
+  or permit, and open the source's own page (`HS.tpl.isThirdPartyListing`, `thirdPartyListingNote`, `devCard`).
+  A listing has no dossier on development.html.
+- **`data/official-record-portals.json`**: official planning/permit systems per jurisdiction, with discovery,
+  record and document coverage kept separate and every check dated. A missing open-data dataset is not a missing
+  record system. First entry: Oakland's Accela portal (anonymous search verified; record detail is a postback, so
+  no stable record links; no record matched to the Behring project). Nothing reads it at runtime yet.
+- Audit: `scripts/audits/map-list-parity.sql`. Tests: `test/zip-development-map-parity.test.mjs`,
+  `test/zip-development-list.browser.test.mjs`.
