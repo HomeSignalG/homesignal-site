@@ -80,8 +80,9 @@ const COPY = [
   'Start free — 100 reports', 'View a sample report →',
   'Click Type or Stage',
   'What’s changing near your next property?', 'Enter an address or ZIP code to check available development activity.', 'Enter property address or ZIP', 'Check coverage',
-  'Pricing', 'Free', '100 Development Activity reports free', 'No credit card required.', 'Start Free',
-  'Professional', 'Individual Agents', 'Paid plans coming soon', 'For agents who need ongoing property intelligence.',
+  'Pricing', 'Free during beta', '100 Development Activity reports free', 'No credit card required.', 'Start Free',
+  'Professional', 'Individual Agents', 'Paid plans coming after beta', 'For agents who need ongoing property intelligence.',
+  'We’ll notify you before beta ends. You won’t be charged unless you choose a paid plan.',
   'Brokerage & Enterprise', 'Custom Pricing', 'Tailored reporting for teams, brokerages, and enterprise organizations.', 'Request a Quote',
   'Brokerage or enterprise? Contact us'
 ];
@@ -139,9 +140,11 @@ const REMOVED = [
   ['an invented replacement price, crossed-out price, or urgency', /\$129|normally \$|<s>|<del>|limited time|only \d+ (spots|left)|ends (soon|today)/i]
 ];
 REMOVED.forEach(([label, re]) => ok(!re.test(text), 'the page does not bring back ' + label, (text.match(re) || [])[0]));
-ok((text.match(/\$\d+/g) || []).length === 0, 'FREE-ONLY (founder, 2026-10-15): no price appears anywhere on the page until a payment processor is connected', text.match(/\$\d+/g));
+// Founder, 2026-11-12 (second instruction, which replaced the same day's planned-price card): free access is a temporary BETA offer and
+// NO individual subscription price is shown, not even a planned one.
+ok((text.match(/\$\d+/g) || []).length === 0, 'no price appears anywhere on the page (founder, 2026-11-12: no $78 or any other individual subscription price)', text.match(/\$\d+/g));
 ok(!/Walk into the conversation|Show them the record|Clear enough for your client|before your client asks/i.test(text), 'founder, 2026-10-18: the use-case, trust and closing sections are gone');
-ok(['Free', 'Professional', 'Brokerage &amp; Enterprise'].every((b) => new RegExp('<p class="da-plan-name">' + b + '</p>').test(markup)), 'the pricing hierarchy is Free / Professional / Brokerage / Enterprise');
+ok(['Free during beta', 'Professional', 'Brokerage &amp; Enterprise'].every((b) => new RegExp('<p class="da-plan-name">' + b + '</p>').test(markup)), 'the pricing hierarchy is Free / Professional / Brokerage / Enterprise');
 const coverageAt = at(/id="coverage"/), pricingAt = at(/id="pricing"/);
 ok((markup.slice(coverageAt).match(/id="daCoverBtn"/g) || []).length === 1 && (markup.match(/id="daCoverBtn"/g) || []).length === 1, 'the coverage checker exists once, inside the coverage section');
 ok(!/href="#coverage"/.test(markup), 'nothing links to the coverage section from the hero or the close: it is an availability utility, not a call to action');
@@ -170,8 +173,13 @@ ok(cta.length === 2 && cta.every((c) => c.cta === 'start-free'),
   'the hero and pricing "Start free — 100 reports" buttons are present (Join for $79/month is a link now, checked below)', cta.map((c) => c.cta));
 // Founder, 2026-10-15: FREE-ONLY. The "Join for $79/month" link is gone with the price; no page link goes to a Billing card or a checkout.
 const joins = [...markup.matchAll(/<a\b[^>]*data-cta="join"[^>]*>([^<]*)<\/a>/g)];
-ok(joins.length === 0 && !/Join for|Cancel anytime|\/month/.test(text), 'there is no Join link, no price, no "/month" and no "Cancel anytime" on the landing page (free-only)', joins.map((j) => j[0]));
-ok(/Paid plans (are )?(coming|on the way)/i.test(text), 'the page says paid plans are coming');
+ok(joins.length === 0 && !/Join for|Cancel anytime|Subscribe|Buy now|Pay now|\/month|per month|credit card information|card details/i.test(text),
+  'there is no Join link, no subscribe/pay action, no "/month" and no "Cancel anytime" on the landing page', joins.map((j) => j[0]));
+const betaNote = (markup.match(/<p class="da-beta-note">([^<]*)<\/p>/) || [])[1] || '';
+ok(/Paid plans coming after beta/.test(text) && betaNote === 'We’ll notify you before beta ends. You won’t be charged unless you choose a paid plan.' && at(/class="da-beta-note"/) > at(/class="da-plans"/) && at(/class="da-beta-note"/) < at(/id="sample"/),
+  'free is labelled a beta offer, paid plans are "coming after beta", and the notice-and-no-charge note sits beneath the pricing cards');
+ok(!/beta (ends|closes|ending) (on|in|by) |until (january|february|march|april|may|june|july|august|september|october|november|december)|\b20\d\d\b[^<]{0,40}beta|beta[^<]{0,40}\b20\d\d\b|(january|february|march|april|may|june|july|august|september|october|november|december) \d{1,2}/i.test(text),
+  'no beta end date or launch date is named');
 ok(cta.every((c) => /aria-disabled="true"/.test(c.tag) && !/\shref=|onclick=|type="submit"/.test(c.tag)),
   'each commerce button is inert (aria-disabled, no href, no handler): the 10-report entitlement and the $79 checkout do not exist yet', cta.map((c) => c.tag));
 const scriptCode = (noComments.match(/<script>[\s\S]*?<\/script>/g) || []).join('\n').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
