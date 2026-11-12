@@ -176,6 +176,18 @@ const sitesNow = await page.evaluate(() => window.__HS_SITES.length);
 ok(sitesNow === before.sites && !(await page.evaluate(() => window.__HS_SITES.some((s) => /herndon campus/i.test(String(s.label || s.name || ''))))),
   '1g: the point is not added to the records the page counts', JSON.stringify({ before, sitesNow }));
 
+// 1h. a point outside the records' frame is brought into view (it was drawn off-screen before)
+MAP_INDEX = { schema: 'development-map-index/1', zips: { '20171': [Object.assign({}, PT, { lat: 39.0600, lng: -77.2000 })] } };
+await load('/homesignalmap.html?zip=20171');
+const inView = await page.evaluate(() => {
+  const p = document.querySelector('#map .rv-pin'), m = document.querySelector('#map');
+  if (!p || !m) return null;
+  const r = p.getBoundingClientRect(), b = m.getBoundingClientRect();
+  return { inside: r.left >= b.left && r.right <= b.right && r.top >= b.top && r.bottom <= b.bottom, r: [r.left, r.top], b: [b.left, b.top, b.width, b.height] };
+});
+ok(inView && inView.inside, '1h: a point outside the records\' frame is brought into the visible map', JSON.stringify(inView));
+MAP_INDEX = { schema: 'development-map-index/1', zips: { '20171': [PT] } };
+
 // 2. another ZIP: no marker
 await load('/homesignalmap.html?zip=99999');
 ok(await pins() === 0, '2: a ZIP the index does not name draws no marker');

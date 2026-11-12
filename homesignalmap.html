@@ -5437,8 +5437,9 @@ HS.onReady(function(){
   function drawReviewedProjects(){
     if(reviewedLayer && map){ map.removeLayer(reviewedLayer); }
     reviewedLayer = null;
-    if(!REVIEWED_POINTS.length) return;
-    if(!map){ ensureParcelMap(REVIEWED_POINTS[0].lat, REVIEWED_POINTS[0].lng); }
+    // Drawn on the map render() builds (render() calls this again at its end), never on a map made here:
+    // a map created before its container is shown has no size, and every position on it is wrong.
+    if(!REVIEWED_POINTS.length || !map) return;
     reviewedLayer = L.layerGroup().addTo(map);
     REVIEWED_POINTS.forEach(function(e){
       var icon = L.divIcon({ className:"", iconSize:[22,22], iconAnchor:[11,11], popupAnchor:[0,-12],
@@ -5450,6 +5451,19 @@ HS.onReady(function(){
       m.bindPopup(reviewedPopupHTML(e));
       m.addTo(reviewedLayer);
     });
+    // A reviewed point outside the framed view would be drawn and never seen: widen the view to hold it.
+    try{
+      var sz = map.getSize();
+      if(!sz || sz.x <= 0 || sz.y <= 0) return;
+      var vb = map.getBounds();
+      if(vb && vb.isValid()){
+        var add = REVIEWED_POINTS.filter(function(e){ return !vb.contains([e.lat, e.lng]); });
+        if(add.length){
+          add.forEach(function(e){ vb.extend([e.lat, e.lng]); });
+          map.fitBounds(vb, { padding:[30,30], animate:false });
+        }
+      }
+    }catch(err){}
   }
   function loadReviewedProjects(zip){
     REVIEWED_ZIP = zip; REVIEWED_POINTS = []; drawReviewedProjects();
