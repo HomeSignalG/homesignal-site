@@ -6937,4 +6937,8 @@ target / file wins; null = the generated line).
   the ending; refused while that file is being built. **Tab 17:** the choice only; the engine reads
   `video_endings_current` (service role only) and the visuals must be prepared again. **Tab 20:** mount with
   `{tab:'weekly', targets}` once the weekly report (PR #2772) renders videos; until then nothing is mounted.
-- Tests: `test/video_endings_pg` (`video-endings-suite.yml`, 24 checks), `test/video-endings.browser.test.mjs`.
+- **Two upload buttons (founder, 2026-11-12: "make the 2 buttons"):** "Upload ending for Shorts (vertical)" and "Upload ending
+  for main videos (horizontal)". `video_endings.shape` records which; a Short's picker lists only vertical recordings, a main
+  video's only horizontal ones, and `hs_video_ending_choose` refuses the other kind. The browser reads the file's width and
+  height and refuses a clip on the wrong button before uploading. A recording with no shape (none exist) fits either.
+- Tests: `test/video_endings_pg` (`video-endings-suite.yml`, 31 checks), `test/video-endings.browser.test.mjs`.
