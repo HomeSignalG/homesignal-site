@@ -3230,6 +3230,25 @@ Receipt: `docs/dc-atlas-phase-a-deploy-receipt-2026-09-25.md`.
   switch on the NEW replica. The earlier "25 removed / 1 added" is stale; today's data has 2,216 Atlas
   records.
 
+## 7.13b MAP 1 SAYS HOW FRESH EACH DATA-CENTRE SOURCE IS (2026-11-12) — PR ONLY, SQL NOT APPLIED
+
+From 2026-11-07 the Compute Atlas file answered 404 and Map 1 kept drawing the 2026-11-06 read with nothing on the page
+saying so. `docs/dc-source-freshness.sql` adds one read-only reader, `public.dc_source_freshness()` (anon may run it;
+it exposes no URL, failure detail or record). `lib/dc-freshness.js` words it. Three dates, never blurred:
+- **Publisher's edition date** (`source_declared_freshness` of our newest complete read; "not stated" when the publisher
+  gives none) · **our last successful read** · **our most recent read attempt and how it ended**.
+- A source with several files is reported at its weakest file.
+- ⛔ The dates are dataset-level. The notice and every popup line say the facility was not individually checked on
+  either date. Do not word any of them as verification.
+- Where: a block above the source box on the full map (only for sources with a record on the page), and one line in each
+  national data-centre pin's popup, which is what the embedded map shows (`.hs-embed #dcFresh` is hidden). Popups are
+  now built when they OPEN (`bindPopup(function…)`), so a pin drawn before the read still gets the line.
+- A missing reader (SQL not applied) or a failed read shows nothing; pins are unchanged. OpenStreetMap has no
+  acquisition row, so it gets no notice.
+- Engine half (a failed read now fails its workflow run): homesignal-ingest CLAUDE.md, same date.
+- Tests: `test/dc-freshness.test.mjs`, `test/map1-dc-freshness.browser.test.mjs`, `test/dc_source_freshness_pg`
+  (`dc-source-freshness-suite.yml`; 13 checks, 10 mutations).
+
 ## 7.14 THE OPENSTREETMAP LAYER IS CHECKED WITH THE SHARED RULES AND NEVER MERGED ⚖️ FOUNDER RULING (2026-09-26 — C3a BUILT, NOT YET APPLIED)
 
 **OpenStreetMap is an approved, active data-centre source and stays a SEPARATE layer** (founder,
