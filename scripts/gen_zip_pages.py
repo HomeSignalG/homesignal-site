@@ -2458,6 +2458,7 @@ def main():
     fc_pages, fc_index = fcp.build(fc_claims, a.out, now_iso[:10], _head, state, base=BASE)
     fc_paths = fc_pages + [fc_index]
     n_land_links = dvp.write_land_index(dossiers, a.out)
+    n_map_points = dvp.write_map_index(dossiers, a.out)
     guide_paths = build_guides(cities, projects, pages, a.out, now_iso[:10], state,
                                areas=load_focus_areas(), indexable=indexable)
     project_lastmod = {pr["path"]: pr["changed_on"] for pr in projects.values()}
@@ -2513,6 +2514,7 @@ def main():
           f"({sum(len(dv.get('withheld') or []) for dv in dossiers.values())} links withheld by the snapshot)")
     print(f"fact-checks    : {len(fc_pages)} claim-check pages + the archive")
     print(f"development    : {n_land_links} land assemblies linked to their page (development/land-index.json)")
+    print(f"development    : {n_map_points} reviewed project point(s) for Map 1 (development/map-index.json)")
     print(f"project pages  : {nproj} ({proj_bytes/1048576:.1f} MB; "
           f"{sum(1 for p in projects.values() if p['held'])} held; {linked} linked from a card; "
           f"{sum(1 for p in projects.values() if not p['tracked'])} no longer tracked; "

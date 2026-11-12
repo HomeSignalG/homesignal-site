@@ -31,7 +31,7 @@ const REPO = process.cwd();
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 const srv = createServer(async (q, s) => {
   const p = normalize(join(REPO, decodeURIComponent(q.url.split('?')[0])));
-  try { s.writeHead(200, { 'Content-Type': MIME[extname(p)] || 'text/plain' }); s.end(await readFile(p)); }
+  try { const body = await readFile(p); s.writeHead(200, { 'Content-Type': MIME[extname(p)] || 'text/plain' }); s.end(body); }
   catch { s.writeHead(404); s.end('nope'); }
 });
 await new Promise(r => srv.listen(8823, '127.0.0.1', r));

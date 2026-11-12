@@ -290,6 +290,8 @@ def zips_of(d):
             z += [x.get("zip") for x in (f.get("zips") or []) if isinstance(x, dict)]
         elif l.get("kind") == "source_record":
             z += list(f.get("zips") or [])
+        elif l.get("kind") == "site_location" and len(f.get("zips") or []) == 1:
+            z += list(f["zips"])        # on a shared ZIP edge it names no ZIP (see map_index)
     seen, out = set(), []
     for x in z:
         if isinstance(x, str) and re.fullmatch(r"\d{5}", x) and x not in seen:
@@ -626,6 +628,23 @@ def _protest_deadlines(d):
     return f'<ul class="dnext">{"".join(lis)}</ul>' if lis else ""
 
 
+def _scheduled_events(d):
+    """Hearings and agenda items a reviewer linked whose own date is on or after the build day, as What's
+    next items, so the page never says no hearing is on record while its timeline lists one. Only the
+    source's date and the reviewer's words are shown: a scheduled hearing is not an outcome. An unknown
+    build day or an undated link counts as not upcoming."""
+    today = str(d.get("_today") or "")
+    if not DAY_RE.match(today):
+        return ""
+    lis = []
+    for l in sorted(_links(d, "government_record"), key=lambda x: str(x.get("date") or "")):
+        dt = str(l.get("date") or "")
+        if l.get("role") in ("hearing", "agenda_item") and DAY_RE.match(dt) and dt >= today:
+            lis.append(f'<li><strong>{esc(day(dt))}</strong>: {esc(prose(l.get("date_label") or "Scheduled"))}.'
+                       f'{(" " + esc(l["text"])) if l.get("text") else ""}{_src(l.get("evidence_url"), l.get("evidence_label"))}</li>')
+    return f'<ul class="dnext">{"".join(lis)}</ul>' if lis else ""
+
+
 def _sentence(text_html, url, label):
     return f'<li>{text_html}{_src(url, label)}</li>'
 
@@ -770,6 +789,17 @@ def render(d, pages, built, head, crumb_place=None):
                             f' · <a href="/community/{esc(z)}/">ZIP {esc(z)} page</a>'
                             f' <span class="small">{esc(x.get("parcels"))} associated parcel'
                             f'{"" if x.get("parcels") == 1 else "s"}</span></li>')
+    # The approximate location: one point a reviewer approved, with the basis written beside it. It is
+    # never drawn as an area, and never called the project's site or boundary.
+    for l in _links(d, "site_location"):
+        f = l.get("facts") or {}
+        zs = [z for z in (f.get("zips") or []) if z in pages]
+        where = (f' on the <a href="/map/{esc(zs[0])}/">ZIP {esc(zs[0])} map</a>' if len(zs) == 1 and len(f.get("zips") or []) == 1
+                 else "")
+        land.append(f'<li>Approximate location{where}: {esc(l.get("text") or "one map point")}.'
+                    f'{(" " + esc(l["evidence_note"])) if l.get("evidence_note") else ""}'
+                    f'{_src(l.get("evidence_url"), l.get("evidence_label"))}'
+                    f' <span class="small">One point, not a surveyed site or a project boundary.</span></li>')
     other = [z for z in zips if not any(f"/map/{z}/" in s for s in land)]
     land += [f'<li><a href="/map/{esc(z)}/">ZIP {esc(z)} ({esc(pages[z]["name"])}) on the map</a>'
              f' · <a href="/community/{esc(z)}/">ZIP {esc(z)} page</a></li>' for z in other]
@@ -861,7 +891,7 @@ def render(d, pages, built, head, crumb_place=None):
     recs = "".join(f'<li><a href="{esc(u)}">{esc(prose(n))}</a></li>' for n, u in (d.get("_records") or []))
     recs = (f'<ul class="plain">{recs}</ul><p class="small">The record pages on this site for the filings linked '
             f'above. Each opens the agency\'s own record.</p>') if recs else ""
-    nxt = _stmt_list(_stmts(d, "next"), "dnext") + _protest_deadlines(d)
+    nxt = _stmt_list(_stmts(d, "next"), "dnext") + _protest_deadlines(d) + _scheduled_events(d)
     timeline = _timeline(d)
     n_events = timeline.count('<li><div class="tdate">')
     n_docs = len(_links(d, *DOC_KINDS))
@@ -975,6 +1005,47 @@ def land_index(dossiers):
                 seen.setdefault(ref, []).append({"path": d["path"], "name": d["display_name"]})
     land = {ref: v[0] for ref, v in sorted(seen.items()) if len(v) == 1}
     return {"schema": LAND_INDEX_SCHEMA, "land": land}
+
+
+MAP_INDEX_SCHEMA = "development-map-index/1"
+MAP_INDEX_PATH = ("development", "map-index.json")
+
+
+def map_index(dossiers):
+    """Which published development page Map 1 shows as a point on which ZIP: {zip: [{path, name, lat, lng, basis}]}.
+
+    Only from a site_location link a reviewer approved (the snapshot carries no other links), and only when
+    the project has exactly one such link and its point falls in exactly one ZIP with a page (the database
+    decides that with Map 1's own boundary predicate). Two locations, or a point on a shared ZIP edge, put
+    the project on no map rather than on a guessed one. A point, never a footprint."""
+    out = {}
+    for key in sorted(dossiers):
+        d = dossiers[key]
+        locs = _links(d, "site_location")
+        if len(locs) != 1:
+            continue
+        f = locs[0].get("facts") or {}
+        zs, lat, lng = f.get("zips") or [], f.get("lat"), f.get("lng")
+        if len(zs) != 1 or not re.fullmatch(r"\d{5}", str(zs[0])):
+            continue
+        if not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in (lat, lng)):
+            continue
+        if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+            continue
+        out.setdefault(zs[0], []).append({"path": d["path"], "name": d["display_name"], "lat": lat, "lng": lng,
+                                          "basis": str(locs[0].get("evidence_note") or "")})
+    return {"schema": MAP_INDEX_SCHEMA, "zips": out}
+
+
+def write_map_index(dossiers, out_dir):
+    """Written beside the dossier pages, only when there are any. Map 1 reads a missing file as no points."""
+    if not dossiers:
+        return 0
+    doc = map_index(dossiers)
+    out = os.path.join(out_dir, *MAP_INDEX_PATH)
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    open(out, "w", encoding="utf-8").write(json.dumps(doc, sort_keys=True, separators=(",", ":")))
+    return sum(len(v) for v in doc["zips"].values())
 
 
 def write_land_index(dossiers, out_dir):
