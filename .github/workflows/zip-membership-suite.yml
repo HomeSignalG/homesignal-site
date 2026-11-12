@@ -18,6 +18,8 @@ on:
       - 'test/zip-membership-canonical.test.mjs'
       - 'docs/map1-dc-publication.sql'
       - 'test/map1_dc_publication_pg/**'
+      - 'docs/map1-project-link.sql'
+      - 'test/map1_project_link_pg/**'
       - 'docs/dc-step3b-canonical-geography.sql'
       - 'test/dc_geography_pg/**'
       - 'docs/dc-step3d-derived-location.sql'
@@ -55,6 +57,8 @@ on:
       - 'test/zip_membership_pg/**'
       - 'docs/map1-dc-publication.sql'
       - 'test/map1_dc_publication_pg/**'
+      - 'docs/map1-project-link.sql'
+      - 'test/map1_project_link_pg/**'
       - 'docs/dc-step3b-canonical-geography.sql'
       - 'test/dc_geography_pg/**'
       - 'docs/dc-step3d-derived-location.sql'
@@ -136,6 +140,16 @@ jobs:
         run: |
           set -o pipefail
           bash test/map1_dc_publication_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/pb.log
+      - name: Map 1 project link and its documents (locate through Map 1's own reader; approved documents only) pass; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: zip_membership_disposable
+        run: |
+          set -o pipefail
+          bash test/map1_project_link_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/pl.log
       - name: Canonical DC geography (identity-first, publisher-stated area points withheld) passes; every prohibited mutation is killed
         env:
           PGHOST: localhost
