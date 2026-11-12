@@ -1048,6 +1048,7 @@
 <script src="lib/residential-qualify.js?v=20260905"></script>
 <script src="lib/n5-radius.js?v=f26fcf4f"></script>
 <script src="lib/zip-authoritative.js?v=20261029a"></script>
+<script src="lib/project-page-link.js?v=20261112a"></script>
 <script src="lib/state-cleanup.js?v=20261022a"></script>
 <script src="lib/water-rights.js?v=add4200a"></script>
 <script src="lib/water-rights-map.js?v=f867f0d7"></script>
@@ -2008,6 +2009,7 @@ HS.onReady(function(){
     // A facility's record_url IS its ECHO report, so for env sites show the shared env links (ECHO +
     // TCEQ); a non-env point (e.g. a TABS permit) keeps its labeled record link.
     var links = hasEnvRecord(s) ? envLinks(s).join("") : (link ? recordLink(s, link) : "");
+    if(window.HS && HS.projectPages) links += HS.projectPages.linkHTML(s);
     return "<button class='cl' id='mk3close' aria-label='Close'>×</button>"+
       "<div class='ci-n'>"+esc(s.label||"")+"</div>"+
       "<div class='ci-t'>"+esc(typeLine)+(dist?" · "+dist:"")+"</div>"+
@@ -2562,6 +2564,14 @@ HS.onReady(function(){
     }, function(){ /* no ZIP page known: no sign-up offered for this address */ });
   }
 
+  // Project pages (lib/project-page-link.js): read this ZIP's published index once; when it
+  // lands after the lists were drawn, fill their link slots. Popups read it when opened.
+  var PP_WIRED = false;
+  function loadProjectPages(zip){
+    if(!(window.HS && HS.projectPages)) return;
+    if(!PP_WIRED){ PP_WIRED = true; HS.projectPages.onLoad(function(){ HS.projectPages.fill(document); }); }
+    HS.projectPages.load(zip);
+  }
   function loadZip(zip){
     ZIP_MODE = true; ZIP_CODE = zip; HOME_ANCHOR = true;
     document.body.classList.remove("addrzip");
@@ -3326,7 +3336,7 @@ HS.onReady(function(){
       var solidPoint = s.scope==="point" && !isApproxPoint(s);
       var size = solidPoint ? 14 : 12;
       var m = L.marker(ll, { icon: siteIcon(mk, size, solidPoint, markerTitle(s, mk)) });
-      m.bindPopup(popupHTML(s));
+      m.bindPopup(function(){ return popupHTML(s); });
       m.on("mouseover", function(){ this.openPopup(); });
       siteMarkers.push({ m:m, bucket:bucketOf(s.type, s), s:s, mk:mk, size:size, solidPoint:solidPoint });
       bounds.push(ll);
@@ -3837,6 +3847,13 @@ HS.onReady(function(){
   function recordKind(s){
     var url = String((s && (s.record_url || s.url)) || "").toLowerCase();
     var src = String((s && s.src) || "").toLowerCase();
+    // A national data-centre listing (Compute Atlas, Epoch, OpenStreetMap) is a third-party
+    // dataset, not a government record: its link is the source that dataset cites (often a
+    // news story) or the OpenStreetMap object itself. Say so; never call it an official record.
+    if(s && s.record_kind === "national_project"){
+      if(/openstreetmap\.org/.test(url)) return "OpenStreetMap entry (third-party)";
+      return "Source cited by " + (s.source_name ? String(s.source_name) : "a third-party dataset") + " (third-party)";
+    }
     // Federal facility registry → EPA ECHO detailed facility report.
     if(/echo\.epa\.gov/.test(url) || /\bepa\s+frs\b/.test(src)) return "EPA facility record";
     // State construction / licensing permit filings (carry a project number; e.g. TX TDLR TABS).
@@ -3863,6 +3880,8 @@ HS.onReady(function(){
     // below), so don't also render a duplicate "EPA facility record" link here; a non-env point
     // (e.g. a TABS permit) keeps its labeled record link.
     var a = (!hasEnvRecord(s) && link) ? " · " + recordLink(s, link) : "";
+    // The record's own project page, when the build published one (lib/project-page-link.js).
+    if(window.HS && HS.projectPages) a += HS.projectPages.linkHTML(s);
     // Prefer the engine-stamped canonical_addr (v17 — the ONE normalizer is engine-side); the
     // filed location_addr is only a fallback for rows cached before v17. Same key + precedence
     // the list view uses (listInto) to route to our internal property page.
@@ -3957,6 +3976,9 @@ HS.onReady(function(){
       // links every fact to its own official record); label it as such, not "record ▸".
       if(pkey){ a = " · <a href='"+esc(propertyHref(pkey))+"'>Address page →</a>"; }
       else if(link){ a = " · " + recordLink(s, link); }
+      // The record's own project page, when the build published one; a slot filled later
+      // when the ZIP's index lands after this list was drawn (lib/project-page-link.js).
+      if(window.HS && HS.projectPages) a += HS.projectPages.slotHTML(s);
       // Environmental record (shared helper): the headline signal, colored by severity, with the
       // official ECHO/TCEQ links. Only an alert/watch signal is worth a list flag — a clean
       // "no recorded violations" stays quiet in the compact list.
@@ -4674,6 +4696,7 @@ HS.onReady(function(){
       var approxPt=isApproxPoint(s);
       var el=glMarkerEl(s, approxPt);
       var popup=new maplibregl.Popup({offset:12,maxWidth:"260px"}).setHTML(popupHTML(s));
+      popup.on("open", function(){ popup.setHTML(popupHTML(s)); });
       var marker=new maplibregl.Marker({element:el}).setLngLat([ll[1],ll[0]]).setPopup(popup).addTo(GL.map);
       el.addEventListener("mouseenter",function(){ if(GL.cur&&GL.cur!==popup)GL.cur.remove(); if(!popup.isOpen())marker.togglePopup(); GL.cur=popup; });
       GL.markers.push({marker:marker,bucket:bkt});
@@ -4751,7 +4774,7 @@ HS.onReady(function(){
       var mk=L.marker([ll[0], ll[1]], {
         icon:L.divIcon({ html:el.outerHTML, className:"", iconSize:[size,size], iconAnchor:[size/2, size/2] })
       });
-      mk.bindPopup(popupHTML(s), { maxWidth:260 });
+      mk.bindPopup(function(){ return popupHTML(s); }, { maxWidth:260 });
       mk.addTo(GL.rasterLayer);
     });
   }
@@ -5700,6 +5723,7 @@ HS.onReady(function(){
   // The outline is keyed to its ZIP, so a late answer for a ZIP the page has left is dropped.
   function paintZipBoundary(zip){
     BOUNDARY_ZIP = (zip && /^\d{5}$/.test(String(zip))) ? String(zip) : null;
+    if(BOUNDARY_ZIP) loadProjectPages(BOUNDARY_ZIP);       // which records here have a project page
     ZIP_BOUNDARY = null;
     drawZipBoundary();                                     // clear any previous ZIP's line
     if(!window.HS || !HS.sb || !HS.boundaryFC) return;
