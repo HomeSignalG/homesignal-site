@@ -20,4 +20,5 @@ $P -f "$Q/production-decide.sql" >/dev/null
 $P -f "$ROOT/docs/youtube-video-file-decide-queue-apply.sql" >/dev/null
 $P -f "$ROOT/docs/youtube-channel-sync.sql" >/dev/null
 $P -f "$ROOT/docs/youtube-channel-sync.sql" >/dev/null    # applying twice is safe
+$P -f "$ROOT/docs/video-bluesky-thumbnail.sql" >/dev/null
 $P -f "$HERE/suite.sql"

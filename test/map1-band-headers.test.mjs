@@ -5,7 +5,8 @@ import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 const page = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
 assert.match(page, /\.band-h\{[^}]*color:#fff/, 'band headers are white text (premise of this test)');
-const heads = [...page.matchAll(/<div class="(band-h[^"]*)">([^<]*)<\/div>/g)];
+// Other attributes may follow the class (the first band's heading carries id="builtHead", set at run time).
+const heads = [...page.matchAll(/<div class="(band-h[^"]*)"[^>]*>([^<]*)<\/div>/g)];
 assert.ok(heads.length >= 6, `expected the six list bands, found ${heads.length}`);
 for (const [, cls, label] of heads) {
   const t = cls.split(/\s+/).find(c => c.startsWith('t-'));

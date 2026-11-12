@@ -71,6 +71,7 @@ export const PERMIT_TRACKING_ON = new Set([
 
 const ECHO_RESTORE_FIELDS = [
   "in_violation",
+  "no_violation",
   "snc",
   "quarters_nc",
   "inspections",
@@ -107,7 +108,17 @@ export function interpretEcho(row: Record<string, string>): Record<string, unkno
       inViolation.push(code);
     }
   }
-  const epa: Record<string, unknown> = { in_violation: inViolation };
+  // Statutes ECHO itself reports as "No Violation Identified" for THIS facility (2026-11-09). This is
+  // the only evidence a "no recorded violations" sentence may rest on: a statute with no status, "Not
+  // Applicable", "Terminated Permit" or anything else is not a clean record, and neither is a facility
+  // this lookup did not return (no env.epa, or only CWA permit fields). Values read live from
+  // echo_rest_services.get_qid, 2026-11-09: "No Violation Identified", "Terminated Permit",
+  // "Not Applicable", or empty.
+  const noViolation: string[] = [];
+  for (const [code, field] of ECHO_STATUTES) {
+    if (/^\s*no violation identified\s*$/i.test(String(row[field] ?? ""))) noViolation.push(code);
+  }
+  const epa: Record<string, unknown> = { in_violation: inViolation, no_violation: noViolation };
   if (row.FacSNCFlg === "Y") epa.snc = true;
   const qtrs = parseInt(row.FacQtrsWithNC ?? "", 10);
   if (Number.isFinite(qtrs) && qtrs > 0) epa.quarters_nc = qtrs;

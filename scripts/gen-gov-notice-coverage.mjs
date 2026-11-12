@@ -89,7 +89,9 @@ const zips = [...configured].sort();
 // The control: a generator that silently produced an empty or a total set would look
 // exactly like a working one. Refuse both.
 // 12,722 until the founder's 2026-10-26 Alaska expansion (docs/alaska-zip-expansion-2026-10-26.sql).
-if (canonical.size !== 12744) throw new Error(`canonical ZIP count is ${canonical.size}, expected 12744`);
+// Since 2026-11-11 Tab 14 requests add ZIP pages automatically, so the floor is 12,745, not an exact count
+// (scripts/verify-zip-universe.mjs checks the exact set against the build queue).
+if (canonical.size < 12745) throw new Error(`canonical ZIP count is ${canonical.size}, expected at least 12745`);
 if (zips.length === 0 || zips.length === canonical.size) throw new Error(`implausible configured count ${zips.length}`);
 for (const z of zips) if (!canonical.has(z)) throw new Error(`configured ZIP ${z} is not canonical`);
 

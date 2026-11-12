@@ -86,7 +86,7 @@ ok(/shouldCreateUser:\s*true/.test(code) && !/shouldCreateUser:\s*false/.test(co
 
 // ---- 3. two functions, no decisions -----------------------------------------------------------------------------------------------------------
 const urls = [...new Set([...code.matchAll(/https:\/\/[^'"\s)]+/g)].map((m) => m[0]))];
-ok(JSON.stringify(urls) === JSON.stringify(['https://qwnnmljucajnexpxdgxr.supabase.co', 'https://wa.me/?text='])
+ok(JSON.stringify(urls) === JSON.stringify(['https://qwnnmljucajnexpxdgxr.supabase.co'])
    && /var REPORT_FN = SB_URL \+ '\/functions\/v1\/get-development-activity-report';/.test(code) && /var TRIAL_FN = SB_URL \+ '\/functions\/v1\/development-activity-trial';/.test(code)
    && /var SHARE_FN = SB_URL \+ '\/functions\/v1\/manage-shared-report';/.test(code) && /var WATCH_FN = SB_URL \+ '\/functions\/v1\/manage-property-watch';/.test(code)
    && /var BILLING_FN = SB_URL \+ '\/functions\/v1\/manage-billing';/.test(code)
@@ -243,12 +243,10 @@ ok(css.search(/(^|\})\s*\[hidden\]\{display:none!important\}/) < css.search(/(^|
 // ---- the report's own "Share report" popup (follow-up to build step 8, founder 2026-10-04) -----------------------------------------------------
 // The popup decides nothing: the link is made by the share function through makeShare, and the popup only hands that one validated link to the person's own apps.
 const popMarkup = (page.match(/<div id="share-pop"[\s\S]*?<\/main>/) || [''])[0];
-ok(/<div id="share-pop" role="dialog" aria-modal="true" aria-labelledby="share-pop-title" hidden>/.test(popMarkup) && (popMarkup.match(/<a class="go ghost"/g) || []).length === 3
-   && !/facebook|twitter|reddit|linkedin|bsky|nextdoor|telegram/i.test(popMarkup + code.slice(code.indexOf('function fillSharePop'), code.indexOf('function copyPop'))),
-  '9k the popup is a hidden, labelled modal dialog with exactly three link targets (text, email, WhatsApp) and no public network anywhere in it');
-const wa = (code.match(/https:\/\/wa\.me\/\?text=/g) || []);
-ok(wa.length === 1 && /\$\('share-pop-wa'\)\.href = 'https:\/\/wa\.me\/\?text=' \+ t;/.test(code) && !/fetch\([^)]*wa\.me|post\([^)]*wa\.me/.test(code),
-  '9l the only non-project URL is the WhatsApp link, written once onto the popup\'s own anchor (a link the person follows, never a request the page makes)');
+ok(/<div id="share-pop" role="dialog" aria-modal="true" aria-labelledby="share-pop-title" hidden>/.test(popMarkup) && /<div class="sharegrid" id="share-pop-grid">/.test(popMarkup)
+   && /<script src="lib\/share-modal\.js\?v=[0-9a-f]{8}"><\/script>/.test(page) && /window\.HS\.fillShareGridEl\(\$\('share-pop-grid'\), link, /.test(code) && !/navigator\.share/.test(code),
+  '9k the popup is a hidden, labelled modal dialog whose share icons are the site\'s own grid (lib/share-modal.js, founder 2026-11-09), not the device share sheet');
+ok(!/wa\.me|facebook\.com|twitter\.com/.test(code), '9l the page writes no share URL of its own: every target comes from lib/share-modal.js');
 ok(/else if \(act === 'share'\) shareFromReport\(b\);/.test(code) && !/\$\('share'\)\.scrollIntoView/.test(code) && /var made = await makeShare\(\);/.test(code),
   '9m the report\'s Share button runs shareFromReport, which makes the link through makeShare (the old scroll-to-the-card is gone)');
 ok(/if \(!shareFor \|\| !session \|\| !session\.user\) \{[\s\S]*?was not saved, so it can't be shared with a client/.test(code) && (code.match(/live: [a-zA-Z]+ \? \['share', 'watch', 'pdf', 'compare'\] : \['share', 'pdf'\], hide: COMPARE_AT_LAUNCH \? \[\] : \['compare'\]/g) || []).length === 2,

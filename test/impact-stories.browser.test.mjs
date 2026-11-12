@@ -66,7 +66,7 @@ await page.evaluate(() => {
         version: { version: window.db.version, body: Object.assign(JSON.parse(JSON.stringify(body)), (window.db.extra || {}).body || {}), checked: true, derived,
           validation: { arc: { fear: { ok: true, blocking: [], warnings: [] }, anger: { ok: true, blocking: [] }, motivation: { ok: false, blocking: ['MOTIVATION: none of its counterevidence (cost_none) is spoken.'] } },
             outline: { ok: true, blocking: [] }, short_a: { ok: false, blocking: ['Short A next line 1: promises a link.'] }, main: { ok: true, blocking: [], warnings: [] },
-            narrative: { ok: false, blocking: ['Short A: Short A next line 1: promises a link.'] }, v3: (window.db.extra || {}).v3 } },
+            narrative: { ok: false, blocking: ['Short A: Short A next line 1: promises a link.'] }, v3: (window.db.extra || {}).v3, currency: window.db.cur } },
         versions: [{ version: 7 }, { version: 6 }], approvals: [], jobs: [], events: [{ at: '2026-10-25T10:00:00Z', kind: 'job_failed', actor: 'worker', detail: {} },
           { at: '2026-10-25T11:00:00Z', kind: 'section_revision', actor: 'f@x', detail: { section: 'fear', version: 7, note: 'Name the <floodplain> earlier.' } }] },
       hs_impact_story_version: { version: 6, body: v6 },
@@ -262,6 +262,15 @@ ok(await page.evaluate(() => ['s1/visuals/jv/preview-main-000.jpg', 's1/visuals/
    .every((p) => window.calls.some((c) => c[0] === 'download' && c[1] === 'impact-media' && c[2] === p))),
    'visuals: the previews on screen are downloaded with the admin session (blob links)');
 ok(await page.evaluate(() => !window.calls.some((c) => c[0] === 'download' && c[2] === 's1/visuals/jv/preview-short_a-000.jpg')), 'visuals: previews of other videos load only when opened');
+// Exceptions first (audit, 2026-11-11): only the shot that needs a look is drawn; the rest are counted and one click away.
+const showAll = async () => { if (await page.locator('#is [data-act=vall][aria-pressed=false]').count()) { await page.click('#is [data-act=vall]'); await page.waitForTimeout(80); } };
+ok(await page.locator('#is-vfilter').count() === 1 && await page.locator('#is figure.is-shot').count() < await page.evaluate(() => window.db.visuals.manifest.assets.main.shots.length)
+   && (await page.locator('#is').innerText()).includes('passed every check') && await page.locator('#is [data-act=vapprovegroup]').count() === 2,
+   'visuals: by default only the shots that need a look are drawn; every act keeps its Approve button');
+await showAll();
+ok(await page.locator('#is figure.is-shot').count() === await page.evaluate(() => window.db.visuals.manifest.assets.main.shots.length)
+   && await page.locator('#is [data-act=vall][aria-pressed=true]').count() === 1, 'visuals: Show every shot draws them all');
+await page.waitForTimeout(150);
 ok(await page.locator('#is img[src^="blob:"]').count() >= 3 && (await page.innerHTML('#is')).includes('A dock for &lt;fishers&gt;'), 'visuals: previews show from blob links; text is escaped');
 await page.click('#is [data-act=vtab][data-k=short_a]'); await page.waitForTimeout(120);
 ok((await page.locator('#is').innerText()).includes('short_a-hook') && await page.evaluate(() => window.calls.some((c) => c[0] === 'download' && c[2] === 's1/visuals/jv/preview-short_a-000.jpg')),
@@ -306,7 +315,7 @@ await page.waitForTimeout(120);
 // Approve / Reject / Need new photo under every shot (2026-10-30), and rejecting every photo of an act.
 await page.click('#is [data-act=vtab][data-k=main]'); await page.waitForTimeout(80);
 await page.evaluate(() => { window.db.visuals.manifest.assets.main.shots[0].subject_ref = 'oak-trees'; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
-await page.waitForTimeout(120);
+await page.waitForTimeout(120); await showAll();
 ok(await page.locator('#is [data-act=vshot][data-d=approved]').count() === 0 && await page.locator('#is [data-act=vshot][data-shot=a1-s1][data-d=rejected]').count() >= 1
    && await page.locator('#is [data-act=vshot][data-shot=a1-s1][data-d=new_photo]').count() >= 1,
    'visuals: every shot has Reject, and Need new photo when it is about a subject; approving is per act, not per shot');
@@ -337,7 +346,27 @@ await page.evaluate(() => { window.db.visuals.photo_requests = [{ subject_id: 'o
 await page.waitForTimeout(120);
 ok(/You asked for: The photo needs to be of jeffries/.test(await page.locator('#is').innerText()),
    'visuals: a request carried from earlier previews (a Reject note) shows under its shot');
-await page.evaluate(() => { delete window.db.visuals.photo_requests; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+// what the last Prepare did with it (audit, 2026-11-07): a search that found nothing says so, a placed photo is labelled
+ok(!/No usable photo was found/.test(await page.locator('#is').innerText()) && await page.locator('#is .is-badge', { hasText: 'Found for your request' }).count() === 0,
+   'visuals: no outcome is claimed before a Prepare has searched the request');
+await page.evaluate(() => { window.db.visuals.manifest.requests_unfound = [{ asset: 'main', shot_id: 'a1-s1', request: 'The photo needs to be of jeffries' }];
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+ok(/No usable photo was found for this request/.test(await page.locator('#is').innerText()),
+   'visuals: a request the search found nothing for says so under its shot');
+await page.evaluate(() => { window.db.visuals.photo_requests[0].note = 'Hakeem Jeffries at a podium';
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+ok(!/No usable photo was found/.test(await page.locator('#is').innerText()),
+   'visuals: a reworded request is not reported as not found before it has been searched');
+await page.evaluate(() => { delete window.db.visuals.manifest.requests_unfound;
+  window.db.visuals.manifest.auto_choices = [{ subject_id: 'oak-trees', candidate_id: 'oak', entry: { id: 'oak', for_shot: { asset: 'main', shot: 'a1-s1' } } }];
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+ok(await page.locator('#is .is-badge', { hasText: 'Found for your request' }).count() === 1,
+   'visuals: the photo the code put on a shot for a request is labelled Found for your request');
+await page.evaluate(() => { delete window.db.visuals.manifest.auto_choices; delete window.db.visuals.photo_requests;
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
 await page.waitForTimeout(120);
 // a reject asks in the page, never in a browser pop-up
 await page.evaluate(() => { window.realConfirm = window.confirm; window.realPrompt = window.prompt;
@@ -768,6 +797,38 @@ txt = await page.locator('#is-media-now').innerText();
 ok(/the last render stopped/i.test(txt) && txt.includes('Outdated status') && txt.includes('Next: Check sources again.') && txt.includes('1 more item'),
    'media now: a stopped render says so, names the reason that needs a person, and the next step');
 ok(!/rendering now/i.test(await page.locator('#is').innerText()), 'media now: nothing says it is rendering once it stopped');
+ok(await page.locator('#is [data-act=cdismiss]').count() === 0, 'media: a stop with no keyed events offers no Not-about-this-story button');
+await page.evaluate(() => { window.db.media.blocked.currency = { state: 'stale', events: [{ key: 'abcdef0123456789', summary: 'October 30, 2026' }] };
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(80);
+await page.click('#is [data-act=step][data-step=media]'); await page.waitForTimeout(50);
+ok(await page.locator('#is .is-row:not(#is-next-box .is-row) [data-act=cdismiss][data-then=render][data-keys="abcdef0123456789"]', { hasText: 'render again' }).count() === 1,
+   'media: a render stopped on a keyed newer event offers "Not about this story — render again"');
+await page.evaluate(() => { window.calls = []; });
+await page.click('#is .is-row:not(#is-next-box .is-row) [data-act=cdismiss][data-then=render]'); await page.waitForTimeout(120);
+ok(await page.evaluate(() => { const n = window.calls.map((c) => c[0]); const i = n.indexOf('hs_impact_story_currency_dismiss'), j = n.indexOf('hs_impact_story_render');
+     return i >= 0 && j > i && n.indexOf('hs_impact_story_visuals_prepare') < 0; }),
+   'media: it sets the event aside, then renders again (approved pictures kept, nothing prepared)');
+// founder 2026-11-07: "there are no buttons to give me options to do something". The top box of a render stopped on
+// keyed newer news names it and offers both answers instead of "Something went wrong" / Retry; Media review offers
+// "Update the story with this news" beside "render again". Update writes the note and starts Fix, nothing else.
+await page.evaluate(() => { window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(80);
+const rtop = await page.evaluate(() => (document.querySelector('#is #is-next-box') || {}).innerText || '');
+ok(/a source shows something newer/i.test(rtop) && rtop.includes('October 30, 2026') && !/Something went wrong/i.test(rtop)
+   && await page.locator('#is #is-next-box [data-act=retry]').count() === 0
+   && await page.locator('#is #is-next-box [data-act=curupdate][data-keys="abcdef0123456789"]').count() === 1
+   && await page.locator('#is #is-next-box [data-act=cdismiss][data-then=render][data-keys="abcdef0123456789"]').count() === 1,
+   'next step: a render stopped on keyed newer news offers Update / Not about this story, not Retry');
+await page.click('#is [data-act=step][data-step=media]'); await page.waitForTimeout(50);
+ok(await page.locator('#is .is-row:not(#is-next-box .is-row) [data-act=curupdate][data-keys="abcdef0123456789"]').count() === 1,
+   'media: "Update the story with this news" sits beside "render again"');
+await page.evaluate(() => { window.calls = []; });
+await page.click('#is #is-next-box [data-act=curupdate]'); await page.waitForTimeout(120);
+ok(await page.evaluate(() => { const c = window.calls.filter((x) => x[0] === 'hs_impact_story_currency_update');
+     return c.length === 1 && c[0][1].p_story === 's1' && JSON.stringify(c[0][1].p_keys) === '["abcdef0123456789"]'
+       && !window.calls.some((x) => /currency_dismiss|_render$|visuals_prepare|job_retry/.test(x[0])); }),
+   'update the story: one call with the valid key; nothing is set aside, prepared or rendered');
 await page.evaluate(() => { window.db.status = window.__st; const m = window.db.media; delete m.blocked; m.current = true; m.hum = false; m.stale_reason = null; m.fix_requests = []; m.fix_batch = null; });
 // the quality gates (2026-10-27): a file the visual gate failed, a blocked render with licensed candidates, the status check
 await page.evaluate(() => {
@@ -795,6 +856,34 @@ ok(txt.includes('stopped before rendering anything') && txt.includes('Missing es
    && txt.includes('Latest development check') && !(await page.locator('#is b').allInnerTexts()).some((x) => x.includes('<b>')), 'media: a blocked render names what is missing and the licensed candidates');
 ok(await page.locator('#is [data-act=mdecide][data-d=approved][data-id="2"]').count() === 0, 'media: a file the visual gate failed has no Approve button');
 ok(!(await page.locator('#is').innerHTML()).includes('<b>Person'), 'media: candidate text is escaped');
+// Tab 17 audit 2026-11-11: style checks are warnings. When the database marks the file approve_anyway, the video is
+// shown with what it failed and can be approved; without the mark (above) nothing changes.
+{
+  const reopen = async (anyway) => {
+    await page.evaluate((v) => { const f = window.db.media.files[1];
+      if (v) { f.approve_anyway = true; f.style_warnings = 'Too many documents and cards'; } else { delete f.approve_anyway; delete f.style_warnings; }
+      window.HS.acqImpactStories.load(window.client, document.getElementById('is')); }, anyway);
+    await page.waitForTimeout(80);
+    await page.click('#is [data-act=step][data-step=media]'); await page.waitForTimeout(50);
+  };
+  await reopen(true);
+  const card = page.locator('#is section.is-angle', { hasText: 'Short A (9:16)' });
+  const ct = await card.innerText();
+  ok(ct.includes('did not pass these style checks: Too many documents and cards') && ct.includes('approve it anyway')
+     && await card.locator('[data-act=mdecide][data-d=approved][data-id="2"]', { hasText: 'Approve anyway' }).count() === 1
+     && await card.locator('[data-act=fixform][data-id="2"]').count() === 1
+     && !ct.includes('cannot be approved'), 'media: a style-only failure offers Approve anyway beside Request a fix, and says what it failed');
+  ok(await card.locator('> video, > [data-act=watch]').count() === 1, 'media: a style-only failure is shown for watching, not hidden under Details');
+  await card.locator('[data-act=mdecide][data-d=approved][data-id="2"]').click(); await page.waitForTimeout(60);
+  ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_media_decide' && c[1].p_asset_id === 2 && c[1].p_decision === 'approved')),
+     'media: Approve anyway sends one approval for that file');
+  await page.evaluate(() => { window.db.media.fix_batch = { id: 'fa', status: 'working', auto: true, requests: 1 }; });
+  await reopen(true);
+  ok(await page.locator('#is [data-act=mdecide][data-d=approved][data-id="2"]').count() === 0, 'media: while the automatic fix is running, Approve anyway is not offered');
+  await page.evaluate(() => { window.db.media.fix_batch = null; });
+  await reopen(false);
+  await page.evaluate(() => document.querySelectorAll('#is details').forEach((d) => { d.open = true; }));
+}
 // founder 2026-11-05: "i pressed request fix, but i do not know what fix is" — the box starts filled in with what failed
 ok(txt.includes('Rendering again will not change it') && txt.includes('already filled in with what failed'), 'media: a failed check says to request a fix, not to render again');
 await page.click('#is [data-act=fixform][data-id="2"]'); await page.waitForTimeout(50);
@@ -981,9 +1070,55 @@ await page.evaluate(() => {
 await page.waitForTimeout(120);
 const obox = await page.evaluate(() => (document.querySelector('#is #is-next-box') || {}).innerText || '');
 ok(!/no photo|photo search/i.test(obox) && /newer/i.test(obox) && obox.includes('Democrats win House majority with Trump approval at historic low')
-   && /fix the check/i.test(obox) && await page.locator('#is #is-next-box [data-act=retry]').count() === 0,
+   && /Prepare the visuals again/.test(obox) && await page.locator('#is #is-next-box [data-act=retry]').count() === 0
+   && await page.locator('#is [data-act=cdismiss]').count() === 0,
    'next step: a Prepare stopped on an Outdated status names the headline and never says the photo search failed');
+// founder 2026-11-07: "the article does not matter but there is no button to disregard it and continue". A check that
+// names the event with a key offers "Not about this story — continue preparing": it sets the event aside, then prepares.
+await page.evaluate(() => {
+  const b = window.db.visuals.blocked;
+  b.currency = { state: 'stale', events: [{ key: '0123456789abcdef', kind: 'document_link_changed', summary: 'Democrats win House majority' },
+                                         { key: '0123456789abcdef', summary: 'dup' }, { key: '<bad>', summary: 'no key' }] };
+  window.HS.acqImpactStories._state.data = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(120);
+const dbox = await page.evaluate(() => (document.querySelector('#is #is-next-box') || {}).innerText || '');
+ok(/Not about this story/.test(dbox) && await page.locator('#is #is-next-box [data-act=cdismiss][data-keys="0123456789abcdef"]').count() === 1,
+   'next step: a keyed Outdated status offers "Not about this story — continue preparing" with only the valid key');
+await page.evaluate(() => { window.calls = []; });
+await page.click('#is #is-next-box [data-act=cdismiss]'); await page.waitForTimeout(120);
+ok(await page.evaluate(() => { const n = window.calls.map((c) => c[0]); const i = n.indexOf('hs_impact_story_currency_dismiss'), j = n.indexOf('hs_impact_story_visuals_prepare');
+     return i >= 0 && j > i && JSON.stringify(window.calls[i][1].p_keys) === '["0123456789abcdef"]' && window.calls[j][1].p_new === true; }),
+   'not about this story: sets the event aside, then prepares the visuals again');
+await page.evaluate(() => { window.HS.acqImpactStories._state.data = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+const ubox = await page.evaluate(() => (document.querySelector('#is #is-next-box') || {}).innerText || '');
+ok(/Update the story with this news/.test(ubox) && !/Claude Code session/.test(ubox)
+   && await page.locator('#is #is-next-box [data-act=curupdate][data-keys="0123456789abcdef"]').count() === 1,
+   'next step: a keyed Outdated status on Prepare also offers "Update the story with this news"');
 await page.evaluate(() => { Object.assign(window.db, window.__beforeBlocked); });
+// Prepare refused because the source records changed after they were checked (House Speaker story, 2026-11-07: three
+// Prepare runs refused in a row while the box offered only Retry and Prepare). The one button is Re-check sources.
+await page.evaluate(() => {
+  window.__beforeSrc = { status: window.db.status };
+  const base = window.db.status;
+  window.db.status = () => Object.assign(base(), { stage: 'visuals', owner: 'you', next: 'Prepare the visuals',
+    job: { id: 'jsc', kind: 'visuals', status: 'failed', attempts: 1, created_at: '2026-11-07T23:36:13Z', completed_at: '2026-11-07T23:39:00Z',
+      error: 'The source records changed since this story was checked. Re-check sources, approve the narrative again, then prepare the visuals. Nothing was made.' } });
+  window.calls = [];
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(80);
+const sctxt = await page.locator('#is-next-box').innerText();
+ok(/re-check them first/i.test(sctxt) && !/Something went wrong/i.test(sctxt)
+   && await page.locator('#is #is-next-box [data-act=retry]').count() === 0
+   && await page.locator('#is #is-next-box [data-act=vprep]').count() === 0
+   && await page.locator('#is #is-next-box .is-btn.primary[data-act=req][data-kind=pack]', { hasText: 'Re-check sources' }).count() === 1,
+   'sources changed: no Retry and no Prepare; Re-check sources is the one button');
+await page.click('#is #is-next-box [data-act=req][data-kind=pack]'); await page.waitForTimeout(120);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_request' && c[1].p_kind === 'pack')),
+   'sources changed: the button asks for a source check');
+await page.evaluate(() => { window.db.status = window.__beforeSrc.status; });
 // A render refused because the pictures no longer match the approved set (founder, 2026-11-06, EPA methane story:
 // "i have no idea if it is fixing requests or i am supposed to press retry"). Retry would fail the same way.
 await page.evaluate(() => {
@@ -1121,6 +1256,28 @@ kbox = await page.locator('#is-next-box').innerText();
 ok(/Working on it/i.test(kbox) && /writing a plan/.test(kbox) && await page.locator('#is #is-next-box button').count() === 0 && await page.locator('#is .is-next-box').count() === 1,
    'plan being written: the one box says nothing is needed, with no button');
 await page.evaluate(() => { Object.assign(window.db, window.__beforeBlockedVids); });
+// House Speaker story, 2026-11-09 ("i do not understand what it needs from me"): the SCRIPT check found newer news. The top
+// box names the news and offers both answers; "Not about this story" sets it aside and checks the script again.
+await page.evaluate(() => {
+  window.__keep = { job: window.db.job, fb: window.db.media && window.db.media.fix_batch };
+  window.db.job = { id: 'jg', kind: 'generate', status: 'complete', created_at: '2026-11-09T15:11:07Z', completed_at: '2026-11-09T15:13:49Z' };
+  if (window.db.media) window.db.media.fix_batch = null;
+  window.db.cur = { state: 'stale', events: [{ key: '0e7cbefee047fb66', kind: 'new_record_text', date: null, source: 'https://www.newsweek.com/x',
+    text: 'A petition calling on House Democrats not to support Hakeem Jeffries has passed 1 million signatures, according to its creator. ' + 'More words. '.repeat(40) }] };
+  window.calls = []; window.HS.acqImpactStories._state.data = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(120);
+let nbox = await page.locator("#is-next-box").innerText();
+ok(/New news since you approved/i.test(nbox) && nbox.includes('passed 1 million signatures') && nbox.includes('newsweek.com') && nbox.length < 1200
+   && await page.locator('#is #is-next-box [data-act=curupdate][data-keys="0e7cbefee047fb66"]').count() === 1
+   && await page.locator('#is #is-next-box [data-act=cdismiss][data-then=validate][data-keys="0e7cbefee047fb66"]').count() === 1,
+   'script news: the top box names the news (shortened) and offers Update / Not about this story');
+await page.click('#is #is-next-box [data-act=cdismiss]'); await page.waitForTimeout(150);
+ok(await page.evaluate(() => { const n = window.calls.map((c) => c[0]); const i = n.indexOf('hs_impact_story_currency_dismiss'), j = n.indexOf('hs_impact_story_request');
+     const r = window.calls[j]; return i >= 0 && j > i && r[1].p_kind === 'validate' && r[1].p_new === true
+       && JSON.stringify(window.calls[i][1].p_keys) === '["0e7cbefee047fb66"]' && n.indexOf('hs_impact_story_visuals_prepare') < 0 && n.indexOf('hs_impact_story_render') < 0; }),
+   'script news: Not about this story sets it aside, then checks the script again (nothing prepared or rendered)');
+await page.evaluate(() => { window.db.cur = undefined; window.db.job = window.__keep.job; if (window.db.media) window.db.media.fix_batch = window.__keep.fb; });
 // library: grouped by whose turn it is, stories above Hot Topics, one label per card
 await page.evaluate(() => { location.hash = ''; window.HS.acqImpactStories._state.open = null; window.HS.acqImpactStories._state.data = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
 await page.waitForTimeout(120);

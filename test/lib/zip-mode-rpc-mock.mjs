@@ -10,6 +10,9 @@
 //     in-ZIP production objects, and the geometric verdict itself is proven where it can be,
 //     in test/zip_membership_pg (PostGIS) and the national proof, not here.
 // A test that wants an OUTSIDE or unmeasured facility passes `verdictOf`.
+// facility_inventory (docs/zip-facility-inventory.sql) is passed through from the fixture row when the row
+// carries one, and left out otherwise: a reply without it is what production sends until that SQL is applied,
+// and the page must then present the count as not complete.
 
 /** The p_zip argument of a POSTed RPC call, or null. */
 export function rpcZip(route) {
@@ -21,7 +24,8 @@ export function zipModeReportPayload(rows, zip, { verdictOf } = {}) {
   const row = Array.isArray(rows) ? rows[0] : rows;
   const counts = { member: 0, outside: 0, not_measured: 0, no_coordinates: 0 };
   if (!row || !Array.isArray(row.sites)) {
-    return { zip, status: 'no_report', sites: [], facility_counts: counts };
+    return { zip, status: 'no_report', sites: [], facility_counts: counts,
+      ...(row && row.facility_inventory ? { facility_inventory: row.facility_inventory } : {}) };
   }
   const sites = [];
   for (const s of row.sites) {
@@ -32,7 +36,8 @@ export function zipModeReportPayload(rows, zip, { verdictOf } = {}) {
     counts[v] = (counts[v] || 0) + 1;
     if (v === 'member') sites.push({ ...s, zip_membership: 'member' });
   }
-  return { zip, status: 'complete', sites, facility_counts: counts };
+  return { zip, status: 'complete', sites, facility_counts: counts,
+    ...(row.facility_inventory ? { facility_inventory: row.facility_inventory } : {}) };
 }
 
 /** Fulfil a /rpc/zip_mode_report_sites route from a rows-for-zip lookup. */

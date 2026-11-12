@@ -258,6 +258,16 @@ Record of the decision, in the founder's words: `docs/national-source-policy-202
   **Do not add a noindex rule or an exclusion criterion without explicit founder approval.**
 - Gate: `scripts/audit_index_all.py` runs in `pages.yml` against `_site` (public noindex, robots block, non-self canonical, missing from sitemap).
 
+### DEVELOPMENT MAP INDEXING PILOT (2026-11-11) — BUILT LOCALLY, NOT DEPLOYED
+Every `/map/<zip>/` document kept its whole page inside an inert `<template>` (6 visible words in the first HTML), and
+`page_semantics.projection` drops `<template>`, so a map's records never moved its fingerprint, `lastmod` or IndexNow.
+`scripts/map_zip_summary.py` writes `#hs-map-zip-summary` OUTSIDE the template from the Rule D plane count and the ZIP's
+project pages (links to `/project/…/`, `/community/<zip>/`, `/community/<zip>/projects/`); the runtime moves it under the
+map; treated project-list pages link back to the map. Who gets it: `data/seo-map-pilot.json` (`pilot` = 100 treatment
+ZIPs; `all` = nationwide rollout, not enabled; `off` = rollback; unreadable = off). Controls are byte-identical to a
+pilot-off build. Selection, audit, deployment, rollback and monitoring: `docs/seo/map-indexing-pilot/README.md`.
+Tests: `test/map-zip-summary.test.mjs`, `test/map-zip-summary.browser.test.mjs`. ⛔ Do not request indexing for either arm.
+
 ### GOOGLE SEARCH CONSOLE: GIVE THE FOUNDER FULL https://jodytracks.com URLS (founder, 2026-10-29)
 **The founder's Search Console box does not accept a bare path.** Every sitemap or page address given to the founder for
 Search Console is the full URL on the live host, one per copy block, e.g. `https://jodytracks.com/sitemaps/map.xml`. Never
@@ -1870,6 +1880,24 @@ legal/framing change not covered by the one-time sign-off.
   *(2026-10-22: `sitemap.yml` is deleted, and the build drops these `homesignalmap.html?zip=` URLs
   from the served sitemap anyway (`gen_zip_pages.py::reconcile_sitemap`). See §5.)*
 
+## 7.03 EVERY MAP 1 VIEW DRAWS THE ZIP OUTLINE, FOR EVERY VISITOR ⚖️ FOUNDER (2026-11-09)
+
+"put it on every map a zip boundary line"; "any time a zip code is entered and someone is viewing … a non signed user …
+an address with a zip code or just a zip code it needs a boundary map." Before this the outline was drawn only in the ZIP
+embed (`paintEmbedZipBoundary`) and only for signed-in visitors.
+- **One reader, one drawer** in `homesignalmap.html`: `paintZipBoundary(zip)` reads `public.app_zcta_boundary` and
+  `drawZipBoundary()` draws it on the 2D map, the satellite view (MapLibre layer `zipline`, or the Leaflet imagery fallback)
+  and the 3D aerial (`V3.zipGrp`). `BOUNDARY_ZIP` is the ZIP being looked at: `loadZip()` (full page and embed), the
+  geocoder's ZIP after an address search, and `?outline=<zip>` on the address embed (`property.html` passes the saved
+  address's ZIP; not `?zip=`, which would make it a ZIP embed). A late answer for a ZIP the page left is dropped.
+- Only the ZIP embed re-frames the camera to the outline; the full page keeps `ZIP_FRAME`. No Census area
+  (`not_measured`) draws nothing, never a circle.
+- **anon has EXECUTE on `app_zcta_boundary`** (migration `app_zcta_boundary_grant_anon_20261109`, read back
+  `anon=X`; `docs/app-zcta-boundary.sql` updated). `geo` USAGE stays forbidden (anon_geo false).
+- `lib/community-page.js` ~line 484 still says the outline needs a session: stale comment, left untouched so the
+  file's cache key does not move. Tests: `test/map1-zip-outline.browser.test.mjs`, `place-context-map` §9,
+  `zcta-boundary-reader` §4.
+
 ## 7.04a THE MAPS (ALL THEMES) ZIP LIST IS A SECOND, INDEPENDENT LIST (2026-10-15)
 
 The Acquisition Dashboard's POST ZIP ORDER panel now exists in two scopes that share ONE code path (`ZO_SCOPES` in
@@ -1887,6 +1915,52 @@ contract is shared (`lib/maps-dc-zip-order.js`). DDL of record: `docs/maps-zip-o
   malformed/duplicate rejected leaving the stored list intact, empty list refused, cool-off, non-founder refused, anon denied,
   dispatch body carries `maps_order: "true"`. Not applied to production by the session that wrote it.
 - Pinned by `test/maps-zip-order.test.mjs`; the Data Center list's `test/maps-dc-zip-order.test.mjs` passes unchanged.
+
+## 7.04b EVERY DEVELOPMENT-ALERT SUBSCRIBER'S ZIP IS ON THE MAPS POST LIST ⚖️ FOUNDER (2026-11-09)
+
+"when a new subscriber signs up for the development map alerts we need to add their zip code to the bluesky post.
+otherwise they will never get any emails. even if they add an address we need to add their zip code."
+The MAPS email only sends published Bluesky MAPS posts about the subscriber's ZIP, and drafts for chosen ZIPs come from
+`public.maps_zip_order` (All Maps list), so a subscriber whose ZIP is not on it never gets an email (85083 and 64166,
+added by hand 2026-11-09). SQL of record `docs/maps-zip-order-subscriber-zips.sql`.
+- **One rule, `public.maps_zip_order_sync_subscribers()`:** appends at the END of the list every ZIP with an active maps
+  subscriber (`alert_subscription_state`, stream `maps`, `subscribed`) not already on it. The ZIP is the subscription's
+  own ZIP community, so it is the same whatever page the resident signed up from. Append only: the founder's order never
+  changes and nothing is removed.
+- Runs after any write to `user_subscriptions`, after `users.unsubscribed` / `alert_email_consent` / `community_id`
+  changes, at the end of `hs_set_maps_zip_order` (an upload that leaves out a subscriber ZIP gets it appended), and once
+  on apply. The triggers never block a sign-up (a failure is a WARNING).
+- It does not create drafts: "Create + refresh drafts" in All Maps still does that.
+- Test: `test/maps_zip_order_subscribers_pg` (`maps-zip-order-subscribers-suite.yml`; 15 checks incl. S00a/S00b, which
+  pin the fixture's resolver view and list table to production's fingerprints; 6 mutations; `replay_guard.sh`).
+- **Audit follow-ups (same day, founder "all"):**
+  - ⛔ **`docs/maps-zip-order.sql` still carries the OLD `hs_set_maps_zip_order`** (drops subscriber ZIPs). It now runs as
+    one transaction and REFUSES, changing nothing, when `maps_zip_order_sync_subscribers()` exists. On a fresh database it
+    applies as before (old body md5 `7eca7b45…`); apply the subscriber file after it.
+  - **The hourly monitor pages** (`maps_subscriber_zips`, `docs/maps-subscriber-zips-monitor.sql`, a splice of
+    `pipeline_health_tick()`): fewer than 2 rule triggers, a subscriber ZIP missing from the list, or a ZIP whose non-test
+    maps subscriber has waited over 7 days with no published, un-withdrawn MAPS post (so no email). Test-only ZIPs (every
+    subscriber `referral_source = 'admin_test'`) are counted, never paged. Test: `test/maps_subscriber_zips_monitor_pg`.
+    Measured 2026-11-09: 68 ZIPs, 65 test-only, 97702 posted, 85083 and 64166 inside the 7 days.
+  - **Map 1 offers the sign-up after an address search too**, for the ZIP the geocoder names, only when that ZIP has its
+    own ZIP page (`HS.data.zipCommunity`), with the line "This address is in ZIP <zip>." (`body.addrzip`,
+    `offerZipEmailForAddress`). Before, the button was ZIP-mode only, so an address searcher could not sign up at all.
+    Browser test `test/maps-zip-email.browser.test.mjs` §5.
+  - The two 85083/64166 identities created 2026-11-09 14:41:49Z are an `admin_test` account, not new residents.
+
+## 7.04c TEST SIGN-UPS DO NOT KEEP A ZIP ON THE MAPS POST LIST ⚖️ FOUNDER (2026-11-11)
+
+"i want to remove pierce county zips now"; chosen: "Test sign-ups don't count". Narrows §7.04b: a ZIP is kept on
+`public.maps_zip_order` only for a subscriber who is NOT a known test identity. "Known test" is homesignal-ingest's
+`public.bsky_maps_known_test_identity(user)` (the posting-priority rule); it is not re-derived here.
+- **Why:** the 65 Pierce County ZIPs each carried one `admin_test` sign-up, so the list rule put them back whenever
+  they were removed. Measured 2026-11-11: 68 ZIPs on the list, 66 test-only (65 Pierce + Bend 97702), 2 real (85083, 64166).
+- **Rule:** `maps_zip_order_sync_subscribers()` in `docs/maps-zip-order-subscriber-zips.sql` (applied 2026-11-11, body md5
+  `5a74e481…`). **Alarm:** `docs/maps-subscriber-zips-monitor-real-only.sql` (applied, tick body `242beb32…` → `22400e90…`):
+  a ZIP missing from the list pages only when it has a real subscriber, and "test" asks the same function.
+- **One-time removal:** `docs/maps-zip-order-remove-test-only-2026-11-11.sql` (fail-closed on the measured 66-ZIP set;
+  leaves 85083, 64166). The test sign-ups themselves are untouched.
+- Tests: `test/maps_zip_order_subscribers_pg` S14-S16, `test/maps_subscriber_zips_monitor_pg` R01-R04 (+4 mutations).
 
 ## 7.04 THE DATA CENTER THEME BUTTON CREATES **AND** REFRESHES ⚖️ FOUNDER REQUIREMENT (2026-09-21)
 
@@ -3542,6 +3616,7 @@ Measured on production 2026-09-22, every canonical ZIP, no sampling:
     retrieved (around the ZIP centre). A facility inside a very large ZIP but beyond that
     retrieval is not served — an omission, never a wrong placement. The ZIP community page's
     facility section (`app_projects`) is still radius context and is not Map 1.
+    ⬆️ **Closed for EPA by §7.08a (2026-11-09):** ZIP-mode retrieval now covers the whole boundary.
 - ⚖️ **DEVELOPMENT POINTS IN `development_reports` ARE CANDIDATES, NOT MEMBERS — never drop them
   at the row.** They feed N5 (`n5_expected_input` reads `app_projects`, built from these rows), and
   N5 unions candidates from every report — that is what finds a record inside a large ZIP but
@@ -3560,6 +3635,66 @@ Measured on production 2026-09-22, every canonical ZIP, no sampling:
   inside-far / outside-near / boundary / far points; centroid-radius, national-bypass,
   Type-scoped and facility-bypass mutations must each FAIL it). The earlier 26-check version, which also covered the
   reverted trigger, passed 26/26 against production inside a rolled-back transaction.
+
+## 7.08a ZIP-MODE EPA RETRIEVAL COVERS THE WHOLE ZIP BOUNDARY (2026-11-09) — BUILT, NOT DEPLOYED
+
+Found by the Phoenix 85083 audit. **Not a regression: the EPA plane never had boundary retrieval.** Since #113 (2026-07-04)
+`get-address-report` ZIP mode asked EPA FRS for one 3-mile circle around `development_reports.home_lat/lng` (a pinned ZIP
+centre from the state seeds, never an address), cut rows beyond 3 mi, kept the nearest 40, and only at READ time
+(`zip_mode_report_sites`, #1312) tested them against the ZIP. The polygon-bbox scope (#1794) was wired into the permit
+connectors only and ships OFF (`ZIP_SCOPE_BOUNDS_MODE`); measured 2026-11-09: 200 of 200 recent ZIP responses report every
+connector `"scope":"legacy"`.
+- **Now:** `sources/epa-frs-zip.ts` covers the ZIP's polygon box with FRS circles (a refused circle splits into four, never
+  shrinks in place), every circle must answer or the plane is `ok:false`, rows are de-duplicated by RegistryId, the ZIP
+  polygon (`zip_scope_members`, the same boundary-inclusive predicate Map 1 serves) decides inclusion, and EVERY member is
+  kept. ⛔ **No count cap.** A 250 cap shipped in the first version of this change; it was a guess, not an EPA, storage or
+  display limit, and was removed (founder, 2026-11-09). EPA's own per-ZIP totals for a random 80 of the 2,550 ZIPs stuck
+  at the old 40 cap: 37 over 250, max 1,265 (raw totals, before the name filter and the boundary). No boundary ⇒ `ok:false reason no_boundary` (stored layer
+  kept, count unknown), never a radius. A ZIP request with no point uses the boundary box centre as its anchor.
+  `frs_start_mi` is ignored in ZIP mode. ECHO/CWA enrichment asks around the covering circle (capped at 5 mi).
+  Address mode (`facilitySites(lat, lng, radiusMi)`) is unchanged; the FRS row → site literal is one helper, `frsRowToSite`.
+- **Scope measured 2026-11-09:** 8,108 of 12,038 ZIPs with a boundary have part of it more than 3 mi from the stored point;
+  706 have no boundary. Arizona sample: 2,286 of 4,327 stored facility entries (53%) lie outside their own ZIP.
+- **A complete read is marked; nothing else is.** `counts.facilities_coverage = "zip_boundary_v1"` is sent only when
+  `epa.ok`, `mode zip_boundary` and `complete` (`facilityCoverage`). The collector stores `counts` as sent on an
+  accepted EPA write, so no SQL change was needed. Its absence means "not known to be complete": a radius-era list, a
+  failed read, a ZIP with no boundary. Never infer completeness from a count, `= 40`, or `facilities_refreshed_at`.
+  ⚠️ On a REFUSED write the collector keeps the stored facilities but takes the new `counts` keys, so a later failed
+  read drops the marker (reads as unverified, never as complete). Keeping it there is a collector change.
+  → **APPLIED 2026-11-09 21:07Z: `docs/dev-refresh-collect-facility-inventory.sql`** (one helper
+  `dev_facility_read_untrusted`, verbatim the old `facilities_unavailable` expression; when true, keep the stored
+  facility count AND coverage, hold `facilities_refreshed_at`). Collector md5 `b17263cc…` → `bd775733…`.
+- **What the count may claim — `docs/zip-facility-inventory.sql` (APPLIED 2026-11-09, migration `20261109210857`; live
+  `zip_mode_report_sites` md5 `751f297c…`, collector `bd775733…`; first collector run after, 21:10Z, succeeded).**
+  `public.zip_facility_inventory_state` is the one decision: `complete` (marker, latest refresh ok; 0 = verified
+  empty) · `complete_as_of` (marker, latest refresh failed: complete as of `last_success_at`) · `not_complete` (no
+  marker: radius-era list or no boundary read has ever completed) · `not_measured` (no boundary / no report).
+  `zip_mode_report_sites` (Map 1) gains `facility_inventory`; `zip_facility_inventory(zip)` serves the ZIP page strip.
+  `HS.facilityInventory` (lib/templates.js) presents it: only `complete` prints a plain total; `not_complete` prints
+  "N+ · not a complete count" or a dash; the empty-page "we checked the EPA registry and found nothing" sentence
+  needs a complete zero. An unread inventory is never a total. Reports carry no EPA facilities (development only).
+  Applied in that order; PR #2736 merged after (`9e992121`). Until `get-address-report` is deployed, no ZIP carries the
+  marker, so every ZIP reads `not_complete` (measured 2026-11-09 on 85083, 84302, 78617; 01004 `not_measured`). Proof: `test/dev_collect_inventory_pg` (engine response → live
+  collector → reader; production's code fails exactly the 3 defect cases first), `facility-inventory-suite.yml`.
+- **Termination:** a circle answering ≥ 1,000 rows (`FRS_TILE_ROW_CEILING`, the largest answer seen) is split; full at
+  the 0.25 mi floor ⇒ `saturated`, refused there ⇒ `process_limit`, more than 64 requests ⇒ `request_limit`, past the
+  45 s overlay deadline ⇒ `deadline`. All four are `ok:false` with no rows.
+- **Retries always wait** (2 s, then 5 s, or the full Retry-After when longer; a Retry-After that does not fit in the remaining 45 s stops the read as `deadline`), with or without a deadline; each
+  attempt counts toward the 64. `frsAt` no longer reads a missing Retry-After header as 0 s (it did, for both modes).
+  ⚠️ Address mode's ladder (`frsFacilities`, epa-frs.ts) still caps Retry-After at 10 s (`FRS_RETRY_AFTER_CAP_MS`);
+  unchanged here.
+- **"No violations" needs EPA's own answer (2026-11-09).** `interpretEcho` stores `env.epa.no_violation`, the
+  statutes ECHO lists as "No Violation Identified" for that facility. `HS.fac.noViolationLine` (lib/templates.js) is
+  the one rule, used by Map 1 and the ZIP/facility pages: it needs `current_as_of`, a non-empty `no_violation`,
+  nothing in violation, no SNC, no non-compliant quarters, and drops CWA when its permit is not tracked. It names the
+  laws and the date. A permit status or tracking flag alone, a missing/failed/capped/out-of-range ECHO lookup, or a
+  statute ECHO left blank / "Not Applicable" / "Terminated Permit" is UNKNOWN: no sentence. Measured before: a 3%
+  sample had 5 facilities showing the old line, 4 with no ECHO compliance match. Stored lists without
+  `no_violation` show no clean line until their next refresh. Test: `test/map1-epa-clean-record.test.mjs`.
+- **Still radius-based and NOT part of this change:** the permit connectors while `ZIP_SCOPE_BOUNDS_MODE` is off (their own
+  runbook, `docs/zip-scope-bounds-runbook.md`, gates enabling it).
+- Tests: `test/epa-zip-boundary.test.mjs`, `epa-zip-boundary.handler.test.ts` (real FRS answers saved 2026-11-09,
+  `test/fixtures/epa-zip-boundary/`).
 
 ## 7.11 THE CANONICAL DEVELOPMENT TYPE LIVES IN `lib/project-type.js` — ONE CLASSIFIER, NO MAP RUNTIME (2026-09-24)
 
@@ -6173,6 +6308,59 @@ Results.
   are refused, the next step is Prepare the visuals, and `_hs_is_status.job.visuals_changed` lets the page drop Retry
   (#2655/#2657 built that box). pg 12z1-12z3.
 
+## IMPACT STORIES, TAB 17: STYLE CHECKS ARE WARNINGS; A FIX RUN THAT NEVER STARTED IS "STALLED" (audit, 2026-11-11)
+
+Measured 2026-11-11: 11 stories, 24 finished renders, 65 of 72 videos failed the visual quality gate, 0 videos ever approved;
+one story went through 13 fix batches and 9 renders. The founder asked for the audit's plan to be carried out.
+- **A video that failed ONLY style checks can be approved after watching it.** `_hs_is_style_warnings(qc)` is the one
+  decision: file checks passed, quality failed, every failure carries a code, none in `_hs_is_hard_quality_codes()`
+  (`audio_defect`). `_hs_is_media` still reports such a file `blocked` (so the automatic fix and the status keep working)
+  with `approve_anyway: true` and `style_warnings`; `hs_impact_story_media_decide` accepts the approval and records
+  "Approved with style warnings: …". A failed file check, an audio defect, an out-of-date file and outdated news still block.
+  The page shows the video with **Approve anyway** beside Request a fix (not while an automatic fix is running).
+- **Style checks get ONE automatic fix round per story** (`_hs_is_auto_fix`; event `auto_fix_skipped` after that). File-check
+  and hard failures are still fixed every time. This narrows the 2026-11-07 rule below: after the one round, a style-failed
+  video is shown with its warnings.
+- **A fix batch nobody claimed for 30 minutes reads `stalled`** (`_hs_is_fix_batch`), so the next step says to press Fix.
+  Before, a batch whose GitHub run was cancelled in the queue said "Claude is making the fixes" for four days.
+- Apply file (generated from the DDL of record, guarded on the live bodies): `docs/impact-style-warnings-apply-2026-11-11.sql`.
+- **A fix run that never started is sent again by itself (2026-11-11).** `public.impact_fix_redispatch_tick()` (pg_cron
+  `impact-fix-redispatch`, every 10 minutes) re-sends a batch still `plan_queued` or `queued` that no run has claimed:
+  15 minutes after the last send, at most 3 times, only within 24 hours of the request (or the plan's confirm), never for
+  an archived story. Each send is a `fix_batch_redispatched` event. After 3 tries the batch reads `stalled` as before
+  and waits for Fix. Measured that day: three batches had sat unclaimed for up to four days after a lost dispatch.
+  pg checks 12R1-12R8 (4 deliberate breaks caught).
+- Engine half (package-server outage, dead runners recorded): homesignal-ingest CLAUDE.md, same date.
+- Tests: pg 12r6, 12S0-12S5 (4 deliberate breaks caught); `test/impact-stories.browser.test.mjs` "style-only failure".
+- **Visuals shows the shots that need a look first (same audit).** When some shots of the open video passed every check and
+  some did not, each act draws only the ones that need a look (flagged, blocked, rejected, a new photo asked for, a request
+  on file) and counts the rest; "Show every shot" (`data-act="vall"`, `S.vall`) draws them all, and "Show it" in the
+  attention list does too. "Approve this act" still approves the whole act. Page only, no SQL.
+- **Approved pictures survive a code-only change** (engine, homesignal-ingest CLAUDE.md, same date): a render no longer
+  sends a story back to Prepare just because video code merged after the approval.
+
+## IMPACT STORIES, TAB 17: "NOT ABOUT THIS STORY — CONTINUE PREPARING" (2026-11-07)
+
+Founder: "the article does not matter but there is no button to disregard it and continue". When Prepare (or a render)
+stops on an Outdated status and the engine's check named the newer events with keys (homesignal-ingest
+`currency.event_key`), the Visuals stop shows **Not about this story — continue preparing**: `hs_impact_story_currency_dismiss`
+records the keys (append-only `impact_story_currency_dismissals`; only a key a failed job of this story reported), then the
+page prepares again. The claim sends `story.currency_dismissed`, and the check lists those events as dismissed instead of
+blocking; anything new still blocks. A stop from before keys existed offers only Prepare again. A render stopped the same way shows **Not about this story — render again** in Media review (keeps the approved pictures). The Visuals stop reads `currency` through `_hs_is_visuals` (added after a self-audit found the first version never passed it; pg 12y0). Apply order: ingest first,
+then `docs/impact-stories.sql`, then the page. Tests: pg 12y1-12y4, `test/impact-stories.browser.test.mjs`.
+- **The other answer (founder, 2026-11-07: "there are no buttons to give me options to do something").** Beside every
+  "Not about this story" button, **Update the story with this news** → `hs_impact_story_currency_update(story, keys)` (the
+  same key check): one research line note on path `main.status` naming the news (no second while one is open or with
+  Claude), then Fix (plan → you confirm → work; homesignal-ingest `impact/fixes/FIXES.md` says what that path means). The
+  top box of a render stopped this way (`media.blocked`, same job) offers both buttons instead of "Something went wrong /
+  Retry". Tests: pg 12x1-12x5, browser "update the story" / "render stopped on keyed newer news".
+- **The script check's news gets the same two buttons (2026-11-09, founder: "i do not understand what it needs from me").**
+  The narrative was "Blocked" by news the generate/validate check found (`version.validation.currency.events`), and the page only
+  said "Fix the script first". Both functions now look keys up through `_hs_is_currency_event` (a failed job's result, else the
+  current version's check), and "Your next step" names the news with **Update the story with this news** and **Not about this
+  story** (sets it aside, then requests a `validate` job). Applied 2026-11-09 (migration
+  `impact_story_currency_event_from_script_check`, bodies md5-equal to the file). Tests: pg 12w1-12w3, browser "script news".
+
 ## IMPACT STORIES, TAB 17: FAILED VIDEOS ARE FIXED BEFORE YOU WATCH THEM ⚖️ FOUNDER (2026-11-07)
 
 "if you have to fix things, than you should fix before i have to watch. otherwise you are wasting my time". When a render
@@ -6416,6 +6604,29 @@ video from the first import. Tab 16 shows what the sync found; typing a link by 
 video post also carries `https://jodytracks.com`. Tests: `test/youtube_channel_sync_pg` (CI `youtube-channel-sync-suite.yml`),
 `test/youtube-channel-sync.test.mjs`. Runbook: homesignal-ingest `docs/VIDEO_BLUESKY.md`.
 
+**Thumbnails are Bluesky posts too (founder, 2026-11-07).** `docs/video-bluesky-thumbnail.sql` adds `'thumbnail'` as a
+fourth queue item (a fail-closed splice of the live bodies plus the table's `file_key` check). Approving a Tab 16 thumbnail
+creates its one job; it takes a VIDEO time (no time added) and waits for the YouTube main video's link like the other items.
+Tab 16 draws the thumbnail's Bluesky box only when `hs_video_jobs_list` lists it; Tab 12 previews it as an image. The
+publisher half (image post, shrunk under 1 MB) is homesignal-ingest #1071. ⚠️ Replaying `docs/video-bluesky-queue.sql`,
+`docs/youtube-video-file-decide-queue-apply.sql` or `docs/youtube-video-outdated.sql` drops the thumbnail again: re-apply
+the thumbnail file after any of them. Tests: `test/video_bluesky_queue_pg` §13 + 4f/11g, `test/video-bluesky-queue.browser.test.mjs`.
+
+## TAB 12 QUEUE ORDER: SUBSCRIBER ZIPS FIRST, APPROVED LAST ⚖️ FOUNDER (2026-11-11)
+
+"i do not want the approved posts at the top anymore. i want the new subscriber zip code posts always at top."
+The post list in Tab 12 is three groups: **Subscriber ZIPs** (that ZIP's drafts newest first, then its approved posts,
+under one status line per subscriber ZIP, shown even when nothing is waiting) · **To review** (every other draft, newest
+first) · **Approved and scheduled** (by posting time, folded until opened). Before, the list was sorted by posting time,
+so 17 approved posts sat above 85 drafts.
+- Grouping: `lib/acq-bluesky-queue-order.js` (`HS.bskyQueueGroups`, a view only). Which ZIPs have a real subscriber:
+  admin-only `public.hs_bsky_subscriber_zips()` (`docs/bluesky-subscriber-zips.sql`, applied 2026-11-11), which reads
+  homesignal-ingest's `bsky_maps_priority_classification` (class `eligible`; test sign-ups are not subscribers) and
+  returns ZIPs and counts only. Do not decide "subscriber ZIP" anywhere else.
+- A failed read shows a red note and promotes nothing; it is never read as "no subscribers".
+- This is the review order only. Posting order is still homesignal-ingest's `bsky_maps_subscribers_first()`.
+- Test: `test/bluesky-queue-order.test.mjs`.
+
 ## BLUESKY PUBLISHING SCHEDULE (Tab 12) + MAPS vs SHORTS ⚖️ FOUNDER (2026-10-27)
 
 One schedule, two queues: 2 MAPS + 2 video posts a day, America/Los_Angeles (shown in Central too), never within 150 minutes.
@@ -6639,3 +6850,71 @@ Titles & thumbnail edits `packaging.thumbnail.subline` (the existing line editor
 Distribution shows, on the Bluesky post, "Action link included · deadline …", "Edited by hand · kept as written" or
 "Leaves out the verified action link", and lists `derived.variants.actions` with Open / Closed / Verified states; Visuals
 shows the thumbnail's sentence and CTA from the manifest. Test: `test/impact-stories.browser.test.mjs` (distribution).
+
+## TAB 16: A FILE BUILT FROM AN OLDER SCRIPT IS "OUT OF DATE" AND CANNOT BE APPROVED (2026-11-07)
+
+Founder: "fix this error so never happens again". Video 3014's main video version 4 was rebuilt at 15:16Z from a script
+six minutes older than the founder's checklist note (#1051, 15:21Z) and showed as "Revised, awaiting review", checklist
+included; its thumbnail v4 likewise predated the sentence and action line (#1060). SQL of record
+`docs/youtube-video-outdated.sql` (after `docs/youtube-video-rebuild-applies-note.sql`; splices the live list and
+file_decide, md5-guarded). Engine half: homesignal-ingest `scripts/video_project_heads.py` (CLAUDE.md there).
+- **One decision, `_hs_yv_file_outdated(slug, key)`:** the version's recorded fingerprint (`meta.project_fp`, from the
+  worker; for an original upload, the review row's) against `youtube_video_project_heads` (the script on main). The
+  thumbnail compares `all`; the videos compare `video`, which leaves out thumbnail, action links, YouTube texts and notes,
+  so a thumbnail-only change never flags a video. No fingerprint: out of date when the script changed after the file was
+  made. No head (project not on main): unknown, blocks nothing.
+- `hs_youtube_videos_list` sends `outdated` per file; `hs_youtube_video_file_decide` refuses to approve an out-of-date file
+  (55006). The page says "Out of date", disables Approve and makes Full rebuild the main button.
+- Tests: `test/youtube_video_revision_plans_pg/outdated.sql` (production's decide body, `live-decide.sql`),
+  `test/youtube-video-outdated.browser.test.mjs`.
+- **Each kind of file is compared on what it reads** (`docs/youtube-video-outdated-parts.sql`, after the file above):
+  main video `main` (no Shorts), Shorts `video`, thumbnail `thumb` (no scenes, Shorts or voice). The first live
+  reading (2026-11-07) showed why: #1049 changed only the Shorts' openings and the broad rule flagged 21 approved main
+  videos and thumbnails. A version recorded before the parts is compared on `all`/`video` (never narrower); a file
+  with no fingerprint uses the time its own part last changed (`<part>_changed_at`). Test:
+  `test/youtube_video_revision_plans_pg/outdated-parts.sql`.
+
+## TAB 14 AREA REQUESTS BUILD THEIR ZIP PAGE AUTOMATICALLY ⚖️ FOUNDER (2026-11-11)
+
+"make this also automatic code build. if we receive a request on a tab 14. you automatically build it and notify me
+by email." Notice email: **hello@homesignal.net** (Resend, via ingest's `notify-health`, kind `zip_request`). Hard cases
+are emailed and NOT built (founder choice the same day). SQL of record `docs/zip-request-autobuild.sql`; engine
+homesignal-ingest `scripts/zip_request_plan.py` (the decision, pure) + `zip_request_build.py` + `zip-request-build.yml`.
+- **Chain:** a `community_requests` row for a 5-digit ZIP with no page → trigger `zip_request_enqueue` queues one
+  `zip_request_builds` row and dispatches the ingest workflow (hourly schedule picks up a lost dispatch) → plan (service
+  key: TIGERweb county polygons intersected with `geo.zcta_boundary` in `zip_request_facts`) → workbook row via
+  `add_gold_master_zips.py` → check (no secret; only the workbook files may change; registry gates) → land on main →
+  `zip_request_apply` (registry row, county root if new with the 6 topics, the page, guard self-test count) →
+  `get-address-report` → `zip_request_store_report` (report + `app_refresh_zip`) → `zip_request_finish` (email).
+- **Refused, emailed, never built:** not five digits · already built · not an active USPS ZIP (zipcodes 3.0.0) · no Census
+  ZCTA (PO box / single business) · no county with ≥50% of the land · USPS county ≠ Census majority county · state with
+  no workbook rows · no endpoint list · slug taken.
+- **Endpoints are never new:** the URL list most of the county's existing rows carry, else the feeds on ≥90% of the
+  state's rows (the state NWS feed must be one). Same as the 97149 hand build.
+- **Counts are no longer typed per ZIP.** Ingest reads the Gold Master `MANIFEST.json` `zip_rows`
+  (`CANONICAL_ZIP_N`, the inventory workflow). Here: `verify-zip-universe` expects 12,745 + the ZIPs the queue built
+  (`zip_request_built_zips()`, the hand-built 97149 is code `hand_built`), and every one must be in the registry;
+  `verify-production-environment` C1b and the Notices coverage generator/tests take 12,745 as a floor.
+- **Not automatic yet (known):** the Notices coverage artifact only regenerates on a branch, so a ZIP built under a root
+  that HAS notice feeds reads "no source identified" on its page until that artifact is regenerated by PR.
+- 97149 Neskowin OR (2026-11-11, by hand, before this existed) is recorded as built.
+
+## SESSION STATUS: THE FOUNDER MUST NEVER OPEN A SESSION TO FIND OUT WHETHER IT NEEDS THEM ⚖️ FOUNDER (2026-11-11)
+
+"i have no idea when i have to look at a session because you need me or stopped and need a prompt to continue."
+Every session says, in two places, whether it needs the founder. Same rule in homesignal-ingest CLAUDE.md.
+1. **Work until everything asked is done.** The founder never types "keep going". Do not stop to ask permission to continue, to
+   report progress, or because a step is long. A turn ends only when all of the work is done, or it is waiting on an event that
+   wakes the session by itself (a PR check, a run, a scheduled wake), or one of the two states below.
+2. **Session title.** Keep it a short topic, prefixed with a color dot and its state, set with `set_session_title`
+   (claude-code-remote) whenever the state changes:
+   `🔴 NEEDS YOU: <topic>` (a decision, a secret, or an approval only the founder can give; the founder opens it and answers) ·
+   `🟠 STUCK: <topic>` (tried everything reasonable and cannot proceed; say what was tried and what is blocking) ·
+   `🟡 WORKING: <topic>` (waiting on CI, a run or a PR event that wakes it; nothing to do) ·
+   `🟢 DONE: <topic>` (finished; nothing to do).
+3. **First line of every final message** is exactly one of `NEEDS YOU: <what, one line>`, `STUCK: <blocker, one line>` or
+   `NO ACTION NEEDED: <state>`.
+4. **Push notification** (`PushNotification`) only when the state becomes NEEDS YOU or STUCK, one line leading with what to do.
+   Never for routine progress, CI waits or completion that needs nothing.
+5. **A turn never ends idle.** WORKING names the event that wakes it. NEEDS YOU names the question. STUCK names the blocker.
+   "Stopped, waiting for a prompt" is not a state.

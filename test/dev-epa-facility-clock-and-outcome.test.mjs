@@ -459,5 +459,19 @@ console.log('\n== 5. §1 PARITY: new body minus the named additions == supersede
      stripped === P ? '' : `len ${stripped.length} vs ${P.length}`);
 }
 
+// SUPERSEDED (2026-11-09): this file's collector body predates the failed-source retention fix
+// (docs/dev-refresh-collect-carry-failed-sources.sql). Replaying it must change nothing, so its FIRST
+// executable statement is an unconditional refusal, ahead of `begin;` and every DDL statement.
+{
+  const exe = executable(rawNew).trim();
+  const firstStmt = exe.slice(0, exe.indexOf(';', exe.indexOf('end $refuse$')) + 1);
+  ok('superseded: the first statement inside the one transaction refuses',
+     /^begin;\s*do \$refuse\$ begin\s+raise exception 'SUPERSEDED:/.test(exe), exe.slice(0, 120));
+  ok('superseded: every DDL statement comes after the refusal, inside the same transaction',
+     exe.indexOf('alter table') > exe.indexOf('end $refuse$') && (exe.match(/^begin;/gm) || []).length === 1 &&
+     (exe.match(/^commit;/gm) || []).length === 1, firstStmt.slice(0, 80));
+  ok('superseded: the body still lacks the retention call, which is why it refuses',
+     !collectBody(rawNew).includes('dev_with_carried_sources'));
+}
 console.log(`\n${failures.length ? `FAILED: ${failures.length}` : 'ALL PASS'} — facility clock + durable EPA outcome`);
 if (failures.length) process.exit(1);

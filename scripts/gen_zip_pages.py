@@ -35,6 +35,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import page_semantics as ps  # noqa: E402
 import development_pages as dvp  # noqa: E402
 import fact_check_pages as fcp  # noqa: E402
+import map_zip_summary as mzs  # noqa: E402
 
 SUPA = "https://qwnnmljucajnexpxdgxr.supabase.co"
 BASE = ps.BASE   # one origin, from the brand contract
@@ -698,6 +699,10 @@ def assemble(d, now_iso):
                     "ln": [], "gn": [], "um": [],
                     "rule_d": bool(rec.get("rule_d")),
                     "rule_d_count": rec.get("count") if rec.get("count") is not None else 0,
+                    # What the plane says about this ZIP's count (scripts/map_zip_summary.py): counted,
+                    # held (not measured: count null) or absent (measured, below the Rule D bar, omitted).
+                    "dev_plane_state": ("absent" if not rec else
+                                        "held" if rec.get("count") is None else "counted"),
                     "dev_entities": list(rec.get("entities") or [])}
         # THE COUNTY-EQUIVALENT IS THE ROOT COMMUNITY, NAMED AS ITSELF. The short `county` field
         # is a join key, not a name: "Baltimore" is both Baltimore city and Baltimore County (two
@@ -1072,8 +1077,8 @@ def render(p, built):
         # both hosts run ONE runtime, so a dependency added to community.html alone breaks
         # this one. Fails CLOSED if absent (outcome 'unavailable', no absence claim).
         '<script src="/lib/zip-authoritative.js?v=20261029a"></script>\n'
-        '<script src="/lib/data.js?v=c047cd53"></script>\n<script src="/lib/topic-prefs.js?v=fe87d99b"></script>\n'
-        '<script src="/lib/templates.js?v=ddc4a550"></script>\n<script src="/lib/impact.js"></script>\n'
+        '<script src="/lib/data.js?v=65b0cd6d"></script>\n<script src="/lib/topic-prefs.js?v=fe87d99b"></script>\n'
+        '<script src="/lib/templates.js?v=6bbb33ed"></script>\n<script src="/lib/impact.js"></script>\n'
         # lib/project-type.js: the canonical Development Type (pure — no DOM, no map runtime).
         # The Development & Growth Type badge reads HS.canonicalProjectType from it. Same parity
         # rule as the files around it: both hosts run ONE runtime. lib/map.js stays OFF (§5a).
@@ -1091,7 +1096,7 @@ def render(p, built):
         '<script src="/shell.js?v=4fa4fbd4"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
         '<script src="/lib/water-rights.js?v=add4200a"></script>\n'
-        '<script src="/lib/community-page.js?v=2d11b2fd"></script>\n'
+        '<script src="/lib/community-page.js?v=b50922a9"></script>\n'
         "</body>\n</html>\n")
 
 
@@ -1461,7 +1466,8 @@ def render_project_list(z, keys, projects, pages):
             f'<p>{len(rows)} project{"s" if len(rows) != 1 else ""}, newest first.</p></header>'
             f'<section class="zsec"><ul>{"".join(li)}</ul></section>'
             f'<nav class="zsec"><a href="/community/{esc(z)}/">Back to {esc(z)} · {esc(label)}</a> · '
-            f'<a href="/">HomeSignal home</a></nav></main>')
+            + (f'<a href="{esc(map_path(z))}">Development map for {esc(z)}</a> · ' if p.get("map_summary") else "")
+            + f'<a href="/">HomeSignal home</a></nav></main>')
     return (_head(title, desc, f"{BASE}{project_list_path(z)}", robots="index, follow")
             + f'<body data-nav="project-list">\n{body}\n</body>\n</html>\n')
 
@@ -1568,7 +1574,10 @@ def render_guide_what(cities, built):
           '<p>Each project is sorted by where it stands:</p><ul>'
           '<li><strong>Proposed</strong> — filed, under review, or waiting for a hearing.</li>'
           '<li><strong>Approved</strong> — permitted or approved, and may not be built yet.</li>'
-          '<li><strong>Operating / built</strong> — finished or in use.</li>'
+          '<li><strong>Completed (agency record)</strong> — the agency marked the permit or case complete. '
+          'This does not confirm that a building is occupied or a business is open. '
+          'A data center its source lists as operating shares this colour and reads '
+          '<em>Operating (source listing)</em>: that is the source\'s claim, not checked by Jody.</li>'
           '<li><strong>Lifecycle unknown</strong> — the record does not say.</li></ul>'
           '<p>And by what kind of project it is: data center, industrial, residential, roads '
           '&amp; infrastructure, commercial, civic &amp; public, or other. Each one links to the '
@@ -1738,6 +1747,14 @@ def _url_el(loc, lastmod=None, bare=False):
 
 
 SITEMAP_MAX_URLS = 50000        # the sitemaps.org limit for one file
+SITEMAP_MAX_BYTES = 52428800    # and its size limit (50 MiB, uncompressed)
+
+# Families listed ONLY in their own family sitemap (declared in robots.txt), never in sitemap.xml.
+# The flat master would otherwise pass the 50,000-URL limit (2026-11-09: 50,681 URLs, every pages
+# build failed). project-list was the first; project pages followed because they only ever grow
+# (a page is kept when its project leaves the cards). Every URL is still advertised exactly once
+# per sitemap that lists it: removing a family from the master removes no page from any sitemap.
+FAMILY_ONLY = ("project", "project-list")
 
 
 def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide_paths=(),
@@ -1795,9 +1812,10 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
         block += "\n" + "\n".join(_url_el(f"{BASE}{cp}", lm.get(cp)) for cp in cps)
     # Project pages (plan step 12) are written only for featured, durable projects: every
     # one is indexable.
+    # Project pages (plan step 12) are NOT listed here: they are a FAMILY_ONLY family, advertised
+    # in sitemaps/project.xml alone (write_family_sitemaps). project_paths is still taken so the
+    # count below can prove none of them leaked in.
     pps = sorted(project_paths)
-    if pps:
-        block += "\n" + "\n".join(_url_el(f"{BASE}{pp}", lm.get(pp)) for pp in pps)
     gps = sorted(guide_paths)
     if gps:
         block += "\n" + "\n".join(_url_el(f"{BASE}{gp}", lm.get(gp)) for gp in gps)
@@ -1825,7 +1843,7 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
         # key here is a KeyError that kills the whole build on the no-sitemap path only —
         # a branch the SEO suite's happy path never takes.
         return {"removed": 0, "removed_dev": 0, "added": len(zips), "cities": len(cps),
-                "projects": len(pps), "guides": len(gps), "maps": len(mps), "developments": len(dps),
+                "projects": 0, "guides": len(gps), "maps": len(mps), "developments": len(dps),
                 "fact_checks": len(fps)}
     txt = open(path, encoding="utf-8").read()
     removed = len(SITEMAP_LEGACY_RE.findall(txt))
@@ -1843,8 +1861,9 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     if nc != len(cps):
         sys.exit(f"ERROR: sitemap carries {nc} city URLs for {len(cps)} city pages")
     npj = len(re.findall(r"<loc>[^<]*/project/[a-z0-9-]+/[a-z0-9-]+/</loc>", txt))
-    if npj != len(pps):
-        sys.exit(f"ERROR: sitemap carries {npj} project URLs for {len(pps)} project pages")
+    if npj:
+        sys.exit(f"ERROR: sitemap.xml carries {npj} project URLs; project pages are listed only in "
+                 "sitemaps/project.xml")
     ngd = len(re.findall(r"<loc>[^<]*/guides/[a-z0-9-]+/</loc>", txt))
     if ngd != len(gps):
         sys.exit(f"ERROR: sitemap carries {ngd} guide URLs for {len(gps)} guide pages")
@@ -1859,7 +1878,10 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
         sys.exit(f"ERROR: sitemap carries {nfc} fact-check URLs for {len(fps)} fact-check pages")
     n_master = len(re.findall(r"<loc>", txt))
     if n_master > SITEMAP_MAX_URLS:
-        sys.exit(f"ERROR: sitemap.xml lists {n_master} URLs, over the {SITEMAP_MAX_URLS} limit")
+        sys.exit(f"ERROR: sitemap.xml lists {n_master} URLs, over the {SITEMAP_MAX_URLS} limit "
+                 "(move a growing family to FAMILY_ONLY)")
+    if len(txt.encode("utf-8")) > SITEMAP_MAX_BYTES:
+        sys.exit(f"ERROR: sitemap.xml is {len(txt.encode('utf-8'))} bytes, over {SITEMAP_MAX_BYTES}")
     if re.search(r"community\.html\?zip=", txt):
         sys.exit("ERROR: the legacy community.html?zip= URL survived in the artifact sitemap")
     # Every advertised URL must agree with its own robots directive. The development URLs
@@ -1869,19 +1891,17 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     if re.search(r"homesignalmap\.html\?zip=", txt):
         sys.exit("ERROR: a noindex homesignalmap.html?zip= URL survived in the artifact sitemap")
     return {"removed": removed, "removed_dev": removed_dev, "added": len(zips), "cities": len(cps),
-            "projects": len(pps), "guides": len(gps), "maps": len(mps), "developments": len(dps),
+            "projects": 0, "guides": len(gps), "maps": len(mps), "developments": len(dps),
                 "fact_checks": len(fps)}
 
 
 # ---------------------------------------------------------------- family sitemaps (plan step 14)
 # Search Console reports indexing per SUBMITTED sitemap, so one sitemap per page family is what
-# lets it measure each family separately. These are ADDITIONAL to sitemap.xml, which is
-# unchanged; every URL in them is also in sitemap.xml. The two ZIP families overlap on
-# purpose: a ZIP that passes both Rule F and Rule D is in both, so each rule is measured
-# over the whole set of pages it qualifies.
-# project-list is the ONE family that is not also in sitemap.xml: with every public page indexable the
-# flat master would pass the 50,000-URL limit, so the ZIP project lists are listed here (declared in
-# robots.txt) and reconcile_sitemap fails the build if the master itself ever exceeds the limit.
+# lets it measure each family separately. Every URL in them is also in sitemap.xml EXCEPT the
+# FAMILY_ONLY families (project, project-list), which are listed only in their own sitemap (declared
+# in robots.txt) because the flat master would pass the 50,000-URL limit; reconcile_sitemap fails the
+# build if the master itself ever exceeds it. The two ZIP families overlap on purpose: a ZIP that passes
+# both Rule F and Rule D is in both, so each rule is measured over the whole set of pages it qualifies.
 # "zip" lists EVERY community document (index-all policy). zip-alerts and zip-development are kept as
 # MEASUREMENT partitions (Search Console already has them submitted); they exclude nothing, because the
 # master and the "zip" family list every ZIP.
@@ -1889,22 +1909,82 @@ SITEMAP_FAMILIES = ("zip", "zip-alerts", "zip-development", "city", "project", "
                     "development", "fact-check")
 
 
-def write_family_sitemaps(out_dir, families, lastmod=None):
+def _urlset(elements):
+    return ('<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            + "".join(e + "\n" for e in elements) + "</urlset>\n")
+
+
+def _pack(elements, max_urls, max_bytes):
+    """Split <url> elements, in order, into the fewest urlsets each within both limits."""
+    head = len(_urlset([]).encode("utf-8"))
+    out, cur, size = [], [], head
+    for e in elements:
+        n = len(e.encode("utf-8")) + 1
+        if head + n > max_bytes:
+            sys.exit("ERROR: one sitemap <url> element is larger than a whole sitemap file")
+        if cur and (len(cur) >= max_urls or size + n > max_bytes):
+            out.append(cur)
+            cur, size = [], head
+        cur.append(e)
+        size += n
+    out.append(cur)
+    return out
+
+
+def write_family_sitemaps(out_dir, families, lastmod=None, max_urls=None, max_bytes=None):
+    """One sitemap per family. A family within one file's limits is ONE urlset at
+    sitemaps/<name>.xml (every family today). A family past either limit is split, in order, into
+    sitemaps/<name>-1.xml .. <name>-N.xml and sitemaps/<name>.xml becomes a sitemap INDEX of them, so
+    the URL robots.txt declares and Search Console already has keeps working and every URL is listed
+    exactly once. sitemap_locs() reads either shape. The limits are parameters only for tests."""
+    max_urls = max_urls or SITEMAP_MAX_URLS
+    max_bytes = max_bytes or SITEMAP_MAX_BYTES
     d = os.path.join(out_dir, "sitemaps")
     os.makedirs(d, exist_ok=True)
-    counts = {}
+    counts, parts = {}, {}
     for name in SITEMAP_FAMILIES:
         paths = sorted(families.get(name) or [])
-        if len(paths) > SITEMAP_MAX_URLS:
-            sys.exit(f"ERROR: sitemaps/{name}.xml would list {len(paths)} URLs, over the "
-                     f"{SITEMAP_MAX_URLS} limit for one file — split it before publishing")
-        body = ('<?xml version="1.0" encoding="UTF-8"?>\n'
-                '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-                + "".join(_url_el(f"{BASE}{p}", (lastmod or {}).get(p)) + "\n" for p in paths)
-                + "</urlset>\n")
-        open(os.path.join(d, f"{name}.xml"), "w", encoding="utf-8").write(body)
+        if len(paths) != len(set(paths)):
+            sys.exit(f"ERROR: sitemaps/{name}.xml would list a URL twice")
+        els = [_url_el(f"{BASE}{p}", (lastmod or {}).get(p)) for p in paths]
+        chunks = _pack(els, max_urls, max_bytes)
+        for old in os.listdir(d):    # a rebuild into the same directory never keeps stale chunks
+            if re.fullmatch(re.escape(name) + r"-\d+\.xml", old):
+                os.remove(os.path.join(d, old))
+        if len(chunks) == 1:
+            open(os.path.join(d, f"{name}.xml"), "w", encoding="utf-8").write(_urlset(chunks[0]))
+        else:
+            for i, c in enumerate(chunks, 1):
+                open(os.path.join(d, f"{name}-{i}.xml"), "w", encoding="utf-8").write(_urlset(c))
+            idx = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+                   '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+                   + "".join(f"  <sitemap>\n    <loc>{html.escape(f'{BASE}/sitemaps/{name}-{i}.xml')}</loc>\n"
+                             "  </sitemap>\n" for i in range(1, len(chunks) + 1))
+                   + "</sitemapindex>\n")
+            open(os.path.join(d, f"{name}.xml"), "w", encoding="utf-8").write(idx)
         counts[name] = len(paths)
-    return counts
+        parts[name] = len(chunks)
+    return counts, parts
+
+
+SITEMAPINDEX_LOC_RE = re.compile(r"<sitemap>\s*<loc>([^<]+)</loc>")
+URL_LOC_RE = re.compile(r"<url>\s*<loc>([^<]+)</loc>")
+
+
+def sitemap_locs(root, rel):
+    """Page URLs listed by the sitemap at <root>/<rel>, following a sitemap index to its child files
+    (which must be in the same artifact). Used by the build's own gates and the index-all audit."""
+    txt = open(os.path.join(root, rel), encoding="utf-8").read()
+    if "<sitemapindex" in txt:
+        out = []
+        for u in SITEMAPINDEX_LOC_RE.findall(txt):
+            m = re.match(r"https?://[^/]+/(.+)$", html.unescape(u))
+            if not m or "<sitemapindex" in open(os.path.join(root, m.group(1)), encoding="utf-8").read():
+                sys.exit(f"ERROR: {rel} names a child sitemap that is not a urlset in this artifact: {u}")
+            out += sitemap_locs(root, m.group(1))
+        return out
+    return [html.unescape(u) for u in URL_LOC_RE.findall(txt)]
 
 
 # ---------------------------------------------------------------- focus-area sitemaps
@@ -2086,8 +2166,11 @@ class MapTemplate:
         # ZIP-framed static hero (what a crawler reads before any script runs). Facts come from the
         # same page record the community document uses; nothing is inferred.
         n = p.get("rule_d_count") if p.get("rule_d") else None
+        summary = p.get("map_summary_html") or ""
+        # With the static summary (map_zip_summary.py) the count lives there, once; the hero inside the
+        # template would repeat it after the runtime mounts the page.
         fact = (f" {n} distinct development projects are on record for this ZIP, compiled from "
-                f"official sources." if isinstance(n, int) and n > 0 else "")
+                f"official sources." if isinstance(n, int) and n > 0 and not summary else "")
         sub = ('<div class="sub">Development records, permits and regulated facilities on file for '
                f'ZIP {esc(z)} ({esc(plabel)}), each linked to its official public record.{fact} '
                'Search an address to see what is built and proposed nearby. '
@@ -2106,6 +2189,12 @@ class MapTemplate:
         ):
             out = out.replace(old, new, 1)
         out = out.replace(self.OG_IMAGE, f"{BASE}/og-default.png")
+        if summary:
+            # OUTSIDE the inert <template>: a crawler reads it in the first HTML, and page_semantics
+            # fingerprints it, so a change to these records moves the page's lastmod and IndexNow.
+            if out.count("</template>\n") != 1:
+                sys.exit("ERROR: Map 1 template: expected exactly one </template> to place the ZIP summary after")
+            out = out.replace("</template>\n", "</template>\n" + summary, 1)
         out = re.sub(r'<meta name="description" content="[^"]*"/>',
                      lambda m: f'<meta name="description" content="{esc(desc)}"/>', out, count=1)
         return out
@@ -2177,6 +2266,9 @@ def main():
     ap.add_argument("--dev-dossiers", default=None,
                     help="published development dossiers (default: data/development_dossiers.json; "
                          "a fixture reads a sibling development_dossiers.json when present)")
+    ap.add_argument("--map-pilot", default=mzs.PILOT_PATH,
+                    help="Development Map summary manifest (default: data/seo-map-pilot.json). Tests and "
+                         "previews point this at a fixture manifest; production always uses the committed one.")
     ap.add_argument("--zip-coverage", default=COVERAGE_PATH,
                     help="ZIP coverage model JSON (default: lib/zip-coverage.json). Tests point "
                          "this at a fixture model; production always uses the committed one.")
@@ -2327,6 +2419,24 @@ def main():
         pages[z]["rule_d"], pages[z]["rule_d_count"], pages[z]["dev_entities"] = False, 0, []
     link_cities(pages, cities)
     linked = link_projects(pages, cities, projects)
+    # Development Map indexing pilot (data/seo-map-pilot.json): the static ZIP summary on /map/<zip>/
+    # and the map link on that ZIP's project list. Mode pilot = the manifest's treatment ZIPs only.
+    pilot = mzs.load_pilot(a.map_pilot)
+    for z, p in pages.items():
+        if mzs.treated(z, p, pilot):
+            p["map_summary"] = True
+            p["map_summary_html"] = mzs.render({**p, "place_label": place_label(p["name"], p.get("state"), z)},
+                                               projects)
+    n_summary = sum(1 for p in pages.values() if p.get("map_summary"))
+    # Every treatment ZIP that has a standard page must get it; a treatment ZIP that has since lost its page or its
+    # Census area is reported, not fatal (it simply leaves the pilot).
+    expected = {z for z in pilot["treatment"] if z in pages and not pages[z].get("coverage")}
+    if pilot["mode"] == "pilot" and n_summary != len(expected):
+        sys.exit(f"ERROR: map pilot: {n_summary} summaries for {len(expected)} eligible treatment ZIPs")
+    if pilot["mode"] == "pilot" and len(expected) != len(pilot["treatment"]):
+        print(f"::warning::map pilot: {len(pilot['treatment']) - len(expected)} treatment ZIP(s) have no standard page")
+    print(f"map summary    : mode {pilot['mode']}{' (' + pilot['error'] + ')' if pilot.get('error') else ''}; "
+          f"{n_summary} /map/<zip>/ documents carry the static ZIP summary")
     dvp.annotate(dossiers, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
     dvp.link_pages(dossiers, pages, projects)
     npass = sum(1 for p in pages.values() if p["rule_f"])
@@ -2372,7 +2482,7 @@ def main():
     sm = reconcile_sitemap(a.out, indexable, city_paths, project_paths, guide_paths,
                            lastmod=lastmod_map, map_paths=map_paths, dev_paths=dev_paths,
                            fc_paths=fc_paths)
-    fam = write_family_sitemaps(a.out, {
+    fam, fam_files = write_family_sitemaps(a.out, {
         "zip": [f"/community/{z}/" for z in sorted(pages)],
         "zip-alerts": [f"/community/{z}/" for z, p in pages.items() if p["rule_f"]],
         "zip-development": [f"/community/{z}/" for z, p in pages.items() if p.get("rule_d")],
@@ -2453,11 +2563,12 @@ def main():
                "sitemap_community_urls": sm["added"],
                "sitemap_dev_urls_removed": sm["removed_dev"],
                "city_pages": city_paths, "sitemap_city_urls": sm["cities"],
-               "project_pages": project_paths, "sitemap_project_urls": sm["projects"],
+               "project_pages": project_paths, "sitemap_project_urls": fam["project"],   # in sitemaps/project.xml
                "development_pages": dev_paths, "sitemap_development_urls": sm["developments"],
                "fact_check_pages": fc_paths, "sitemap_fact_check_urls": sm["fact_checks"],
                "guide_pages": sorted(guide_paths), "sitemap_guide_urls": sm["guides"],
-               "family_sitemaps": fam,
+               "family_sitemaps": fam, "family_sitemap_files": fam_files,
+               "master_sitemap_families_excluded": list(FAMILY_ONLY),
                "focus_sitemaps": focus,
                "page_state_hash": state_doc["state_hash"], "page_state_pages": len(page_state)},
               open(os.path.join(a.out, "zip-pages-manifest.json"), "w"))

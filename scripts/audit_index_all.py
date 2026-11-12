@@ -63,6 +63,26 @@ def blocked(path, disallow):
     return any(path.startswith(d.rstrip("*")) for d in disallow if d != "/") or "/" in disallow
 
 
+def page_locs(root, rel, seen=None):
+    """Page URLs a sitemap lists. A sitemap INDEX (a family split past one file's limits,
+    gen_zip_pages.write_family_sitemaps) is followed to its child files in the same artifact;
+    its own <loc>s are sitemap files, not pages, and are never counted as pages."""
+    seen = set() if seen is None else seen
+    if rel in seen:
+        return set()
+    seen.add(rel)
+    f = os.path.join(root, rel)
+    if not os.path.exists(f):
+        return set()
+    txt = open(f, encoding="utf-8").read()
+    if "<sitemapindex" in txt:
+        out = set()
+        for u in LOC.findall(txt):
+            out |= page_locs(root, url_path(u).lstrip("/"), seen)
+        return out
+    return {url_path(u) for u in LOC.findall(txt)}
+
+
 def url_path(u):
     m = re.match(r"https?://[^/]+(/.*)?$", u)
     return (m.group(1) or "/") if m else u
@@ -86,9 +106,7 @@ def main():
 
     sitemap_paths = set()
     for sm in ["sitemap.xml"] + [url_path(u).lstrip("/") for u in declared if "/sitemaps/" in u]:
-        f = os.path.join(root, sm)
-        if os.path.exists(f):
-            sitemap_paths |= {url_path(u) for u in LOC.findall(open(f, encoding="utf-8").read())}
+        sitemap_paths |= page_locs(root, sm)
     if not sitemap_paths:
         print("AUDIT COULD NOT RUN: no URLs found in any sitemap")
         return 2

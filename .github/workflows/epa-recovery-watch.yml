@@ -116,7 +116,10 @@ jobs:
           echo "passed=pending" >> "$GITHUB_OUTPUT"
 
       - name: Step 3 — repair a bounded batch, ONLY if the proof passed
-        if: steps.proof.outputs.passed == 'true'
+        # PAUSE SWITCH (2026-11-10): repository variable EPA_RECOVERY_REPAIR_PAUSED = 'true' skips ONLY this
+        # step (the 60-ZIP repair burst). Absent or any other value: unchanged. The gate, the 82801 proof,
+        # the report and every other workflow are unaffected.
+        if: steps.proof.outputs.passed == 'true' && vars.EPA_RECOVERY_REPAIR_PAUSED != 'true'
         run: |
           set -euo pipefail
           # The RPC refuses anyway if the proof did not pass; this `if:` just avoids a noisy failure.

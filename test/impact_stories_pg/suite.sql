@@ -127,6 +127,12 @@ select pg_temp.chk('5g one approval: on to the Visuals step', pg_temp.stage() = 
 select pg_temp.chk('5h approving twice records nothing new', (select (public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'narrative', 'approved', 3))->>'unchanged') = 'true'
    and (select count(*) from public.impact_story_approvals where artifact = 'narrative' and decision = 'approved') = 1);
 
+select pg_temp.chk('5i approving the script starts preparing its pictures by itself',
+   (pg_temp.lastjob()).kind = 'visuals' and (pg_temp.lastjob()).status = 'queued');
+-- the worker takes that job and stops it, so the later steps start from no job in flight (as before this was automatic)
+select public.hs_impact_story_job_claim((pg_temp.lastjob()).id);
+select public.hs_impact_story_job_fail((pg_temp.lastjob()).id, 'test: stopped');
+
 -- 6. any change inside the narrative needs approving again; a change outside it does not ----------------
 select public.hs_impact_story_save(pg_temp.id('s')::uuid, 3, pg_temp.body() || '{"main":{"acts":[{"act":1},{"act":6}]},"suitability":"edited note"}');
 select pg_temp.work(jsonb_build_object('derived', jsonb_build_object('validation', pg_temp.ok_val(true, 'P1'))));
@@ -144,6 +150,9 @@ select public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'narrative', 'revoke
 select pg_temp.chk('6d a revoked approval blocks readiness', pg_temp.nst() = 'revoked' and pg_temp.stage() = 'script');
 select public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'narrative', 'approved', 6);
 select pg_temp.chk('6e re-approval is a new row; history kept', (select count(*) from public.impact_story_approvals where artifact = 'narrative') = 5);
+
+select public.hs_impact_story_job_claim((pg_temp.lastjob()).id) where (pg_temp.lastjob()).kind = 'visuals' and (pg_temp.lastjob()).status = 'queued';
+select public.hs_impact_story_job_fail((pg_temp.lastjob()).id, 'test: stopped') where (pg_temp.lastjob()).kind = 'visuals' and (pg_temp.lastjob()).status = 'running';
 
 -- 7. optimistic lock, superseded results ---------------------------------------------------------------
 select pg_temp.chk('7a a stale editor cannot overwrite', pg_temp.err(format('select public.hs_impact_story_save(%L, 5, %L::jsonb)', pg_temp.id('s'), pg_temp.body())) like '40001%');
@@ -238,7 +247,7 @@ create function pg_temp.approve_visuals() returns void language plpgsql as $$ be
   perform public.hs_impact_story_visuals_approve(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash');
 end $$;
 select pg_temp.chk('12V1 an approved narrative goes to the Visuals step first; Render is refused until the visuals are approved',
-  pg_temp.stage() = 'visuals' and pg_temp.nxt() = 'Prepare the visuals' and pg_temp.vis()->>'state' = 'none'
+  pg_temp.stage() = 'visuals' and pg_temp.nxt() like 'Prepar%' and pg_temp.vis()->>'state' in ('none', 'preparing', 'failed')
   and pg_temp.err(format('select public.hs_impact_story_render(%L, 7)', pg_temp.id('s'))) like '%Approve the visuals before rendering%');
 select pg_temp.as_user('stranger@example.com');
 select pg_temp.chk('12V2 non-admin cannot prepare, approve or revoke visuals',
@@ -567,6 +576,81 @@ select pg_temp.chk('12z3 a render failed before the code existed is read from th
   and not public._hs_is_visuals_changed('render', 'failed', null, 'The render failed: OSError')
   and not public._hs_is_visuals_changed('visuals', 'failed', '{"code":"visuals_changed"}', null));
 rollback;
+-- 12y1-12y4 (2026-11-07, founder: "no button to disregard new article and continue"): a newer event the check named
+-- with a key can be set aside; its key then rides on every later job's story, and an unreported key is refused.
+begin;
+select public.hs_impact_story_job_claim(pg_temp.id('r1')::uuid);
+select public.hs_impact_story_job_fail(pg_temp.id('r1')::uuid, 'Nothing was rendered: Outdated status',
+  '{"blocked":true,"failures":[{"code":"outdated_status"}],"currency":{"state":"stale","events":[{"key":"0123456789abcdef","kind":"document_link_changed","summary":"Democrats win House majority","source":"https://x.example/a"}]}}'::jsonb);
+select pg_temp.chk('12y1 an unreported or malformed key is refused',
+  pg_temp.err(format('select public.hs_impact_story_currency_dismiss(%L, array[''fedcba9876543210''])', pg_temp.id('s'))) like '22023%'
+  and pg_temp.err(format('select public.hs_impact_story_currency_dismiss(%L, array[]::text[])', pg_temp.id('s'))) like '22023%');
+-- the real case: Prepare (a visuals job) stopped on the check. Inserted as the worker leaves it: failed, with the result.
+insert into public.impact_story_jobs (story_id, kind, base_version, idempotency_key, status, result, error, requested_by, completed_at)
+values (pg_temp.id('s')::uuid, 'visuals', pg_temp.cur(), 'test-12y0-visuals-stop', 'failed',
+  '{"blocked":true,"failures":[{"code":"outdated_status"}],"currency":{"state":"stale","events":[{"key":"abcdef0123456789","summary":"x"}]}}',
+  'Nothing was rendered: Outdated status', 'worker', now() + interval '1 hour');
+select pg_temp.chk('12y0 the Visuals stop the page reads carries the check''s keyed events (the button needs them)',
+  public._hs_is_visuals(pg_temp.id('s')::uuid)->'blocked'->'currency'->'events'->0->>'key' = 'abcdef0123456789'
+  and (public.hs_impact_story_currency_dismiss(pg_temp.id('s')::uuid, array['abcdef0123456789'])->>'dismissed')::int = 1);
+select public.hs_impact_story_currency_dismiss(pg_temp.id('s')::uuid, array['0123456789abcdef', '0123456789abcdef']);
+select pg_temp.chk('12y2 the reported key is set aside once, with what it was, and an event',
+  (select count(*) from public.impact_story_currency_dismissals where event_key = '0123456789abcdef' and decision = 'dismissed'
+     and event->>'summary' = 'Democrats win House majority') = 1
+  and exists (select 1 from public.impact_story_events where story_id = pg_temp.id('s')::uuid and kind = 'currency_dismissed'));
+select public.hs_impact_story_job_retry(pg_temp.id('r1')::uuid);
+select pg_temp.chk('12y3 the next job''s story carries the dismissed key',
+  public.hs_impact_story_job_claim(pg_temp.id('r1')::uuid)->'story'->'currency_dismissed' = '["0123456789abcdef", "abcdef0123456789"]'::jsonb);
+select pg_temp.chk('12y4 dismissals are append-only and hidden from visitors',
+  pg_temp.err('delete from public.impact_story_currency_dismissals') is not null
+  and not has_table_privilege('anon', 'public.impact_story_currency_dismissals', 'select')
+  and not has_function_privilege('anon', 'public.hs_impact_story_currency_dismiss(uuid, text[])', 'execute'));
+rollback;
+-- 12x1-12x5 (2026-11-07, founder: "there are no buttons to give me options to do something"): the other answer to a
+-- newer-news stop. "Update the story" writes one research note naming the news on main.status, then starts Fix.
+begin;
+select public.hs_impact_story_job_claim(pg_temp.id('r1')::uuid);
+select public.hs_impact_story_job_fail(pg_temp.id('r1')::uuid, 'Nothing was rendered: Outdated status',
+  '{"blocked":true,"failures":[{"code":"outdated_status"}],"currency":{"state":"stale","events":[{"key":"0123456789abcdef","kind":"document_link_changed","summary":"Rule 3.15 amendments: hearing Nov. 20, 2026","source":"https://www.rrc.texas.gov/x"}]}}'::jsonb);
+select pg_temp.chk('12x1 an unreported or empty key list is refused',
+  pg_temp.err(format('select public.hs_impact_story_currency_update(%L, array[''fedcba9876543210''])', pg_temp.id('s'))) like '22023%'
+  and pg_temp.err(format('select public.hs_impact_story_currency_update(%L, array[]::text[])', pg_temp.id('s'))) like '22023%'
+  and not exists (select 1 from public.impact_story_line_notes where story_id = pg_temp.id('s')::uuid and path = 'main.status'));
+select public.hs_impact_story_currency_update(pg_temp.id('s')::uuid, array['0123456789abcdef']);
+select pg_temp.chk('12x2 one research note on main.status names the news and its source',
+  (select count(*) from public.impact_story_line_notes where story_id = pg_temp.id('s')::uuid and path = 'main.status'
+     and kind = 'research' and note like '%Rule 3.15 amendments: hearing Nov. 20, 2026%' and note like '%rrc.texas.gov%'
+     and note like '%update every line that states the status%' and char_length(note) <= 1000) = 1);
+select pg_temp.chk('12x3 Fix is started with that note',
+  exists (select 1 from public.impact_story_fix_batches where story_id = pg_temp.id('s')::uuid));
+select public.hs_impact_story_currency_update(pg_temp.id('s')::uuid, array['0123456789abcdef']);
+select pg_temp.chk('12x4 a second press adds no second note',
+  (select count(*) from public.impact_story_line_notes where story_id = pg_temp.id('s')::uuid and path = 'main.status') = 1);
+select pg_temp.chk('12x5 visitors cannot call it',
+  not has_function_privilege('anon', 'public.hs_impact_story_currency_update(uuid, text[])', 'execute')
+  and has_function_privilege('authenticated', 'public.hs_impact_story_currency_update(uuid, text[])', 'execute'));
+rollback;
+-- 12w1-12w3 (2026-11-09, House Speaker story): the SCRIPT check (the current version's validation.currency) reported the
+-- news; both answers accept its key, a key from an older version is refused, and Update writes the same note.
+begin;
+update public.impact_story_versions set validation = coalesce(validation, '{}'::jsonb) || '{"currency":{"state":"stale","events":[{"key":"0e7cbefee047fb66","kind":"new_record_text","text":"A petition has passed 1 million signatures","source":"https://www.newsweek.com/x"}]}}'::jsonb
+ where story_id = pg_temp.id('s')::uuid and version = pg_temp.cur();
+update public.impact_story_versions set validation = coalesce(validation, '{}'::jsonb) || '{"currency":{"events":[{"key":"1111111111111111","text":"old"}]}}'::jsonb
+ where story_id = pg_temp.id('s')::uuid and version < pg_temp.cur();
+select pg_temp.chk('12w1 a key only an older version reported is refused',
+  pg_temp.err(format('select public.hs_impact_story_currency_dismiss(%L, array[''1111111111111111''])', pg_temp.id('s'))) like '22023%'
+  and not has_function_privilege('authenticated', 'public._hs_is_currency_event(uuid, text)', 'execute'));
+select public.hs_impact_story_currency_update(pg_temp.id('s')::uuid, array['0e7cbefee047fb66']);
+select pg_temp.chk('12w2 Update accepts the script check''s key: one note naming the news, and Fix starts',
+  (select count(*) from public.impact_story_line_notes where story_id = pg_temp.id('s')::uuid and path = 'main.status'
+     and note like '%passed 1 million signatures%' and note like '%newsweek.com%') = 1
+  and exists (select 1 from public.impact_story_fix_batches where story_id = pg_temp.id('s')::uuid));
+select public.hs_impact_story_currency_dismiss(pg_temp.id('s')::uuid, array['0e7cbefee047fb66']);
+select pg_temp.chk('12w3 Not about this story accepts it too, with no job id, and it rides on the next claim',
+  (select count(*) from public.impact_story_currency_dismissals where event_key = '0e7cbefee047fb66' and job_id is null
+     and event->>'source' = 'https://www.newsweek.com/x' and event->>'summary' like '%1 million signatures%') = 1
+  and public._hs_is_currency_dismissed(pg_temp.id('s')::uuid) ? '0e7cbefee047fb66');
+rollback;
 select pg_temp.chk('12f the worker gets the approved body', (public.hs_impact_story_job_claim(pg_temp.id('r1')::uuid)->'base_body'->>'schema') = 'impact-story/2');
 select public.hs_impact_story_job_complete(pg_temp.id('r1')::uuid, jsonb_build_object('assets',
   (select jsonb_agg(x) from jsonb_array_elements(pg_temp.files(pg_temp.id('r1')::uuid)) x where x->>'asset' <> 'thumbnail')));
@@ -656,6 +740,54 @@ select pg_temp.chk('12f4c no GitHub credential: the batch is failed with a reada
    and not has_function_privilege('authenticated', 'public._hs_is_fix_dispatch(uuid, text)', 'execute'));
 insert into vault.decrypted_secrets values ('github_actions_pat', 'test-pat');
 update public.impact_story_fix_batches set status = 'plan_queued', completed_at = null, summary = null where id = pg_temp.id('fb')::uuid;
+-- 12R: a fix run that never started is sent again by itself, at most 3 times, only inside 24 hours
+create temp table r12 as select count(*) as n, coalesce(max(id), 0) as last from net.requests where url like '%impact-fix-run.yml%';
+select pg_temp.chk('12R1 a batch sent a moment ago is left alone',
+   (public.impact_fix_redispatch_tick()->>'redispatched')::int = 0
+   and (select count(*) from net.requests where url like '%impact-fix-run.yml%') = (select n from r12) + 0);
+update public.impact_story_fix_batches set requested_at = now() - interval '20 minutes' where id = pg_temp.id('fb')::uuid;
+create temp table t12r2 as select public.impact_fix_redispatch_tick() as r;
+select pg_temp.chk('12R2 unclaimed for 15 minutes: the plan run is sent again, counted, and recorded as an event',
+   (select (r->>'redispatched')::int from t12r2) = 1
+   and (select count(*) from net.requests where url like '%impact-fix-run.yml%') = (select n from r12) + 1
+   and (select body from net.requests order by id desc limit 1) = jsonb_build_object('ref', 'main', 'inputs', jsonb_build_object('batch', pg_temp.id('fb'), 'mode', 'plan'))
+   and (select redispatched from public.impact_story_fix_batches where id = pg_temp.id('fb')::uuid) = 1
+   and exists (select 1 from public.impact_story_events where kind = 'fix_batch_redispatched' and actor = 'system:fix-redispatch'
+                and detail->>'batch' = pg_temp.id('fb') and detail->>'phase' = 'plan' and detail->>'try' = '1'));
+select pg_temp.chk('12R3 not again until 15 minutes after the last send',
+   (public.impact_fix_redispatch_tick()->>'redispatched')::int = 0
+   and (select count(*) from net.requests where url like '%impact-fix-run.yml%') = (select n from r12) + 1);
+update public.impact_story_fix_batches set redispatched_at = now() - interval '16 minutes' where id = pg_temp.id('fb')::uuid;
+select public.impact_fix_redispatch_tick();
+update public.impact_story_fix_batches set redispatched_at = now() - interval '16 minutes' where id = pg_temp.id('fb')::uuid;
+select public.impact_fix_redispatch_tick();
+update public.impact_story_fix_batches set redispatched_at = now() - interval '16 minutes', requested_at = now() - interval '70 minutes' where id = pg_temp.id('fb')::uuid;
+select pg_temp.chk('12R4 three tries at most: after that the batch waits for the Fix button',
+   (public.impact_fix_redispatch_tick()->>'redispatched')::int = 0
+   and (select redispatched from public.impact_story_fix_batches where id = pg_temp.id('fb')::uuid) = 3
+   and (select count(*) from net.requests where url like '%impact-fix-run.yml%') = (select n from r12) + 3
+   and public._hs_is_media(pg_temp.id('s')::uuid)->'fix_batch'->>'status' = 'stalled');
+update public.impact_story_fix_batches set redispatched = 0, redispatched_at = null, requested_at = now() - interval '25 hours' where id = pg_temp.id('fb')::uuid;
+select pg_temp.chk('12R5 a request older than 24 hours is never sent by itself',
+   (public.impact_fix_redispatch_tick()->>'redispatched')::int = 0
+   and (select count(*) from net.requests where url like '%impact-fix-run.yml%') = (select n from r12) + 3);
+update public.impact_story_fix_batches set requested_at = now() - interval '20 minutes', status = 'planning', claimed_at = now() where id = pg_temp.id('fb')::uuid;
+select pg_temp.chk('12R6 a batch a run already claimed is never sent again',
+   (public.impact_fix_redispatch_tick()->>'redispatched')::int = 0
+   and (select count(*) from net.requests where url like '%impact-fix-run.yml%') = (select n from r12) + 3);
+update public.impact_story_fix_batches set status = 'queued', claimed_at = null, confirmed_at = now() - interval '20 minutes' where id = pg_temp.id('fb')::uuid;
+create temp table t12r7 as select public.impact_fix_redispatch_tick() as r;
+select pg_temp.chk('12R7 a confirmed plan that never started is sent again as the WORK run',
+   (select (r->>'redispatched')::int from t12r7) = 1
+   and (select body from net.requests order by id desc limit 1) = jsonb_build_object('ref', 'main', 'inputs', jsonb_build_object('batch', pg_temp.id('fb'), 'mode', 'work')));
+select pg_temp.chk('12R8 only the system can run it',
+   not has_function_privilege('authenticated', 'public.impact_fix_redispatch_tick()', 'execute')
+   and not has_function_privilege('anon', 'public.impact_fix_redispatch_tick()', 'execute')
+   and has_function_privilege('service_role', 'public.impact_fix_redispatch_tick()', 'execute'));
+update public.impact_story_fix_batches set status = 'plan_queued', claimed_at = null, confirmed_at = null, requested_at = now(),
+       redispatched = 0, redispatched_at = null where id = pg_temp.id('fb')::uuid;
+-- leave the request and event logs as the later checks expect them
+delete from net.requests where id > (select last from r12);
 select pg_temp.chk('12f5 the fixer lists it as a plan run, with the story slug', public.impact_fix_batches_list()->0->>'id' = pg_temp.id('fb')
    and public.impact_fix_batches_list()->0->>'phase' = 'plan'
    and public.impact_fix_batches_list()->0->>'video_slug' is not null);
@@ -909,9 +1041,12 @@ select public.hs_impact_story_job_complete((pg_temp.lastjob()).id, jsonb_build_o
   jsonb_set(pg_temp.files((pg_temp.lastjob()).id), '{1,qc}', jsonb_build_object('ok', true, 'quality', jsonb_build_object('ok', false,
     'failures', jsonb_build_array(jsonb_build_object('code', 'excessive_documents', 'label', 'Too many documents and cards'))))),
   'quality', jsonb_build_object('ok', false), 'currency', jsonb_build_object('state', 'current')));
-select pg_temp.chk('12r6 a file the visual quality gate failed is blocked and cannot be approved',
+select pg_temp.chk('12r6 a file that failed only style checks is blocked, says so, and is marked approvable anyway',
   pg_temp.fst('short_a') = 'blocked' and pg_temp.fst('main') = 'pending'
-  and pg_temp.err(format('select public.hs_impact_story_media_decide(%L, %s, %L)', pg_temp.id('s'), pg_temp.fid('short_a'), 'approved')) like '%visual quality gate failed: Too many documents and cards%'
+  and (select (x->>'approve_anyway')::boolean and x->>'style_warnings' = 'Too many documents and cards' and x->>'why' like '%visual quality gate failed: Too many documents and cards%'
+         from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'files') x where x->>'asset' = 'short_a')
+  and (select not (x->>'approve_anyway')::boolean and x->'style_warnings' = 'null'::jsonb
+         from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'files') x where x->>'asset' = 'main')
   and public._hs_is_media(pg_temp.id('s')::uuid)->'blocked' = 'null'::jsonb
   and public._hs_is_media(pg_temp.id('s')::uuid)->'currency'->>'state' = 'current');
 select pg_temp.chk('12r6b a picture-check failure that rendering again cannot fix goes straight to the fixer: no new render, one automatic request for that video only',
@@ -920,6 +1055,50 @@ select pg_temp.chk('12r6b a picture-check failure that rendering again cannot fi
         where b.requested_by = 'system:auto-fix' and b.status = 'plan_queued') = '["short_a"]'
   and (select note from public.impact_story_media_decisions where actor = 'system:auto-fix' order by id desc limit 1) like '%Too many documents and cards%'
   and public._hs_is_status(pg_temp.id('s')::uuid)->>'owner' = 'working');
+-- Style checks are warnings (Tab 17 audit, 2026-11-11). What counts as style-only is decided in one function.
+select pg_temp.chk('12S0 style-only means: file checks passed, quality failed, and every failure is a known style code',
+  public._hs_is_style_warnings('{"ok":true,"quality":{"ok":false,"failures":[{"code":"slow_pacing","label":"Slow pacing"},{"code":"weak_opening","label":"Weak opening"}]}}') = 'Slow pacing; Weak opening'
+  and public._hs_is_style_warnings('{"ok":true,"quality":{"ok":false,"failures":[{"code":"slow_pacing","label":"Slow pacing"},{"code":"audio_defect","label":"Audio defect"}]}}') is null
+  and public._hs_is_style_warnings('{"ok":false,"quality":{"ok":false,"failures":[{"code":"slow_pacing","label":"Slow pacing"}]}}') is null
+  and public._hs_is_style_warnings('{"ok":true,"quality":{"ok":false,"failures":[{"label":"No code"}]}}') is null
+  and public._hs_is_style_warnings('{"ok":true,"quality":{"ok":false,"failures":[]}}') is null
+  and public._hs_is_style_warnings('{"ok":true,"quality":{"ok":false}}') is null
+  and public._hs_is_style_warnings('{"ok":true,"quality":{"ok":true}}') is null
+  and public._hs_is_style_warnings('{"ok":true}') is null);
+-- a fix batch nobody claimed for 30 minutes is shown as stalled, never as "Claude is making the fixes"
+update public.impact_story_fix_batches set requested_at = requested_at - interval '31 minutes' where story_id = pg_temp.id('s')::uuid;
+select pg_temp.chk('12S1 a fix batch that waited 30 minutes without starting reads stalled, and the next step says to press Fix',
+  public._hs_is_fix_batch(pg_temp.id('s')::uuid)->>'status' = 'stalled'
+  and public._hs_is_status(pg_temp.id('s')::uuid)->>'owner' = 'you'
+  and public._hs_is_status(pg_temp.id('s')::uuid)->>'next' like 'The fix run did not start or stopped%');
+update public.impact_story_fix_batches set requested_at = requested_at + interval '31 minutes' where story_id = pg_temp.id('s')::uuid;
+select pg_temp.chk('12S1b a batch that has just been sent is not stalled', public._hs_is_fix_batch(pg_temp.id('s')::uuid)->>'status' = 'plan_queued');
+-- style checks get one automatic fix round per story
+update public.impact_story_fix_batches set status = 'done' where story_id = pg_temp.id('s')::uuid and requested_by = 'system:auto-fix' and status = 'plan_queued';
+drop table if exists _af2;
+create temp table _af2 as select public._hs_is_auto_fix(pg_temp.id('s')::uuid, (public._hs_is_media(pg_temp.id('s')::uuid)->>'render_job')::uuid) r;
+select pg_temp.chk('12S2 after one automatic fix round, style-only failures start no second one',
+  (select r->>'reason' from _af2) = 'style checks already had their one automatic fix round'
+  and (select count(*) from public.impact_story_fix_batches where story_id = pg_temp.id('s')::uuid and status in ('plan_queued', 'planning', 'planned', 'queued', 'working')) = 0
+  and exists (select 1 from public.impact_story_events where story_id = pg_temp.id('s')::uuid and kind = 'auto_fix_skipped'));
+select public.hs_impact_story_media_decide(pg_temp.id('s')::uuid, pg_temp.fid('short_a'), 'approved');
+select pg_temp.chk('12S3 the founder can approve a style-only failure anyway; the approval records which checks it failed',
+  pg_temp.fst('short_a') = 'approved'
+  and (select x->>'why' like 'Approved by founder@example.com with style warnings: Too many documents and cards.' and not (x->>'approve_anyway')::boolean
+         from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'files') x where x->>'asset' = 'short_a')
+  and (select note from public.impact_story_media_decisions where asset_id = pg_temp.fid('short_a') order by id desc limit 1) = 'Approved with style warnings: Too many documents and cards');
+select public.hs_impact_story_media_decide(pg_temp.id('s')::uuid, pg_temp.fid('short_a'), 'revoked', 'changed my mind');
+select pg_temp.chk('12S4 revoking that approval puts the file back to failed-but-approvable', pg_temp.fst('short_a') = 'blocked'
+  and (select (x->>'approve_anyway')::boolean from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'files') x where x->>'asset' = 'short_a'));
+-- a hard quality code (audio) still blocks, whatever else failed
+set session_replication_role = replica;   -- the asset rows are append-only; the test rewrites one report in place
+update public.impact_story_assets set qc = jsonb_set(qc, '{quality,failures}', qc->'quality'->'failures' || '[{"code":"audio_defect","label":"Audio defect"}]'::jsonb)
+ where id = pg_temp.fid('short_a');
+set session_replication_role = origin;
+select pg_temp.chk('12S5 a video with an audio defect cannot be approved',
+  pg_temp.fst('short_a') = 'blocked'
+  and (select not (x->>'approve_anyway')::boolean from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'files') x where x->>'asset' = 'short_a')
+  and pg_temp.err(format('select public.hs_impact_story_media_decide(%L, %s, %L)', pg_temp.id('s'), pg_temp.fid('short_a'), 'approved')) like '%Cannot approve: The visual quality gate failed%');
 select pg_temp.chk('12r7 a file with no quality report (rendered before the gates) is not blocked by it', pg_temp.fst('main') = 'pending');
 
 -- 10. a story written before the outline, and its old approvals --------------------------------------

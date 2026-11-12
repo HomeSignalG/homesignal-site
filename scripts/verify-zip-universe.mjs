@@ -25,7 +25,7 @@
 //   5. canonical_zip_guard_selftest() returns all-passed — including its own positive
 //      control, so a blanket-deny guard cannot score green here.
 //
-// Env: EXPECTED_ZIPS (default 12744: 12,722 until the founder's 2026-10-26 Alaska expansions, 12,726 after the first, 12,743 after the second, 12,744 with 99519 on 2026-10-27), SUPABASE_URL / SUPABASE_ANON_KEY (default: read from
+// Env: EXPECTED_ZIPS (default: 12,745 plus the ZIPs public.zip_request_builds built automatically; 12,722 until the founder's 2026-10-26 Alaska expansions, 12,726 after the first, 12,743 after the second, 12,744 with 99519 on 2026-10-27, 12,745 with 97149 on 2026-11-11), SUPABASE_URL / SUPABASE_ANON_KEY (default: read from
 // config.js, the one place the app config lives).
 
 import { readFileSync } from 'node:fs';
@@ -41,7 +41,12 @@ const grab = (name) => {
 };
 const SUPABASE_URL = process.env.SUPABASE_URL || grab('SUPABASE_URL');
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || grab('SUPABASE_ANON_KEY');
-const EXPECTED = parseInt(process.env.EXPECTED_ZIPS || '12744', 10);
+// Since 2026-11-11 a Tab 14 area request builds its ZIP page automatically (docs/zip-request-autobuild.sql),
+// so the approved count is the 12,745 of 2026-11-11 (97149 included, recorded as code 'hand_built') PLUS every
+// ZIP that queue built itself. Its audit table is the only way the registry may grow, so a production-only ZIP
+// with no build record still fails.
+const BASELINE_ZIPS = 12745;
+let EXPECTED = process.env.EXPECTED_ZIPS ? parseInt(process.env.EXPECTED_ZIPS, 10) : null;
 
 const HEAD = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
 
@@ -132,7 +137,14 @@ function compareSets(label, actual, registry) {
 }
 
 async function main() {
+  let autoBuilt = [];
+  if (EXPECTED === null) {
+    autoBuilt = (await rpc('zip_request_built_zips'))
+      .filter((r) => r.code !== 'hand_built').map((r) => r.zip);
+    EXPECTED = BASELINE_ZIPS + autoBuilt.length;
+  }
   console.log(`ZIP universe verification — expecting exactly ${EXPECTED} approved ZIPs\n`);
+  if (autoBuilt.length) console.log(`  (12,745 on 2026-11-11 + ${autoBuilt.length} built from Tab 14 requests: ${autoBuilt.join(', ')})\n`);
 
   // 1 — the registry itself.
   const regCount = await exactCount('canonical_zip_registry');
@@ -145,6 +157,9 @@ async function main() {
   const registry = await allValues('canonical_zip_registry', 'zip');
   check(registry.length === regCount,
     `registry read is complete: ${registry.length} of ${regCount} rows fetched`);
+  const regSet = new Set(registry);
+  const builtMissing = autoBuilt.filter((z) => !regSet.has(z));
+  check(builtMissing.length === 0, `every ZIP built from a Tab 14 request is in the registry (${builtMissing.join(', ') || 'all'})`);
 
   // 2..4 — the three public surfaces, each against its own exact count first.
   const surfaces = [

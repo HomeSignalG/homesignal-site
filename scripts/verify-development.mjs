@@ -241,7 +241,7 @@ async function renderZipPage(page, zip) {
     // An UNRECOGNISED value now yields null and is SKIPPED here rather than forced into
     // 'proposed': assertZip's lifecycleValueRecognised check already names a mapping gap, and
     // inventing a bucket for it would report that gap as a mislabel instead.
-    const OK = { built: ['operating now', 'built', 'recorded'], approved: ['approved'], proposed: ['proposed'] };
+    const OK = { built: ['completed (agency record)', 'operating (source listing)', 'operating now', 'built', 'recorded'], approved: ['approved'], proposed: ['proposed'] };
     const railOf = (t) => {
       const raw = t == null ? '' : String(t).trim().toLowerCase();
       if (raw === 'built' || raw === 'operating') return 'built';

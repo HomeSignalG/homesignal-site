@@ -1,6 +1,8 @@
 // Deno integration test: the SHIPPED get-address-report handler (index.ts), ZIP mode, with the
 // network stubbed. It proves — under the real Deno runtime and the real module graph — that the
-// polygon-bbox spatial scope is controlled ONLY by server policy:
+// polygon-bbox spatial scope OF THE PERMIT CONNECTORS is controlled ONLY by server policy
+// (the ZIP boundary itself is read once per ZIP request since 2026-11-09, for the EPA facility
+// plane — see epa-zip-boundary.handler.test.ts — and that read never widens a permit query):
 //   • unset / "off" / unknown mode  ⇒ no bounds read, the legacy centroid square is queried;
 //   • "allowlist"                   ⇒ only listed ZIPs read bounds and widen;
 //   • "all"                         ⇒ every ZIP widens;
@@ -101,19 +103,19 @@ const widerThanLegacy = (zip: string, g: string | null) => {
   ok("handler runs ZIP mode end to end under Deno (200)", r.status === 200, `status ${r.status}: ${r.text.slice(0, 200)}`);
   ok("default (no env): the real Denton entry is queried", r.geom !== null);
   ok("default: legacy centroid square, byte-for-byte", near(parse(r.geom), legacyGeom("76247")), String(r.geom));
-  ok("default: zip_scope_bounds is NOT called", r.rpc.length === 0, JSON.stringify(r.rpc));
+  ok("default: zip_scope_bounds is read exactly once (for the EPA facility plane, 2026-11-09) and does NOT widen the permit query", r.rpc.length === 1 && r.rpc[0] === "76247", JSON.stringify(r.rpc));
 }
 // ── 2. a caller cannot turn it ON ───────────────────────────────────────────────────────────
 for (const extra of [{ scope_bounds: true }, { scopeBounds: true }, { ZIP_SCOPE_BOUNDS_MODE: "all" }, { zip_scope_bounds: true }]) {
   const r = await zipRun("76247", extra);
-  ok(`request body ${JSON.stringify(extra)} cannot enable the scope`, near(parse(r.geom), legacyGeom("76247")) && r.rpc.length === 0, String(r.geom));
+  ok(`request body ${JSON.stringify(extra)} cannot enable the scope`, near(parse(r.geom), legacyGeom("76247")) && r.rpc.length === 1, String(r.geom));
 }
 // ── 3. unknown mode fails closed ────────────────────────────────────────────────────────────
 for (const mode of ["", "off", "OFF", "on", "true", "1", "allow", "everything"]) {
   Deno.env.set("ZIP_SCOPE_BOUNDS_MODE", mode);
   Deno.env.set("ZIP_SCOPE_BOUNDS_ZIPS", "76247");
   const r = await zipRun("76247");
-  ok(`mode "${mode}" (even with the ZIP listed) ⇒ OFF`, near(parse(r.geom), legacyGeom("76247")) && r.rpc.length === 0, String(r.geom));
+  ok(`mode "${mode}" (even with the ZIP listed) ⇒ OFF`, near(parse(r.geom), legacyGeom("76247")) && r.rpc.length === 1, String(r.geom));
 }
 // ── 4. allowlist ────────────────────────────────────────────────────────────────────────────
 Deno.env.set("ZIP_SCOPE_BOUNDS_MODE", "allowlist");
@@ -125,9 +127,9 @@ Deno.env.set("ZIP_SCOPE_BOUNDS_ZIPS", "76258");
   const b = BOUNDS["76258"], g = parse(on.geom);
   ok("allowlist: the wider scope contains the ZIP polygon box", g[0] <= b.xmin && g[1] <= b.ymin && g[2] >= b.xmax && g[3] >= b.ymax, String(on.geom));
   const off = await zipRun("76247");
-  ok("allowlist: an UNLISTED ZIP is untouched (legacy square, no bounds read)", near(parse(off.geom), legacyGeom("76247")) && off.rpc.length === 0, String(off.geom));
+  ok("allowlist: an UNLISTED ZIP is untouched (legacy square; the one bounds read is the EPA plane's)", near(parse(off.geom), legacyGeom("76247")) && off.rpc.length === 1, String(off.geom));
   const offBody = await zipRun("76247", { scope_bounds: true });
-  ok("allowlist: a body flag cannot add an unlisted ZIP", near(parse(offBody.geom), legacyGeom("76247")) && offBody.rpc.length === 0);
+  ok("allowlist: a body flag cannot add an unlisted ZIP", near(parse(offBody.geom), legacyGeom("76247")) && offBody.rpc.length === 1);
   const onBody = await zipRun("76258", { scope_bounds: false });
   ok("allowlist: a body flag cannot remove a listed ZIP", widerThanLegacy("76258", onBody.geom) && onBody.rpc.length === 1);
 }
@@ -141,7 +143,7 @@ Deno.env.set("ZIP_SCOPE_BOUNDS_ZIPS", " 76258 , 76247;76227 not-a-zip 7624 76247
 Deno.env.set("ZIP_SCOPE_BOUNDS_ZIPS", "");
 {
   const r = await zipRun("76258");
-  ok("allowlist mode with an EMPTY list enables nothing", near(parse(r.geom), legacyGeom("76258")) && r.rpc.length === 0);
+  ok("allowlist mode with an EMPTY list enables nothing", near(parse(r.geom), legacyGeom("76258")) && r.rpc.length === 1);
 }
 // ── 5. all ──────────────────────────────────────────────────────────────────────────────────
 Deno.env.set("ZIP_SCOPE_BOUNDS_MODE", "all");
@@ -182,7 +184,7 @@ Deno.env.set("ZIP_SCOPE_BOUNDS_MODE", "all");
   ok("handler: membership RPC failure ⇒ still a 200 (legacy scope for that source, never an error page)", e.status === 200 && e.members.length >= 1, String(e.status));
   Deno.env.set("ZIP_SCOPE_BOUNDS_MODE", "off");
   const o = await zipRun("76258");
-  ok("handler: mode off ⇒ the membership RPC is never called", o.members.length === 0 && o.rpc.length === 0, JSON.stringify(o.members));
+  ok("handler: mode off ⇒ the membership RPC is never called for the permit source", o.members.length === 0 && o.rpc.length === 1, JSON.stringify(o.members));
   dentonFeatures = [];
 }
 

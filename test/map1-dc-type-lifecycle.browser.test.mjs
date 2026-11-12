@@ -103,7 +103,9 @@ const clickStage = (page, id) => page.evaluate((want) => {
   const c = document.querySelector('#mapkey .stagechip[data-stage-id="' + want + '"]'); if (c) c.click();
 }, id);
 const listText = (page, id) => page.evaluate((i) => { const el = document.getElementById(i); return el ? el.innerText : null; }, id);
-const WORD = { Operating: 'Operating data center', Approved: 'Approved data center', Proposed: 'Proposed data center' };
+// 2026-11-09: an operating data center is its source's own listing (HS.isSourceOwnRecord), so its hover
+// names whose claim it is (homesignalmap.html stageWord / markerTitle).
+const WORD = { Operating: 'Operating (source listing) data center', Approved: 'Approved data center', Proposed: 'Proposed data center' };
 const expectTitles = (zip) => count(FIX.rows.filter((r) => r.zip === zip).map((r) => WORD[r.map_status]));
 const BAD = /other project|lifecycle unknown/i;
 

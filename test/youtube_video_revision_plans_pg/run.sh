@@ -61,3 +61,27 @@ $P -f "$ROOT/docs/youtube-video-rebuild-applies-note.sql" >/dev/null
 $P -f "$ROOT/docs/youtube-video-rebuild-applies-note.sql" >/dev/null
 echo "ok rebuild-note applies twice"
 $P -f "$HERE/rebuild-note.sql"
+# Out-of-date files (2026-11-07): production's decide body, then the splice; refuses an unknown body; applies twice
+$P -f "$HERE/live-decide.sql" >/dev/null
+if $P -c "create or replace function public.hs_youtube_videos_list() returns jsonb language plpgsql as \$\$ begin return '[]'; end \$\$" >/dev/null \
+   && $P -f "$ROOT/docs/youtube-video-outdated.sql" >/dev/null 2>&1; then
+  echo "FAIL guard: the outdated SQL spliced an unknown hs_youtube_videos_list"; exit 1
+fi
+echo "ok outdated guard refuses an unknown hs_youtube_videos_list"
+$P -f "$ROOT/docs/youtube-video-revisions.sql" >/dev/null   # put the list back
+$P -f "$ROOT/docs/youtube-video-revision-plans.sql" >/dev/null
+$P -f "$ROOT/docs/youtube-video-revision-plans-also.sql" >/dev/null
+$P -f "$ROOT/docs/youtube-video-rebuild.sql" >/dev/null
+$P -f "$ROOT/docs/youtube-video-rebuild-applies-note.sql" >/dev/null
+$P -f "$HERE/live-decide.sql" >/dev/null
+$P -At -c "select md5(prosrc) from pg_proc where proname = 'hs_youtube_videos_list'" | grep -qx 09eecdd3a42974994a243305b9f192d2 \
+  || { echo "FAIL the fixture's list is not production's"; exit 1; }
+$P -f "$ROOT/docs/youtube-video-outdated.sql" >/dev/null
+$P -f "$ROOT/docs/youtube-video-outdated.sql" >/dev/null
+echo "ok outdated applies twice"
+# the parts (2026-11-07): applied on top; the original checks must still pass, then the per-part ones
+$P -f "$ROOT/docs/youtube-video-outdated-parts.sql" >/dev/null
+$P -f "$ROOT/docs/youtube-video-outdated-parts.sql" >/dev/null
+echo "ok outdated parts apply twice"
+$P -f "$HERE/outdated.sql"
+$P -f "$HERE/outdated-parts.sql"
