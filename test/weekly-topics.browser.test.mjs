@@ -108,43 +108,82 @@ const full = (await calls('hs_weekly_lead_save'))[0].p_fields;
 ok(full.topic === 'Water Quality' && full.location === 'TEST Town' && full.source_urls.length === 2 && full.questions.length === 2
   && full.commitment_wording === 'TEST: we will cover this.' && full.commitment_post_url === 'https://social.example.test/post/7' && !('notes' in full), '3d the optional fields are sent only when filled');
 
-// 4 send to research
+// 4 send to research. A topic is only offered the reports the database would accept it into (category, open, not
+// already published, not one it was deferred or dropped from); the database still checks every call.
 await clear();
-await page.waitForSelector('.tq-lead[data-lead="' + L2.id + '"]');
-await card(L2).locator('button[data-tq="send"]').click();
-ok((await calls('hs_weekly_lead_send_to_research')).length === 0 && (await T('.tq-root [role="alert"]')).includes('Choose a report edition first'), '4a no edition chosen: nothing is sent');
-const openIds = await card(L2).locator('.tq-send-edition option').evaluateAll((os) => os.map((o) => o.value).filter(Boolean));
-ok(openIds.includes(EC.id) && openIds.includes(EA2.id) && !openIds.includes(EA.id), '4b a closed edition is not offered');
-await page.evaluate((id) => { window.answers.hs_weekly_lead_send_to_research = { data: { request_id: 'abcdef12-0000-0000-0000-000000000000', existing: false, lead_id: id } }; }, L2.id);
-await card(L2).locator('.tq-send-edition').selectOption(EW.id);
-await card(L2).locator('button[data-tq="send"]').click();
+const offered = (l) => card(l).locator('.tq-send-edition option').evaluateAll((os) => os.map((o) => o.value).filter(Boolean));
+// the Oregon lead is Water Quality; the fixture's only Water Quality report is already published, so nothing is offered
+const nw = await card(L2).innerText();
+ok((await card(L2).locator('.tq-send-edition, button[data-tq="send"], button[data-tq="assign"]').count()) === 0
+  && /There is no open Water Quality report to add it to yet/.test(nw), '4a a Water topic is offered no Data Centers, Air Quality or published Water report: it says there is no open Water Quality report');
+ok(JSON.stringify((await offered(LD)).sort()) === JSON.stringify([EA2.id]), '4b an Air Quality topic is offered only the open Air Quality report (not the closed one, not Data Centers, not Water)');
+ok(JSON.stringify((await offered(LQ)).sort()) === JSON.stringify([EA2.id, EC.id].sort()) && !(await offered(LQ)).includes(EW.id) && !(await offered(LQ)).includes(EA.id),
+  '4b2 a topic with no category yet is offered every open report whose video is not yet published');
+const ldOpts = await card(LD).locator('.tq-send-edition option').allInnerTexts();
+ok(ldOpts.length === 1 && ldOpts[0] === 'Air Quality report, Nov 9–15, 2026' && !/air-quality-2026-11-09/.test(await card(LD).locator('.tq-next').innerText()),
+  '4b3 the choice reads as a report and its dates; the technical identifier is not in the selector');
+await card(LQ).locator('button[data-tq="send"]').click();
+ok((await calls('hs_weekly_lead_send_to_research')).length === 0 && (await T('.tq-root [role="alert"]')).includes('Choose a report edition first'), '4c no report chosen: nothing is sent');
+await clear();
+await page.evaluate((id) => { window.answers.hs_weekly_lead_send_to_research = { data: { request_id: 'abcdef12-0000-0000-0000-000000000000', existing: false, lead_id: id } }; }, LD.id);
+await card(LD).locator('button[data-tq="send"]').click();
 await page.waitForFunction(() => window.calls.some((c) => c[0] === 'hs_weekly_lead_send_to_research'));
 const sent = (await calls('hs_weekly_lead_send_to_research'))[0];
 const fmt = await page.evaluate(() => window.HS.acqWeeklySlice.answerFormatText());
-ok(sent.p_lead === L2.id && sent.p_edition === EW.id && sent.p_answer_format === fmt && /WEEKLY-ANSWER v1/.test(fmt), '4c the handoff names the topic, the edition and the weekly screen’s own answer format');
+ok(sent.p_lead === LD.id && sent.p_edition === EA2.id && sent.p_answer_format === fmt && /WEEKLY-ANSWER v1/.test(fmt), '4d the handoff names the topic, the edition’s id and the weekly screen’s own answer format');
 await page.waitForFunction(() => /Sent to research: request abcdef12/.test(document.querySelector('.tq-root').innerText));
-ok(true, '4d a successful handoff is confirmed with its request');
+ok(true, '4e a successful handoff is confirmed with its request');
 // a repeat: the same request, said so
 await clear();
 await page.evaluate(() => { window.answers.hs_weekly_lead_send_to_research = { data: { request_id: 'abcdef12-0000-0000-0000-000000000000', existing: true } }; });
-await card(L2).locator('.tq-send-edition').selectOption(EW.id);
-await card(L2).locator('button[data-tq="send"]').click();
+await card(LD).locator('button[data-tq="send"]').click();
 await page.waitForFunction(() => /Already sent: research request abcdef12/.test(document.querySelector('.tq-root').innerText));
-ok(/No second request was made/.test(await T('.tq-root .tq-ok')), '4e a repeated handoff says the existing request was kept');
-// a failure: the reason is shown, no success message, and the topic still reads as it did
+ok(/No second request was made/.test(await T('.tq-root .tq-ok')), '4f a repeated handoff says the existing request was kept');
+// a refusal the page cannot foresee: the database's reason is shown, no success message, and the topic still reads as it did
 await clear();
-await page.evaluate(() => { window.answers.hs_weekly_lead_send_to_research = { error: 'this lead is filed under "Water Quality"; edition data-centers-2026-11-09 is a "Data Centers" report' }; });
-await card(L2).locator('.tq-send-edition').selectOption(EC.id);
-await card(L2).locator('button[data-tq="send"]').click();
+await page.evaluate(() => { window.answers.hs_weekly_lead_send_to_research = { error: 'edition air-quality-2026-11-09 is closed' }; });
+await card(LD).locator('button[data-tq="send"]').click();
 await page.waitForFunction(() => document.querySelector('.tq-root [role="alert"]'));
-ok((await T('.tq-root [role="alert"]')).includes('is a "Data Centers" report') && (await page.locator('.tq-root .tq-ok').count()) === 0
-  && (await card(L2).getAttribute('data-status')) === 'captured' && (await card(L2).locator('.tq-chip:has-text("Edition ")').count()) === 0, '4f a failed handoff shows why and the topic is still unassigned');
+ok((await T('.tq-root [role="alert"]')).includes('edition air-quality-2026-11-09 is closed') && (await page.locator('.tq-root .tq-ok').count()) === 0
+  && (await card(LD).getAttribute('data-status')) === 'captured' && (await card(LD).locator('.tq-edchip').count()) === 0, '4g a refused handoff shows why and the topic is still unassigned');
+// a report the topic was already deferred from is not offered again (the database refuses it), even while that report is open
+await clear();
+await page.evaluate((a) => { const q = JSON.parse(JSON.stringify(window.queue)); const f = q.leads.find((l) => l.id === a.lf);
+  f.state.editions[0].edition = q.editions.find((e) => e.id === a.ea2); f.state.last_disposition.edition = f.state.editions[0].edition; window.queue = q; }, { lf: LF.id, ea2: EA2.id });
+await page.selectOption('#tq-edition', EC.id); await page.waitForFunction(() => window.calls.some((c) => c[0] === 'hs_weekly_topic_queue'));
+await view('deferred');
+ok((await card(LF).locator('.tq-send-edition').count()) === 0 && /There is no open Air Quality report to add it to yet/.test(await card(LF).innerText())
+  && /Deferred from the Air Quality report, Nov 9–15, 2026/.test(await card(LF).innerText()), '4h a report the topic was deferred from is not offered again; the deferral and its reason stay visible');
+await page.evaluate((Q) => { window.queue = Q; }, Q);
+await page.selectOption('#tq-edition', ''); await view('inbox');
 
 // 5 research in progress: the linked request, kept for the manual Perplexity step
 await clear();
 await view('research');
 ok((await page.locator('#tq-list .tq-lead').count()) === 2 && (await card(L1).innerText()).includes('Queued for research'), '5a research in progress lists the handed-off topics');
-await card(L1).locator('.tq-request > summary').click();
+const nb = card(L1).locator('.tq-next');
+ok((await nb.locator('button').count()) === 1 && (await nb.locator('button.tq-primary').innerText()) === 'Open and copy the research request'
+  && (await nb.locator('button[data-tq="dispose"]').count()) === 0 && (await card(L1).locator('.tq-later button[data-tq="dispose"]').count()) === 3
+  && /After you have read the research, record a decision/.test(await card(L1).locator('.tq-later').innerText()), '5a2 a prepared request: the one primary action opens and copies it; Include/Defer/Drop sit apart, after the research');
+const nc0 = (await page.evaluate(() => window.calls.length));
+await nb.locator('button[data-tq="open-request"]').click();
+await page.waitForFunction((id) => document.querySelector('.tq-request[data-lead="' + id + '"]').open && /Copied|Copying failed/.test(document.querySelector('.tq-request[data-lead="' + id + '"] .tq-copied').textContent), L1.id);
+ok((await page.evaluate(() => window.calls.length)) === nc0 && (await card(L1).getAttribute('data-status')) === 'queued_for_research'
+  && (/does not submit or complete the research/.test(await card(L1).locator('.tq-copied').innerText()) || /^Copying failed\./.test(await card(L1).locator('.tq-copied').innerText())),
+  '5a3 open-and-copy opens the request, makes no call, changes no status, and never says the research was done');
+// copying fails (the browser refuses the clipboard, or has none): the request still opens, and the card says copying FAILED
+for (const how of ['refused', 'absent']) {
+  await page.evaluate((id) => { const d = document.querySelector('.tq-request[data-lead="' + id + '"]'); d.open = false; d.querySelector('.tq-copied').textContent = ''; }, L1.id);
+  await page.evaluate((h) => { Object.defineProperty(navigator, 'clipboard', { configurable: true,
+    value: h === 'refused' ? { writeText: () => Promise.reject(new Error('NotAllowedError')) } : undefined }); }, how);
+  const n0 = await page.evaluate(() => window.calls.length);
+  await card(L1).locator('button[data-tq="open-request"]').click();
+  await page.waitForFunction((id) => document.querySelector('.tq-request[data-lead="' + id + '"] .tq-copied').textContent !== '', L1.id);
+  const note = await card(L1).locator('.tq-copied').innerText();
+  ok((await card(L1).locator('.tq-request').evaluate((d) => d.open)) && (await card(L1).locator('.tq-reqtext').isVisible())
+    && /^Copying failed\. The request is open above/.test(note) && !/Copied/.test(note) && (await page.evaluate(() => window.calls.length)) === n0
+    && (await card(L1).getAttribute('data-status')) === 'queued_for_research', '5a4 clipboard ' + how + ': the request still opens, the card says copying failed (never "Copied"), and nothing is recorded');
+}
 const req = await card(L1).locator('.tq-reqtext').inputValue();
 ok(req.includes('SpaceX proposed Cochise County, Arizona data center') && req.includes('1. What is the power demand?') && req.includes('6. How can the public take part?')
   && req.includes('Location: Cochise County, Arizona') && req.includes('Public coverage commitment: none recorded') && req.includes('unverified lead'), '5b the request carries the topic, its location, its questions and no invented commitment');
@@ -165,7 +204,7 @@ ok(/air-quality-2026-11-02: deferred — TEST: the permit record is not public y
 // 7 deferred / carry forward: still there after its edition closed
 await view('deferred');
 const cf = await card(LF).innerText();
-ok((await page.locator('#tq-list .tq-lead').count()) === 1 && cf.includes('Deferred in air-quality-2026-11-02: TEST: waiting for the next hearing') && cf.includes('Send to research'), '7a a deferred topic stays in carry forward, with its reason, and can be sent again');
+ok((await page.locator('#tq-list .tq-lead').count()) === 1 && cf.includes('Deferred from the Air Quality report, Nov 2–8, 2026: TEST: waiting for the next hearing') && cf.includes('Send to research'), '7a a deferred topic stays in carry forward, with its reason, and can be sent again');
 ok(/Deferred topics stay here, with their reasons/.test(await T('#tq-list')), '7b the view says deferred topics are kept');
 
 // 8 this edition: what must be decided before approval
@@ -208,6 +247,16 @@ ok(pub.p_video_url === 'https://video.example.test/watch?v=NEW' && pub.p_publish
 await view('published');
 const cx = await card(LX).innerText();
 ok((await page.locator('#tq-list .tq-lead').count()) === 1 && cx.includes('Published') && cx.includes('https://video.example.test/watch?v=TEST') && cx.includes('2026-11-08'), '9a a published topic shows our video and its date');
+// its edition is published but still open, and a research request is on file: neither makes it look unfinished
+ok(!EW.closed && EW.published && (await card(LX).locator('button[data-tq="dispose"], button[data-tq="send"], button[data-tq="send-current"], button[data-tq="open-request"], .tq-primary').count()) === 0
+  && /Done\. This topic is in our published video for the Water Quality report, Nov 2–8, 2026/.test(cx) && !/Prepare research request|Open the research request|record a decision/i.test(cx),
+  '9a2 a published topic offers no research step and no Include/Defer/Drop for the published report');
+await clear();
+await card(LX).locator('button[data-tq="followup"]').click();
+ok((await page.evaluate(() => window.calls.length)) === 0 && (await T('#tq-capture h3')) === 'Capture a follow-up topic' && (await page.inputValue('#tq-title')) === 'Follow-up: ' + LX.title
+  && (await page.inputValue('#tq-topic')) === 'Water Quality' && /the published report is not changed/.test(await T('#tq-capture')), '9a3 a follow-up is an explicit new topic for a later report: the form is filled in, nothing is saved, the published report is untouched');
+await page.click('button[data-tq="cancel-edit"]');
+ok((await T('#tq-capture h3')) === 'Capture a topic' && (await page.inputValue('#tq-title')) === '', '9a4 cancelling the follow-up leaves an empty form');
 await page.selectOption('#tq-edition', EA.id);
 await page.waitForFunction(() => /Closed: TEST: no video this week/.test(document.querySelector('#tq-editions').innerText));
 ok(!(await T('#tq-editions')).includes('Close this edition') && (await T('#tq-editions')).includes('Our video is not recorded as published'), '9b a closed edition with no video says so and cannot be closed again');

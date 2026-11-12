@@ -207,8 +207,11 @@ await cp.locator('.tq-reason').fill(F.steps[9].args.p_reason);
 await shot('#tab-weeklyreport .tq-lead[data-lead="' + ID.lp + '"]', 'C1-promised-lead-defer-with-reason.png');
 await cp.locator('button[data-d="deferred"]').click(); await wait(10, /Decision recorded/);
 await view('deferred');
-ok(at === 10 && (await cp.getAttribute('data-status')) === 'deferred' && /Deferred in water-quality-2026-11-09: TEST: the record is not public yet/.test(await cp.innerText())
+ok(at === 10 && (await cp.getAttribute('data-status')) === 'deferred' && /Deferred from the Water Quality report, Nov 9–15, 2026: TEST: the record is not public yet/.test(await cp.innerText())
   && (await cp.locator('.tq-promised').count()) === 1, '5d deferred with its reason; it is in carry forward and still flagged as promised');
+// the only other open report is Data Centers: the database would refuse it for a Water topic, and the report it was deferred from would be refused too
+ok((await cp.locator('.tq-send-edition, button[data-tq="send"], button[data-tq="assign"]').count()) === 0 && /There is no open Water Quality report to add it to yet/.test(await cp.innerText()),
+  '5e no report the database would refuse is offered: not the Data Centers report, not the report it was deferred from');
 await shot('#tab-weeklyreport #tq-list', 'C2-deferred-in-carry-forward.png');
 
 // ── 6 disposition and publication ──
@@ -219,6 +222,7 @@ await c2.locator('button[data-tq="assign"]').click(); await wait(11, /Assigned t
 await view('all');
 await c2.locator('button[data-d="included"]').click(); await wait(12, /Decision recorded/);
 ok(at === 12 && (await c2.getAttribute('data-status')) === 'included' && /Our video is not recorded as published yet/.test(await c2.innerText()), '6a the Water lead is included; included is not published');
+ok((await c2.locator('button[data-tq="send-current"], .tq-primary').count()) === 0 && !/Prepare the research request/.test(await c2.innerText()), '6a2 an included topic is not sent back to its first research step');
 await page.selectOption('#tq-edition', ID.ew);
 await page.waitForFunction(() => /Our video is not recorded as published/.test(document.querySelector('#tq-editions').innerText) && !!document.querySelector('#tq-video'));
 await page.fill('#tq-video', F.steps[13].args.p_video_url);
@@ -229,6 +233,8 @@ await page.fill('#tq-video', F.steps[13].args.p_video_url); await page.fill('#tq
 await page.click('button[data-tq="publish"]'); await wait(14, /Publication recorded/);
 await view('published');
 ok(at === 14 && (await c2.getAttribute('data-status')) === 'published' && (await c2.innerText()).includes('https://video.example.test/watch?v=TEST') && (await c2.innerText()).includes('2026-11-10'), '6c with both, the lead is Published with our video and its date');
+ok((await c2.locator('button[data-tq="dispose"], button[data-tq="send-current"], .tq-primary').count()) === 0 && /Done\. This topic is in our published video/.test(await c2.innerText())
+  && (await c2.locator('button[data-tq="followup"]').count()) === 1, '6d published (its report is still open): no research step and no Include/Defer/Drop; a follow-up is offered as a new topic');
 await shot('#tab-weeklyreport #tq-list', 'D1-published-with-our-video.png');
 
 // ── 7 carry forward into the next edition ──
