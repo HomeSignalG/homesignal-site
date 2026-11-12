@@ -6,7 +6,7 @@
 #      append-only triggers, the new functions' security, exactly four replaced function bodies, nothing else);
 #   2. 1-9 applied twice equals 1-9 applied once;
 #   3. the upgrade path: files 8 and 9 applied over a seeded 1-7 database leave every existing weekly row as it was;
-#   4. the known re-apply hazard: re-applying file 2 or 7 after 9 restores their own bodies of the four functions, and
+#   4. the known re-apply hazard: re-applying file 2 or 7 after 9 restores their own bodies of the five functions, and
 #      re-applying 9 then restores 9's (so 9 must be re-applied after any re-application of 2 or 7);
 #   5. three negative controls, each of which release_catalog.py must refuse.
 set -euo pipefail
@@ -57,7 +57,7 @@ import json, sys
 b, c = (json.load(open(p))["functions"] for p in sys.argv[1:3])
 d = sorted(k for k in b if b[k] != c.get(k))
 print("  re-applying 2 and 7 after 9 changes:", d)
-assert d == sorted(["_wk_lead_assign(uuid,uuid,text)", "weekly_lead_request_text(uuid,uuid,text)",
+assert d == sorted(["_wk_lead_assign(uuid,uuid,text)", "weekly_lead_request_text(uuid,uuid,text)", "hs_weekly_lead_disposition(uuid,uuid,text,text)",
                     "hs_weekly_lead_send_to_research(uuid,uuid,text)", "hs_weekly_edition_link_version(uuid,uuid)"]), d
 PY
 P -f "$WEEKLY_DOCS/weekly-9-edition-topics.sql" >/dev/null 2>&1; cat_snap "$tmp/c2.json"

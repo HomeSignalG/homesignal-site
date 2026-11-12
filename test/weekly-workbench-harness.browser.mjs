@@ -151,7 +151,8 @@ select 'IDS ' || :'ed' || ' ' || :'air' || ' ' || :'water';`;
       return r.fulfill({ contentType: 'application/json', body: JSON.stringify(pgRpc(name, args)) });
     }
     return r.fulfill({ contentType: 'text/html', body: '<!doctype html><html><head><meta charset="utf-8">' + style + HARNESS_CSS + '</head><body>' +
-      '<div class="hx"><h2>LOCAL HARNESS — not Tab 20, not production</h2><p>The edition video sequence, on a disposable database with TEST DATA. Every button calls the real database functions.</p></div>' +
+      '<div class="hx"><h2>LOCAL HARNESS — not Tab 20, not production</h2><p>The edition video sequence, on a disposable database with TEST DATA. Every button calls the real database functions.</p>' +
+      '<p class="bad" id="hx-fixture">TECHNICAL FIXTURE: the Water Quality script is the Air Quality demonstration with its topic label renamed. Its text is about the EPA methane proposal, not water; it has no water sources and is not a Water Quality report.</p></div>' +
       '<div id="we" style="margin:12px"></div><script src="/we.js"></script></body></html>' });
   });
   const p2 = await ctx2.newPage();
@@ -213,6 +214,7 @@ select 'IDS ' || :'ed' || ' ' || :'air' || ' ' || :'water';`;
   ok((await status()).includes('Not approved') && (await status()).includes('not the current approved version') &&
      psqlAs(`select (public.hs_weekly_edition_video('${ED}') ->> 'approved');`).trim() === 'false', 'L10 a newer version of included content makes the approval stale, with the reason');
   if (shots) await p2.screenshot({ path: shots + '/edition-stale-after-content-change.png', fullPage: true });
+  ok((await p2.locator('#hx-fixture').innerText()).includes('not a Water Quality report'), 'L13 the page states that the Water text is a technical fixture, not Water reporting');
   ok(calls2.length > 0 && calls2.every((n) => ALLOWED.has(n)), 'L11 the editor called only the four edition functions (' + [...new Set(calls2)].join(', ') + ')');
   ok((await p2.locator('button', { hasText: /render|export|publish/i }).count()) === 0 && out2.length === 0 && err2.length === 0, 'L12 no render, export or publish button; nothing left the page; no page errors');
   await ctx2.close();

@@ -22,9 +22,14 @@ NEW_FUNCTIONS = {
     "weekly_edition_sequence_problems(bigint)", "weekly_edition_sequence_digest(bigint)", "weekly_edition_video(uuid)",
     "hs_weekly_edition_sequence_set(uuid,jsonb)", "hs_weekly_edition_sequence_approve(uuid,text)", "hs_weekly_edition_video(uuid)",
     "weekly_edition_render_export(uuid)", "weekly_edition_topics(uuid)", "hs_weekly_edition_add_topic(uuid,text)",
-    "hs_weekly_edition_topics(uuid)", "weekly_edition_candidates(uuid)"}
+    "hs_weekly_edition_topics(uuid)", "weekly_edition_candidates(uuid)",
+    "weekly_edition_locked(uuid)", "weekly_edition_content_lock()"}
 REPLACED = {"_wk_lead_assign(uuid,uuid,text)", "weekly_lead_request_text(uuid,uuid,text)",
-            "hs_weekly_lead_send_to_research(uuid,uuid,text)", "hs_weekly_edition_link_version(uuid,uuid)"}
+            "hs_weekly_lead_send_to_research(uuid,uuid,text)", "hs_weekly_edition_link_version(uuid,uuid)",
+            "hs_weekly_lead_disposition(uuid,uuid,text,text)"}
+# the content lock (8): one trigger added to two existing workbench tables, and nothing else about them changes
+NEW_TRIGGERS = {"weekly_scripts": {"weekly_edition_content_lock": "weekly_edition_content_lock"},
+                "weekly_script_approvals": {"weekly_edition_content_lock": "weekly_edition_content_lock"}}
 SERVICE_ONLY = {"weekly_edition_render_export(uuid)"}
 
 Q = r"""
@@ -90,8 +95,16 @@ def diff(a_path, b_path):
         else:
             bad.append("unexpected new relation %s (kind %s)" % (k, x["kind"]))
     for k in sorted(set(ra) & set(rb)):
-        if ra[k] != rb[k]:
-            bad.append("existing relation %s changed: %s" % (k, sorted(f for f in ra[k] if ra[k][f] != rb[k].get(f))))
+        x, y = dict(ra[k]), dict(rb[k])
+        if k in NEW_TRIGGERS:
+            added = {t: f for t, f in y["triggers"].items() if t not in x["triggers"]}
+            kept = {t: f for t, f in y["triggers"].items() if t in x["triggers"]}
+            lines.append("  existing table %s: triggers added %s" % (k, added))
+            if added != NEW_TRIGGERS[k] or kept != x["triggers"]:
+                bad.append("existing table %s: triggers added %s, expected exactly %s" % (k, added, NEW_TRIGGERS[k]))
+            x.pop("triggers"); y.pop("triggers")
+        if x != y:
+            bad.append("existing relation %s changed: %s" % (k, sorted(f for f in x if x[f] != y.get(f))))
     fa, fb = a["functions"], b["functions"]
     if set(fa) - set(fb):
         bad.append("functions removed: %s" % sorted(set(fa) - set(fb)))

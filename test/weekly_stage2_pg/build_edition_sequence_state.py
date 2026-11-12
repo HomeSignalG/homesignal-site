@@ -4,6 +4,8 @@ Two topics of TEST DATA, each through the real functions of files 1-7:
   Air Quality    build_render_handoff_fixture.sql(): the demonstration, its document cue, version 3 approved;
   Water Quality  the same demonstration's research and draft parts with the topic and finding keys renamed,
                  then its newest script version approved through hs_weekly_version_approve.
+TECHNICAL FIXTURE: the Water Quality script is the Air Quality demonstration with its topic label renamed. Its text is about the EPA methane proposal, not water; it has no water sources and is not a Water Quality report.
+Never present it as an editorial demonstration, and never add invented water sourcing to it.
 Prints nothing on success; the suite reads the state from the database.
 
     PGHOST=... PGDATABASE=... python3 test/weekly_stage2_pg/build_edition_sequence_state.py

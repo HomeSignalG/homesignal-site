@@ -52,7 +52,7 @@ select 'EXPORT ' || public.weekly_edition_render_export(:'ed')::text;
     out = psql(script)
     export = json.loads([ln for ln in out.splitlines() if ln.startswith("EXPORT ")][-1][len("EXPORT "):])
     doc = {"_note": "TEST DATA. public.weekly_edition_render_export and one visual_check claim from a disposable database"
-                    " (docs/weekly-1..9). Not production.", "claims": [claim], "export": export}
+                    " (docs/weekly-1..9). Not production. TECHNICAL FIXTURE: the Water Quality script is the Air Quality demonstration with its topic label renamed. Its text is about the EPA methane proposal, not water; it has no water sources and is not a Water Quality report.", "claims": [claim], "export": export}
     open(OUT, "w", encoding="utf-8").write(json.dumps(doc, indent=1, sort_keys=True, ensure_ascii=False) + "\n")
     print("wrote", OUT, "approved:", export["approved"], "topics:", export["topics"])
 

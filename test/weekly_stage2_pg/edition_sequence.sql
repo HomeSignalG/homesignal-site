@@ -1,5 +1,6 @@
 -- docs/weekly-8-edition-sequence.sql and weekly-9-edition-topics.sql on a DISPOSABLE database seeded by build_edition_sequence_state.py (TEST DATA).
 -- Prints one "Qnn|true/false" line per check.
+-- TECHNICAL FIXTURE: the Water Quality script is the Air Quality demonstration with its topic label renamed. Its text is about the EPA methane proposal, not water; it has no water sources and is not a Water Quality report.
 \set ON_ERROR_STOP 0
 create or replace function pg_temp.raises(q text, code text) returns boolean language plpgsql as $$
 begin execute q; return false; exception when others then return code is null or sqlstate = code; end $$;
@@ -169,4 +170,100 @@ select 'Q18|' || (pg_temp.raises('delete from public.weekly_edition_sequences', 
 select set_config('test.jwt', '{"email":"someone@test.invalid"}', false);
 set role authenticated;
 select 'Q28|' || pg_temp.raises(format('select public.hs_weekly_edition_add_topic(%L, %L)', :'ed', 'Data Centers'), '42501');
+reset role;
+
+-- ── a stored approval holds only while its eligibility conditions hold (Q30-Q34) ───────────────────────────────────
+-- From here on: the Water version (current, approved, linked to ed) is the whole sequence.
+select set_config('test.jwt', :'admin', false);
+set role authenticated;
+\set wseq '[{"version_id": "' :water '", "from": 0, "to": 1}]'
+select public.hs_weekly_edition_sequence_set(:'ed', :'wseq'::jsonb) ->> 'digest' as wdg \gset
+select public.hs_weekly_edition_sequence_approve(:'ed', :'wdg') is not null as ok \gset
+select 'Q30|' || coalesce((public.hs_weekly_edition_video(:'ed') ->> 'approved')::boolean, false);
+-- Q31 a lead newly assigned to the edition, with no decision yet: the stored approval stops holding, and says why;
+--     the approval itself is not deleted, and holds again once the lead is decided (the video's content never changed)
+select (public.hs_weekly_lead_save(null, '{"title": "TEST DATA late Air lead", "topic": "Air Quality"}'::jsonb) ->> 'lead_id') as l2 \gset
+select public.hs_weekly_lead_assign(:'l2', :'ed') is not null as ok \gset
+select public.hs_weekly_edition_video(:'ed') as w1 \gset
+select 'Q31|' || (not (:'w1'::jsonb ->> 'approved')::boolean and :'w1'::jsonb ->> 'problems' like '%have no disposition yet%');
+select public.hs_weekly_lead_disposition(:'l2', :'ed', 'deferred', 'TEST DATA: not this week') is not null as ok \gset
+select 'Q31b|' || coalesce((public.hs_weekly_edition_video(:'ed') ->> 'approved')::boolean, false);
+reset role;
+-- Q32 membership withdrawn (no function can do this: links are append-only, so it is simulated as the table owner in a
+--     transaction that is rolled back): the approval stops holding, and the render export says not approved
+begin;
+alter table public.weekly_topic_lead_events disable trigger weekly_topic_lead_events_append_only;
+delete from public.weekly_topic_lead_events where kind = 'version_linked' and version_id = :'water';
+select 'Q32|' || (not (public.weekly_edition_video(:'ed') ->> 'approved')::boolean
+  and public.weekly_edition_video(:'ed') ->> 'problems' like '%not linked to this edition%'
+  and not (public.weekly_edition_render_export(:'ed') ->> 'approved')::boolean);
+rollback;
+-- Q33 coverage withdrawn (simulated the same way): Water is no longer a topic the edition covers -> not approved
+begin;
+alter table public.weekly_edition_topic_events disable trigger weekly_edition_topic_events_append_only;
+delete from public.weekly_edition_topic_events where edition_id = :'ed' and topic = 'Water Quality';
+select 'Q33|' || (not (public.weekly_edition_video(:'ed') ->> 'approved')::boolean
+  and public.weekly_edition_video(:'ed') ->> 'problems' like '%is not one this edition covers%');
+rollback;
+-- Q34 control: with nothing withdrawn, the same approval holds (so Q32 and Q33 measured the withdrawal, not the setup)
+select 'Q34|' || coalesce((public.weekly_edition_video(:'ed') ->> 'approved')::boolean, false);
+
+-- ── a published edition is locked on the server (Q35-Q37) ──────────────────────────────────────────────────────────
+select set_config('test.jwt', :'admin', false);
+set role authenticated;
+-- a lead assigned and included WITHOUT a research request, before publication: the one path on which a research request
+-- reaches send's own check rather than the assignment's
+select (public.hs_weekly_lead_save(null, '{"title": "TEST DATA lead included without research", "topic": "Air Quality"}'::jsonb) ->> 'lead_id') as l4 \gset
+select public.hs_weekly_lead_assign(:'l4', :'ed') is not null as ok \gset
+select public.hs_weekly_lead_disposition(:'l4', :'ed', 'included') is not null as ok \gset
+select public.hs_weekly_edition_publish(:'ed', 'https://video.test.invalid/weekly-test', current_date) is not null as ok \gset
+select (public.hs_weekly_lead_save(null, '{"title": "TEST DATA lead after publication", "topic": "Air Quality"}'::jsonb) ->> 'lead_id') as l3 \gset
+reset role;
+select id as unlinked from public.weekly_scripts where stage = 'script' and topic = 'Air Quality' and public.weekly_version_edition(id) is null
+  order by created_at limit 1 \gset
+select id as linked_air from public.weekly_scripts where stage = 'script' and topic = 'Air Quality' and public.weekly_version_edition(id) = :'ed'
+  order by created_at desc limit 1 \gset
+-- every weekly row, fingerprinted before the attempts (order-independent: no collation involved)
+select (select string_agg(t || ':' || n || ':' || h, ',' order by t collate "C") from (
+  select 'leads' t, count(*) n, coalesce(sum(('x' || substr(md5(to_jsonb(x)::text), 1, 8))::bit(32)::bigint), 0) h from public.weekly_topic_leads x union all
+  select 'lead_events', count(*), coalesce(sum(('x' || substr(md5(to_jsonb(x)::text), 1, 8))::bit(32)::bigint), 0) from public.weekly_topic_lead_events x union all
+  select 'editions', count(*), coalesce(sum(('x' || substr(md5(to_jsonb(x)::text), 1, 8))::bit(32)::bigint), 0) from public.weekly_editions x union all
+  select 'topic_events', count(*), coalesce(sum(('x' || substr(md5(to_jsonb(x)::text), 1, 8))::bit(32)::bigint), 0) from public.weekly_edition_topic_events x union all
+  select 'sequences', count(*), coalesce(sum(('x' || substr(md5(to_jsonb(x)::text), 1, 8))::bit(32)::bigint), 0) from public.weekly_edition_sequences x union all
+  select 'approvals', count(*), coalesce(sum(('x' || substr(md5(to_jsonb(x)::text), 1, 8))::bit(32)::bigint), 0) from public.weekly_edition_approvals x union all
+  select 'requests', count(*), coalesce(sum(('x' || substr(md5(to_jsonb(x)::text), 1, 8))::bit(32)::bigint), 0) from public.weekly_research_requests x union all
+  select 'scripts', count(*), coalesce(sum(('x' || substr(md5(to_jsonb(x)::text), 1, 8))::bit(32)::bigint), 0) from public.weekly_scripts x union all
+  select 'script_approvals', count(*), coalesce(sum(('x' || substr(md5(to_jsonb(x)::text), 1, 8))::bit(32)::bigint), 0) from public.weekly_script_approvals x) q) as fp0 \gset
+select set_config('test.jwt', :'admin', false);
+set role authenticated;
+select 'Q35|' || (pg_temp.raises(format('select public.hs_weekly_lead_assign(%L, %L)', :'l3', :'ed'), '55000')
+  and pg_temp.raises(format('select public.hs_weekly_lead_send_to_research(%L, %L, %L)', :'l3', :'ed', 'TEST FORMAT'), '55000')
+  and pg_temp.raises(format('select public.hs_weekly_lead_send_to_research(%L, %L, %L)', :'l4', :'ed', 'TEST FORMAT'), '55000')
+  and pg_temp.raises(format('select public.hs_weekly_lead_disposition(%L, %L, %L, %L)', :'lw', :'ed', 'dropped', 'TEST DATA: trying to change a decision'), '55000')
+  and pg_temp.raises(format('select public.hs_weekly_edition_add_topic(%L, %L)', :'ed', 'Data Centers'), '55000')
+  and pg_temp.raises(format('select public.hs_weekly_edition_link_version(%L, %L)', :'ed', :'unlinked'), '55000')
+  and pg_temp.raises(format('select public.hs_weekly_edition_sequence_set(%L, %L::jsonb)', :'ed', :'wseq'), '55000')
+  and pg_temp.raises(format('select public.hs_weekly_edition_sequence_approve(%L, %L)', :'ed', :'wdg'), '55000')
+  and pg_temp.raises(format('select public.hs_weekly_doc_cue_set(%L, 0, null)', :'linked_air'), '55000'));
+reset role;
+-- an approval written straight into the table, as the owner, for content of the published edition: refused too
+select 'Q35b|' || pg_temp.raises(format($q$insert into public.weekly_script_approvals (script_id, body_sha256, approved_by)
+  select id, body_sha256, 'TEST' from public.weekly_scripts where id = %L$q$, :'water'), '55000');
+-- Q36 the refusals left every weekly row exactly as it was
+select (select string_agg(t || ':' || n || ':' || h, ',' order by t collate "C") from (
+  select 'leads' t, count(*) n, coalesce(sum(('x' || substr(md5(to_jsonb(x)::text), 1, 8))::bit(32)::bigint), 0) h from public.weekly_topic_leads x union all
+  select 'lead_events', count(*), coalesce(sum(('x' || substr(md5(to_jsonb(x)::text), 1, 8))::bit(32)::bigint), 0) from public.weekly_topic_lead_events x union all
+  select 'editions', count(*), coalesce(sum(('x' || substr(md5(to_jsonb(x)::text), 1, 8))::bit(32)::bigint), 0) from public.weekly_editions x union all
+  select 'topic_events', count(*), coalesce(sum(('x' || substr(md5(to_jsonb(x)::text), 1, 8))::bit(32)::bigint), 0) from public.weekly_edition_topic_events x union all
+  select 'sequences', count(*), coalesce(sum(('x' || substr(md5(to_jsonb(x)::text), 1, 8))::bit(32)::bigint), 0) from public.weekly_edition_sequences x union all
+  select 'approvals', count(*), coalesce(sum(('x' || substr(md5(to_jsonb(x)::text), 1, 8))::bit(32)::bigint), 0) from public.weekly_edition_approvals x union all
+  select 'requests', count(*), coalesce(sum(('x' || substr(md5(to_jsonb(x)::text), 1, 8))::bit(32)::bigint), 0) from public.weekly_research_requests x union all
+  select 'scripts', count(*), coalesce(sum(('x' || substr(md5(to_jsonb(x)::text), 1, 8))::bit(32)::bigint), 0) from public.weekly_scripts x union all
+  select 'script_approvals', count(*), coalesce(sum(('x' || substr(md5(to_jsonb(x)::text), 1, 8))::bit(32)::bigint), 0) from public.weekly_script_approvals x) q) as fp1 \gset
+select 'Q36|' || (:'fp0' = :'fp1' and :'fp0' like '%scripts:%');
+-- Q37 control: the lock is about THIS edition. Another, open edition still takes the same new lead.
+select set_config('test.jwt', :'admin', false);
+set role authenticated;
+select (public.hs_weekly_edition_create('Air Quality', '2026-11-16') ->> 'id') as ed4 \gset
+select 'Q37|' || coalesce((public.hs_weekly_lead_assign(:'l3', :'ed4') ->> 'existing') = 'false', false);
 reset role;

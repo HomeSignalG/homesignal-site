@@ -3,7 +3,7 @@
 -- Needs: 1 (base: weekly_sha256, weekly_append_only), 2 (topic queue: weekly_editions), 3 (workbench: weekly_scripts,
 --   weekly_version_status, _hs_is_admin), 6 (document cues: weekly_cue_count, weekly_visual_checks), 7 (weekly_version_edition).
 -- Application order (docs/weekly-release-order.md): 1 · 2 · 3 · 4 · 5 · 6 · 7 · 8. Additive: it creates two tables and
---   eight functions, changes no object of files 1-7, and is one transaction that is safe to apply twice.
+--   ten functions and two triggers, changes no object of files 1-7, and is one transaction that is safe to apply twice.
 --
 -- The model, kept apart on purpose:
 --   research and edition membership   files 2-3, unchanged: leads, their dispositions ("included" means kept for this
@@ -57,10 +57,17 @@ create index if not exists weekly_edition_approvals_edition on public.weekly_edi
 create or replace function public.weekly_edition_sequence_problems(p_sequence bigint) returns text[]
 language plpgsql stable security definer set search_path = public as $$
 declare s public.weekly_edition_sequences; e jsonb; i integer := 0; v public.weekly_scripts; st jsonb; n integer;
-        f integer; t integer; probs text[] := '{}'; used text[] := '{}'; k text; vc jsonb; linked uuid;
+        f integer; t integer; probs text[] := '{}'; used text[] := '{}'; k text; vc jsonb; linked uuid; covered text[];
 begin
   select * into s from public.weekly_edition_sequences where id = p_sequence;
   if s.id is null then return array['unknown sequence']; end if;
+  -- the topics this edition covers: 9's list when 9 is installed, otherwise its one topic. Read at every check, so an
+  -- approval stops holding if coverage no longer includes an entry's topic.
+  if to_regprocedure('public.weekly_edition_topics(uuid)') is not null then
+    execute 'select public.weekly_edition_topics($1)' into covered using s.edition_id;
+  else
+    select array[topic] into covered from public.weekly_editions where id = s.edition_id;
+  end if;
   for e in select x from jsonb_array_elements(s.entries) x loop
     i := i + 1;
     if jsonb_typeof(e) <> 'object' or (select count(*) from jsonb_object_keys(e)) <> 3
@@ -102,6 +109,9 @@ begin
       probs := probs || ('entry ' || i || ': that version is not linked to this edition; link it first');
     elsif linked <> s.edition_id then
       probs := probs || ('entry ' || i || ': that version belongs to another edition');
+    end if;
+    if not (v.topic = any (coalesce(covered, '{}'))) then
+      probs := probs || ('entry ' || i || ': its topic "' || v.topic || '" is not one this edition covers');
     end if;
   end loop;
   select count(*), string_agg(u.title, '; ') into n, k from public.weekly_edition_unresolved(s.edition_id) u;
@@ -175,6 +185,7 @@ begin
   select * into ed from public.weekly_editions where id = p_edition;
   if ed.id is null then raise exception 'unknown edition' using errcode = '22023'; end if;
   if ed.closed_at is not null then raise exception 'edition % is closed', ed.edition_key using errcode = '55000'; end if;
+  if ed.video_url is not null then raise exception 'edition % is published; its video is final', ed.edition_key using errcode = '55000'; end if;
   if jsonb_typeof(p_entries) is distinct from 'array' or jsonb_array_length(p_entries) = 0 then
     raise exception 'a sequence lists at least one entry' using errcode = '22023';
   end if;
@@ -187,8 +198,12 @@ end $$;
 -- A person approves the sequence they reviewed: p_digest is the digest the page showed them.
 create or replace function public.hs_weekly_edition_sequence_approve(p_edition uuid, p_digest text) returns jsonb
 language plpgsql security definer set search_path = public as $$
-declare e text := public._hs_is_admin(); s public.weekly_edition_sequences; probs text[]; dg text;
+declare e text := public._hs_is_admin(); s public.weekly_edition_sequences; probs text[]; dg text; ed public.weekly_editions;
 begin
+  select * into ed from public.weekly_editions where id = p_edition;
+  if ed.id is null then raise exception 'unknown edition' using errcode = '22023'; end if;
+  if ed.closed_at is not null then raise exception 'edition % is closed', ed.edition_key using errcode = '55000'; end if;
+  if ed.video_url is not null then raise exception 'edition % is published; its video is final', ed.edition_key using errcode = '55000'; end if;
   select * into s from public.weekly_edition_sequences where edition_id = p_edition order by id desc limit 1;
   if s.id is null then raise exception 'this edition has no sequence' using errcode = '22023'; end if;
   probs := public.weekly_edition_sequence_problems(s.id);
@@ -235,6 +250,36 @@ language sql stable security definer set search_path = public as $$
       where s.id = (select max(id) from public.weekly_edition_sequences where edition_id = p_edition))))
 $$;
 
+-- A published or closed edition's content is final. A new version made from content that belongs to such an edition,
+-- and any approval of such content, is refused here, whichever function writes it (the workbench's functions in 3-6
+-- write weekly_scripts and weekly_script_approvals). Changing a published report needs a separate, explicitly authorized
+-- revision workflow, which does not exist yet; a follow-up topic in a later edition is the way forward meanwhile.
+create or replace function public.weekly_edition_locked(p_edition uuid) returns text
+language sql stable security definer set search_path = public as $$
+  select case when ed.video_url is not null then 'published' when ed.closed_at is not null then 'closed' end
+  from public.weekly_editions ed where ed.id = p_edition
+$$;
+create or replace function public.weekly_edition_content_lock() returns trigger language plpgsql security definer set search_path = public as $$
+declare ed uuid; why text; src uuid;
+begin
+  if tg_table_name = 'weekly_scripts' then
+    ed := coalesce(public.weekly_version_edition(new.parent_id), public.weekly_version_edition(new.depends_on));
+  else
+    ed := public.weekly_version_edition(new.script_id);
+  end if;
+  if ed is null then return new; end if;
+  why := public.weekly_edition_locked(ed);
+  if why is not null then
+    raise exception 'edition % is %; its content is final (start a follow-up topic for a later edition)',
+      (select edition_key from public.weekly_editions where id = ed), why using errcode = '55000';
+  end if;
+  return new;
+end $$;
+drop trigger if exists weekly_edition_content_lock on public.weekly_scripts;
+create trigger weekly_edition_content_lock before insert on public.weekly_scripts for each row execute function public.weekly_edition_content_lock();
+drop trigger if exists weekly_edition_content_lock on public.weekly_script_approvals;
+create trigger weekly_edition_content_lock before insert on public.weekly_script_approvals for each row execute function public.weekly_edition_content_lock();
+
 do $$
 declare t text; f text;
 begin
@@ -245,7 +290,7 @@ begin
     execute format('revoke all on public.%I from public, anon, authenticated', t);
   end loop;
   foreach f in array array['weekly_edition_sequence_problems(bigint)', 'weekly_edition_sequence_digest(bigint)',
-    'weekly_edition_video(uuid)', 'weekly_edition_candidates(uuid)', 'hs_weekly_edition_sequence_set(uuid,jsonb)', 'hs_weekly_edition_sequence_approve(uuid,text)',
+    'weekly_edition_video(uuid)', 'weekly_edition_candidates(uuid)', 'weekly_edition_locked(uuid)', 'weekly_edition_content_lock()', 'hs_weekly_edition_sequence_set(uuid,jsonb)', 'hs_weekly_edition_sequence_approve(uuid,text)',
     'hs_weekly_edition_video(uuid)', 'weekly_edition_render_export(uuid)'] loop
     execute format('revoke all on function public.%s from public, anon, authenticated', f);
   end loop;

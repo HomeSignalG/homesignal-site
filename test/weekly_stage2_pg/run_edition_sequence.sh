@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# docs/weekly-8-edition-sequence.sql and docs/weekly-9-edition-topics.sql against a DISPOSABLE Postgres (never
+# docs/weekly-8-edition-sequence.sql and docs/weekly-9-edition-topics.sql (multi-topic editions, membership, eligibility
+# and the publication lock) against a DISPOSABLE Postgres (never
 # production): files 1-9 applied twice, TEST DATA seeded through the real functions (build_edition_sequence_state.py),
 # edition_sequence.sql run, then each mutation of file 8 or 9 must make at least one check fail. A check that does not
 # print, or an SQL error, is a failure. File 9 must also match its generator (build_edition_topics_sql.py --check).
@@ -52,6 +53,17 @@ MUT=(
  "9|add-topic-any-category|s.replace(\"  if t is null or not exists (select 1 from public.alert_topic_catalog c where c.stream = 'news' and c.topic = t) then\",\"  if t is null then\",1)"
  "9|add-topic-no-admin|s.replace(\"declare e text := public._hs_is_admin(); ed public.weekly_editions; t text\",\"declare e text := 'x'; ed public.weekly_editions; t text\",1)"
  "9|topic-events-not-append-only|s.replace(\"  execute 'create trigger weekly_edition_topic_events_append_only\",\"  -- execute 'create trigger weekly_edition_topic_events_append_only\",1)"
+ "8|coverage-unchecked|s.replace(\"    if not (v.topic = any (coalesce(covered, '{}'))) then\",\"    if false then\",1)"
+ "8|sequence-set-published|s.replace(\"  if ed.video_url is not null then raise exception 'edition % is published; its video is final', ed.edition_key using errcode = '55000'; end if;\n  if jsonb_typeof\",\"  if jsonb_typeof\",1)"
+ "8|approve-published|s.replace(\"  if ed.video_url is not null then raise exception 'edition % is published; its video is final', ed.edition_key using errcode = '55000'; end if;\n  select * into s\",\"  select * into s\",1)"
+ "8|content-lock-new-versions|s.replace(\"create trigger weekly_edition_content_lock before insert on public.weekly_scripts\",\"-- create trigger weekly_edition_content_lock before insert on public.weekly_scripts\",1)"
+ "8|content-lock-approvals|s.replace(\"create trigger weekly_edition_content_lock before insert on public.weekly_script_approvals\",\"-- create trigger weekly_edition_content_lock before insert on public.weekly_script_approvals\",1)"
+ "8|lock-ignores-publication|s.replace(\"case when ed.video_url is not null then 'published' when\",\"case when false then 'published' when\",1)"
+ "9|assign-published|s.replace(\"  if ed.video_url is not null then raise exception 'edition % is published; its topics are final', ed.edition_key using errcode = '55000'; end if;\n  if l.topic is not null\",\"  if l.topic is not null\",1)"
+ "9|send-published|s.replace(\"  if ed.video_url is not null then raise exception 'edition % is published; its topics are final', ed.edition_key using errcode = '55000'; end if;\n  txt :=\",\"  txt :=\",1)"
+ "9|disposition-published|s.replace(\"  if ed.video_url is not null then raise exception 'edition % is published; its decisions stand', ed.edition_key using errcode = '55000'; end if;\n\",\"\",1)"
+ "9|add-topic-published|s.replace(\"  if ed.video_url is not null then raise exception 'edition % is published; its topics are final', ed.edition_key using errcode = '55000'; end if;\n  insert into public.weekly_edition_topic_events\",\"  insert into public.weekly_edition_topic_events\",1)"
+ "9|link-published|s.replace(\"  if ed.video_url is not null then raise exception 'edition % is published; its content is final', ed.edition_key using errcode = '55000'; end if;\n\",\"\",1)"
  "9|topic-events-readable|s.replace(\"  execute 'revoke all on public.weekly_edition_topic_events from public, anon, authenticated';\",\"  execute 'grant select on public.weekly_edition_topic_events to authenticated';\",1)"
 )
 bad=0
@@ -64,8 +76,12 @@ s = open(sys.argv[1]).read(); t = eval(sys.argv[3], {"s": s})
 if t == s: sys.exit("mutation did not apply")
 open(sys.argv[2], "w").write(t)
 PY
-  if [ "$which" = 8 ]; then o="$(run_once "$tmp/m.sql" "$f9" 2>/dev/null || true)"; else o="$(run_once "$f8" "$tmp/m.sql" 2>/dev/null || true)"; fi
+  set +e
+  if [ "$which" = 8 ]; then o="$(run_once "$tmp/m.sql" "$f9" 2>/dev/null)"; else o="$(run_once "$f8" "$tmp/m.sql" 2>/dev/null)"; fi
+  rc=$?; set -e
   k=$(grep -c '|' <<<"$o" || true); nt=$(grep -vc '|true$' <<<"$o" || true)
+  # a mutation whose SQL does not apply never reached the checks: that is a broken mutation, not a detected one
+  if [ $rc -eq 2 ]; then echo "  BROKEN (did not apply, so nothing was tested): $which/$name"; bad=1; continue; fi
   if [ "$k" -eq "$expected" ] && [ "$nt" -eq 0 ]; then echo "  SURVIVED: $which/$name"; bad=1
   else echo "  killed: $which/$name ($(grep -v '|true$' <<<"$o" | cut -d'|' -f1 | tr '\n' ' ')$([ "$k" -lt "$expected" ] && echo "; $((expected-k)) not printed"))"; fi
 done
