@@ -515,6 +515,11 @@ print("LOADED")`;
   ok(idx.v === 1 && idx.zip === '01002' && idx.pages[K1.replace(/\|\d+$/, '')] === pathOf('https://permits.example.gov/r/1'),
      'the ZIP project index maps each source_key to its page');
   ok(Object.values(idx.pages).every((p) => /^\/project\//.test(p)), 'the index holds project paths only');
+  const zl = JSON.parse(readFileSync(join(hb.out, 'lib', 'generated', 'project-page-zips.json'), 'utf8'));
+  ok(zl.v === 1 && zl.zips.includes('01002') && zl.zips.every((z) => existsSync(join(hb.out, 'community', z, 'projects', 'pages.json'))),
+     'the ZIP list names exactly ZIPs that have an index');
+  ok(JSON.parse(readFileSync(join(root, 'lib', 'generated', 'project-page-zips.json'), 'utf8')).zips.length === 0,
+     'the committed placeholder lists no ZIP (it links nothing until the build replaces it)');
   for (const [m, label] of [
     [(d) => { d.projectsDoc.projects[K1].history = [{ day: 'bad', kind: 'status_changed' }]; }, 'a malformed history day'],
     [(d) => { d.projectsDoc.projects[K1].history = [{ day: '2026-01-01', kind: 'invented' }]; }, 'an unknown history kind'],

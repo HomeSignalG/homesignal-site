@@ -27,7 +27,7 @@ const DC_23150 = FIX.rows.filter((r) => r.zip === '23150').map((r) => { const o 
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 const srv = createServer(async (q, s) => {
   const p = normalize(join(REPO, decodeURIComponent(q.url.split('?')[0])));
-  try { s.writeHead(200, { 'Content-Type': MIME[extname(p)] || 'text/plain' }); s.end(await readFile(p)); }
+  try { const __body = await readFile(p); s.writeHead(200, { 'Content-Type': MIME[extname(p)] || 'text/plain' }); s.end(__body); }
   catch { s.writeHead(404); s.end('nope'); }
 });
 await new Promise(r => srv.listen(8857, '127.0.0.1', r));
@@ -41,7 +41,9 @@ const AGENCY = { projects: [{ source_key: 'arcgis:henrico:C-1', project_ref: 'ar
   submitted_at: '2026-06-01', date_kind: 'filed', impact_score: null, impact_dimensions: null }],
   markers: [{ project_ref: 'arcgis:henrico:C-1', lat: 37.505, lng: -77.255, marker_rule: 'POINT_AUTHORITATIVE', marker_seq: 0 }] };
 const IDX = { v: 1, zip: '23150', pages: { 'arcgis:henrico:C-1': PATH } };
+const asked = [];
 const CASES = {
+  unlisted: { dc: [], dev: AGENCY, index: IDX, listed: false },
   linked: { dc: DC_23150, dev: AGENCY, index: IDX },
   late: { dc: [], dev: AGENCY, index: IDX, delayMs: 2500 },
   missing: { dc: [], dev: AGENCY, index: 404 },
@@ -57,9 +59,16 @@ async function open(name) {
   const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
   const pageErrors = [];
   page.on('pageerror', e => pageErrors.push(String(e).slice(0, 300)));
+  page.on('console', m => { if (m.type() === 'error') pageErrors.push('console: ' + m.text().slice(0, 200)); });
+  asked.length = 0;
   await page.route('**/*', async (route) => {
     const url = route.request().url();
+    if (url.includes('/lib/generated/project-page-zips.json')) {
+      return route.fulfill({ status: 200, contentType: 'application/json',
+        body: JSON.stringify({ v: 1, zips: c.listed === false ? [] : ['23150'] }) });
+    }
     if (url.includes('/community/23150/projects/pages.json')) {
+      asked.push(url);
       if (c.index === 404) return route.fulfill({ status: 404, body: 'nope' });
       if (c.delayMs) await new Promise((r) => setTimeout(r, c.delayMs));
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(c.index) });
@@ -141,6 +150,15 @@ console.log('\n2. index answered after the list was drawn');
   await page.context().close();
 }
 
+console.log('\n2b. a ZIP the list does not name');
+{
+  const { page, pageErrors } = await open('unlisted');
+  await page.waitForTimeout(500);
+  ok(asked.length === 0, '2b the per-ZIP index is never requested', asked);
+  ok(!(await listHtml(page)).includes('pplink') && pageErrors.length === 0, '2b no link, no error', pageErrors[0]);
+  await page.context().close();
+}
+
 for (const name of ['missing', 'unsafe']) {
   console.log(`\n3. ${name} index`);
   const { page, pageErrors } = await open(name);
@@ -148,7 +166,10 @@ for (const name of ['missing', 'unsafe']) {
   const l = await listHtml(page);
   ok(!l.includes('pplink') && l.includes('https://henrico.example.gov/c1'), `3 ${name}: no project link; the official record link stays`, l.slice(0, 300));
   ok(!l.includes('evil.example'), `3 ${name}: an unsafe path is never drawn`);
-  ok(pageErrors.length === 0, `3 ${name}: no page errors`, pageErrors[0]);
+  // 'missing' answers 404 on purpose (list and index disagree), so the browser's own
+  // "Failed to load resource" line is expected there; a script error never is.
+  const errs = name === 'missing' ? pageErrors.filter((e) => !/Failed to load resource/.test(e)) : pageErrors;
+  ok(errs.length === 0, `3 ${name}: no page errors`, errs[0]);
   await page.context().close();
 }
 

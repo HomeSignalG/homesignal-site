@@ -1581,6 +1581,7 @@ def build_projects(projects, pages, out_dir, built, state=None):
         open(os.path.join(d, "index.html"), "wb").write(h)
         written += 1
         nbytes += len(h)
+    zips_with_pages = []
     for z in sorted(pages):
         keys = pages[z].get("project_list")
         if not keys:
@@ -1594,10 +1595,21 @@ def build_projects(projects, pages, out_dir, built, state=None):
                        separators=(",", ":")).encode("utf-8")
         open(os.path.join(d, PROJECT_INDEX_FILE), "wb").write(j)
         nbytes += len(j)
+        zips_with_pages.append(z)
+    # Which ZIPs have a project index. Map 1 reads this first and asks for a ZIP's
+    # pages.json only when the ZIP is listed, so it never requests a file that does not
+    # exist. It overwrites the committed placeholder (lib/generated/project-page-zips.json,
+    # an empty list, which links nothing).
+    gd = os.path.join(out_dir, "lib", "generated")
+    os.makedirs(gd, exist_ok=True)
+    zj = json.dumps({"v": 1, "zips": sorted(zips_with_pages)}, separators=(",", ":")).encode("utf-8")
+    open(os.path.join(gd, PROJECT_ZIPS_FILE), "wb").write(zj)
+    nbytes += len(zj)
     return written, nbytes
 
 
 PROJECT_INDEX_FILE = "pages.json"
+PROJECT_ZIPS_FILE = "project-page-zips.json"
 
 
 def project_page_index(z, keys, projects):
