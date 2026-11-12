@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Runs docs/map1-dc-source-freshness.sql against a DISPOSABLE Postgres and checks its answers.
+# Runs docs/map1-datacentre-freshness.sql against a DISPOSABLE Postgres and checks its answers.
 # Stand-in tables carry only the columns the function reads (types as in production).
 # Needs PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE for a throwaway database.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
-sql="$here/../../docs/map1-dc-source-freshness.sql"
+sql="$here/../../docs/map1-datacentre-freshness.sql"
 q() { psql -X -v ON_ERROR_STOP=1 -qtA "$@"; }
 fail=0
 check() { if [ "$2" = "$3" ]; then echo "PASS — $1"; else echo "FAIL — $1: got [$2] want [$3]"; fail=1; fi; }
@@ -39,9 +39,9 @@ SQL
 q -f "$sql"
 q -f "$sql"   # idempotent
 
-out() { q -c "select $1 from public.map1_dc_source_freshness() where source_key='$2'"; }
+out() { q -c "select $1 from public.map1_datacentre_freshness() where source_key='$2'"; }
 check "1 three rows: two active sources and the OSM load; the retired source is left out" \
-  "$(q -c "select string_agg(source_key, ',' order by source_key collate \"C\") from public.map1_dc_source_freshness()")" \
+  "$(q -c "select string_agg(source_key, ',' order by source_key collate \"C\") from public.map1_datacentre_freshness()")" \
   "compute_atlas,epoch_ai,openstreetmap"
 check "2 Compute Atlas last success is the Nov 6 read, not the newer failed one" \
   "$(out "to_char(last_success_at at time zone 'UTC','YYYY-MM-DD HH24:MI')" compute_atlas)" "2026-11-06 09:45"
@@ -54,10 +54,10 @@ check "5 Epoch: newest success is the newest read, and it refreshed" \
 check "6 OSM: one-time load, not scheduled, no attempt" \
   "$(out "to_char(last_success_at at time zone 'UTC','YYYY-MM-DD')||' '||scheduled||' '||coalesce(last_attempt_at::text,'none')" openstreetmap)" "2026-09-15 false none"
 check "7 no failure detail is reachable through the reader" \
-  "$(q -c "select count(*) from public.map1_dc_source_freshness() f where to_jsonb(f)::text like '%do-not-leak%'")" "0"
+  "$(q -c "select count(*) from public.map1_datacentre_freshness() f where to_jsonb(f)::text like '%do-not-leak%'")" "0"
 check "8 anon may execute it; PUBLIC may not" \
-  "$(q -c "select has_function_privilege('anon','public.map1_dc_source_freshness()','execute')||' '||coalesce((select bool_or(a.grantee=0) from pg_proc p, aclexplode(p.proacl) a where p.proname='map1_dc_source_freshness' and a.privilege_type='EXECUTE'),false)")" "true false"
+  "$(q -c "select has_function_privilege('anon','public.map1_datacentre_freshness()','execute')||' '||coalesce((select bool_or(a.grantee=0) from pg_proc p, aclexplode(p.proacl) a where p.proname='map1_datacentre_freshness' and a.privilege_type='EXECUTE'),false)")" "true false"
 q -c "delete from public.national_dc_records"
 check "9 no OSM rows: no OSM line" \
-  "$(q -c "select count(*) from public.map1_dc_source_freshness() where source_key='openstreetmap'")" "0"
+  "$(q -c "select count(*) from public.map1_datacentre_freshness() where source_key='openstreetmap'")" "0"
 exit $fail

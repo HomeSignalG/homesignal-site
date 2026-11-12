@@ -1,6 +1,6 @@
 name: dc-source-freshness-suite
 
-# DATA-CENTRE LAYER FRESHNESS (docs/map1-dc-source-freshness.sql): runs the shipped reader against
+# DATA-CENTRE LAYER FRESHNESS (docs/map1-datacentre-freshness.sql): runs the shipped reader against
 # a DISPOSABLE Postgres with stand-in tables and checks its answers: the last successful refresh is
 # the read whose records Map 1 shows, a failed newer read is reported as an attempt that did not
 # refresh, the one-time OpenStreetMap load is never called scheduled, and no failure detail leaks.
@@ -8,14 +8,14 @@ name: dc-source-freshness-suite
 on:
   pull_request:
     paths:
-      - 'docs/map1-dc-source-freshness.sql'
-      - 'test/map1_dc_source_freshness_pg/**'
+      - 'docs/map1-datacentre-freshness.sql'
+      - 'test/map1_datacentre_freshness_pg/**'
       - '.github/workflows/dc-source-freshness-suite.yml'
   push:
     branches: [main]
     paths:
-      - 'docs/map1-dc-source-freshness.sql'
-      - 'test/map1_dc_source_freshness_pg/**'
+      - 'docs/map1-datacentre-freshness.sql'
+      - 'test/map1_datacentre_freshness_pg/**'
       - '.github/workflows/dc-source-freshness-suite.yml'
   workflow_dispatch: {}
 
@@ -59,4 +59,4 @@ jobs:
           PGUSER: postgres
           PGPASSWORD: postgres
           PGDATABASE: dc_source_freshness_disposable
-        run: bash test/map1_dc_source_freshness_pg/run.sh
+        run: bash test/map1_datacentre_freshness_pg/run.sh

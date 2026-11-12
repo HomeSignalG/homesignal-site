@@ -1,5 +1,5 @@
 // DATA-CENTRE LAYER FRESHNESS (founder, 2026-11-12), the offline half.
-// The SQL half is test/map1_dc_source_freshness_pg (dc-source-freshness-suite.yml).
+// The SQL half is test/map1_datacentre_freshness_pg (dc-source-freshness-suite.yml).
 // Fixture rows are the reader's output computed read-only on production at 2026-11-12 14:12 UTC.
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
@@ -68,11 +68,11 @@ ok(el.innerHTML === '', '12 a ZIP with no data-centre pins clears the panel');
 
 // The page wires it after the development-source panel, and the reader name matches the SQL.
 const page = read('homesignalmap.html');
-ok(/<div id="srcFresh"><\/div>\s*<div id="dcFresh"><\/div>/.test(page), '13 the page has its own panel under the source panel');
+ok(/<div id="dcFresh"><\/div>\s*<div id="srcFresh"><\/div>/.test(page), '13 the page has its own panel above the development-source panel');
 ok(/HS\.mountDcFreshness\(\$\("dcFresh"\)/.test(page) && /lib\/dc-freshness\.js\?v=/.test(page), '14 the page loads and mounts it');
-const sql = read('docs/map1-dc-source-freshness.sql');
-ok(/create or replace function public\.map1_dc_source_freshness\(\)/.test(sql)
-  && read('lib/dc-freshness.js').includes("rpc('map1_dc_source_freshness')"), '15 one reader name in SQL and page');
+const sql = read('docs/map1-datacentre-freshness.sql');
+ok(/create or replace function public\.map1_datacentre_freshness\(\)/.test(sql)
+  && read('lib/dc-freshness.js').includes("rpc('map1_datacentre_freshness')"), '15 one reader name in SQL and page');
 ok(/completeness_state = 'SUCCESS_COMPLETE' and a\.advanced_observations/.test(sql),
   '16 "last successful refresh" uses the same rule that chooses the records Map 1 shows');
 

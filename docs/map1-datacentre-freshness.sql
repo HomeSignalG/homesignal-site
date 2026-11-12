@@ -1,4 +1,4 @@
--- map1_dc_source_freshness: when each data-centre source was last refreshed, and when we last tried.
+-- map1_datacentre_freshness: when each data-centre source was last refreshed, and when we last tried.
 --
 -- Founder, 2026-11-12: "Show the data-centre layer's last successful refresh date and its age.
 -- Clearly distinguish that from when our workflow last attempted a fetch. Do not imply that each
@@ -28,7 +28,7 @@
 -- STATUS: NOT APPLIED. The page (homesignalmap.html) calls it and renders nothing when it is
 -- absent, so either order is safe. Apply only with the founder's go.
 
-create or replace function public.map1_dc_source_freshness()
+create or replace function public.map1_datacentre_freshness()
 returns table(source_key text, publisher text, dataset_name text, licence text,
               last_success_at timestamptz, last_success_release text,
               publisher_edition_at timestamptz, last_attempt_at timestamptz,
@@ -68,9 +68,9 @@ as $function$
   select * from rows order by source_key collate "C";
 $function$;
 
-comment on function public.map1_dc_source_freshness() is
+comment on function public.map1_datacentre_freshness() is
   'Per active data-centre source: last successful refresh (the run whose records Map 1 shows), '
-  'the publisher''s edition date, and our last attempt. docs/map1-dc-source-freshness.sql.';
+  'the publisher''s edition date, and our last attempt. docs/map1-datacentre-freshness.sql.';
 
-revoke all on function public.map1_dc_source_freshness() from public;
-grant execute on function public.map1_dc_source_freshness() to anon, authenticated, service_role;
+revoke all on function public.map1_datacentre_freshness() from public;
+grant execute on function public.map1_datacentre_freshness() to anon, authenticated, service_role;
