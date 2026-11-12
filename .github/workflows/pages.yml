@@ -98,6 +98,8 @@ on:
       - 'test/bsky-did-document.test.mjs'
       - '.well-known/did.json'
       - 'scripts/gen_zip_pages.py'
+      - 'scripts/map_zip_summary.py'
+      - 'data/seo-map-pilot.json'
       - 'scripts/page_semantics.py'
       - 'scripts/indexnow.py'
       - 'test/indexnow-*.test.mjs'

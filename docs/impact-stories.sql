@@ -240,6 +240,9 @@ create table if not exists public.impact_story_fix_batches (
 -- Cancel on a plan ends the batch as cancelled, and its notes can be sent again.
 alter table public.impact_story_fix_batches add column if not exists plan jsonb;
 alter table public.impact_story_fix_batches add column if not exists plan_md5 text;
+-- how often an unclaimed batch was sent to GitHub again by itself (impact_fix_redispatch_tick), and when
+alter table public.impact_story_fix_batches add column if not exists redispatched integer not null default 0;
+alter table public.impact_story_fix_batches add column if not exists redispatched_at timestamptz;
 alter table public.impact_story_fix_batches add column if not exists planned_at timestamptz;
 alter table public.impact_story_fix_batches add column if not exists confirmed_at timestamptz;
 alter table public.impact_story_fix_batches add column if not exists confirmed_by text;
@@ -2661,10 +2664,51 @@ begin
     raise exception 'The plan changed since this page loaded. Read it again, then confirm.' using errcode = '55000';
   end if;
   update public.impact_story_fix_batches set status = 'queued', confirmed_at = now(), confirmed_by = e, attempts = 0,
-         claimed_at = null where id = b.id;
+         claimed_at = null, redispatched = 0, redispatched_at = null where id = b.id;
   perform public._hs_is_event(p_story, 'fix_plan_confirmed', jsonb_build_object('batch', b.id, 'plan_md5', b.plan_md5), e);
   perform public._hs_is_fix_dispatch(b.id, 'work');
   return jsonb_build_object('ok', true, 'batch', public._hs_is_fix_batch(p_story));
+end $$;
+
+-- A fix run that never started starts again by itself (Tab 17 audit, 2026-11-11). The Fix button's start signal to
+-- GitHub can be lost (the run is cancelled in GitHub's queue, or the dispatch call fails), and the batch then sat
+-- unclaimed until the founder noticed and pressed Fix again: measured that day, three batches had waited 8 hours, 4 days
+-- and 4 days. Every 10 minutes, a batch still waiting to start 15 minutes after it was last sent is sent again, at most
+-- 3 times, and only within 24 hours of the founder's request or confirmation (an older one is the founder's to press:
+-- the story may have moved on). A second run cannot claim a batch the first already took (impact_fix_batch_claim), so
+-- sending twice can never run a fix twice. After 3 tries the batch stays "stalled" with the Fix button, as before.
+
+create or replace function public.impact_fix_redispatch_tick()
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare b public.impact_story_fix_batches%rowtype; n integer := 0;
+begin
+  for b in
+    select fb.* from public.impact_story_fix_batches fb join public.impact_stories s on s.id = fb.story_id
+     where fb.status in ('queued', 'plan_queued') and fb.claimed_at is null and s.archived_at is null
+       and fb.redispatched < 3
+       and coalesce(fb.redispatched_at, fb.confirmed_at, fb.requested_at) < now() - interval '15 minutes'
+       and coalesce(fb.confirmed_at, fb.requested_at) > now() - interval '24 hours'
+     order by fb.requested_at
+     for update of fb skip locked
+  loop
+    update public.impact_story_fix_batches set redispatched = redispatched + 1, redispatched_at = now() where id = b.id;
+    perform public._hs_is_fix_dispatch(b.id, case when b.status = 'plan_queued' then 'plan' else 'work' end);
+    perform public._hs_is_event(b.story_id, 'fix_batch_redispatched',
+      jsonb_build_object('batch', b.id, 'phase', case when b.status = 'plan_queued' then 'plan' else 'work' end, 'try', b.redispatched + 1),
+      'system:fix-redispatch');
+    n := n + 1;
+  end loop;
+  return jsonb_build_object('redispatched', n);
+end $$;
+revoke all on function public.impact_fix_redispatch_tick() from public, anon, authenticated;
+grant execute on function public.impact_fix_redispatch_tick() to service_role;
+
+do $$
+begin
+  if exists (select 1 from pg_namespace where nspname = 'cron') then
+    perform cron.unschedule(jobid) from cron.job where jobname = 'impact-fix-redispatch';
+    perform cron.schedule('impact-fix-redispatch', '*/10 * * * *', 'select public.impact_fix_redispatch_tick()');
+  end if;
 end $$;
 
 -- Cancel a plan (waiting, written, or stalled while writing). Nothing was changed; the notes can be sent again.
@@ -2773,7 +2817,7 @@ begin
   -- of what was done. The founder's own notes are never in such a batch, so their plans still wait for a confirm.
   if b.requested_by = 'system:auto-fix' then
     update public.impact_story_fix_batches set status = 'queued', confirmed_at = now(), confirmed_by = 'system:auto-fix',
-           attempts = 0, claimed_at = null where id = b.id;
+           attempts = 0, claimed_at = null, redispatched = 0, redispatched_at = null where id = b.id;
     perform public._hs_is_event(b.story_id, 'fix_plan_confirmed', jsonb_build_object('batch', b.id, 'plan_md5', md5(p_plan::text), 'auto', true), 'system:auto-fix');
     perform public._hs_is_fix_dispatch(b.id, 'work');
     return jsonb_build_object('ok', true, 'plan_md5', md5(p_plan::text), 'confirmed', true);

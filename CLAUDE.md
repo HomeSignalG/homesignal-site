@@ -258,6 +258,16 @@ Record of the decision, in the founder's words: `docs/national-source-policy-202
   **Do not add a noindex rule or an exclusion criterion without explicit founder approval.**
 - Gate: `scripts/audit_index_all.py` runs in `pages.yml` against `_site` (public noindex, robots block, non-self canonical, missing from sitemap).
 
+### DEVELOPMENT MAP INDEXING PILOT (2026-11-11) — BUILT LOCALLY, NOT DEPLOYED
+Every `/map/<zip>/` document kept its whole page inside an inert `<template>` (6 visible words in the first HTML), and
+`page_semantics.projection` drops `<template>`, so a map's records never moved its fingerprint, `lastmod` or IndexNow.
+`scripts/map_zip_summary.py` writes `#hs-map-zip-summary` OUTSIDE the template from the Rule D plane count and the ZIP's
+project pages (links to `/project/…/`, `/community/<zip>/`, `/community/<zip>/projects/`); the runtime moves it under the
+map; treated project-list pages link back to the map. Who gets it: `data/seo-map-pilot.json` (`pilot` = 100 treatment
+ZIPs; `all` = nationwide rollout, not enabled; `off` = rollback; unreadable = off). Controls are byte-identical to a
+pilot-off build. Selection, audit, deployment, rollback and monitoring: `docs/seo/map-indexing-pilot/README.md`.
+Tests: `test/map-zip-summary.test.mjs`, `test/map-zip-summary.browser.test.mjs`. ⛔ Do not request indexing for either arm.
+
 ### GOOGLE SEARCH CONSOLE: GIVE THE FOUNDER FULL https://jodytracks.com URLS (founder, 2026-10-29)
 **The founder's Search Console box does not accept a bare path.** Every sitemap or page address given to the founder for
 Search Console is the full URL on the live host, one per copy block, e.g. `https://jodytracks.com/sitemaps/map.xml`. Never
@@ -1937,6 +1947,20 @@ added by hand 2026-11-09). SQL of record `docs/maps-zip-order-subscriber-zips.sq
     `offerZipEmailForAddress`). Before, the button was ZIP-mode only, so an address searcher could not sign up at all.
     Browser test `test/maps-zip-email.browser.test.mjs` §5.
   - The two 85083/64166 identities created 2026-11-09 14:41:49Z are an `admin_test` account, not new residents.
+
+## 7.04c TEST SIGN-UPS DO NOT KEEP A ZIP ON THE MAPS POST LIST ⚖️ FOUNDER (2026-11-11)
+
+"i want to remove pierce county zips now"; chosen: "Test sign-ups don't count". Narrows §7.04b: a ZIP is kept on
+`public.maps_zip_order` only for a subscriber who is NOT a known test identity. "Known test" is homesignal-ingest's
+`public.bsky_maps_known_test_identity(user)` (the posting-priority rule); it is not re-derived here.
+- **Why:** the 65 Pierce County ZIPs each carried one `admin_test` sign-up, so the list rule put them back whenever
+  they were removed. Measured 2026-11-11: 68 ZIPs on the list, 66 test-only (65 Pierce + Bend 97702), 2 real (85083, 64166).
+- **Rule:** `maps_zip_order_sync_subscribers()` in `docs/maps-zip-order-subscriber-zips.sql` (applied 2026-11-11, body md5
+  `5a74e481…`). **Alarm:** `docs/maps-subscriber-zips-monitor-real-only.sql` (applied, tick body `242beb32…` → `22400e90…`):
+  a ZIP missing from the list pages only when it has a real subscriber, and "test" asks the same function.
+- **One-time removal:** `docs/maps-zip-order-remove-test-only-2026-11-11.sql` (fail-closed on the measured 66-ZIP set;
+  leaves 85083, 64166). The test sign-ups themselves are untouched.
+- Tests: `test/maps_zip_order_subscribers_pg` S14-S16, `test/maps_subscriber_zips_monitor_pg` R01-R04 (+4 mutations).
 
 ## 7.04 THE DATA CENTER THEME BUTTON CREATES **AND** REFRESHES ⚖️ FOUNDER REQUIREMENT (2026-09-21)
 
@@ -6300,6 +6324,12 @@ one story went through 13 fix batches and 9 renders. The founder asked for the a
 - **A fix batch nobody claimed for 30 minutes reads `stalled`** (`_hs_is_fix_batch`), so the next step says to press Fix.
   Before, a batch whose GitHub run was cancelled in the queue said "Claude is making the fixes" for four days.
 - Apply file (generated from the DDL of record, guarded on the live bodies): `docs/impact-style-warnings-apply-2026-11-11.sql`.
+- **A fix run that never started is sent again by itself (2026-11-11).** `public.impact_fix_redispatch_tick()` (pg_cron
+  `impact-fix-redispatch`, every 10 minutes) re-sends a batch still `plan_queued` or `queued` that no run has claimed:
+  15 minutes after the last send, at most 3 times, only within 24 hours of the request (or the plan's confirm), never for
+  an archived story. Each send is a `fix_batch_redispatched` event. After 3 tries the batch reads `stalled` as before
+  and waits for Fix. Measured that day: three batches had sat unclaimed for up to four days after a lost dispatch.
+  pg checks 12R1-12R8 (4 deliberate breaks caught).
 - Engine half (package-server outage, dead runners recorded): homesignal-ingest CLAUDE.md, same date.
 - Tests: pg 12r6, 12S0-12S5 (4 deliberate breaks caught); `test/impact-stories.browser.test.mjs` "style-only failure".
 - **Visuals shows the shots that need a look first (same audit).** When some shots of the open video passed every check and
@@ -6868,3 +6898,47 @@ homesignal-ingest `scripts/zip_request_plan.py` (the decision, pure) + `zip_requ
 - **Not automatic yet (known):** the Notices coverage artifact only regenerates on a branch, so a ZIP built under a root
   that HAS notice feeds reads "no source identified" on its page until that artifact is regenerated by PR.
 - 97149 Neskowin OR (2026-11-11, by hand, before this existed) is recorded as built.
+
+## SESSION STATUS: THE FOUNDER MUST NEVER OPEN A SESSION TO FIND OUT WHETHER IT NEEDS THEM ⚖️ FOUNDER (2026-11-11)
+
+"i have no idea when i have to look at a session because you need me or stopped and need a prompt to continue."
+Every session says, in two places, whether it needs the founder. Same rule in homesignal-ingest CLAUDE.md.
+1. **Work until everything asked is done.** The founder never types "keep going". Do not stop to ask permission to continue, to
+   report progress, or because a step is long. A turn ends only when all of the work is done, or it is waiting on an event that
+   wakes the session by itself (a PR check, a run, a scheduled wake), or one of the two states below.
+2. **Never rename or retitle the session (founder, 2026-11-12: "stop changing session names").** Do not call
+   `set_session_title`, and do not add color dots, state prefixes or any other title change. The session title is the
+   founder's. The state is carried by item 3 (first line of the final message) and item 4 (push notification) only.
+3. **First line of every final message** is exactly one of `NEEDS YOU: <what, one line>`, `STUCK: <blocker, one line>` or
+   `NO ACTION NEEDED: <state>`.
+4. **Push notification** (`PushNotification`) only when the state becomes NEEDS YOU or STUCK, one line leading with what to do.
+   Never for routine progress, CI waits or completion that needs nothing.
+5. **A turn never ends idle.** WORKING names the event that wakes it. NEEDS YOU names the question. STUCK names the blocker.
+   "Stopped, waiting for a prompt" is not a state.
+6. **A question in prose is a NEEDS YOU.** If the final message asks the founder anything, its first line is `NEEDS YOU`. The app
+   cannot see this (its summary may say nothing is needed), so the session must say it. Never end a message with a question under
+   `NO ACTION NEEDED`.
+7. **Backstop, not a substitute.** Any founder-run routine that re-colors titles is the founder's own; sessions never set titles.
+   It cannot know that a question was asked, so it never replaces rule 6.
+
+## YOUR RECORDED ENDINGS, IN TABS 16, 17 AND 20 ⚖️ FOUNDER (2026-11-12)
+
+"i will prerecord different endings and i want a button in tab 16, 17 and 20 to be able to upload the recording and have
+it seamed at end of video"; "video of me and voice of me speaking"; main videos and Shorts, chosen per file; it
+REPLACES the generated closing line. SQL of record `docs/video-endings.sql` (apply AFTER homesignal-ingest's
+`video/ending.py` is on main): private bucket `video-endings` (admin may add `<uuid>.<mp4|mov|webm|m4v>`, nothing may
+replace or delete one), `video_endings` (label, sha256, size), append-only `video_ending_choices` (newest per tab /
+target / file wins; null = the generated line).
+- Page: `lib/acq-video-endings.js` (`HS.acqVideoEndings.mount(client, host, {tab})`), its own box in Tab 16
+  (`#ve-youtube-host`) and Tab 17 (`#ve-impact-host`; the Impact Stories workspace moved into `#is-host`). It uploads
+  with the founder's session, sends the browser-computed sha256 to `hs_video_ending_register`, and lists a picker per
+  main video / Short. It decides nothing.
+- **Tab 16:** `hs_video_ending_choose('youtube', slug, file, ending)` starts a Full-rebuild revision whose settings carry
+  the ending; refused while that file is being built. **Tab 17:** the choice only; the engine reads
+  `video_endings_current` (service role only) and the visuals must be prepared again. **Tab 20:** mount with
+  `{tab:'weekly', targets}` once the weekly report (PR #2772) renders videos; until then nothing is mounted.
+- **Two upload buttons (founder, 2026-11-12: "make the 2 buttons"):** "Upload ending for Shorts (vertical)" and "Upload ending
+  for main videos (horizontal)". `video_endings.shape` records which; a Short's picker lists only vertical recordings, a main
+  video's only horizontal ones, and `hs_video_ending_choose` refuses the other kind. The browser reads the file's width and
+  height and refuses a clip on the wrong button before uploading. A recording with no shape (none exist) fits either.
+- Tests: `test/video_endings_pg` (`video-endings-suite.yml`, 31 checks), `test/video-endings.browser.test.mjs`.

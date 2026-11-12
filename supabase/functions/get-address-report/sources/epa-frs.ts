@@ -60,72 +60,7 @@ export type FrsAttempt = {
   why?: string;
   /** Seconds from a Retry-After header on a refused attempt, when EPA sent one. */
   retryAfterS?: number;
-  /** DIAGNOSTIC ONLY (never read by a decision): for a thrown error, fixed values describing it (see FrsErrorDiag). */
-  diag?: FrsErrorDiag;
 };
-
-/**
- * DIAGNOSTIC ONLY. A thrown FRS error, recorded as FIXED VALUES ONLY. No free-form text from the error, its message
- * or its cause is ever copied: every string field is one of the closed vocabularies below, and the only other
- * fields are integers. So an entry cannot carry a URL, a host, an address, a coordinate or a key, however the
- * runtime words its error. The cost: an error the vocabularies do not describe reads kind "unknown", and its
- * wording is not recorded.
- *   stage   where the attempt was when it threw: "fetch" (no response yet), "after_headers" (response object
- *           received, before the body read started), "body_read" (reading the body), "parse" (turning the body
- *           into JSON or recognizing the envelope).
- *   name    the error's constructor name, if it is one of FRS_DIAG_NAMES, else "other".
- *   kind    a classification of the error and its cause, from FRS_DIAG_KINDS.
- *   code    the cause's errno-style code (e.g. "ECONNRESET"), only if it matches /^E[A-Z0-9_]{2,20}$/, else null.
- *   os_error  the number in "(os error N)", if present and below 100000, else null.
- *   ms      how long the attempt took.
- */
-export const FRS_DIAG_STAGES = ["fetch", "after_headers", "body_read", "parse"] as const;
-export type FrsDiagStage = typeof FRS_DIAG_STAGES[number];
-export const FRS_DIAG_NAMES = ["TypeError", "TimeoutError", "AbortError", "SyntaxError", "RangeError", "DOMException", "Error"] as const;
-export const FRS_DIAG_KINDS = [
-  "timeout", "abort", "connection_reset", "connection_refused", "connection_closed", "dns", "tls", "invalid_json", "unknown",
-] as const;
-export type FrsErrorDiag = {
-  stage: FrsDiagStage;
-  name: typeof FRS_DIAG_NAMES[number] | "other";
-  kind: typeof FRS_DIAG_KINDS[number];
-  code: string | null;
-  os_error: number | null;
-  ms: number;
-};
-
-/** Ordered: the first matching rule decides. Reads the error's name, message and cause, and returns a fixed value. */
-function classifyKind(name: string, text: string, stage: FrsDiagStage): FrsErrorDiag["kind"] {
-  if (name === "TimeoutError" || /\btimed? ?out\b|etimedout/.test(text)) return "timeout";
-  if (name === "AbortError") return "abort";
-  if (/reset by peer|econnreset|connection reset/.test(text)) return "connection_reset";
-  if (/refused|econnrefused/.test(text)) return "connection_refused";
-  if (/dns|lookup|enotfound|eai_again|name resolution|getaddrinfo|resolve/.test(text)) return "dns";
-  if (/\btls\b|\bssl\b|certificate|handshake/.test(text)) return "tls";
-  if (/closed|eof|incomplete message|broken pipe|epipe|hang ?up/.test(text)) return "connection_closed";
-  if (stage === "parse" && name === "SyntaxError") return "invalid_json";
-  return "unknown";
-}
-
-export function errorDiag(e: unknown, stage: FrsDiagStage, ms: number): FrsErrorDiag {
-  const err = e instanceof Error ? e : (e && typeof e === "object" && "name" in e ? e as Error : null);
-  const rawName = err ? String(err.name) : "";
-  const name = (FRS_DIAG_NAMES as readonly string[]).includes(rawName) ? rawName as FrsErrorDiag["name"] : "other";
-  const c = err ? (err as { cause?: unknown }).cause : undefined;
-  const cObj = c && typeof c === "object" ? c as { code?: unknown; name?: unknown; message?: unknown } : null;
-  const text = [err?.message, cObj?.code, cObj?.name, cObj?.message, cObj ? null : c]
-    .filter((x) => x != null).map(String).join(" ").toLowerCase().slice(0, 2000);
-  const rawCode = cObj && typeof cObj.code === "string" ? cObj.code : null;
-  const os = /os error (\d{1,5})\b/.exec(text);
-  return {
-    stage,
-    name,
-    kind: classifyKind(rawName, text, stage),
-    code: rawCode && /^E[A-Z0-9_]{2,20}$/.test(rawCode) ? rawCode : null,
-    os_error: os ? Number(os[1]) : null,
-    ms: Math.max(0, Math.round(ms)),
-  };
-}
 
 /** The result of the whole back-off sequence. `ok:false` must NEVER be persisted as zero. */
 export type FrsOutcome = {
@@ -239,13 +174,10 @@ export async function frsAt(
     search_radius: String(rad),
     output: "JSON",
   });
-  const t0 = Date.now();
-  let stage: FrsDiagStage = "fetch";
   try {
     const r = await fetchImpl(`${FRS_ENDPOINT}?${q}`, {
       signal: AbortSignal.timeout(Math.max(1, Math.floor(timeoutMs))),
     });
-    stage = "after_headers";
     // Probe and ingest now agree: only HTTP 200 is an answer. A 204 / other 2xx used to
     // fall through to JSON.parse and become a schema miss or, before that, a silent zero.
     // 5xx and 429 remain transient (retried); 403/404 remain not-a-zero.
@@ -255,13 +187,11 @@ export async function frsAt(
       const ra = raw != null && String(raw).trim() !== "" ? Number(raw) : NaN;
       return { ...TRANSIENT, why: String(r.status), ...(Number.isFinite(ra) && ra >= 0 ? { retryAfterS: ra } : {}) };
     }
-    stage = "body_read";
     const text = await r.text();
-    stage = "parse";
     return recognizedFrsPayload(parseEpaJson(text));
   } catch (e) {
     // network/parse → transient. The error NAME (TimeoutError, SyntaxError, TypeError…) says which.
-    return { ...TRANSIENT, why: e instanceof Error ? e.name : "error", diag: errorDiag(e, stage, Date.now() - t0) };
+    return { ...TRANSIENT, why: e instanceof Error ? e.name : "error" };
   }
 }
 

@@ -67,17 +67,30 @@ migration_for_current_body
 expect_refusal "M04 the anchor appears twice" "appears 2 time(s)"
 
 # ------------------------------------------------------------------------------ the check
-run_suite() {  # $1 migration file; prints the suite output and returns its status
+# Both splices are applied, in order: the check as first written (docs/maps-subscriber-zips-monitor.sql)
+# and "test sign-ups do not count" (docs/maps-subscriber-zips-monitor-real-only.sql, 2026-11-11).
+mig2="$root/docs/maps-subscriber-zips-monitor-real-only.sql"
+live2_md5=242beb326ba16126bf173228923f6a24
+grep -q "$live2_md5" "$mig2" || { echo "FAIL: the real-only migration no longer names the live body md5 $live2_md5"; exit 1; }
+run_suite() {  # $1 first migration file  [$2 real-only migration file]; prints the suite output
   fresh; load_base
   migration_for_current_body "$1"
   q -f "$tmp/mig.sql" 2>/dev/null
-  q -f "$here/suite.sql" 2>&1 | sed -n -e 's/^.*NOTICE:  //p' -e 's/^.*ERROR:  //p'
+  sed "s/$live2_md5/$(body_md5)/g" "${2:-$mig2}" > "$tmp/mig2.sql"
+  local a b; a="$(attrs)"
+  q -f "$tmp/mig2.sql" 2>"$tmp/n2.txt" || { echo "FAIL the real-only splice did not apply: $(tail -1 "$tmp/n2.txt")"; return 0; }
+  [ "$(attrs)" = "$a" ] || echo "FAIL the real-only splice changed owner, grants or settings"
+  b="$(body_md5)"
+  q -f "$tmp/mig2.sql" 2>"$tmp/n2.txt"
+  { [ "$(body_md5)" = "$b" ] && grep -q "already counts real subscribers only" "$tmp/n2.txt"; } || echo "FAIL a second apply of the real-only splice was not a no-op"
+  cat "$here/suite.sql" "$here/suite-real-only.sql" | q -f - 2>&1 | sed -n -e 's/^.*NOTICE:  //p' -e 's/^.*ERROR:  //p'
 }
 out="$(run_suite "$mig")"
 echo "$out"
 n="$(grep -c '^PASS S' <<<"$out" || true)"
 ! grep -q '^FAIL' <<<"$out" || { echo "FAIL -- a scenario failed"; exit 1; }
 [ "$n" -ge 14 ] || { echo "FAIL -- only $n scenarios reported PASS; the suite did not run"; exit 1; }
+[ "$(grep -c '^PASS R' <<<"$out" || true)" -ge 4 ] || { echo "FAIL -- the real-only scenarios did not run"; exit 1; }
 
 # ------------------------------------------------------------------------------ mutations
 # Each breaks one thing in a copy of the migration and requires the suite to notice. A suite
@@ -101,11 +114,28 @@ mutate "a missing trigger passes"                   "(m.n_trig = 2 and m.n_missi
 mutate "any status counts as published"             "p.content_family = 'MAPS' and p.status = 'published' and p.zip = g.zip" "p.content_family = 'MAPS' and p.zip = g.zip"
 mutate "withdrawn posts count"                      "and not exists (select 1 from public.social_post_withdrawals w" "and true or exists (select 1 from public.social_post_withdrawals w"
 mutate "any family counts"                          "p.content_family = 'MAPS' and p.status = 'published' and p.zip = g.zip" "p.status = 'published' and p.zip = g.zip"
-mutate "test subscribers page too"                  "filter (where u.referral_source is distinct from 'admin_test') as real_since" "as real_since"
 mutate "unsubscribed people are watched"            "where s.stream = 'maps' and s.subscribed" "where s.stream = 'maps'"
 mutate "not alertable"                              "(m.n_trig = 2 and m.n_missing = 0 and m.n_stale = 0),
            true," "(m.n_trig = 2 and m.n_missing = 0 and m.n_stale = 0),
            false,"
 mutate "no wrapper: a broken check kills the monitor" "  exception when others then" "  exception when no_data_found then"
+
+# ------------------------------------------------------------------------------ mutations of the real-only splice
+mutate2() {  # $1 label  $2 old  $3 new
+  python3 -I - "$mig2" "$tmp/mut2.sql" "$2" "$3" <<'PY2' || { echo "FAIL mutation '$1' did not apply"; exit 1; }
+import sys
+src, dst, old, new = sys.argv[1:5]
+s = open(src, encoding="utf-8").read()
+assert s.count(old) == 1, ("mutation target not found exactly once", old)
+open(dst, "w", encoding="utf-8").write(s.replace(old, new))
+PY2
+  if res="$(run_suite "$mig" "$tmp/mut2.sql" 2>&1)" && ! grep -q '^FAIL' <<<"$res"; then
+    echo "FAIL mutation '$1' SURVIVED -- the suite did not notice"; exit 1
+  fi
+  echo "PASS mutation '$1' killed"
+}
+mutate2 "test ZIPs missing from the list page"   '$n$count(*) filter (where not z.listed and z.real_since is not null) as n_missing,$n$' '$n$count(*) filter (where not z.listed or  z.real_since is     null) as n_missing,$n$'
+mutate2 "real missing ZIPs never page"            '$n$count(*) filter (where not z.listed and z.real_since is not null) as n_missing,$n$' '$n$count(*) filter (where not z.listed and z.real_since is     null) as n_missing,$n$'
+mutate2 "test is read from referral_source"       '$n$min(us.created_at) filter (where not public.bsky_maps_known_test_identity(u.id)) as real_since$n$' "\$n\$min(us.created_at) filter (where u.referral_source is distinct from 'admin_test'  ) as real_since\$n\$"
 
 echo "ALL PASS"

@@ -229,8 +229,8 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     <div class="tab" id="tab-premium"></div>
     <div class="tab" id="tab-arearequests"></div>
     <div class="tab" id="tab-saleshandy"></div>
-    <div class="tab" id="tab-youtubevideos"><div id="yv-suggest-host"></div><div id="yv-list-host"></div></div>
-    <div class="tab" id="tab-impactstories"></div>
+    <div class="tab" id="tab-youtubevideos"><div id="yv-suggest-host"></div><div id="ve-youtube-host"></div><div id="yv-list-host"></div></div>
+    <div class="tab" id="tab-impactstories"><div id="ve-impact-host"></div><div id="is-host"></div></div>
     <div class="tab" id="tab-dossiers"></div>
     <div class="tab" id="tab-claimcheck"></div>
     <div class="tab" id="tab-weeklyreport"></div>
@@ -293,6 +293,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
 <script src="lib/acq-saleshandy.js?v=eca3a26c"></script>
 <script src="lib/acq-youtube-videos.js?v=93a936a9"></script>
 <script src="lib/acq-video-suggest.js?v=b1284c80"></script>
+<script src="lib/acq-video-endings.js?v=6e124c92"></script>
 <script src="lib/acq-bluesky-videos.js?v=574d20af"></script>
 <script src="lib/acq-bluesky-schedule.js?v=d543ca4c"></script>
 <!-- Tab 12 queue order: subscriber ZIPs first, then drafts to review, approved last. A view only. -->
@@ -303,7 +304,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
 <script src="lib/acq-impact-creator.js?v=4964cd46"></script>
 <script src="lib/acq-impact-discovery.js?v=f402aaab"></script>
 <script src="lib/acq-impact-engagement.js?v=d36b6629"></script>
-<script src="lib/acq-impact-stories.js?v=37d3d004"></script>
+<script src="lib/acq-impact-stories.js?v=0db53caa"></script>
 <script src="lib/acq-development-review.js?v=ddfaa1d6"></script>
 <script src="lib/acq-claim-check.js?v=3a241441"></script>
 <script src="lib/acq-weekly-slice.js?v=08ab7b29"></script>
@@ -443,13 +444,18 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       // Suggest a video: its own box, so the list refresh never wipes typing.
       var sg = document.getElementById('yv-suggest-host');
       if (sg && window.HS && window.HS.acqVideoSuggest) window.HS.acqVideoSuggest.mount(window.hsClient, sg);
+      // Your recorded endings (docs/video-endings.sql): its own box too.
+      var ve = document.getElementById('ve-youtube-host');
+      if (ve && window.HS && window.HS.acqVideoEndings) window.HS.acqVideoEndings.mount(window.hsClient, ve, { tab: 'youtube' });
       var el = document.getElementById('yv-list-host');
       if (el && window.HS && window.HS.acqYoutubeVideos) window.HS.acqYoutubeVideos.load(window.hsClient, el);
     },
     // Live, gated (hs_impact_story_*): the Impact Stories workspace. Never baked into the snapshot, and a snapshot refresh
     // never touches it (render() skips this tab), so an open editor is never overwritten.
     impactstories: function () {
-      var el = document.getElementById('tab-impactstories');
+      var ve = document.getElementById('ve-impact-host');
+      if (ve && window.HS && window.HS.acqVideoEndings) window.HS.acqVideoEndings.mount(window.hsClient, ve, { tab: 'impact' });
+      var el = document.getElementById('is-host');
       if (el && window.HS && window.HS.acqImpactStories) window.HS.acqImpactStories.load(window.hsClient, el);
     },
     // Live, gated (development_review_queue): the reviewer's screen for development pages. Never baked into the snapshot.

@@ -11,7 +11,12 @@ create or replace function auth.jwt() returns jsonb language sql stable as
   $$ select coalesce(nullif(current_setting('test.jwt', true), ''), '{}')::jsonb $$;
 create table public.communities (id uuid primary key default gen_random_uuid(), level text not null, zip_codes text[] not null);
 create table public.users (id uuid primary key default gen_random_uuid(), email text, community_id uuid,
-  zip_code text, alert_email_consent boolean not null default true, unsubscribed boolean not null default false);
+  zip_code text, alert_email_consent boolean not null default true, unsubscribed boolean not null default false,
+  referral_source text);
+-- Stand-in for homesignal-ingest's test-identity rule (its real body reads more columns). Two
+-- values count as test here so a test can tell "asks the function" from "reads referral_source".
+create function public.bsky_maps_known_test_identity(p_user uuid) returns boolean language sql stable as
+  $$ select coalesce((select u.referral_source in ('admin_test','campaign_test') from public.users u where u.id = p_user), false) $$;
 create table public.user_subscriptions (user_id uuid, community_id uuid, stream text, topic text,
   origin text, sort_order integer, created_at timestamptz default now());
 create view public.alert_subscription_state with (security_invoker = true) as

@@ -18,7 +18,7 @@ const labels = [...nav.matchAll(/data-tab="([^"]+)">([^<]+)</g)].map((m) => [m[1
 ok(labels.length >= 17 && labels[16][0] === 'impactstories' && labels[16][1] === '17 · Impact Stories', 'nav: tab 17 is named exactly "17 · Impact Stories"');
 ok(!/youtube|tiktok/i.test(labels[16][1]), 'nav: the tab name carries no platform name');
 ok(labels[10][1] === '11 · Video Producer' && labels[15][1] === '16 · YouTube Videos' && labels[15][0] === 'youtubevideos', 'nav: tabs 11 and 16 keep their ids and names');
-ok(html.includes('<div class="tab" id="tab-impactstories"></div>'), 'shell: the tab container exists');
+ok(html.includes('<div class="tab" id="tab-impactstories"><div id="ve-impact-host"></div><div id="is-host"></div></div>'), 'shell: the tab container exists');
 ok(/impactstories: function \(\) \{[\s\S]*?HS\.acqImpactStories\.load\(window\.hsClient, el\)/.test(html), 'shell: a trusted initializer loads the module');
 ok(html.includes("if(id==='impactstories') return;"), 'shell: a snapshot refresh never overwrites the open workspace');
 const key = createHash('sha256').update(read('lib/acq-impact-stories.js')).digest('hex').slice(0, 8);

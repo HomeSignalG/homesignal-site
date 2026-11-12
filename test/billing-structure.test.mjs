@@ -202,8 +202,8 @@ ok([BR, LB, ...Object.values(MB), ...Object.values(WB)].every((t) => t.length > 
   const landing = read('development-activity.html');
   ok(!/manage-billing|lemonsqueezy|checkout/i.test(stripJs(landing.replace(/<!--[\s\S]*?-->/g, ''))) && !/da-join|data-cta="join"/.test(landing),
     '4e the landing page makes NO checkout, calls no billing function or processor, and (free-only, founder 2026-10-15) carries no Join link');
-  ok(!/\$\d/.test(landing.replace(/<!--[\s\S]*?-->/g, '')) && /Paid plans are coming\./.test(page),
-    '4f free-only (founder, 2026-10-15): the landing page shows no price and the Reports page offer says only that paid plans are coming');
+  ok(!/\$\d/.test(landing.replace(/<!--[\s\S]*?-->/g, '')) && /Paid plans coming after beta/.test(landing) && /You won’t be charged unless you choose a paid plan\./.test(landing) && /Paid plans are coming\./.test(page),
+    '4f the landing page shows no price, says paid plans come after beta and that nothing is charged unless a paid plan is chosen (founder, 2026-11-12), and the Reports page offer still says paid plans are coming');
 }
 
 // ---- 5. the wiring and the written record ------------------------------------------------------------------------------------------------------
