@@ -15,7 +15,7 @@
 // which runs scripts/impact-dc-verify-run.mjs (the production wiring).
 //
 // Every outside call goes through `deps`, so test/impact-dc-verify.test.mjs runs the whole flow with no network.
-import { HS, SITE_ORIGIN, matchProject, chooseProjectKey, assessDocuments, activityFor, decide, isOfficialHost }
+import { HS, SITE_ORIGIN, matchProject, zipsNamedByTopic, chooseProjectKey, assessDocuments, activityFor, decide, isOfficialHost }
   from './lib/impact-dc-verify-core.mjs';
 
 const MAX_ZIPS = 150;
@@ -25,11 +25,24 @@ export function zipsForCandidate(candidate) {
   return [...new Set((Array.isArray(candidate.zips) ? candidate.zips : []).map(String).filter((z) => /^\d{5}$/.test(z)))].sort();
 }
 
+/** Two-letter states of the topic's places, as the claim computed them. */
+export function statesForCandidate(candidate) {
+  return [...new Set((Array.isArray(candidate.states) ? candidate.states : []).map((x) => String(x).toUpperCase()).filter((x) => /^[A-Z]{2}$/.test(x)))].sort();
+}
+
 export async function verifyOne(deps, job) {
   const candidate = job.candidate || {};
-  const zips = zipsForCandidate(candidate);
+  let zips = zipsForCandidate(candidate);
+  let scope = 'place';
+  const states = statesForCandidate(candidate);
+  if (!zips.length && states.length) {
+    // the topic names a state, not a county or city: pick only the ZIPs whose drawn project the topic names
+    zips = zipsNamedByTopic(candidate, await deps.rpc('impact_dc_state_name_points', { p_states: states }));
+    scope = 'state';
+  }
+  const search = { scope, states, zips: zips.length };
   if (!zips.length) {
-    return decide({ match: { state: 'no_match', alternatives: [] }, candidate });
+    return Object.assign(decide({ match: { state: 'no_match', alternatives: [] }, candidate }), { search });
   }
   if (zips.length > MAX_ZIPS) throw new Error('The topic\'s place covers ' + zips.length + ' ZIP pages; more than ' + MAX_ZIPS + ' is not searched.');
   const records = [];
@@ -37,8 +50,8 @@ export async function verifyOne(deps, job) {
     const rows = await deps.rpc('map1_dc_zip_members', { p_zip: z });   // throws on a failed read: no partial answer
     for (const r of rows || []) records.push(Object.assign({ zip: z, map_key: r.source_key, status: r.map_status }, r));
   }
-  const match = matchProject(candidate, records);
-  if (match.state !== 'matched') return decide({ match, candidate });
+  const match = matchProject(candidate, records, { requireName: scope === 'state' });
+  if (match.state !== 'matched') return Object.assign(decide({ match, candidate }), { search });
 
   const keys = await deps.rpc('map1_project_stable_keys', { p_map_key: match.record.map_key });
   const key = chooseProjectKey(Array.isArray(keys) ? keys : []);
@@ -80,7 +93,7 @@ export async function verifyOne(deps, job) {
     try { page = await deps.checkPage(link, { mapKey: locate.map_key, name: match.record.project_name, docUrls: urls }); }
     catch (e) { page = { state: 'error', error: String(e && e.message || e).slice(0, 200), checks: [] }; }
   }
-  return decide({ match, locate: Object.assign({ key }, locate), link, page, docs, activity, candidate });
+  return Object.assign(decide({ match, locate: Object.assign({ key }, locate), link, page, docs, activity, candidate }), { search });
 }
 
 function candidateUrls(c) {

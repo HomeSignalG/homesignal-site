@@ -33,6 +33,7 @@ function fakeDeps(opt = {}) {
       if (opt.fail && opt.fail[fn]) throw new Error(opt.fail[fn]);
       switch (fn) {
         case 'map1_dc_zip_members': return members[body.p_zip] || [];
+        case 'impact_dc_state_name_points': return opt.statePoints || [];
         case 'map1_project_stable_keys': return opt.keys ? opt.keys(body.p_map_key) : ['dcrec:compute_atlas|facilities|cyrusone-vint-hill'];
         case 'map1_project_locate': return opt.locate ? opt.locate(body) :
           { key: body.p_key, kind: 'dcrec', state: 'found', zip: '20187', zips: ['20187'], map_key: 'dc:aaa' };
@@ -118,6 +119,27 @@ r = await verifyOne(fakeDeps(), { candidate: topic({ zips: [] }) });
 ok(r.outcome === 'needs_review' && r.match.state === 'no_match', '5d no ZIP page for the place: needs review');
 r = await verifyOne(fakeDeps({ members: { '20187': [Object.assign(row(), {}), row({ source_key: 'dc:ccc', project_name: 'CyrusOne Vint Hill', source_url: 'https://y.example' })], '20186': [] } }), { candidate: topic() });
 ok(r.outcome === 'needs_review' && r.match.state === 'ambiguous', '5e ambiguous: needs review', r.match);
+
+console.log('\n5s. a topic that names only a state (2026-11-13)');
+const stateTopic = (over = {}) => topic(Object.assign({ place: 'Virginia', coverage: { places: [{ state: 'VA', county: null }] },
+  zips: [], states: ['VA'] }, over));
+const pts = [{ zip: '20187', project_name: 'CyrusOne Vint Hill', developer_or_operator: 'CyrusOne' },
+             { zip: '22030', project_name: 'Amazon Fairfax', developer_or_operator: 'Amazon Web Services' }];
+ok(JSON.stringify(core.zipsNamedByTopic(stateTopic(), pts)) === '["20187"]', '5s1 only the ZIP whose project the topic names in full');
+ok(core.zipsNamedByTopic(stateTopic({ title: 'Vint Hill neighbors meet', evidence: {} }), pts).length === 0, '5s2 part of a name is not enough');
+let sd = fakeDeps({ statePoints: pts });
+r = await verifyOne(sd, { candidate: stateTopic() });
+ok(r.link.available && r.search.scope === 'state' && r.search.states[0] === 'VA', '5s3 state topic: the named project is found and linked', r);
+ok(sd.calls.filter((c) => c[0] === 'map1_dc_zip_members').map((c) => c[1].p_zip).join() === '20187', '5s4 only the named ZIP is read');
+r = await verifyOne(fakeDeps({ statePoints: pts }), { candidate: stateTopic({ title: 'CyrusOne neighbors worried', evidence: {} }) });
+ok(r.match.state === 'no_match', '5s5 operator alone across a state is not a match', r.match);
+r = await verifyOne(fakeDeps({ statePoints: [{ zip: '20187', project_name: 'Vint Hill' }],
+  members: { '20187': [row({ project_name: 'CyrusOne Manassas' })] } }),
+  { candidate: stateTopic({ title: 'Vint Hill campus fight, CyrusOne quiet', evidence: {} }) });
+ok(r.match.state === 'no_match', '5s6 a ZIP chosen by one name never lets another project match there by operator', r.match);
+sd = fakeDeps({ statePoints: pts });
+r = await verifyOne(sd, { candidate: topic() });
+ok(!sd.calls.some((c) => c[0] === 'impact_dc_state_name_points') && r.search.scope === 'place', '5s7 a county topic does not do the statewide search');
 
 console.log('\n6. the reply');
 const rep = core.composeReply('https://jodytracks.com/map/20187/?project=dcrec%3Aa');
