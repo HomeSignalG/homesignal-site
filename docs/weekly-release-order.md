@@ -14,6 +14,20 @@ Re-applying an earlier file after a later one changes nothing.
 | 6 | `docs/weekly-6-doc-cues.sql` | Document-evidence cues | 1, 3, 4 |
 | 7 | `docs/weekly-7-topic-queue-gate.sql` | The version-to-edition link and the approval gate | 1, 2, 3 |
 
+## Bluesky sources: `docs/weekly-bluesky-sources.sql` (separate, unnumbered; needs 1, 2, 2a)
+
+Files the account's own Bluesky posts that start with "QUALITY-of-LIFE WEEKLY REPORT:" under the weekly-report topic
+named after the colon. The weekly-report topics are the 13 Local News categories (`alert_topic_catalog`, stream `news`),
+the same list a report edition is made for, so an edition shows the posts of its own category. Creates four tables
+(`weekly_topic_aliases`, `weekly_bsky_sources`, `weekly_bsky_source_revisions`, `weekly_bsky_sync`), four service-role
+writer functions, three admin functions (`hs_weekly_bsky_sources`, `hs_weekly_bsky_source_file`,
+`hs_weekly_topic_alias_add`) and seeds one alias ("Data Center" for "Data Centers"). **It replaces no function of files
+1-7**, so the publication lock is untouched, and it is unnumbered because #2850 proposes files 8 and 9. The writer is
+homesignal-ingest `scripts/weekly_bsky_sources.mjs` (workflow `weekly-bsky-sources.yml`, every 2 hours at :17), which
+imports nothing until its switch `data/weekly_bsky_sources.json` is set to `enabled: true` on main. Apply this file before
+turning the switch on.
+Tests: `test/weekly_bsky_sources_pg/run.sh` (32 checks, nine mutations), `test/weekly-bsky-sources.browser.test.mjs`.
+
 ## The queue-only release: files 1, 2 and 2a
 
 This is what Tab 20 (`acquisition.html`, `HS.acqWeeklyTopics.load`) uses. It installs six tables

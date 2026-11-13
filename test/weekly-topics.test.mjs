@@ -14,6 +14,8 @@ const slice = strip(read('lib/acq-weekly-slice.js'));
 const baseSql = read('docs/weekly-1-base.sql'), queue = read('docs/weekly-2-topic-queue.sql'), gate = read('docs/weekly-7-topic-queue-gate.sql');
 const sql = baseSql + '\n' + queue;
 const sqlCode = sql.replace(/--.*$/gm, '');
+// the Bluesky sources (docs/weekly-bluesky-sources.sql): an optional file the queue reads beside the queue-only release
+const bsky = read('docs/weekly-bluesky-sources.sql');
 const stage2 = ['weekly-3-workbench.sql', 'weekly-4-source-copy.sql', 'weekly-5-titles.sql', 'weekly-6-doc-cues.sql'].map((f) => read('docs/' + f)).join('\n') + '\n' + gate;
 
 // 1 on the page: Tab 20 is the queue, mounted through its own entry point; the workbench is loaded as a library only
@@ -47,16 +49,18 @@ const W_PRE = W.PREPARED;
 const rpcs = [...new Set([...code.matchAll(/rpc\('([a-z_]+)'/g)].map((m) => m[1]))];
 ok(rpcs.length >= 9 && rpcs.every((n) => /^hs_weekly_/.test(n)), '2a every call is an hs_weekly_* admin function (' + rpcs.length + ')');
 const defined = (n, text) => new RegExp('function public\\.' + n + '\\(').test(text);
-ok(rpcs.every((n) => defined(n, sql) || defined(n, stage2)), '2b every function it calls is defined in the prepared SQL');
+ok(rpcs.every((n) => defined(n, sql) || defined(n, stage2) || defined(n, bsky)), '2b every function it calls is defined in the prepared SQL');
 // the two calls that are NOT in the queue-only release are each behind its own switch
-const later = rpcs.filter((n) => !defined(n, sql)).sort();
+const later = rpcs.filter((n) => !defined(n, sql) && !defined(n, bsky)).sort();
+ok(rpcs.filter((n) => defined(n, bsky)).sort().join() === 'hs_weekly_bsky_source_file,hs_weekly_bsky_sources'
+  && /function notInstalled\(e\)/.test(code), '2j the Bluesky sources: two admin functions of docs/weekly-bluesky-sources.sql, and the section hides itself when that file is not installed');
 ok(JSON.stringify(later) === JSON.stringify(['hs_weekly_edition_link_version', 'hs_weekly_paste_answer'])
   && /if \(a === 'paste'\) \{\s*if \(!processing\(\)\) return;/.test(code) && /if \(a === 'link-version'\) \{\s*if \(!canLink\(\)\) return;/.test(code)
   && /function processing\(\) \{ return S\.opts\.researchProcessing === true; \}/.test(code) && /researchProcessing: false/.test(code.match(/function load\(client, el\) \{[\s\S]*?\n  \}/)[0]),
   '2h answer processing and version linking are the only calls outside the queue-only release; both are off unless switched on, and Tab 20’s entry point leaves processing off');
 ok(/Prepare research request/.test(js) && /Nothing was submitted for processing/.test(js) && /prepared, not submitted/.test(js) && W_PRE === 'Research request prepared'
   && /Unavailable in this release: research processing is not deployed/.test(js), '2i a prepared request is worded apart from submitted research, and the unavailable action says why');
-ok(!/\bfetch\s*\(|XMLHttpRequest|WebSocket|sendBeacon|\.from\s*\(|\.storage\b|\.upload\s*\(|localStorage|sessionStorage|indexedDB|document\.cookie|perplexity\.ai|anthropic\.com|bsky|youtube/i.test(code), '2c no network, table, storage, browser-storage, provider or posting call');
+ok(!/\bfetch\s*\(|XMLHttpRequest|WebSocket|sendBeacon|\.from\s*\(|\.storage\b|\.upload\s*\(|localStorage|sessionStorage|indexedDB|document\.cookie|perplexity\.ai|anthropic\.com|api\.bsky\.app|bsky\.social\/xrpc|youtube/i.test(code), '2c no network, table, storage, browser-storage, provider or posting call');
 ok(!/\b(confirm|alert|prompt)\s*\(/.test(code), '2d no browser dialogs');
 ok(!/\bverified\b/i.test(code.replace(/unverified/gi, '')), '2e nothing is labelled "verified"');
 ok(/This records the promise\. It is not evidence for the story\./.test(js) && /A topic is a lead, not evidence\./.test(js) && /not evidence/.test(js.match(/Where the lead came from[^']*/)[0]), '2f promise, lead and source wording stay apart from evidence');
@@ -95,7 +99,7 @@ try { base = execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { encodi
 if (!base) console.log('SKIP — 6 origin/main is not in this checkout');
 else {
   const changed = execFileSync('git', ['diff', '--name-only', base], { encoding: 'utf8' }).split('\n').filter(Boolean);
-  ok(!changed.some((f) => /impact|acq-weekly-report|^topics\.js$|youtube|^lib\/.*bluesky|^docs\/.*bluesky/i.test(f)), '6 no Tab 17, Stage 1, Bluesky or YouTube file differs from origin/main (' + changed.length + ' files changed)');
+  ok(!changed.some((f) => /impact|acq-weekly-report|^topics\.js$|youtube|^lib\/.*bluesky|^docs\/(?!weekly-bluesky-sources\.sql$).*bluesky/i.test(f)), '6 no Tab 17, Stage 1, Bluesky or YouTube file differs from origin/main (' + changed.length + ' files changed)');
   // the one other-tab file that changes: a test that counts the dashboard's tabs (19 -> 20)
   // Before #2772 merged these three were the expected set; once main carries them, a later branch may change none of them.
   const allowed = ['acquisition.html', 'test/claim-check.test.mjs', 'test/video-bluesky-queue.test.mjs'];
