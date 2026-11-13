@@ -345,11 +345,26 @@ select pg_temp.chk('14b a handful of visits never moves the ranking', public._hs
 create table public.communities (id uuid default gen_random_uuid(), name text, county text, state text, level text);
 insert into public.communities (name, county, state, level) values
   ('Lakewood (98499)', 'Pierce', 'WA', 'zip'), ('Tacoma (98402)', 'Pierce', 'WA', 'zip'), ('Seattle (98101)', 'King', 'WA', 'zip'),
-  ('Pierce County, WA', 'Pierce', 'WA', 'county');
+  ('Pierce County, WA', 'Pierce', 'WA', 'county'),
+  ('Memphis (38103)', 'Shelby', 'TN', 'zip'), ('Memphis (38104)', 'Shelby', 'TN', 'zip'), ('Memphis (38105)', 'Shelby', 'TN', 'zip'),
+  ('Memphis (38106)', 'Shelby', 'TN', 'zip'), ('Memphis (38107)', 'Shelby', 'TN', 'zip'), ('Memphis (38108)', 'Shelby', 'TN', 'zip'),
+  ('Memphis (38109)', 'Shelby', 'TN', 'zip'), ('Memphis (38111)', 'Shelby', 'TN', 'zip'), ('Memphis (38112)', 'Shelby', 'TN', 'zip'),
+  ('Memphis (68042)', 'Saunders', 'NE', 'zip'), ('Kenosha (53140)', 'Kenosha', 'WI', 'zip'),
+  ('Twin City (30471)', 'Emanuel', 'GA', 'zip'), ('Twin City (30472)', 'Emanuel', 'GA', 'zip'), ('Twin City (55401)', 'Hennepin', 'MN', 'zip'),
+  ('Aurora (80010)', 'Arapahoe', 'CO', 'zip'), ('Aurora (60505)', 'Kane', 'IL', 'zip');
 select pg_temp.chk('15a coverage counts the ZIP pages a county mention reaches',
   (public.impact_discovery_coverage('[{"state":"wa","county":"Pierce County"}]')->0->>'zip_pages')::int = 2
   and (public.impact_discovery_coverage('[{"state":"wa","city":"Seattle"}]')->0->>'zip_pages')::int = 1
   and (public.impact_discovery_coverage('[{"state":"NY","county":"Erie"}]')->0->>'zip_pages')::int = 0);
+select pg_temp.chk('15b a city written without a state takes the state with all, or at least 90% (5+), of its ZIP pages',
+  public.impact_discovery_coverage('[{"state":null,"city":"Kenosha"}]')->0 @> '{"state":"WI","city":"Kenosha","zip_pages":1}'
+  and public.impact_discovery_coverage('[{"state":null,"city":"Memphis"}]')->0 @> '{"state":"TN","city":"Memphis","zip_pages":9}');
+select pg_temp.chk('15b2 a 2-to-1 split is not dominant, and a small dominant set (under 5 pages) is not enough',
+  public.impact_discovery_coverage('[{"state":null,"city":"Twin City"}]')->0 @> '{"state":null,"zip_pages":0}');
+select pg_temp.chk('15c two states with that city, or none: no state and no coverage, never a guess',
+  public.impact_discovery_coverage('[{"state":null,"city":"Aurora"}]')->0 @> '{"state":null,"zip_pages":0}'
+  and public.impact_discovery_coverage('[{"state":null,"city":"Cambridge"}]')->0 @> '{"state":null,"zip_pages":0}'
+  and public.impact_discovery_coverage('[{"state":null,"county":"Richmond"}]')->0 @> '{"state":null,"zip_pages":0}');
 
 -- 16. the 60-topic limit keeps core topics first: 70 higher-scoring experimental topics cannot push a core topic out
 update public.impact_discovery_settings set experimental_enabled = true where id;
