@@ -170,15 +170,19 @@ grant execute on function public.impact_dc_topic_states(jsonb) to service_role;
 create or replace function public.impact_dc_state_name_points(p_states text[])
 returns table(zip text, project_name text, developer_or_operator text)
 language plpgsql stable security definer set search_path to 'public', 'geo', 'pg_temp' set jit to 'off' as $fn$
+declare v_pages text[];
 begin
+  -- the states' ZIP pages, first and as a plain array: inside a function, a CTE here let the planner compare every
+  -- point with every page (over 60 s for TX), where an array membership test keeps it to the boundary index lookups
+  select array_agg(distinct zc) into v_pages
+    from public.communities z cross join lateral unnest(z.zip_codes) zc
+   where z.level = 'zip' and zc ~ '^[0-9]{5}$'
+     and upper(z.state) = any (select upper(s) from unnest(coalesce(p_states, '{}')) s where upper(s) ~ '^[A-Z]{2}$');
+  if v_pages is null then return; end if;
   return query
-  with st as (select distinct upper(s) s from unnest(coalesce(p_states, '{}')) s where upper(s) ~ '^[A-Z]{2}$'),
-  pages as (select distinct zc
-              from public.communities z cross join lateral unnest(z.zip_codes) zc
-             where z.level = 'zip' and upper(z.state) in (select s from st) and zc ~ '^[0-9]{5}$'),
-  -- each point's ZCTA through the boundary index, then kept only when that ZCTA is one of the states' ZIP pages;
+  -- each point's ZCTA through the boundary index, kept only when that ZCTA is one of the states' ZIP pages;
   -- placed first, named second, so only entities in those pages are joined to their names
-  ents as materialized (
+  with ents as materialized (
     select z.zc, ge.canonical_entity_id
       from public.dc_entity_geography ge
       join public.dc_canonical_entity e on e.canonical_entity_id = ge.canonical_entity_id
@@ -186,20 +190,19 @@ begin
       cross join lateral (select b.zcta5::text zc from geo.zcta_boundary b
                            where b.geom && ST_SetSRID(ST_MakePoint(ge.lng, ge.lat), 4269)
                              and ST_Intersects(b.geom, ST_SetSRID(ST_MakePoint(ge.lng, ge.lat), 4269)) limit 1) z
-     where ge.geography_status = 'RESOLVED' and ge.geometry_type = 'POINT' and z.zc in (select zc from pages)),
+     where ge.geography_status = 'RESOLVED' and ge.geometry_type = 'POINT' and z.zc = any (v_pages)),
   canon as (
     select n.zc, o.source_native_name as name, nullif(btrim(o.source_native_operator), '') as op
       from ents n
       join public.dc_entity_observation eo on eo.canonical_entity_id = n.canonical_entity_id
-      join public.dc_current_observation cx on cx.home_signal_observation_id = eo.home_signal_observation_id
-      join public.dc_source_observation o on o.home_signal_observation_id = eo.home_signal_observation_id),
+      join public.dc_current_observation o on o.home_signal_observation_id = eo.home_signal_observation_id),
   compat as materialized (
     select z.zc, r.project_name as name, nullif(btrim(r.developer_or_operator), '') as op
       from public.national_dc_records r
       cross join lateral (select b.zcta5::text zc from geo.zcta_boundary b
                            where b.geom && ST_SetSRID(ST_MakePoint(r.lng, r.lat), 4269)
                              and ST_Intersects(b.geom, ST_SetSRID(ST_MakePoint(r.lng, r.lat), 4269)) limit 1) z
-     where r.map_eligible and z.zc in (select zc from pages))
+     where r.map_eligible and z.zc = any (v_pages))
   select distinct u.zc, u.name, u.op from (select * from canon union all select * from compat) u where u.name is not null;
 end $fn$;
 revoke all on function public.impact_dc_state_name_points(text[]) from public;
