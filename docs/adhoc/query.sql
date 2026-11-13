@@ -3,4 +3,4 @@ select distinct on (source_key) source_key, type, type_raw, status, name, scope_
 from public.app_projects
 where record_kind='development'
   and (coalesce(name,'')||' '||coalesce(type_raw,'')||' '||coalesce(scope_text,'')) ~* '(data ?cent(er|re)s?|hyperscale|colocation|server farm|super-?comput|\mhpc\M|comput(e|ing) facilit)'
-order by source_key, id offset 0 limit 60) x;
+order by source_key, id offset 60 limit 60) x;
