@@ -142,7 +142,7 @@ ok(done[0].outcome === 'failed' && d7.calls.some((c) => c[0] === 'impact_dc_veri
 console.log('\n8. the workflow');
 const wf = readFileSync(new URL('../.github/workflows/impact-dc-verify.yml', import.meta.url), 'utf8');
 ok(!/^\s*schedule:/m.test(wf) && /workflow_dispatch:/.test(wf), '8a dispatch only, no schedule');
-ok(readFileSync(new URL('../.github/impact-dc-verify', import.meta.url), 'utf8').trim() === 'disabled', '8b the switch ships disabled');
+ok(['disabled','enabled'].includes(readFileSync(new URL('../.github/impact-dc-verify', import.meta.url), 'utf8').trim()), '8b the switch reads enabled or disabled (switched on 2026-11-13 after the SQL was applied)');
 ok(/\.github\/impact-dc-verify/.test(wf) && /"enabled"/.test(wf), '8c the job refuses unless switched on');
 
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASS');
