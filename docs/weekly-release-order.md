@@ -8,6 +8,7 @@ Re-applying an earlier file after a later one changes nothing.
 | 1 | `docs/weekly-1-base.sql` | Helpers; the research request, pasted answer and engine run tables | `alert_topic_catalog` |
 | 2 | `docs/weekly-2-topic-queue.sql` | The topic queue: leads, editions, lead events, eight admin functions | 1, `_hs_is_admin` |
 | 2a | `docs/weekly-2a-publication-lock.sql` | The publication lock: three of file 2's functions, each with one added line. Creates no object | 1, 2 |
+| 2b | `docs/weekly-2b-lead-category.sql` | Every topic has its Local News category: `hs_weekly_lead_save` refuses a topic with none, and a category change while the topic is in a report. Creates no object. Prepared 2026-11-13, not applied | 1, 2 |
 | 3 | `docs/weekly-3-workbench.sql` | Research processing and the editorial workbench (sources, findings, library, scripts, approvals, lessons, costs). **This file dispatches the ingest workflows.** | 1, `_hs_is_admin`, vault, `pg_net` |
 | 4 | `docs/weekly-4-source-copy.sql` | Source copies; both private storage buckets and their one read policy. **Incomplete work, paused.** | 1, 3, Storage |
 | 5 | `docs/weekly-5-titles.sql` | Title versions and their three decisions | 1, 3 |
@@ -47,6 +48,8 @@ does for a closed edition. Before 2a only the page hid those actions. 2a is gene
 function's closed check, so a closed edition keeps its own message. Owner, privileges, SECURITY DEFINER and search_path
 are unchanged. A research request that already exists for a lead in a published edition is still answered as
 `existing: true`; nothing is written. File 9, prepared separately, inserts the same line at the same places.
+**File 2b, the category rule** (generated from file 2 by `test/weekly_stage2_pg/build_lead_category_sql.py`). Re-applying file 2 after 2b removes it; re-apply 2b after it.
+
 **Re-applying file 2 after 2a removes the lock; re-apply 2a after it.** Files 3-7 do not replace these functions.
 Tests: `test/weekly_stage2_pg/run_publication_lock.sh` (publication_lock.sql, checks L00-L11, nine mutations).
 

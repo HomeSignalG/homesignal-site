@@ -298,6 +298,65 @@ await page.waitForFunction(() => /TEST <img src=x/.test(document.querySelector('
 ok((await page.evaluate(() => window.pwned)) === undefined && (await page.locator('.tq-lead img, .tq-lead script').count()) === 0
   && (await page.locator('.tq-lead a[href^="javascript"]').count()) === 0 && (await page.locator('.tq-lead a[href="https://ok.example.test/a"]').count()) === 1, '11 markup and script addresses are shown as text');
 
+// 14 nothing typed is lost when a save is refused or the page redraws for another action
+await page.evaluate((Q) => { window.queue = Q; }, Q);
+await clear();
+await page.fill('#tq-title', 'TEST: keep me');
+await page.click('#tq-more > summary').catch(() => {});
+if (!(await page.locator('#tq-more').evaluate((d) => d.open))) await page.click('#tq-more > summary');
+await page.fill('#tq-sources', 'https://news.example.test/keep');
+await page.fill('#tq-notes', 'TEST notes to keep');
+await page.fill('#tq-commit-wording', 'TEST wording to keep');
+await page.click('#tq-capture button[data-tq="save"]');   // no category: refused on the page
+ok((await page.inputValue('#tq-title')) === 'TEST: keep me' && (await page.inputValue('#tq-sources')) === 'https://news.example.test/keep'
+  && (await page.inputValue('#tq-notes')) === 'TEST notes to keep' && (await page.inputValue('#tq-commit-wording')) === 'TEST wording to keep'
+  && (await calls('hs_weekly_lead_save')).length === 0, '14a a save refused for a missing category keeps the title, sources, notes and wording');
+await page.selectOption('#tq-topic', 'Data Centers');
+await page.evaluate(() => { window.answers.hs_weekly_lead_save = { error: 'source URLs holds something that is not a web address: x' }; });
+await page.click('#tq-capture button[data-tq="save"]');
+await page.waitForFunction(() => document.querySelector('.tq-root [role="alert"]') && /not a web address/.test(document.querySelector('.tq-root [role="alert"]').innerText));
+ok((await page.inputValue('#tq-notes')) === 'TEST notes to keep' && (await page.inputValue('#tq-sources')) === 'https://news.example.test/keep'
+  && (await page.inputValue('#tq-topic')) === 'Data Centers', '14b a save the database refuses keeps everything typed');
+await clear();
+await page.selectOption('#tq-edition', EA2.id);
+await page.waitForFunction((id) => window.calls.some((c) => c[0] === 'hs_weekly_topic_queue' && c[1].p_edition === id), EA2.id);
+ok((await page.inputValue('#tq-title')) === 'TEST: keep me' && (await page.inputValue('#tq-notes')) === 'TEST notes to keep', '14c choosing an edition keeps an unsaved topic form');
+await view('all');
+ok((await page.inputValue('#tq-title')) === 'TEST: keep me', '14d switching topic views keeps an unsaved topic form');
+// the New edition form
+await page.click('#tq-newed > summary');
+await page.selectOption('#tq-ed-topic', 'Data Centers');
+await page.fill('#tq-ed-start', '2026-11-09');
+await page.fill('#tq-ed-key', 'data-centers-2026-11-09');
+await page.evaluate(() => { window.answers.hs_weekly_edition_create = { error: 'an edition with the identifier data-centers-2026-11-09 already exists' }; });
+await page.click('button[data-tq="create-edition"]');
+await page.waitForFunction(() => document.querySelector('.tq-root [role="alert"]') && /already exists/.test(document.querySelector('.tq-root [role="alert"]').innerText));
+ok((await page.locator('#tq-newed').evaluate((d) => d.open)) && (await page.inputValue('#tq-ed-topic')) === 'Data Centers'
+  && (await page.inputValue('#tq-ed-start')) === '2026-11-09' && (await page.inputValue('#tq-ed-key')) === 'data-centers-2026-11-09', '14e a refused new edition keeps its category, dates and identifier, and stays open');
+// a refused decision keeps its reason
+await view('edition');
+await page.evaluate(() => { window.answers.hs_weekly_lead_disposition = { error: 'this lead was promised publicly: say why it is deferred (at least 10 characters)' }; });
+await card(LP).locator('.tq-reason').fill('TEST short');
+await card(LP).locator('button[data-d="deferred"]').click();
+await page.waitForFunction(() => document.querySelector('.tq-root [role="alert"]') && /promised publicly/.test(document.querySelector('.tq-root [role="alert"]').innerText));
+ok((await card(LP).locator('.tq-reason').inputValue()) === 'TEST short', '14f a refused decision keeps the reason typed');
+// a successful save clears the form
+await clear();
+await page.click('#tq-capture button[data-tq="save"]');
+await page.waitForFunction(() => /Topic captured/.test(document.querySelector('.tq-root').innerText));
+ok((await page.inputValue('#tq-title')) === '' && (await page.inputValue('#tq-notes')) === '', '14g a saved topic clears the form');
+// a topic already in a report cannot be moved to another category from Edit
+await view('all');
+await card(L1).locator('button[data-tq="edit"]').click();
+ok(L1.state.assigned && (await page.locator('#tq-topic').isDisabled()) && (await page.inputValue('#tq-topic')) === L1.topic
+  && /defer or drop it there first/.test(await T('#tq-capture')), '14h editing a topic that is in a report keeps its category locked, and says why');
+await clear();
+await page.click('#tq-capture button[data-tq="save"]');
+await page.waitForFunction(() => window.calls.some((c) => c[0] === 'hs_weekly_lead_save'));
+ok((await calls('hs_weekly_lead_save'))[0].p_fields.topic === L1.topic, '14i saving it sends its own category unchanged');
+await page.waitForFunction(() => /Topic saved/.test(document.querySelector('.tq-root').innerText));
+await page.evaluate(() => { window.answers = {}; });
+
 // 12 a phone-width screen does not scroll sideways
 await page.setViewportSize({ width: 390, height: 800 });
 await view('all');
