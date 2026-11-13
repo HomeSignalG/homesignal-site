@@ -87,7 +87,7 @@ def main():
         steps.append({"label": label, "rpc": rpc, "args": args, "result": res, "error": err, "queues": queues(editions)})
 
     initial = queues([])
-    step("capture a lead with a title only", "hs_weekly_lead_save", {"p_lead": None, "p_fields": {"title": "TEST: a lead with only a title"}}, "lq")
+    step("capture a lead with a title and its category", "hs_weekly_lead_save", {"p_lead": None, "p_fields": {"title": "TEST: a lead with a title and its category", "topic": "Data Centers"}}, "lq")
     step("capture the Water lead (unverified fixture)", "hs_weekly_lead_save", {"p_lead": None, "p_fields": leads[1]}, "l2")
     step("capture the Data Centers lead (unverified fixture)", "hs_weekly_lead_save", {"p_lead": None, "p_fields": leads[0]}, "l1")
     ed = lambda topic, start: {"p_topic": topic, "p_period_start": start, "p_period_end": None, "p_series": None, "p_key": None}

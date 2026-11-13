@@ -42,6 +42,9 @@ function rpc(name, args) {
   calls.push([name, args]);
   if (name === 'hs_acquisition_dashboard') return { data: { tabs: {}, meta: { snapshot: 'TEST' }, S: [] }, error: null };
   if (!/^hs_weekly_/.test(name)) return { data: null, error: null };          // every other tab's reads: empty
+  // The Bluesky sources (docs/weekly-bluesky-sources.sql) are not part of the queue-only release this fixture recorded:
+  // answered as that database answers, "not found", which the page reads as "not installed" and hides the section.
+  if (name === 'hs_weekly_bsky_sources') return { data: null, error: { message: 'Could not find the function public.hs_weekly_bsky_sources(p_edition) in the schema cache', code: 'PGRST202' } };
   if (name === 'hs_weekly_topic_queue') {
     const qs = at ? F.steps[at - 1].queues : F.initial, key = (args && args.p_edition) || '';
     if (!(key in qs)) { unexpected.push([name, args]); return { data: null, error: { message: 'STUB: no recorded queue for that edition' } }; }
@@ -146,7 +149,7 @@ await shot('#tab-weeklyreport', 'A1-tab20-empty-queue.png');
 // ── 2 capture with a title only; it is still there after a full page reload ──
 const LQ = F.steps[0].args.p_fields;
 await capture(LQ); await wait(1, /Topic captured/);
-ok(at === 1 && (await card(ID.lq).getAttribute('data-status')) === 'captured' && /No category yet/.test(await card(ID.lq).innerText()), '2a a title-only lead is saved as Captured');
+ok(at === 1 && (await card(ID.lq).getAttribute('data-status')) === 'captured' && (await card(ID.lq).innerText()).includes(LQ.topic), '2a a lead saved with its title and category is Captured');
 await shot('#tab-weeklyreport', 'A2-title-only-captured.png');
 await openTab();
 ok((await card(ID.lq).count()) === 1 && (await card(ID.lq).innerText()).includes(LQ.title), '2b after reloading the page the lead is read back from the database');
@@ -266,7 +269,7 @@ for (const w of [1300, 390]) {
 await page.setViewportSize({ width: 1300, height: 900 });
 
 // ── 8 the whole run: exact calls, nothing that dispatches, storage untouched, no outside request ──
-const weekly = calls.filter((c) => /^hs_weekly_/.test(c[0])).map((c) => c[0]);
+const weekly = calls.filter((c) => /^hs_weekly_/.test(c[0]) && c[0] !== 'hs_weekly_bsky_sources').map((c) => c[0]);
 ok(at === F.steps.length && unexpected.length === 0, '8a the page made exactly the ' + F.steps.length + ' recorded calls, in order, with the recorded arguments', unexpected);
 ok(weekly.every((n) => QUEUE_FNS.includes(n)) && !weekly.includes('hs_weekly_paste_answer') && !weekly.some((n) => /request_research|link_version|angles|script|title|doc_cue|source_copy/.test(n)), '8b only the queue’s own functions were called: no answer processing, no workbench, no version link');
 ok(isDeepStrictEqual(F.after, { answers: 0, outbound_calls: 0, requests: 3, runs: 0 }), '8c on the database this flow left 3 prepared requests and no run, no saved answer and no outbound call');

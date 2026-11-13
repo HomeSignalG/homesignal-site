@@ -34,10 +34,11 @@ let mainPage = null;
 try { mainPage = execFileSync('git', ['show', 'origin/main:acquisition.html'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 26 }); } catch (e) { /* none */ }
 if (mainPage == null) console.log('SKIP — 1e origin/main is not in this checkout');
 else {
-  const without = page.replace('<button data-tab="weeklyreport">20 · Weekly Report</button>', '').replace('    <div class="tab" id="tab-weeklyreport"></div>\n', '')
+  const strip = (h) => h.replace('<button data-tab="weeklyreport">20 · Weekly Report</button>', '').replace('    <div class="tab" id="tab-weeklyreport"></div>\n', '')
     .replace(/<script src="lib\/acq-weekly-(slice|topics)\.js\?v=[0-9a-f]{8}"><\/script>\n/g, '').replace(/    \/\/ Live, gated \(hs_weekly_\*\)[\s\S]*?acqWeeklyTopics\.load\(window\.hsClient, el\);\n    \},\n/, '')
     .replace("      if(id==='weeklyreport') return;\n", '');
-  ok(without === mainPage, '1e apart from the Tab 20 lines, acquisition.html is byte-for-byte origin/main’s (Tab 17 and every other tab unchanged)');
+  // Since #2772 merged, main carries Tab 20 too: compare both pages with the Tab 20 lines removed.
+  ok(strip(page) === strip(mainPage), '1e apart from the Tab 20 lines, acquisition.html is byte-for-byte origin/main’s (Tab 17 and every other tab unchanged)');
 }
 ok(/HS\.acqWeeklyTopics/.test(slice) && /ws-topics-host/.test(slice) && /ws-slice-host/.test(slice), '1b the weekly screen mounts the queue in its own box, only when the module is loaded');
 
@@ -100,7 +101,9 @@ else {
   const changed = execFileSync('git', ['diff', '--name-only', base], { encoding: 'utf8' }).split('\n').filter(Boolean);
   ok(!changed.some((f) => /impact|acq-weekly-report|^topics\.js$|youtube|^lib\/.*bluesky|^docs\/(?!weekly-bluesky-sources\.sql$).*bluesky/i.test(f)), '6 no Tab 17, Stage 1, Bluesky or YouTube file differs from origin/main (' + changed.length + ' files changed)');
   // the one other-tab file that changes: a test that counts the dashboard's tabs (19 -> 20)
-  ok(JSON.stringify(changed.filter((f) => !/weekly/i.test(f)).sort()) === JSON.stringify(['acquisition.html', 'test/claim-check.test.mjs', 'test/video-bluesky-queue.test.mjs']),
+  // Before #2772 merged these three were the expected set; once main carries them, a later branch may change none of them.
+  const allowed = ['acquisition.html', 'test/claim-check.test.mjs', 'test/video-bluesky-queue.test.mjs'];
+  ok(changed.filter((f) => !/weekly/i.test(f)).every((f) => allowed.indexOf(f) >= 0),
     '6b outside the weekly files, only acquisition.html and two tab-count tests changed');
 }
 console.log(fails ? fails + ' failed' : 'all passed');
