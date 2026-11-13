@@ -18,7 +18,7 @@ do $$ begin
 end $$;
 create table public.dc_source(source_key text primary key, publisher text, dataset_name text,
   licence text, active_state text);
-create table public.dc_acquisition_run(id uuid primary key, source_key text, run_seq bigint,
+create table public.dc_acquisition_run(id uuid primary key, source_key text, distribution_key text, run_seq bigint,
   started_at timestamptz, completed_at timestamptz, completeness_state text,
   advanced_observations boolean, source_release_key text, source_declared_freshness timestamptz,
   observed_freshness timestamptz, failure_detail jsonb);
@@ -28,11 +28,11 @@ insert into public.dc_source values
   ('epoch_ai','Epoch AI','Epoch AI AI Data Centers','CC BY 4.0','ACTIVE'),
   ('retired_src','Old','Old','x','RETIRED');
 insert into public.dc_acquisition_run values
-  ('00000000-0000-0000-0000-000000000001','compute_atlas',2675,'2026-11-06 09:45:01Z','2026-11-06 09:45:05Z','SUCCESS_COMPLETE',true,'1.35.1','2026-11-05 18:24:03Z','2026-11-05Z',null),
-  ('00000000-0000-0000-0000-000000000002','compute_atlas',2700,'2026-11-12 09:44:17Z','2026-11-12 09:44:17Z','FETCH_FAILED',false,null,null,null,'{"http_status":404,"secret":"do-not-leak"}'),
-  ('00000000-0000-0000-0000-000000000003','epoch_ai',2694,'2026-11-11 10:16:00Z','2026-11-11 10:16:05Z','SUCCESS_COMPLETE',true,null,null,'2026-11-05Z',null),
-  ('00000000-0000-0000-0000-000000000004','epoch_ai',2701,'2026-11-12 10:16:27Z','2026-11-12 10:16:29Z','SUCCESS_COMPLETE',true,null,null,'2026-11-05Z',null),
-  ('00000000-0000-0000-0000-000000000005','retired_src',1,'2026-01-01Z','2026-01-01Z','SUCCESS_COMPLETE',true,null,null,null,null);
+  ('00000000-0000-0000-0000-000000000001','compute_atlas','facilities',2675,'2026-11-06 09:45:01Z','2026-11-06 09:45:05Z','SUCCESS_COMPLETE',true,'1.35.1','2026-11-05 18:24:03Z','2026-11-05Z',null),
+  ('00000000-0000-0000-0000-000000000002','compute_atlas','facilities',2700,'2026-11-12 09:44:17Z','2026-11-12 09:44:17Z','FETCH_FAILED',false,null,null,null,'{"http_status":404,"secret":"do-not-leak"}'),
+  ('00000000-0000-0000-0000-000000000003','epoch_ai','data_centers',2694,'2026-11-11 10:16:00Z','2026-11-11 10:16:05Z','SUCCESS_COMPLETE',true,null,null,'2026-11-05Z',null),
+  ('00000000-0000-0000-0000-000000000004','epoch_ai','data_centers',2701,'2026-11-12 10:16:27Z','2026-11-12 10:16:29Z','SUCCESS_COMPLETE',true,null,null,'2026-11-05Z',null),
+  ('00000000-0000-0000-0000-000000000005','retired_src','x',1,'2026-01-01Z','2026-01-01Z','SUCCESS_COMPLETE',true,null,null,null,null);
 insert into public.national_dc_records values (1,'2026-09-15 18:46:03Z'),(2,'2026-09-15 18:46:03Z');
 SQL
 
@@ -60,4 +60,17 @@ check "8 anon may execute it; PUBLIC may not" \
 q -c "delete from public.national_dc_records"
 check "9 no OSM rows: no OSM line" \
   "$(q -c "select count(*) from public.map1_datacentre_freshness() where source_key='openstreetmap'")" "0"
+# Epoch's second file. Its newest read failed: the source is not refreshed, even though the
+# data_centers file read fine, and its last success is the older of the two files' reads.
+q <<'SQL'
+insert into public.dc_acquisition_run values
+  ('00000000-0000-0000-0000-000000000006','epoch_ai','timelines',2695,'2026-11-11 10:17:00Z','2026-11-11 10:17:04Z','SUCCESS_COMPLETE',true,null,null,'2026-11-04Z',null),
+  ('00000000-0000-0000-0000-000000000007','epoch_ai','timelines',2702,'2026-11-12 10:17:00Z','2026-11-12 10:17:01Z','FETCH_FAILED',false,null,null,null,null);
+SQL
+check "10 Epoch, one file failing: not refreshed; last success is the older file's read; oldest edition" \
+  "$(out "to_char(last_success_at at time zone 'UTC','YYYY-MM-DD HH24:MI')||' '||last_attempt_refreshed||' '||to_char(publisher_edition_at at time zone 'UTC','YYYY-MM-DD')||' '||to_char(last_attempt_at at time zone 'UTC','YYYY-MM-DD HH24:MI')" epoch_ai)" \
+  "2026-11-11 10:17 false 2026-11-04 2026-11-12 10:17"
+q -c "delete from public.dc_acquisition_run where id='00000000-0000-0000-0000-000000000006'"
+check "11 a file never read completely: no last success for the source" \
+  "$(out "coalesce(last_success_at::text,'none')||' '||last_attempt_refreshed" epoch_ai)" "none false"
 exit $fail
