@@ -61,7 +61,7 @@ async function serve() {
   const srv = createServer(async (q, s) => {
     const p = normalize(join(REPO, decodeURIComponent(q.url.split('?')[0])));
     if (!p.startsWith(REPO)) { s.writeHead(403); return s.end(); }
-    try { const body = await readFile(p); s.writeHead(200, { 'Content-Type': MIME[extname(p)] || 'text/plain' }); s.end(body); }
+    try { const __body = await readFile(p); s.writeHead(200, { 'Content-Type': MIME[extname(p)] || 'text/plain' }); s.end(__body); }
     catch { s.writeHead(404); s.end('nope'); }
   });
   await new Promise((r) => srv.listen(0, '127.0.0.1', r));

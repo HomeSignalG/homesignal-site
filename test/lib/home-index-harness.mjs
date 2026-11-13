@@ -19,12 +19,7 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css
 export async function serve() {
   const srv = createServer(async (q, s) => {
     const p = normalize(join(REPO, decodeURIComponent(q.url.split('?')[0])));
-    // Map 1 reads the reviewed-project index the site build writes (development/map-index.json); this
-    // checkout has no build output, so answer it as the build does when no project has a location.
-    if (q.url.split('?')[0] === '/development/map-index.json') {
-      s.writeHead(200, { 'Content-Type': 'application/json' }); return s.end('{"schema":"development-map-index/1","zips":{}}');
-    }
-    try { const body = await readFile(p); s.writeHead(200, { 'Content-Type': MIME[extname(p)] || 'text/plain' }); s.end(body); }
+    try { const __body = await readFile(p); s.writeHead(200, { 'Content-Type': MIME[extname(p)] || 'text/plain' }); s.end(__body); }
     catch { s.writeHead(404); s.end('nope'); }
   });
   await new Promise(r => srv.listen(0, '127.0.0.1', r));
