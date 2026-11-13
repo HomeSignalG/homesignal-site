@@ -44,12 +44,13 @@
   {
    "args": {
     "p_fields": {
-     "title": "TEST: a lead with only a title"
+     "title": "TEST: a lead with a title and its category",
+     "topic": "Data Centers"
     },
     "p_lead": null
    },
    "error": null,
-   "label": "capture a lead with a title only",
+   "label": "capture a lead with a title and its category",
    "queues": {
     "": {
      "capabilities": {
@@ -86,8 +87,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       }
@@ -178,8 +179,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -306,8 +307,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -478,8 +479,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -624,8 +625,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -815,8 +816,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -978,8 +979,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -1141,8 +1142,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -1335,8 +1336,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -1553,8 +1554,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -1778,8 +1779,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -2071,8 +2072,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -2320,8 +2321,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -2576,8 +2577,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -2854,8 +2855,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -3157,8 +3158,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -3467,8 +3468,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -3849,8 +3850,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -4152,8 +4153,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -4462,8 +4463,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -4781,8 +4782,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -5073,8 +5074,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -5372,8 +5373,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -5742,8 +5743,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -6080,8 +6081,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -6425,8 +6426,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -6840,8 +6841,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -7173,8 +7174,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -7513,8 +7514,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -7926,8 +7927,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -8259,8 +8260,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -8599,8 +8600,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -8958,8 +8959,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -9293,8 +9294,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -9635,8 +9636,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -10028,8 +10029,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -10380,8 +10381,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -10739,8 +10740,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -11104,8 +11105,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -11487,8 +11488,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -11891,8 +11892,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -12302,8 +12303,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },
@@ -12719,8 +12720,8 @@
         "promised_publicly": false,
         "status": "captured"
        },
-       "title": "TEST: a lead with only a title",
-       "topic": null,
+       "title": "TEST: a lead with a title and its category",
+       "topic": "Data Centers",
        "updated_at": "2026-11-10T12:00:00Z",
        "why_it_matters": null
       },

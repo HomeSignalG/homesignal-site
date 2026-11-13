@@ -85,18 +85,26 @@ ok(counts.inbox === 3 && counts.promised === 1 && counts.research === 2 && count
 await clear();
 await page.click('#tq-capture button[data-tq="save"]');
 ok((await calls('hs_weekly_lead_save')).length === 0 && (await T('.tq-root [role="alert"]')).includes('needs a title'), '3a no title: nothing is sent');
+// the category is required and sits beside the title, not under the optional details
+ok((await page.locator('#tq-capture > p #tq-title').count()) === 1 && (await page.locator('#tq-capture > p #tq-topic').count()) === 1
+  && (await page.locator('#tq-more #tq-topic').count()) === 0, '3a2 the category selector is beside the title, outside More details');
+const catOpts = await page.locator('#tq-topic option').evaluateAll((os) => os.map((o) => o.value).filter(Boolean));
+ok(JSON.stringify(catOpts) === JSON.stringify(Q.categories), '3a3 its choices are exactly the Local News categories the database sends');
 await page.fill('#tq-title', 'TEST: a new quick topic');
+await page.click('#tq-capture button[data-tq="save"]');
+ok((await calls('hs_weekly_lead_save')).length === 0 && /Local News category/.test(await T('.tq-root [role="alert"]')), '3a4 a title with no category: nothing is sent');
+await page.selectOption('#tq-topic', 'Data Centers');
 await page.click('#tq-capture button[data-tq="save"]');
 await page.waitForFunction(() => window.calls.some((c) => c[0] === 'hs_weekly_lead_save'));
 const saved = (await calls('hs_weekly_lead_save'))[0];
-ok(saved.p_lead === null && JSON.stringify(saved.p_fields) === JSON.stringify({ title: 'TEST: a new quick topic' }), '3b capture sends the title and nothing else');
+ok(saved.p_lead === null && JSON.stringify(saved.p_fields) === JSON.stringify({ title: 'TEST: a new quick topic', topic: 'Data Centers' }), '3b capture sends the title and its category, nothing else');
 await page.waitForFunction(() => /Topic captured/.test(document.querySelector('.tq-root').innerText));
 ok(true, '3c a saved topic is confirmed');
 // full capture, with a commitment
 await clear();
 await page.fill('#tq-title', 'TEST: a full topic');
-await page.click('#tq-more > summary');
 await page.selectOption('#tq-topic', 'Water Quality');
+await page.click('#tq-more > summary');
 await page.fill('#tq-location', 'TEST Town');
 await page.fill('#tq-sources', 'https://news.example.test/one\nhttps://news.example.test/two');
 await page.fill('#tq-questions', 'TEST question one?\n\nTEST question two?');
@@ -117,13 +125,20 @@ const nw = await card(L2).innerText();
 ok((await card(L2).locator('.tq-send-edition, button[data-tq="send"], button[data-tq="assign"]').count()) === 0
   && /There is no open Water Quality report to add it to yet/.test(nw), '4a a Water topic is offered no Data Centers, Air Quality or published Water report: it says there is no open Water Quality report');
 ok(JSON.stringify((await offered(LD)).sort()) === JSON.stringify([EA2.id]), '4b an Air Quality topic is offered only the open Air Quality report (not the closed one, not Data Centers, not Water)');
-ok(JSON.stringify((await offered(LQ)).sort()) === JSON.stringify([EA2.id, EC.id].sort()) && !(await offered(LQ)).includes(EW.id) && !(await offered(LQ)).includes(EA.id),
-  '4b2 a topic with no category yet is offered every open report whose video is not yet published');
+const lq = await card(LQ).innerText();
+ok((await offered(LQ)).length === 0 && (await card(LQ).locator('button[data-tq="send"], button[data-tq="assign"]').count()) === 0
+  && /no Local News category yet/.test(lq) && (await card(LQ).locator('.tq-set-topic').count()) === 1,
+  '4b2 a topic with no category is offered no report: its card asks for the category first, in place');
 const ldOpts = await card(LD).locator('.tq-send-edition option').allInnerTexts();
 ok(ldOpts.length === 1 && ldOpts[0] === 'Air Quality report, Nov 9–15, 2026' && !/air-quality-2026-11-09/.test(await card(LD).locator('.tq-next').innerText()),
   '4b3 the choice reads as a report and its dates; the technical identifier is not in the selector');
-await card(LQ).locator('button[data-tq="send"]').click();
-ok((await calls('hs_weekly_lead_send_to_research')).length === 0 && (await T('.tq-root [role="alert"]')).includes('Choose a report edition first'), '4c no report chosen: nothing is sent');
+await card(LQ).locator('button[data-tq="set-category"]').click();
+ok((await calls('hs_weekly_lead_save')).length === 0 && /Local News category/.test(await card(LQ).innerText()), '4c a category repair with nothing chosen sends nothing');
+await card(LQ).locator('.tq-set-topic').selectOption('Data Centers');
+await card(LQ).locator('button[data-tq="set-category"]').click();
+await page.waitForFunction(() => window.calls.some((c) => c[0] === 'hs_weekly_lead_save'));
+const rep = (await calls('hs_weekly_lead_save'))[0];
+ok(rep.p_lead === LQ.id && JSON.stringify(rep.p_fields) === JSON.stringify({ topic: 'Data Centers' }), '4c2 the repair sends only the category: title, sources and notes are kept');
 await clear();
 await page.evaluate((id) => { window.answers.hs_weekly_lead_send_to_research = { data: { request_id: 'abcdef12-0000-0000-0000-000000000000', existing: false, lead_id: id } }; }, LD.id);
 await card(LD).locator('button[data-tq="send"]').click();

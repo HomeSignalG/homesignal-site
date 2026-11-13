@@ -146,7 +146,7 @@ await shot('#tab-weeklyreport', 'A1-tab20-empty-queue.png');
 // ── 2 capture with a title only; it is still there after a full page reload ──
 const LQ = F.steps[0].args.p_fields;
 await capture(LQ); await wait(1, /Topic captured/);
-ok(at === 1 && (await card(ID.lq).getAttribute('data-status')) === 'captured' && /No category yet/.test(await card(ID.lq).innerText()), '2a a title-only lead is saved as Captured');
+ok(at === 1 && (await card(ID.lq).getAttribute('data-status')) === 'captured' && (await card(ID.lq).innerText()).includes(LQ.topic), '2a a lead saved with its title and category is Captured');
 await shot('#tab-weeklyreport', 'A2-title-only-captured.png');
 await openTab();
 ok((await card(ID.lq).count()) === 1 && (await card(ID.lq).innerText()).includes(LQ.title), '2b after reloading the page the lead is read back from the database');
