@@ -41,13 +41,18 @@ returns table (source_key text, project_name text, map_status text, raw_status t
     from public.fx_map where zip = p_zip and state = 'found' and map_key like 'dc:%'
 $$;
 
-create table public.map1_project_document (document_id uuid primary key default gen_random_uuid(), project_key text not null);
+create table public.map1_project_document (document_id uuid primary key default gen_random_uuid(), project_key text not null,
+  url text not null default 'https://x.gov/d.pdf', title text not null default 'Doc', publisher text not null default 'County',
+  doc_kind text not null default 'application', doc_date date, doc_date_label text, supports text not null default 's',
+  proposed_by text not null default 'verification:x', created_at timestamptz not null default now());
 create table public.map1_project_document_decision (id serial primary key, document_id uuid not null, decision text not null);
+create or replace function public.map1_project_document_current(p uuid) returns text language sql stable as $$
+  select coalesce((select decision from public.map1_project_document_decision where document_id = p order by id desc limit 1), 'pending') $$;
 
 create table public.fx_admin (ok boolean not null);
 insert into public.fx_admin values (true);
-create or replace function public._hs_is_admin() returns void language plpgsql as $$
-begin if not (select ok from public.fx_admin) then raise exception 'not an admin' using errcode = '42501'; end if; end $$;
+create or replace function public._hs_is_admin() returns text language plpgsql as $$
+begin if not (select ok from public.fx_admin) then raise exception 'not an admin' using errcode = '42501'; end if; return 'founder@example.test'; end $$;
 
 create table vault.decrypted_secrets (name text, decrypted_secret text);
 create table net.fx_posts (id serial primary key, url text, body jsonb);

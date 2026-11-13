@@ -198,6 +198,44 @@ insert into chk (name, ok, detail) select 'K3 due: one dispatch of the worker on
 insert into tk select 4, public.impact_dc_verification_tick();
 insert into chk (name, ok, detail) select 'K4 never twice in 10 minutes', (a->>'dispatched')::boolean = false and (select count(*) = 1 from net.fx_posts), a::text from tk where n = 4;
 
+-- 8b. saved reply edits (stage 3)
+update public.impact_dc_verification set result = pg_temp.res('dcrec:a', true, true) || '{"link":{"available":true,"url":"https://jodytracks.com/map/20187/?project=dcrec%3Aa"},"reply":{"ready":true,"text":"Suggested https://jodytracks.com/map/20187/?project=dcrec%3Aa"}}'::jsonb,
+  result_facts = '{"state":"found","status":"Proposed"}' where candidate_id = pg_temp.c1();
+insert into chk (name, ok, detail) select 'E1 no edit: the tile shows the suggested reply',
+  (select e->'reply_edit' = 'null'::jsonb from jsonb_array_elements(public.hs_impact_dc_verification_state(array[pg_temp.c1()])) e), null;
+select public.hs_impact_dc_reply_save(pg_temp.c1(), '  My words: https://jodytracks.com/map/20187/?project=dcrec%3Aa  ');
+insert into chk (name, ok, detail) select 'E2 a saved edit is returned, trimmed, with who saved it and nothing changed since',
+  (select e->'reply_edit'->>'text' = 'My words: https://jodytracks.com/map/20187/?project=dcrec%3Aa' and e->'reply_edit'->>'saved_by' = 'founder@example.test'
+     and not (e->'reply_edit'->>'link_changed')::boolean and not (e->'reply_edit'->>'facts_changed')::boolean and (e->'reply_edit'->>'has_current_link')::boolean
+   from jsonb_array_elements(public.hs_impact_dc_verification_state(array[pg_temp.c1()])) e), null;
+select public.impact_dc_verification_record(pg_temp.claim(pg_temp.c1()), pg_temp.res('dcrec:a', true, true));
+insert into chk (name, ok, detail) select 'E3 a new check never overwrites the edit; it says the link changed',
+  (select e->'reply_edit'->>'text' like 'My words:%' and (e->'reply_edit'->>'link_changed')::boolean
+   from jsonb_array_elements(public.hs_impact_dc_verification_state(array[pg_temp.c1()])) e),
+  (select (e->'reply_edit')::text from jsonb_array_elements(public.hs_impact_dc_verification_state(array[pg_temp.c1()])) e);
+update public.impact_dc_verification set result_facts = '{"state":"found","status":"Approved"}' where candidate_id = pg_temp.c1();
+insert into chk (name, ok, detail) select 'E4 changed project facts are flagged on the edit',
+  (select (e->'reply_edit'->>'facts_changed')::boolean from jsonb_array_elements(public.hs_impact_dc_verification_state(array[pg_temp.c1()])) e), null;
+select public.hs_impact_dc_reply_save(pg_temp.c1(), '');
+insert into chk (name, ok, detail) select 'E5 clearing the edit goes back to the suggested reply; the history is kept',
+  (select e->'reply_edit' = 'null'::jsonb from jsonb_array_elements(public.hs_impact_dc_verification_state(array[pg_temp.c1()])) e)
+  and (select count(*) = 2 from public.impact_dc_reply_edits where candidate_id = pg_temp.c1()), null;
+do $$ begin update public.impact_dc_reply_edits set text = 'x';
+  insert into chk (name, ok) values ('E6 saved edits are append-only', false);
+exception when sqlstate '55000' then insert into chk (name, ok) values ('E6 saved edits are append-only', true); end $$;
+update public.fx_admin set ok = false;
+do $$ begin perform public.hs_impact_dc_reply_save('11111111-1111-1111-1111-111111111111', 'x');
+  insert into chk (name, ok) values ('E7 a non-admin cannot save a reply', false);
+exception when sqlstate '42501' then insert into chk (name, ok) values ('E7 a non-admin cannot save a reply', true); end $$;
+do $$ begin perform public.hs_impact_dc_project_documents('dcrec:a');
+  insert into chk (name, ok) values ('E8 a non-admin cannot list documents for review', false);
+exception when sqlstate '42501' then insert into chk (name, ok) values ('E8 a non-admin cannot list documents for review', true); end $$;
+update public.fx_admin set ok = true;
+insert into chk (name, ok, detail) select 'E9 documents for review carry their current state',
+  (select jsonb_agg(e->>'state' order by e->>'document_id') from jsonb_array_elements(public.hs_impact_dc_project_documents('dcrec:a')) e) = '["revoked"]'
+  and jsonb_array_length(public.hs_impact_dc_project_documents('dcrec:other')) = 1
+  and (public.hs_impact_dc_project_documents('dcrec:other')->0->>'state') = 'approved', public.hs_impact_dc_project_documents('dcrec:a')::text;
+
 -- 9. grants
 insert into chk (name, ok, detail) select 'G1 visitors cannot run the worker''s functions or the tick',
   not has_function_privilege('anon', 'public.impact_dc_verification_claim(text,integer)', 'execute')
@@ -211,7 +249,11 @@ insert into chk (name, ok, detail) select 'G2 visitors cannot read the tables',
 insert into chk (name, ok, detail) select 'G3 the dashboard reads and rechecks through two admin functions',
   has_function_privilege('authenticated', 'public.hs_impact_dc_verification_state(uuid[])', 'execute')
   and has_function_privilege('authenticated', 'public.hs_impact_dc_verification_recheck(uuid)', 'execute')
-  and not has_function_privilege('anon', 'public.hs_impact_dc_verification_recheck(uuid)', 'execute'), null;
+  and not has_function_privilege('anon', 'public.hs_impact_dc_verification_recheck(uuid)', 'execute')
+  and has_function_privilege('authenticated', 'public.hs_impact_dc_reply_save(uuid,text)', 'execute')
+  and not has_function_privilege('anon', 'public.hs_impact_dc_reply_save(uuid,text)', 'execute')
+  and not has_function_privilege('anon', 'public.hs_impact_dc_project_documents(text)', 'execute')
+  and not has_table_privilege('authenticated', 'public.impact_dc_reply_edits', 'select'), null;
 insert into chk (name, ok, detail) select 'G4 no schedule is created', not exists (select 1 from pg_namespace where nspname = 'cron'), null;
 
 select name, case when ok then 't' else 'f' end, coalesce(left(detail, 200), '') from chk order by n;

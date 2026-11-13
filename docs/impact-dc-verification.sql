@@ -1,4 +1,4 @@
--- TAB 17 · DATA-CENTER PROJECT CHECK (2026-11-12, stage 2). PROPOSED · NOT APPLIED TO PRODUCTION.
+-- TAB 17 · DATA-CENTER PROJECT CHECK (2026-11-12, stages 2 and 3). PROPOSED · NOT APPLIED TO PRODUCTION.
 --
 -- For every Hot Topics candidate in category data_centers, a verification job works out which project the topic is
 -- about, where Map 1 draws it, its status, its documents and whether its Map 1 link works, and keeps the result.
@@ -342,7 +342,8 @@ create or replace function public.hs_impact_dc_verification_state(p_candidates u
 returns jsonb language plpgsql stable security definer set search_path to 'public', 'pg_temp' as $fn$
 begin
   perform public._hs_is_admin();
-  return coalesce((select jsonb_agg(public.impact_dc_verification_view(v) order by v.candidate_id)
+  return coalesce((select jsonb_agg(public.impact_dc_verification_view(v) || jsonb_build_object('reply_edit', public.impact_dc_reply_edit(v))
+                            order by v.candidate_id)
                      from public.impact_dc_verification v where v.candidate_id = any(p_candidates[1:200])), '[]'::jsonb);
 end $fn$;
 
@@ -357,6 +358,67 @@ begin
 end $fn$;
 revoke all on function public.hs_impact_dc_verification_state(uuid[]), public.hs_impact_dc_verification_recheck(uuid) from public;
 grant execute on function public.hs_impact_dc_verification_state(uuid[]), public.hs_impact_dc_verification_recheck(uuid) to authenticated;
+
+-- ── Stage 3: what the Tab 17 tile saves and reviews ───────────────────────────────────────────────
+-- SAVED REPLY EDITS. The founder's own wording is kept until the founder changes it: a new check never overwrites it. Each save
+-- records the project link and the project facts it was written against, so the tile can say when either has changed since.
+-- Append-only; the newest row is the edit in force; a row with no text means "use the suggested reply again".
+create table if not exists public.impact_dc_reply_edits (
+  id            bigserial primary key,
+  candidate_id  uuid not null references public.impact_dc_verification(candidate_id),
+  text          text check (text is null or (char_length(btrim(text)) between 1 and 1200)),
+  link_at_save  text,
+  facts_at_save text,
+  saved_by      text not null,
+  saved_at      timestamptz not null default now()
+);
+create index if not exists impact_dc_reply_edits_cand_idx on public.impact_dc_reply_edits (candidate_id, id desc);
+alter table public.impact_dc_reply_edits enable row level security;
+revoke all on public.impact_dc_reply_edits from anon, authenticated;
+create or replace function public.impact_dc_reply_edits_frozen() returns trigger language plpgsql as $fn$
+begin raise exception 'saved reply edits are append-only' using errcode = '55000'; end $fn$;
+drop trigger if exists impact_dc_reply_edits_frozen_trg on public.impact_dc_reply_edits;
+create trigger impact_dc_reply_edits_frozen_trg before update or delete on public.impact_dc_reply_edits
+  for each row execute function public.impact_dc_reply_edits_frozen();
+
+create or replace function public.hs_impact_dc_reply_save(p_candidate uuid, p_text text)
+returns jsonb language plpgsql security definer set search_path to 'public', 'pg_temp' as $fn$
+declare v public.impact_dc_verification%rowtype; who text := public._hs_is_admin(); t text := nullif(btrim(p_text), '');
+begin
+  select * into v from public.impact_dc_verification where candidate_id = p_candidate;
+  if not found then raise exception 'this topic has no project check' using errcode = 'P0002'; end if;
+  if t is not null and char_length(t) > 1200 then raise exception 'the reply is too long' using errcode = '22001'; end if;
+  insert into public.impact_dc_reply_edits (candidate_id, text, link_at_save, facts_at_save, saved_by)
+  values (p_candidate, t, v.result->'link'->>'url', md5(coalesce(v.result_facts::text, '')), who);
+  return jsonb_build_object('saved', true, 'cleared', t is null);
+end $fn$;
+
+-- The edit in force, and whether the link or the project facts moved since it was saved.
+create or replace function public.impact_dc_reply_edit(v public.impact_dc_verification)
+returns jsonb language sql stable security definer set search_path to 'public', 'pg_temp' as $fn$
+  select case when e.text is null then null else jsonb_build_object(
+    'text', e.text, 'saved_at', e.saved_at, 'saved_by', e.saved_by,
+    'link_changed', e.link_at_save is distinct from (v.result->'link'->>'url'),
+    'facts_changed', e.facts_at_save is distinct from md5(coalesce(v.result_facts::text, '')),
+    'has_current_link', (v.result->'link'->>'url') is not null and position((v.result->'link'->>'url') in e.text) > 0) end
+  from (select * from public.impact_dc_reply_edits where candidate_id = v.candidate_id order by id desc limit 1) e
+$fn$;
+
+-- DOCUMENT REVIEW. Every document on file for a project, with its current state (pending, approved, rejected, revoked).
+-- Approving means the document belongs to the project and may be shown on Map 1. It never changes the project's status.
+create or replace function public.hs_impact_dc_project_documents(p_project_key text)
+returns jsonb language plpgsql stable security definer set search_path to 'public', 'pg_temp' as $fn$
+begin
+  perform public._hs_is_admin();
+  return coalesce((select jsonb_agg(jsonb_build_object('document_id', d.document_id, 'url', d.url, 'title', d.title,
+      'publisher', d.publisher, 'doc_kind', d.doc_kind, 'doc_date', d.doc_date, 'doc_date_label', d.doc_date_label,
+      'supports', d.supports, 'proposed_by', d.proposed_by, 'proposed_at', d.created_at,
+      'state', public.map1_project_document_current(d.document_id)) order by d.created_at, d.document_id)
+    from public.map1_project_document d where d.project_key = p_project_key), '[]'::jsonb);
+end $fn$;
+revoke all on function public.hs_impact_dc_reply_save(uuid, text), public.impact_dc_reply_edit(public.impact_dc_verification),
+  public.hs_impact_dc_project_documents(text) from public;
+grant execute on function public.hs_impact_dc_reply_save(uuid, text), public.hs_impact_dc_project_documents(text) to authenticated;
 
 -- ── starting the worker (NOT SCHEDULED HERE) ───────────────────────────────────────────────────────
 -- impact_dc_verification_tick() runs the change detector and dispatches the worker when a job is due, at most once in

@@ -28,6 +28,9 @@ M = {
                            "set attempts = v.attempts + 1, last_error = p_error, result = null,"),
   'zips_ignore_county_suffix': ("lower(regexp_replace(q.co, '\\s+(county|parish|borough|census area)$', '', 'i'))",
                                 "lower(q.co)"),
+  'reply_edit_no_link_flag': ("'link_changed', e.link_at_save is distinct from (v.result->'link'->>'url'),", "'link_changed', false,"),
+  'reply_edits_mutable': ("  for each row execute function public.impact_dc_reply_edits_frozen();", "  for each row when (false) execute function public.impact_dc_reply_edits_frozen();"),
+  'reply_save_no_admin': ("who text := public._hs_is_admin(); t text", "who text := 'anyone'; t text"),
 }
 if sys.argv[1] == '--list':
     print('\n'.join(M)); sys.exit(0)
