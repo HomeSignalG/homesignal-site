@@ -9,6 +9,7 @@ on:
       - 'docs/weekly-*.sql'
       - 'lib/acq-weekly-slice.js'
       - 'test/weekly_stage2_pg/**'
+      - 'test/weekly_bsky_sources_pg/**'
       - 'test/fixtures/weekly-*.json'
       - '.github/workflows/weekly-stage2-suite.yml'
   push:
@@ -17,6 +18,7 @@ on:
       - 'docs/weekly-*.sql'
       - 'lib/acq-weekly-slice.js'
       - 'test/weekly_stage2_pg/**'
+      - 'test/weekly_bsky_sources_pg/**'
       - 'test/fixtures/weekly-*.json'
       - '.github/workflows/weekly-stage2-suite.yml'
   workflow_dispatch: {}
@@ -95,3 +97,13 @@ jobs:
         run: |
           set -o pipefail
           bash test/weekly_stage2_pg/run_topic_queue.sh 2>&1 | grep -v NOTICE
+      - name: Bluesky sources (docs/weekly-bluesky-sources.sql) - routing, dedupe, revisions, published freeze, access; every mutation killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: weekly_stage2_disposable
+        run: |
+          set -o pipefail
+          bash test/weekly_bsky_sources_pg/run.sh 2>&1 | grep -v NOTICE
