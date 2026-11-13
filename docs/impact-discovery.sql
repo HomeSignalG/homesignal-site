@@ -797,6 +797,16 @@ begin
   for p in select * from jsonb_array_elements(coalesce(p_places, '[]'::jsonb)) loop
     st := upper(nullif(btrim(p->>'state'), '')); co := nullif(btrim(p->>'county'), ''); ci := nullif(btrim(p->>'city'), '');
     n := 0; cn := 0;
+    -- A city written with no state ("MEMPHIS — ", "Hermantown City Council"; 2026-11-13) takes a state only when the ZIP
+    -- pages of that name are all in one state, or at least 90% (and 5 or more) of them are: Memphis is 29 Tennessee pages
+    -- and 1 Nebraska village page (measured 2026-11-13). Aurora (7 states, none dominant) or no page: no state, so no
+    -- coverage, never a guess.
+    if st is null and ci is not null and co is null then
+      select q.s into st
+        from (select upper(z.state) s, count(*) n, sum(count(*)) over () t
+                from public.communities z where z.level = 'zip' and z.name ilike ci || ' (%' group by upper(z.state)) q
+       where q.n = q.t or (q.n >= 5 and q.n >= 0.9 * q.t);
+    end if;
     if st is not null then
       select count(*) into cn from public.communities where level = 'zip' and upper(state) = st;
       select count(*) into n from public.communities z
