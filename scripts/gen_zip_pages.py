@@ -562,8 +562,42 @@ def parse_projects(raw_projects, plane_day=""):
             "address": str(r.get("address") or "").strip(),
             "tracked": tracked, "as_of": as_of, "changed_on": changed_on,
             "source": source_name(reg),
+            "status": str(r.get("status") or "").strip(),
+            **parse_project_history(key, r),
         }
     return projects
+
+
+HISTORY_KINDS = ("first_detected", "status_changed")
+HISTORY_MAX = 20
+
+
+def parse_project_history(key, r):
+    """The status history the producer attached from the change ledger (ingest
+    bluesky/lib/project-record-history.mjs). Absent fields stay absent: a record whose
+    ledger was not read says nothing about changes. A malformed entry fails the build."""
+    out = {"history": [], "history_total": 0, "history_read": r.get("history_read") is True,
+           "agency_status": str(r.get("agency_status") or "").strip()[:80],
+           "watched_since": ""}
+    ws = str(r.get("watched_since") or "")[:10]
+    if ws:
+        if not DAY_RE.match(ws):
+            sys.exit(f"ERROR: project {key!r} has a malformed watched_since {ws!r}")
+        out["watched_since"] = ws
+    hist = r.get("history")
+    if hist is None:
+        return out
+    if not isinstance(hist, list) or len(hist) > HISTORY_MAX:
+        sys.exit(f"ERROR: project {key!r} carries a malformed history")
+    for ev in hist:
+        if (not isinstance(ev, dict) or ev.get("kind") not in HISTORY_KINDS
+                or not DAY_RE.match(str(ev.get("day") or ""))):
+            sys.exit(f"ERROR: project {key!r} carries a malformed history event {ev!r}")
+        out["history"].append({k: str(ev.get(k) or "").strip()[:80] for k in
+                               ("day", "kind", "from_stage", "to_stage", "from_label", "to_label")})
+    total = r.get("history_total", len(out["history"]))
+    out["history_total"] = total if isinstance(total, int) and total >= len(out["history"]) else len(out["history"])
+    return out
 
 
 def link_projects(pages, cities, projects):
@@ -1077,8 +1111,8 @@ def render(p, built):
         # both hosts run ONE runtime, so a dependency added to community.html alone breaks
         # this one. Fails CLOSED if absent (outcome 'unavailable', no absence claim).
         '<script src="/lib/zip-authoritative.js?v=20261029a"></script>\n'
-        '<script src="/lib/data.js?v=65b0cd6d"></script>\n<script src="/lib/topic-prefs.js?v=fe87d99b"></script>\n'
-        '<script src="/lib/templates.js?v=6bbb33ed"></script>\n<script src="/lib/impact.js"></script>\n'
+        '<script src="/lib/data.js?v=4dd6cfeb"></script>\n<script src="/lib/topic-prefs.js?v=fe87d99b"></script>\n'
+        '<script src="/lib/templates.js?v=0418fd07"></script>\n<script src="/lib/impact.js"></script>\n'
         # lib/project-type.js: the canonical Development Type (pure — no DOM, no map runtime).
         # The Development & Growth Type badge reads HS.canonicalProjectType from it. Same parity
         # rule as the files around it: both hosts run ONE runtime. lib/map.js stays OFF (§5a).
@@ -1096,7 +1130,7 @@ def render(p, built):
         '<script src="/shell.js?v=4fa4fbd4"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
         '<script src="/lib/water-rights.js?v=add4200a"></script>\n'
-        '<script src="/lib/community-page.js?v=ca77e558"></script>\n'
+        '<script src="/lib/community-page.js?v=b878c77f"></script>\n'
         "</body>\n</html>\n")
 
 
@@ -1322,8 +1356,14 @@ def render_project(pr, pages, built, projects=None):
         facts.append(("Address", esc(addr)))
     if pr["type"]:
         facts.append(("Type", esc(pr["type"])))
-    facts.append(("Where it stands" if pr["tracked"] else "Last recorded status",
-                  esc(pr["lifecycle"])))
+    stands = esc(pr["lifecycle"])
+    if pr.get("status") == "Decided":
+        # A decided application browses as Proposed (lib/project-type.js); say a decision exists.
+        stands += ' <span class="quiet">(a decision is on record; see the agency\'s own status)</span>'
+    facts.append(("Where it stands" if pr["tracked"] else "Last recorded status", stands))
+    if pr.get("agency_status"):
+        facts.append(("Agency's own status" if pr["tracked"] else "Agency's status when last seen",
+                      esc(pr["agency_status"])))
     if as_of_el:
         facts.append(("Status as of" if pr["tracked"] else "Last seen", as_of_el))
     if pr["date"]:
@@ -1390,7 +1430,8 @@ def render_project(pr, pages, built, projects=None):
         + status_line + '</header>'
         + notice
         + f'<section class="zsec"><h2>On the record</h2><dl>{dl}</dl></section>'
-        f'<section class="zsec"><h2>Where it is</h2>'
+        + _history_section(pr)
+        + f'<section class="zsec"><h2>Where it is</h2>'
         f'<p>On the HomeSignal page for {"these ZIP codes" if len(zips) > 1 else "this ZIP code"}:</p>'
         f'<ul>{zli}</ul>'
         f'<p><a href="/map/{esc(zips[0])}/">See it on the Development map</a></p>'
@@ -1405,6 +1446,50 @@ def render_project(pr, pages, built, projects=None):
         + '</main>')
     return (_head(title, desc, canon, og_type="article", ld=ld)
             + f'<body data-nav="project">\n{body}\n</body>\n</html>\n')
+
+
+def _history_section(pr):
+    """Status history from the change ledger. Each line is dated by the day HomeSignal
+    OBSERVED it, which is said on the page: it is not the agency's own decision date. A record
+    whose ledger was not read gets no section; one read with no change says only what was seen."""
+    if not pr.get("history_read"):
+        return ""
+    ws = pr.get("watched_since") or ""
+    ws_el = f'<time datetime="{esc(ws)}">{esc(human_day(ws))}</time>' if ws else ""
+    rows = []
+    for ev in pr.get("history") or []:
+        d = f'<time datetime="{esc(ev["day"])}">{esc(human_day(ev["day"]))}</time>'
+        if ev["kind"] == "first_detected":
+            what = "First seen by HomeSignal"
+            if ev["to_stage"]:
+                what += f'; agency status: <strong>{esc(ev["to_stage"])}</strong>'
+            elif ev["to_label"]:
+                what += f': {esc(ev["to_label"])}'
+        else:
+            bits = []
+            if ev["from_stage"] or ev["to_stage"]:
+                bits.append(f'Agency status changed from <strong>{esc(ev["from_stage"] or "not stated")}</strong> '
+                            f'to <strong>{esc(ev["to_stage"] or "not stated")}</strong>')
+            if ev["from_label"] != ev["to_label"] and (ev["from_label"] or ev["to_label"]):
+                bits.append(f'HomeSignal status {esc(ev["from_label"] or "not stated")} → '
+                            f'{esc(ev["to_label"] or "not stated")}')
+            if not bits:
+                continue
+            what = "; ".join(bits)
+        rows.append(f"<li>{d}: {what}</li>")
+    if not rows and not ws_el:
+        return ""
+    total = pr.get("history_total") or len(rows)
+    more = (f'<p class="quiet">Showing the {len(rows)} newest of {total} recorded changes.</p>'
+            if total > len(rows) else "")
+    since = (f'<p>HomeSignal has watched this record since {ws_el}.</p>' if ws_el else "")
+    body = (f"<ol>{''.join(rows)}</ol>{more}" if rows
+            else "<p>No status change recorded since then.</p>")
+    return (f'<section class="zsec"><h2>Status history</h2>{since}{body}'
+            f'<p class="quiet">Each date is the day HomeSignal saw the change in the agency\'s '
+            f'public records, not necessarily the day the agency acted. Not every project moves '
+            f'through every stage: an application can be withdrawn, denied, revised or paused, '
+            f'and the agency\'s own status word is shown as published.</p></section>')
 
 
 def _related_section(pr, zips, first, pages, projects):
@@ -1496,6 +1581,7 @@ def build_projects(projects, pages, out_dir, built, state=None):
         open(os.path.join(d, "index.html"), "wb").write(h)
         written += 1
         nbytes += len(h)
+    zips_with_pages = []
     for z in sorted(pages):
         keys = pages[z].get("project_list")
         if not keys:
@@ -1505,7 +1591,38 @@ def build_projects(projects, pages, out_dir, built, state=None):
         h = render_project_list(z, keys, projects, pages).encode("utf-8")
         open(os.path.join(d, "index.html"), "wb").write(h)
         nbytes += len(h)
+        j = json.dumps(project_page_index(z, keys, projects), sort_keys=True,
+                       separators=(",", ":")).encode("utf-8")
+        open(os.path.join(d, PROJECT_INDEX_FILE), "wb").write(j)
+        nbytes += len(j)
+        zips_with_pages.append(z)
+    # Which ZIPs have a project index. Map 1 reads this first and asks for a ZIP's
+    # pages.json only when the ZIP is listed, so it never requests a file that does not
+    # exist. It overwrites the committed placeholder (lib/generated/project-page-zips.json,
+    # an empty list, which links nothing).
+    gd = os.path.join(out_dir, "lib", "generated")
+    os.makedirs(gd, exist_ok=True)
+    zj = json.dumps({"v": 1, "zips": sorted(zips_with_pages)}, separators=(",", ":")).encode("utf-8")
+    open(os.path.join(gd, PROJECT_ZIPS_FILE), "wb").write(zj)
+    nbytes += len(zj)
     return written, nbytes
+
+
+PROJECT_INDEX_FILE = "pages.json"
+PROJECT_ZIPS_FILE = "project-page-zips.json"
+
+
+def project_page_index(z, keys, projects):
+    """/community/<zip>/projects/pages.json: which source records on this ZIP have a project
+    page, keyed by the record's source_key (the id Map 1's pins carry as zip_project_ref).
+    Map 1 links a pin or list row to its page only through this file, so it never guesses a
+    URL. Two pages for one source_key (an old seq kept beside a re-keyed one): the tracked
+    page wins, then the lower key, so the choice is deterministic."""
+    out = {}
+    for k in sorted(keys, key=lambda k: (0 if projects[k]["tracked"] else 1, k)):
+        sk = k.rsplit("|", 1)[0]
+        out.setdefault(sk, projects[k]["path"])
+    return {"v": 1, "zip": z, "pages": out}
 
 
 # ---------------------------------------------------------------- guide pages (plan step 13)

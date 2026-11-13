@@ -6942,3 +6942,53 @@ target / file wins; null = the generated line).
   video's only horizontal ones, and `hs_video_ending_choose` refuses the other kind. The browser reads the file's width and
   height and refuses a clip on the wrong button before uploading. A recording with no shape (none exist) fits either.
 - Tests: `test/video_endings_pg` (`video-endings-suite.yml`, 31 checks), `test/video-endings.browser.test.mjs`.
+
+## THE ZIP DEVELOPMENT LISTS HOLD WHAT MAP 1 DRAWS; OFFICIAL PORTALS ARE RECORDED (2026-11-12)
+
+Map 1 in ZIP mode draws app_projects members AND the national data-centre plane (`map1_dc_zip_members`). The ZIP
+page (`lib/community-page.js`) and `development.html` listed only app_projects, so a data centre drawn as Proposed
+was missing from both lists and from the Development tile (Behring 415 20th Street, 94612, canonical entity
+`e59b8d43…`, Compute Atlas). `lib/data.js` `nationalDataCenters()` had been written for this and had no caller.
+- **One combiner, `HS.data.zipDevelopment(zip, home)`**, read by both list pages: authoritative rows + the server's
+  `member` rows, nothing merged across planes (0 app_projects rows carry a `dc:` key, measured 2026-11-12). The
+  geography verdict (`complete`/`outcome`) stays the authoritative read's, so no absence sentence is unlocked by
+  national rows; a failed national read is `national.complete === false`, never "none". Dashboard, property and
+  index pages still read `projects()` only (not changed here).
+- **A national row is a third-party listing, stamped on the row** (`provenance_kind`, `provenance_source`). Cards say
+  "<Status> · third-party listing", credit the source and licence, say it is not an official application, approval
+  or permit, and open the source's own page (`HS.tpl.isThirdPartyListing`, `thirdPartyListingNote`, `devCard`).
+  A listing has no dossier on development.html.
+- **`data/official-record-portals.json`**: official planning/permit systems per jurisdiction, with discovery,
+  record and document coverage kept separate and every check dated. A missing open-data dataset is not a missing
+  record system. First entry: Oakland's Accela portal (anonymous search verified; record detail is a postback, so
+  no stable record links; no record matched to the Behring project). Nothing reads it at runtime yet.
+- Audit: `scripts/audits/map-list-parity.sql`. Tests: `test/zip-development-map-parity.test.mjs`,
+  `test/zip-development-list.browser.test.mjs`.
+
+## TAB 17 DATA-CENTER PROJECT CHECK (2026-11-13): A MAP 1 PROJECT LINK AND A REPLY IN EACH HOT TOPICS TILE
+
+Every Hot Topics topic in category `data_centers` is checked automatically: which Map 1 project it is about, where, its status,
+its documents, and whether its project link opens that project. The tile shows the result with Open project on JODY / Copy
+project link / Open original post, an editable reply (Copy reply, Save my wording, Use the suggested reply), Recheck, and the
+project's documents for review. Nothing is posted; the founder copies the reply and posts it by hand.
+- **Link:** `/map/<zip>/?project=<key>` (`lib/map1-project-panel.js`, `homesignalmap.html` PP module). Keys are stable project
+  keys (`dcrec:<record key>`, `nat:<national key>`, `n5:<source key>`), never `dc:<entity uuid>`, so a merge or a status change
+  keeps the link. The panel shows the latest published information and says it is not live.
+- **SQL of record:** `docs/map1-project-link.sql` (locate, stable keys, documents: pending → approved/rejected → revoked,
+  append-only, decided only by a dashboard admin; approval means the document belongs to the project and may be shown, never a
+  status change) and `docs/impact-dc-verification.sql` (queue, results, triggers, stale rules, Recheck, saved reply edits,
+  document review list, the dispatcher `impact_dc_verification_tick`).
+- **Worker:** `scripts/impact-dc-verify.mjs` (rules in `scripts/lib/impact-dc-verify-core.mjs`, browser check in
+  `scripts/lib/impact-dc-page-check.mjs`, production wiring `scripts/impact-dc-verify-run.mjs`), run by
+  `.github/workflows/impact-dc-verify.yml`, which refuses unless `.github/impact-dc-verify` reads `enabled`.
+- **Link available vs reply ready:** available = project identified, drawn by Map 1, and the link opened it at desktop and phone
+  width. Ready = also documents that support it (a directory listing never supports an Approved or Operating status) and 300
+  graphemes or fewer. A stale result (topic or document change after the run started, a detected project change, older than 48 h,
+  or a later failed attempt) is shown, labelled, and never counts as available or ready.
+- **Retries:** 5 min, 30 min, stop after 3. One job per topic, one run at a time (15 min lease); a change during a run reruns it.
+- **Saved reply edits** are append-only; a new check never replaces them; the tile flags a changed link or changed project facts.
+- Matching searches the data-center map layer only (`map1_dc_zip_members`). Project changes are found by a polling detector
+  inside the tick, not by an event.
+- Tests: `test/impact-dc-verify.test.mjs`, `test/impact-dc-page-check.browser.test.mjs`, `test/impact-dc-check.browser.test.mjs`,
+  `test/map1-project-panel.test.mjs`, `test/map1-project-link.browser.test.mjs`, `test/impact_dc_verification_pg`,
+  `test/map1_project_link_pg` (both in `zip-membership-suite.yml`).

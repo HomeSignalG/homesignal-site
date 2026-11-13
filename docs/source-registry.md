@@ -4134,7 +4134,7 @@ line) and `chicago-building-permits` → IN Lake.
 | `clark-county-active-dev-permits` → OR Multnomah | all 8 probed ZIPs 0 |
 | `fairfax-active-site-construction` → VA Prince William | non-zero ZIPs at 24 / 11 / 8 in-envelope — below the noise floor |
 | Birmingham AL (Jefferson, 60 dark) | CKAN portal live, permits **stalled at 2017** (`modified` 2017-06-29) |
-| Alameda CA (51 dark) | Berkeley + Oakland Socrata catalogs complete; **neither publishes a permit ledger** |
+| Alameda CA (51 dark) | Berkeley + Oakland Socrata catalogs complete; **neither publishes a permit ledger**. ⚠️ 2026-11-12: that is the CATALOG only. Oakland runs a public Accela planning/permit portal (anonymous search verified, not integrated) — `data/official-record-portals.json` |
 | St. Louis County MO (63 dark) | host 404s; AGO title search returns St. Louis County **MINNESOTA** |
 | Oakland County MI (78) · Oklahoma County OK (52) · Sedgwick KS (50) | hub 404 / 403 WAF / SPA shell, no JSON catalog |
 | Lancaster County PA (56) | the layer is a **28-row annual aggregate** (`Year`, `Project_type`, `Units_permitted_by_type`) |
