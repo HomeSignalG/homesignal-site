@@ -146,6 +146,39 @@ select public.development_project_set('proctor-4-tacoma', 'published', 'Proctor 
 select public.development_link_decide(public.development_link_propose('proctor-4-tacoma', 'source_record', 'wa-ecology-sepa:202603632|1',
   'defining_record', 'a', 'https://apps.ecology.wa.gov/separ/Main/SEPA/Record.aspx?SEPANumber=202603632'), 'approved') as l_pdef \gset
 
+-- the one-point approximate location (site_location): a point, never a footprint
+select pg_temp.ck('location: a polygon, a parcel key or a bare number is not a location key',
+  pg_temp.try('authenticated', :'rev', $q$select public.development_link_propose('proctor-4-tacoma', 'site_location',
+     'POLYGON((-97.4 25.9,-97.3 25.9,-97.3 26,-97.4 25.9))', 'approximate_location', 'b', 'https://x.gov/a')$q$) = '23514'
+  and pg_temp.try('authenticated', :'rev', $q$select public.development_link_propose('proctor-4-tacoma', 'site_location',
+     'TX-48061:171887', 'approximate_location', 'b', 'https://x.gov/a')$q$) = '23514'
+  and pg_temp.try('authenticated', :'rev', $q$select public.development_link_propose('proctor-4-tacoma', 'site_location',
+     '25.9,-97.4', 'approximate_location', 'b', 'https://x.gov/a')$q$) = '23514');
+select pg_temp.ck('location: only the approximate_location role fits it',
+  pg_temp.try('authenticated', :'rev', $q$select public.development_link_propose('proctor-4-tacoma', 'site_location',
+     '25.9300,-97.4000', 'associated_land', 'b', 'https://x.gov/a')$q$) = '23514');
+select pg_temp.ck('location: grade b needs its basis written down before approval',
+  pg_temp.try('authenticated', :'rev', format($q$select public.development_link_decide(public.development_link_propose('proctor-4-tacoma',
+     'site_location', '25.9300,-97.4001', 'approximate_location', 'b', 'https://x.gov/a'), 'approved')$q$)) = '23514');
+select public.development_link_decide(public.development_link_propose('proctor-4-tacoma', 'site_location', '25.9300,-97.4000',
+  'approximate_location', 'b', 'https://www2.tceq.texas.gov/airperm/x', 'TCEQ project record', null,
+  'Placed from the agency''s written directions; not a surveyed site.', 'Approximate location'), 'approved') as l_loc \gset
+select pg_temp.ck('location: the reviewer scope list includes it for a reviewer with the default scopes',
+  public.development_reviewer_can(:'rev'::uuid, 'site_location'));
+select pg_temp.ck('location facts: one point, the ZIP whose boundary holds it',
+  public.development_site_location_facts('25.9300,-97.4000') = '{"lat": 25.93, "lng": -97.4, "zips": ["78521"]}'::jsonb,
+  public.development_site_location_facts('25.9300,-97.4000')::text);
+select pg_temp.ck('location facts: a point on a shared edge names both ZIPs (the build then puts it on neither map)',
+  public.development_site_location_facts('25.9500,-97.4000') -> 'zips' = '["78521", "78578"]'::jsonb);
+select pg_temp.ck('location facts: a ZIP with no page is never named, and no boundary is never guessed',
+  public.development_site_location_facts('10.5000,-9.5000') -> 'zips' = '[]'::jsonb
+  and public.development_site_location_facts('45.0000,-120.0000') -> 'zips' = '[]'::jsonb);
+select pg_temp.ck('location facts: a malformed key gives no facts (the link is withheld)',
+  public.development_site_location_facts('25.9,-97.4') is null);
+select pg_temp.ck('location facts: not callable with the public key',
+  not has_function_privilege('anon', 'public.development_site_location_facts(text)', 'execute')
+  and not has_function_privilege('authenticated', 'public.development_site_location_facts(text)', 'execute'));
+
 -- statements
 select public.development_statement_write('stratos-box-elder', 'summary', 'A data center campus proposed for ranch land in Hansel Valley.',
   'https://www.waterrights.utah.gov/search/?q=a55167', 'Change Details for a55167') as s_sum \gset
@@ -196,6 +229,10 @@ select pg_temp.ck('snapshot: candidates, grade c and private-person links never 
   not exists (select 1 from jsonb_array_elements(:'snap'::jsonb #> '{dossiers,stratos-box-elder,links}') l
                where l ->> 'kind' = 'news_report' or l ->> 'ref' = 'UT:Jane Example'
                   or l ->> 'ref' like 'UT:O''Leary%'));
+select pg_temp.ck('snapshot: the approved location carries its point and ZIP, nothing more',
+  (select l ->> 'ref' = '25.9300,-97.4000' and l -> 'facts' = '{"lat": 25.93, "lng": -97.4, "zips": ["78521"]}'::jsonb
+          and l ->> 'role' = 'approximate_location'
+     from jsonb_array_elements(:'snap'::jsonb #> '{dossiers,proctor-4-tacoma,links}') l where l ->> 'kind' = 'site_location'));
 select pg_temp.ck('snapshot: a corrected statement replaces the old one',
   (select count(*) = 1 and bool_and(s ->> 'body' like '%County adopted%')
      from jsonb_array_elements(:'snap'::jsonb #> '{dossiers,stratos-box-elder,statements}') s where s ->> 'kind' = 'unknown'));

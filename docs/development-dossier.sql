@@ -42,7 +42,7 @@ create table if not exists public.development_reviewer (
   user_id     uuid primary key,
   scopes      text[] not null default array['source_record','dc_entity','land_assembly','parcel','water_filing',
                 'government_record','organization','document','youtube_video','bluesky_post','news_report',
-                'statement','project'],
+                'site_location','statement','project'],
   granted_by  text not null,
   granted_at  timestamptz not null default now(),
   revoked_at  timestamptz,
@@ -71,7 +71,7 @@ create table if not exists public.development_project_link (
   object_kind      text not null check (object_kind in (
                      'source_record','dc_entity','land_assembly','parcel','water_filing',
                      'government_record','organization','document','youtube_video',
-                     'bluesky_post','news_report')),
+                     'bluesky_post','news_report','site_location')),
   object_ref       text not null check (btrim(object_ref) <> ''),
   role             text not null,
   grade            char(1) not null check (grade in ('a','b','c','d','e')),
@@ -100,6 +100,15 @@ create table if not exists public.development_project_link (
   check (link_state <> 'approved' or not names_private_person)
 );
 create index if not exists development_project_link_project_idx on public.development_project_link (project_id);
+-- A table made before 'site_location' (2026-11-12) keeps its old kind list under create-if-not-exists:
+-- widen it in place. Additive: every kind it accepted before is still accepted.
+alter table public.development_project_link drop constraint if exists development_project_link_object_kind_check;
+alter table public.development_project_link add constraint development_project_link_object_kind_check check (object_kind in (
+  'source_record','dc_entity','land_assembly','parcel','water_filing','government_record','organization','document',
+  'youtube_video','bluesky_post','news_report','site_location'));
+-- Every current reviewer who may decide parcels may decide the one-point location too (both are land).
+update public.development_reviewer set scopes = scopes || array['site_location']
+ where revoked_at is null and 'parcel' = any(scopes) and not 'site_location' = any(scopes);
 
 -- ── reviewer-written statements (summary, what is known, what is not, next, impacts) ─────
 create table if not exists public.development_project_statement (
@@ -146,6 +155,7 @@ returns boolean language sql immutable set search_path to 'public','pg_temp' as 
     when 'youtube_video'     then p_role = 'explains'
     when 'bluesky_post'      then p_role = 'explains'
     when 'news_report'       then p_role = 'reported_by'
+    when 'site_location'     then p_role = 'approximate_location'
     else false end
 $fn$;
 
@@ -164,6 +174,8 @@ returns boolean language sql immutable set search_path to 'public','pg_temp' as 
     when 'youtube_video'     then p_ref ~ '^youtube:[A-Za-z0-9_-]{11}$'
     when 'bluesky_post'      then p_ref ~ '^bsky:at://\S+$'
     when 'news_report'       then p_ref ~ '^https://\S+$'
+    -- one point, "lat,lng", 3-6 decimals each: never a polygon, a parcel or a footprint
+    when 'site_location'     then p_ref ~ '^-?[0-9]{1,2}\.[0-9]{3,6},-?[0-9]{1,3}\.[0-9]{3,6}$'
     else false end
 $fn$;
 
@@ -453,6 +465,29 @@ do $do$ begin
   end if;
 end $do$;
 
+-- A reviewer-approved approximate location (object_kind site_location, ref "lat,lng"): the point and the
+-- canonical ZIP(s) it falls in, by the same boundary-inclusive predicate Map 1 serves
+-- (geo.zip_point_membership_in), limited to ZIPs that have a page. Never a footprint: one point, and the
+-- build puts it on Map 1 only when it falls in exactly one ZIP (scripts/development_pages.py map_index).
+-- Without boundaries it returns no ZIP rather than guessing one.
+create or replace function public.development_site_location_facts(p_ref text)
+returns jsonb language plpgsql stable security definer set search_path to 'public','pg_temp' as $fn$
+declare lat float8; lng float8; zs jsonb := '[]'::jsonb;
+begin
+  if not public.development_link_ref_ok('site_location', p_ref) then
+    return null;
+  end if;
+  lat := split_part(p_ref, ',', 1)::float8;
+  lng := split_part(p_ref, ',', 2)::float8;
+  if to_regclass('geo.zcta_boundary') is not null and to_regclass('public.canonical_zip_registry') is not null then
+    execute $q$select coalesce(jsonb_agg(b.zcta5 order by b.zcta5 collate "C"), '[]'::jsonb)
+                 from geo.zcta_boundary b join public.canonical_zip_registry r on r.zip = b.zcta5
+                where geo.zip_point_membership_in(b.geom, $1, $2) = 'member'$q$
+      into zs using lat, lng;
+  end if;
+  return jsonb_build_object('lat', lat, 'lng', lng, 'zips', zs);
+end $fn$;
+
 create or replace function public.development_dossier_snapshot()
 returns jsonb language plpgsql stable security definer set search_path to 'public','pg_temp' as $fn$
 declare out jsonb := '{}'::jsonb; p record; links jsonb; stmts jsonb; withheld jsonb; nm text; nsrc text; def jsonb;
@@ -503,6 +538,7 @@ begin
                    'published_at', y.published_at, 'verified', y.public_verified_at)
             from public.youtube_channel_videos y
            where y.video_id = substr(c.object_ref, 9) and y.privacy_status = 'public' and y.public_verified_at is not null)
+        when 'site_location' then public.development_site_location_facts(c.object_ref)
         when 'bluesky_post' then coalesce(
           (select jsonb_build_object('text', j.post_text, 'published_at', j.published_at, 'uri', j.bsky_uri)
              from public.video_bluesky_jobs j where j.bsky_uri = substr(c.object_ref, 6) and j.status = 'published'
@@ -568,6 +604,7 @@ revoke all on function public.development_link_guard() from public, anon, authen
 revoke all on function public.development_statement_guard() from public, anon, authenticated;
 revoke all on function public.development_project_guard() from public, anon, authenticated;
 revoke all on function public.development_dossier_snapshot() from public, anon, authenticated;
+revoke all on function public.development_site_location_facts(text) from public, anon, authenticated;
 revoke all on function public.development_project_create(text, text, text) from public, anon;
 revoke all on function public.development_project_set(text, text, text) from public, anon;
 revoke all on function public.development_link_propose(text, text, text, text, text, text, text, text, text, text, date, text, text, boolean, text) from public, anon;

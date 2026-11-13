@@ -72,3 +72,22 @@ insert into public.dc_entity_observation values
   ('fe2068de-0000-4000-8000-000000000001', '0b500000-0000-4000-8000-000000000001'),
   ('fe2068de-0000-4000-8000-000000000001', '0b500000-0000-4000-8000-000000000002'),
   ('fe2068de-0000-4000-8000-000000000001', '0b500000-0000-4000-8000-000000000003');
+
+-- Stand-ins for the ZIP geography public.development_site_location_facts reads (production: PostGIS
+-- geo.zcta_boundary + geo.zip_point_membership_in, boundary-inclusive). Here a boundary is the text
+-- box "minlat,minlng,maxlat,maxlng"; the predicate keeps production's answer vocabulary.
+create schema if not exists geo;
+drop table if exists geo.zcta_boundary, public.canonical_zip_registry cascade;
+create table geo.zcta_boundary (zcta5 text primary key, geom text);
+create table public.canonical_zip_registry (zip text primary key);
+create or replace function geo.zip_point_membership_in(p_boundary text, p_lat float8, p_lng float8)
+returns text language sql immutable as $$
+  select case when p_lat is null or p_lng is null then 'no_coordinates'
+              when p_boundary is null then 'not_measured'
+              when p_lat between split_part(p_boundary, ',', 1)::float8 and split_part(p_boundary, ',', 3)::float8
+               and p_lng between split_part(p_boundary, ',', 2)::float8 and split_part(p_boundary, ',', 4)::float8
+              then 'member' else 'outside' end $$;
+-- 78521 and 78578 share an edge at lat 25.95; 99999 has a boundary and no ZIP page.
+insert into geo.zcta_boundary values ('78521', '25.90,-97.50,25.95,-97.30'), ('78578', '25.95,-97.50,26.10,-97.30'),
+  ('99999', '10.00,-10.00,11.00,-9.00');
+insert into public.canonical_zip_registry values ('78521'), ('78578');

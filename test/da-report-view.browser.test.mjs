@@ -40,7 +40,7 @@ const server = createServer(async (req, res) => {
   if (url === '/__harness.html') { res.writeHead(200, { 'content-type': 'text/html' }).end(HARNESS); return; }
   const p = normalize(join(root, decodeURIComponent(url)));
   if (!p.startsWith(root)) { res.writeHead(403).end(); return; }
-  try { res.writeHead(200, { 'content-type': MIME[extname(p)] || 'application/octet-stream' }).end(await readFile(p)); }
+  try { const body = await readFile(p); res.writeHead(200, { 'content-type': MIME[extname(p)] || 'application/octet-stream' }).end(body); }
   catch { res.writeHead(404).end('not found'); }
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));

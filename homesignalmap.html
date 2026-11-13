@@ -3348,6 +3348,7 @@ HS.onReady(function(){
     // If the resolved-project parcels have already loaded, draw them onto this same map (and let
     // their footprint re-frame the view — the parcel geometry is the point of the ZIP-precise page).
     drawParcels();
+    drawReviewedProjects();   // the reviewed project points survive a redraw of the records
     publishVerifyState();
   }
 
@@ -5430,6 +5431,74 @@ HS.onReady(function(){
     return name ? { path: e.path, name: name } : null;
   }
 
+  // REVIEWED PROJECT POINTS, from development/map-index.json (written by the site build from the published
+  // dossier snapshot: scripts/development_pages.py map_index). A point is there only when a reviewer
+  // approved ONE approximate location for a published project and the database put it in exactly ONE ZIP
+  // with Map 1's own boundary predicate. It is drawn as one marker linking to the project page: never an
+  // area, never counted with the records above, never filtered by Type or Status (it is not a record).
+  var MAP_INDEX_URL = "development/map-index.json";
+  var REVIEWED_POINTS = [], REVIEWED_ZIP = null, reviewedLayer = null;
+  function reviewedPointsFor(index, zip){
+    var z = index && index.schema === "development-map-index/1" && index.zips;
+    if(!z || !/^\d{5}$/.test(String(zip)) || !Object.prototype.hasOwnProperty.call(z, zip) || !Array.isArray(z[zip])) return [];
+    return z[zip].filter(function(e){
+      return e && typeof e.path === "string" && /^\/development\/[a-z]{2}\/[a-z0-9]+(?:-[a-z0-9]+)*\/$/.test(e.path) &&
+        typeof e.name === "string" && e.name.trim() &&
+        typeof e.lat === "number" && typeof e.lng === "number" && isFinite(e.lat) && isFinite(e.lng) &&
+        e.lat >= -90 && e.lat <= 90 && e.lng >= -180 && e.lng <= 180;
+    });
+  }
+  // Pure: the popup for one reviewed point (tested offline).
+  function reviewedPopupHTML(e){
+    return "<div class='pk'>Development page · reviewed</div>" +
+      "<div class='pt'>" + esc(e.name) + "</div>" +
+      "<div style='margin-top:4px'>Approximate location: one point placed from the records. It is not a surveyed site " +
+      "or a project boundary.</div>" +
+      (e.basis ? "<div class='pk' style='margin-top:4px'>" + esc(e.basis) + "</div>" : "") +
+      "<div style='margin-top:6px'><a class='rv-link' href='" + escAttr(e.path) + "'>Project page ▸</a></div>";
+  }
+  function drawReviewedProjects(){
+    if(reviewedLayer && map){ map.removeLayer(reviewedLayer); }
+    reviewedLayer = null;
+    // Drawn on the map render() builds (render() calls this again at its end), never on a map made here:
+    // a map created before its container is shown has no size, and every position on it is wrong.
+    if(!REVIEWED_POINTS.length || !map) return;
+    reviewedLayer = L.layerGroup().addTo(map);
+    REVIEWED_POINTS.forEach(function(e){
+      var icon = L.divIcon({ className:"", iconSize:[22,22], iconAnchor:[11,11], popupAnchor:[0,-12],
+        html:"<div class='rv-pin' style='width:22px;height:22px;border-radius:50%;box-sizing:border-box;" +
+          "border:3px dashed #111827;background:#fde68a;display:flex;align-items:center;justify-content:center;" +
+          "font:700 11px/1 system-ui,sans-serif;color:#111827'>P</div>" });
+      var m = L.marker([e.lat, e.lng], { icon:icon, title:e.name + " (approximate location, reviewed development page)",
+                                         keyboard:true, zIndexOffset:1000 });
+      m.bindPopup(reviewedPopupHTML(e));
+      m.addTo(reviewedLayer);
+    });
+    // A reviewed point outside the framed view would be drawn and never seen: widen the view to hold it.
+    try{
+      var sz = map.getSize();
+      if(!sz || sz.x <= 0 || sz.y <= 0) return;
+      var vb = map.getBounds();
+      if(vb && vb.isValid()){
+        var add = REVIEWED_POINTS.filter(function(e){ return !vb.contains([e.lat, e.lng]); });
+        if(add.length){
+          add.forEach(function(e){ vb.extend([e.lat, e.lng]); });
+          map.fitBounds(vb, { padding:[30,30], animate:false });
+        }
+      }
+    }catch(err){}
+  }
+  function loadReviewedProjects(zip){
+    REVIEWED_ZIP = zip; REVIEWED_POINTS = []; drawReviewedProjects();
+    fetch(MAP_INDEX_URL, { cache:"no-cache" })
+      .then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; })
+      .then(function(idx){
+        if(REVIEWED_ZIP !== zip) return;         // a newer ZIP load owns the page now
+        REVIEWED_POINTS = reviewedPointsFor(idx, zip);
+        drawReviewedProjects();
+      });
+  }
+
   // One land-assembly card. Pure: returns HTML, touches no DOM, so it can be tested offline.
   function landCardHTML(zr, parent, parcels, zip, devPage){
     parcels = parcels || [];
@@ -5758,6 +5827,7 @@ HS.onReady(function(){
         if(window.HS && HS.state) HS.state.zip = ez;
         if(window.HS && HS.declareRouteZipPlace) HS.declareRouteZipPlace(ez);
         loadZip(ez);                       // Map 1's own ZIP mode (it draws the ZIP outline too)
+        loadReviewedProjects(ez);
         return;                            // no loadDevTracker: the tracker is hidden here
       }
       var elat = parseFloat(u.searchParams.get("lat")), elng = parseFloat(u.searchParams.get("lng"));
@@ -5810,7 +5880,7 @@ HS.onReady(function(){
     }
     if(z && /^\d{5}$/.test(z)){
       if(window.HS && HS.state) HS.state.zip = z;
-      loadZip(z); loadDevTracker(z);
+      loadZip(z); loadDevTracker(z); loadReviewedProjects(z);
     }
   })();
 });  // end HS.onReady — the page runtime above ran after the shell injected #hs-content
