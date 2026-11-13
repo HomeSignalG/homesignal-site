@@ -137,6 +137,14 @@ r = await verifyOne(fakeDeps({ statePoints: [{ zip: '20187', project_name: 'Vint
   members: { '20187': [row({ project_name: 'CyrusOne Manassas' })] } }),
   { candidate: stateTopic({ title: 'Vint Hill campus fight, CyrusOne quiet', evidence: {} }) });
 ok(r.match.state === 'no_match', '5s6 a ZIP chosen by one name never lets another project match there by operator', r.match);
+ok(core.zipsNamedByTopic(stateTopic({ title: 'Google data center protest in Virginia', evidence: {} }),
+  [{ zip: '20187', project_name: 'Google' }, { zip: '22030', project_name: 'Google Data Center' }]).length === 0,
+  '5s8 a brand-only name ("Google", "Google Data Center") is not a statewide match');
+ok(core.zipsNamedByTopic(stateTopic({ title: 'Google Michigan City data center hearing', evidence: {} }),
+  [{ zip: '20187', project_name: 'Google Michigan City Data Center' }]).join() === '20187', '5s9 two distinctive name words do match');
+r = await verifyOne(fakeDeps({ statePoints: [{ zip: '20187', project_name: 'CyrusOne Vint Hill' }],
+  members: { '20187': [row({ project_name: 'CyrusOne' })] } }), { candidate: stateTopic() });
+ok(r.match.state === 'no_match', '5s10 statewide, a drawn record named only by its brand is not matched', r.match);
 sd = fakeDeps({ statePoints: pts });
 r = await verifyOne(sd, { candidate: topic() });
 ok(!sd.calls.some((c) => c[0] === 'impact_dc_state_name_points') && r.search.scope === 'place', '5s7 a county topic does not do the statewide search');
