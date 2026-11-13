@@ -375,6 +375,70 @@ ok(outside.length === 0, '13a no request left the page');
 ok(errors.length === 0, '13b no script errors or dialogs' + (errors.length ? ': ' + errors.join(' | ') : ''));
 ok(names.every((n) => /^hs_weekly_/.test(n)) && !names.some((n) => /bluesky|youtube|publish_post|social/i.test(n)), '13c every call is a weekly admin function; nothing posts');
 
+// 15 Tab 20's entry point (research processing off) shows the automatic Perplexity research as recorded, and decides nothing
+{
+  const P = await ctx.newPage();
+  P.on('pageerror', (e) => errors.push(e.message));
+  await P.goto('https://ws.test/');
+  const R1 = L1.request.id, R2 = LP.request.id;
+  const ans = 'WEEKLY-ANSWER v1\nFINDING\nkey: test-finding\nstatement: TEST statement <script>x</script>\nEND';
+  // As the database derives it: an answer on file and no checking run reads "researching", with no run status.
+  const Q15 = JSON.parse(JSON.stringify(Q)), q1 = Q15.leads.find((l) => l.id === L1.id);
+  q1.state.status = 'researching'; q1.state.current.research = { status: 'researching', answer_id: 'a1', run_status: null, run_error: null };
+  await P.evaluate(([Q, R1, R2, ans]) => {
+    window.calls = [];
+    window.pxs = { sync: { last_run_at: '2026-11-13T19:45:00Z', last_outcome: 'ok', last_error: null }, started_24h: 1, requests: {
+      [R1]: { due: false, answer: { id: 'a1', mode: 'api', raw_text: ans, saved_at: '2026-11-13T19:45:10Z' },
+              calls: [{ attempt: 1, model: 'sonar-pro', status: 'done', answer_id: 'a1', citations: ['https://records.example.test/a', 'javascript:alert(1)'] }] },
+      [R2]: { due: true, answer: null, calls: [{ attempt: 1, model: 'sonar-pro', status: 'failed', error: 'HTTP 503' }] } } };
+    window.client = { rpc: (n, a) => {
+      window.calls.push([n, a]);
+      if (n === 'hs_weekly_topic_queue') return Promise.resolve({ data: JSON.parse(JSON.stringify(Q)), error: null });
+      if (n === 'hs_weekly_perplexity_status') return Promise.resolve({ data: window.pxs, error: null });
+      return Promise.resolve({ data: null, error: { message: 'Could not find the function public.' + n } });
+    } };
+    document.getElementById('ws').innerHTML = '<div id="tq"></div>';
+    return window.HS.acqWeeklyTopics.load(window.client, document.getElementById('tq'));
+  }, [Q15, R1, R2, ans]);
+  await P.waitForSelector('.tq-lead');
+  const pc = (l) => P.locator('.tq-lead[data-lead="' + l.id + '"]');
+  const pv = async (v) => { await P.click('.tq-tabs button[data-v="' + v + '"]'); await P.waitForTimeout(50); };
+  await pv('all');
+  const asked = (await P.evaluate(() => window.calls.filter((c) => c[0] === 'hs_weekly_perplexity_status').map((c) => c[1].p_requests)))[0] || [];
+  ok(asked.includes(R1) && asked.includes(R2), '15a the page asks for the Perplexity status of the requests on screen');
+  const t1 = await pc(L1).innerText();
+  ok(/Perplexity has answered/.test(t1) && (await pc(L1).locator('button[data-tq="open-answer"]').count()) === 1, '15b an answered request says so, with one button to open the answer');
+  await pc(L1).locator('button[data-tq="open-answer"]').click();
+  ok((await pc(L1).locator('.tq-request').evaluate((d) => d.open)) && (await pc(L1).locator('.tq-pxanswer').inputValue()) === ans
+    && (await pc(L1).locator('.tq-pxanswer script').count()) === 0, '15c the answer opens, word for word, as text');
+  const cites = await pc(L1).locator('.tq-pxcites a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
+  ok(cites.length === 1 && cites[0] === 'https://records.example.test/a', '15d cited sources are links; a non-web address is not');
+  ok(/AI draft: nothing in it is checked yet/.test(await pc(L1).innerText()), '15e the answer is labelled an unchecked AI draft');
+  const t2 = await pc(LP).innerText();
+  ok(/Attempt 1 failed: HTTP 503/.test(t2) && /checked every 15 minutes/.test(t2) && /Nothing is needed right now/.test(t2), '15f a failed attempt that will be retried says so');
+  ok(!/Unavailable in this release/.test(await P.locator('.tq-root').textContent()), '15g the "unavailable" note is gone when the automatic research is installed');
+  // no API key
+  await P.evaluate(() => { window.pxs.sync = { last_run_at: '2026-11-13T19:45:00Z', last_outcome: 'no_key', last_error: 'PERPLEXITY_API_KEY is not set' }; });
+  await pv('inbox'); await pv('all');
+  ok(/API key has not been added/.test(await pc(LP).innerText()), '15h a missing API key is named, with the by-hand route');
+  // three failed attempts
+  await P.evaluate((R2) => { window.pxs.sync.last_outcome = 'ok'; window.pxs.requests[R2] = { due: false, answer: null,
+    calls: [1, 2, 3].map((n) => ({ attempt: n, model: 'sonar-pro', status: 'failed', error: 'HTTP 500' })) }; }, R2);
+  await pv('inbox'); await pv('all');
+  ok(/could not answer this in 3 attempts/.test(await pc(LP).innerText()) && (await pc(LP).locator('button[data-tq="open-request"]').count()) === 1, '15i after 3 failures the card says so and offers the request to run by hand');
+  // the reader not installed: the page reads exactly as before
+  await P.evaluate(() => { window.client.rpc = ((orig) => (n, a) => n === 'hs_weekly_perplexity_status'
+    ? Promise.resolve({ data: null, error: { message: 'Could not find the function public.hs_weekly_perplexity_status' } }) : orig(n, a))(window.client.rpc);
+    document.getElementById('ws').innerHTML = '<div id="tq2"></div>';
+    return window.HS.acqWeeklyTopics.load(window.client, document.getElementById('tq2')); });
+  await P.waitForSelector('#tq2 .tq-lead');
+  await pv('all');
+  ok(/Unavailable in this release/.test(await P.locator('.tq-root').textContent()) && !/Perplexity/.test(await P.locator('.tq-root .tq-request').first().locator('summary').innerText()) && !/Perplexity has answered/.test(await P.locator('.tq-root').innerText()), '15j without the Perplexity file installed the page reads as before');
+  const n15 = await P.evaluate(() => Array.from(new Set(window.calls.map((c) => c[0]))));
+  ok(n15.every((n) => n === 'hs_weekly_topic_queue' || n === 'hs_weekly_perplexity_status' || n === 'hs_weekly_bsky_sources'), '15k the page only reads: ' + n15.join(', '));
+  await P.close();
+}
+
 await browser.close();
 if (fails) { console.log(fails + ' failed'); process.exit(1); }
 console.log('all passed');

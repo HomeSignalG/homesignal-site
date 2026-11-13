@@ -29,6 +29,19 @@ imports nothing until its switch `data/weekly_bsky_sources.json` is set to `enab
 turning the switch on.
 Tests: `test/weekly_bsky_sources_pg/run.sh` (32 checks, nine mutations), `test/weekly-bsky-sources.browser.test.mjs`.
 
+## Perplexity's API: `docs/weekly-perplexity-api.sql` (separate, unnumbered; needs 1, 2, 2a)
+
+Research requests are answered by Perplexity's API automatically (founder, 2026-11-13). Widens
+`weekly_research_answers.mode` to `manual_paste` or `api`, and creates `weekly_perplexity_calls` (every call, its
+citations, usage and error) and `weekly_perplexity_sync` (the worker's last check). Four service-role functions
+(`weekly_perplexity_claim`, `_record`, `_fail`, `_heartbeat`) and one admin reader (`hs_weekly_perplexity_status`).
+**It replaces no function of files 1-7.** The cost limits are in the database: one answer per request, 3 attempts, a
+call with no result in 15 minutes counts as failed, at most 20 calls in any 24 hours, only requests from the last 14
+days whose edition is open. The worker is homesignal-ingest `scripts/weekly_perplexity.mjs` (workflow
+`weekly-perplexity.yml`, every 15 minutes); it needs the `PERPLEXITY_API_KEY` secret and does nothing without it. The
+answer is saved as an AI draft; checking its sources is still files 3+.
+Tests: `test/weekly_stage2_pg/run_perplexity.sh` (21 checks, eight mutations), `test/weekly-topics.browser.test.mjs` §15.
+
 ## The queue-only release: files 1, 2 and 2a
 
 This is what Tab 20 (`acquisition.html`, `HS.acqWeeklyTopics.load`) uses. It installs six tables

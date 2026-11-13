@@ -16,6 +16,7 @@ const sql = baseSql + '\n' + queue;
 const sqlCode = sql.replace(/--.*$/gm, '');
 // the Bluesky sources (docs/weekly-bluesky-sources.sql): an optional file the queue reads beside the queue-only release
 const bsky = read('docs/weekly-bluesky-sources.sql');
+const px = read('docs/weekly-perplexity-api.sql');
 const stage2 = ['weekly-3-workbench.sql', 'weekly-4-source-copy.sql', 'weekly-5-titles.sql', 'weekly-6-doc-cues.sql'].map((f) => read('docs/' + f)).join('\n') + '\n' + gate;
 
 // 1 on the page: Tab 20 is the queue, mounted through its own entry point; the workbench is loaded as a library only
@@ -49,15 +50,18 @@ const W_PRE = W.PREPARED;
 const rpcs = [...new Set([...code.matchAll(/rpc\('([a-z_]+)'/g)].map((m) => m[1]))];
 ok(rpcs.length >= 9 && rpcs.every((n) => /^hs_weekly_/.test(n)), '2a every call is an hs_weekly_* admin function (' + rpcs.length + ')');
 const defined = (n, text) => new RegExp('function public\\.' + n + '\\(').test(text);
-ok(rpcs.every((n) => defined(n, sql) || defined(n, stage2) || defined(n, bsky)), '2b every function it calls is defined in the prepared SQL');
+ok(rpcs.every((n) => defined(n, sql) || defined(n, stage2) || defined(n, bsky) || defined(n, px)), '2b every function it calls is defined in the prepared SQL');
 // the two calls that are NOT in the queue-only release are each behind its own switch
-const later = rpcs.filter((n) => !defined(n, sql) && !defined(n, bsky)).sort();
+const later = rpcs.filter((n) => !defined(n, sql) && !defined(n, bsky) && !defined(n, px)).sort();
 ok(rpcs.filter((n) => defined(n, bsky)).sort().join() === 'hs_weekly_bsky_source_file,hs_weekly_bsky_sources'
   && /function notInstalled\(e\)/.test(code), '2j the Bluesky sources: two admin functions of docs/weekly-bluesky-sources.sql, and the section hides itself when that file is not installed');
 ok(JSON.stringify(later) === JSON.stringify(['hs_weekly_edition_link_version', 'hs_weekly_paste_answer'])
   && /if \(a === 'paste'\) \{\s*if \(!processing\(\)\) return;/.test(code) && /if \(a === 'link-version'\) \{\s*if \(!canLink\(\)\) return;/.test(code)
   && /function processing\(\) \{ return S\.opts\.researchProcessing === true; \}/.test(code) && /researchProcessing: false/.test(code.match(/function load\(client, el\) \{[\s\S]*?\n  \}/)[0]),
   '2h answer processing and version linking are the only calls outside the queue-only release; both are off unless switched on, and Tab 20’s entry point leaves processing off');
+ok(rpcs.filter((n) => defined(n, px)).join() === 'hs_weekly_perplexity_status' && /function pxOn\(\) \{ return !processing\(\) && !!S\.px; \}/.test(code)
+  && /hs_weekly_perplexity_status[\s\S]{0,200}notInstalled\(e\) \? '' : e\.message/.test(code),
+  '2k Perplexity: one admin reader of docs/weekly-perplexity-api.sql; the page only reads it, and reads as before when that file is not installed');
 ok(/Prepare research request/.test(js) && /Nothing was submitted for processing/.test(js) && /prepared, not submitted/.test(js) && W_PRE === 'Research request prepared'
   && /Unavailable in this release: research processing is not deployed/.test(js), '2i a prepared request is worded apart from submitted research, and the unavailable action says why');
 ok(!/\bfetch\s*\(|XMLHttpRequest|WebSocket|sendBeacon|\.from\s*\(|\.storage\b|\.upload\s*\(|localStorage|sessionStorage|indexedDB|document\.cookie|perplexity\.ai|anthropic\.com|api\.bsky\.app|bsky\.social\/xrpc|youtube/i.test(code), '2c no network, table, storage, browser-storage, provider or posting call');
