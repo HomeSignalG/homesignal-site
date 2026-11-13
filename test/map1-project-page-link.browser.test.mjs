@@ -67,6 +67,9 @@ async function open(name) {
       return route.fulfill({ status: 200, contentType: 'application/json',
         body: JSON.stringify({ v: 1, zips: c.listed === false ? [] : ['23150'] }) });
     }
+    // Map 1 also reads the reviewed-project index the site build writes; this checkout has none.
+    if (url.includes('/development/map-index.json'))
+      return route.fulfill({ status: 200, contentType: 'application/json', body: '{"schema":"development-map-index/1","zips":{}}' });
     if (url.includes('/community/23150/projects/pages.json')) {
       asked.push(url);
       if (c.index === 404) return route.fulfill({ status: 404, body: 'nope' });
