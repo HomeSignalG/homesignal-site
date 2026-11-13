@@ -6,5 +6,4 @@ union all select 'meta', (select row_to_json(m)::text from (select zip, data_qua
 union all select 'dev_report', (select json_build_object('refreshed', refreshed_at, 'fac_refreshed', facilities_refreshed_at, 'counts', counts, 'unavail', facilities_unavailable)::text from public.development_reports where zip='78521')
 union all select 'root_feeds', (select json_agg(json_build_object('feed',feed_id,'active',active,'table',target_table)) from public.feeds f where f.community_id in (select coalesce(parent_id,id)::text from c union select id::text from c))::text
 union all select 'alerts_on_root', (select json_object_agg(category, n) from (select category, count(*) n from public.alerts a where a.community_id in (select coalesce(parent_id,id) from c) group by 1) x)::text
-union all select 'local_news_holds_or_alerts_78521_14d', (select count(*)::text from public.alerts a where a.category='local_news' and a.community_id in (select coalesce(parent_id,id) from c) and a.created_at > now()-interval '14 days')
-union all select 'markers', (select left(public.app_zip_geography_state('78521')::text, 300));
+union all select 'local_news_holds_or_alerts_78521_14d', (select count(*)::text from public.alerts a where a.category='local_news' and a.community_id in (select coalesce(parent_id,id) from c) and a.created_at > now()-interval '14 days');
