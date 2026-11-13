@@ -258,7 +258,9 @@ Record of the decision, in the founder's words: `docs/national-source-policy-202
   **Do not add a noindex rule or an exclusion criterion without explicit founder approval.**
 - Gate: `scripts/audit_index_all.py` runs in `pages.yml` against `_site` (public noindex, robots block, non-self canonical, missing from sitemap).
 
-### DEVELOPMENT MAP INDEXING PILOT (2026-11-11) — BUILT LOCALLY, NOT DEPLOYED
+### DEVELOPMENT MAP INDEXING PILOT (2026-11-11) — DEPLOYED 2026-11-11 19:29:35 UTC (f65a0f7, #2808)
+Baseline (deploy, IndexNow receipt, the 200 URLs with their lastmods, what a Bing result can and cannot show):
+`docs/seo/map-indexing-pilot/baseline-2026-11-11.md`. The controls were not submitted; IndexNow HTTP 200 is receipt, not indexing.
 Every `/map/<zip>/` document kept its whole page inside an inert `<template>` (6 visible words in the first HTML), and
 `page_semantics.projection` drops `<template>`, so a map's records never moved its fingerprint, `lastmod` or IndexNow.
 `scripts/map_zip_summary.py` writes `#hs-map-zip-summary` OUTSIDE the template from the Rule D plane count and the ZIP's
