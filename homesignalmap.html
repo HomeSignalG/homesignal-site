@@ -1069,7 +1069,7 @@
 <script src="lib/state-cleanup.js?v=20261022a"></script>
 <script src="lib/water-rights.js?v=add4200a"></script>
 <script src="lib/water-rights-map.js?v=f867f0d7"></script>
-<script src="lib/map1-project-panel.js?v=b7a4bcd7"></script>
+<script src="lib/map1-project-panel.js?v=9d60c8c6"></script>
 <script src="lib/commercial-coverage.js?v=20260905"></script>
 <script src="lib/premium-waitlist.js?v=3cb9baaf"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
@@ -2877,6 +2877,7 @@ HS.onReady(function(){
           setIndexable(false);              // an empty ZIP is never indexed, either way
           $("results").style.display = "block";
           status(HS.zipAuthNote(auth, zip, []));
+          focusPendingProject();            // a ?project= link still gets its answer
         }
       })
       .catch(function(){
@@ -2884,6 +2885,7 @@ HS.onReady(function(){
         window.__HS_SITES = [];
         $("results").style.display = "block";
         status("Couldn't load ZIP " + zip + ". Enter your address for the live view.", true);
+        focusPendingProject();
       });
   }
 
@@ -3964,6 +3966,7 @@ HS.onReady(function(){
     el.innerHTML = html; el.hidden = false;
   }
   function ppHide(){ var el = ppEl(); if(el){ el.hidden = true; el.innerHTML = ""; } }
+  function ppNotice(kind){ ppShow(HS.map1ProjectPanelHTML(null, { esc: esc, zip: ZIP_CODE, notice: kind })); window.__HS_PROJECT_NOTICE = kind; }
   function ppRender(s, docs, docsState){
     ppShow(HS.map1ProjectPanelHTML(s, {
       esc: esc, zip: ZIP_CODE, kindLabel: kindLabel(s),
@@ -3999,7 +4002,13 @@ HS.onReady(function(){
     if(!PP.pending || !ZIP_MODE || ZIP_CODE !== PP.zip) return;
     PP.pending = false;
     var x = PP.mapKey ? ppSiteByKey(PP.mapKey) : null;
-    if(!x){ ppShow(HS.map1ProjectPanelHTML(null, { esc: esc, zip: ZIP_CODE, notOnMap: true })); return; }
+    if(!x){
+      // Only the lookup's own answer may say the project is absent; a failed read never does.
+      var st = PP.located && PP.located.state;
+      var notice = PP.lookupFailed ? "lookup_unavailable"
+                 : (st === "found" ? "not_shown" : (st === "not_on_map" || st === "unknown_key" || st === "ambiguous") ? st : "lookup_unavailable");
+      ppNotice(notice); return;
+    }
     ppReveal(x);
     try { map.setView(x.m.getLatLng(), 16, { animate:false }); } catch(e){}
     try { x.m.openPopup(); } catch(e){}
@@ -4017,7 +4026,9 @@ HS.onReady(function(){
   function ppBoot(routeZip, load){
     if(!PP.key){ load(routeZip); return; }
     ppRpc("map1_project_locate", { p_key: PP.key, p_zip: routeZip || null }).then(function(r){
-      PP.located = r || null;
+      // An answer without a known state is not an answer (e.g. a stub or a changed function): treat it as unavailable.
+      if(!r || ["found", "not_on_map", "unknown_key", "ambiguous", "bad_key"].indexOf(r.state) === -1) throw new Error("no state");
+      PP.located = r;
       var zip = (r && r.state === "found" && /^\d{5}$/.test(String(r.zip || ""))) ? String(r.zip) : routeZip;
       if(r && r.state === "found"){
         PP.mapKey = String(r.map_key || "");
@@ -4029,12 +4040,14 @@ HS.onReady(function(){
         }
       }
       PP.zip = zip; PP.pending = !!zip;
-      if(zip) load(zip);
+      if(zip) load(zip); else ppNotice(r.state === "bad_key" ? "unknown_key" : r.state);
     }).catch(function(){
-      // The lookup could not be read: open the ZIP the link names; a key Map 1 draws under its own name still matches.
+      // The lookup could not be read (network, or map1_project_locate not installed): open the ZIP the link names.
+      // A key Map 1 draws under its own name still matches; anything else says the lookup failed, never "not on the map".
+      PP.lookupFailed = true;
       PP.mapKey = /^n5:/.test(PP.key) ? PP.key : (/^nat:/.test(PP.key) ? PP.key.slice(4) : null);
       PP.zip = routeZip; PP.pending = !!routeZip;
-      if(routeZip) load(routeZip);
+      if(routeZip) load(routeZip); else ppNotice("lookup_unavailable");
     });
   }
 

@@ -75,6 +75,11 @@ ok(h.includes('Agency record') && !h.includes('No official government document i
 ok(h.includes('Filed (agency record)') && h.includes('May 1, 2026'), '3q the filing date is labelled from date_kind');
 h = HS.map1ProjectPanelHTML(null, { esc, zip: '20187', notOnMap: true });
 ok(/not on JODY's map right now/.test(h) && h.includes('20187'), '3r a key the map does not draw says so');
+for (const [k, re] of [['lookup_unavailable', /could not be looked up just now/], ['not_shown', /could not be shown just now/],
+                       ['unknown_key', /does not recognise/], ['ambiguous', /more than one project/]]) {
+  const t = HS.map1ProjectPanelHTML(null, { esc, zip: '20187', notice: k });
+  ok(re.test(t) && (k === 'not_on_map' || !/not on JODY's map/.test(t)), '3s notice ' + k + ' says only what is known');
+}
 
 console.log('\n4. the SQL of record');
 const sql = read('docs/map1-project-link.sql');

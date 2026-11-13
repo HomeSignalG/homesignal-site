@@ -48,7 +48,7 @@ const launchOpts = { args: ['--no-sandbox', '--disable-dev-shm-usage'] };
 if (process.env.HS_CHROME) launchOpts.executablePath = process.env.HS_CHROME;
 const browser = await chromium.launch(launchOpts);
 
-async function open(path, { locate, docs = [DOC], docsFail = false, viewport = { width: 1280, height: 900 } } = {}) {
+async function open(path, { locate, locateStatus = 200, dcStatus = 200, docs = [DOC], docsFail = false, viewport = { width: 1280, height: 900 } } = {}) {
   const page = await (await browser.newContext({ viewport })).newPage();
   const pageErrors = [], calls = [];
   page.on('pageerror', e => pageErrors.push(String(e).slice(0, 300)));
@@ -57,12 +57,16 @@ async function open(path, { locate, docs = [DOC], docsFail = false, viewport = {
     if (url.startsWith(base)) return route.continue();
     if (url.includes('/rpc/map1_project_locate')) {
       calls.push(JSON.parse(route.request().postData() || '{}'));
+      if (locateStatus !== 200) return route.fulfill({ status: locateStatus, contentType: 'application/json',
+        body: JSON.stringify({ code: 'PGRST202', message: 'Could not find the function public.map1_project_locate' }) });
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(locate) });
     }
     if (url.includes('/rpc/map1_project_documents')) {
       if (docsFail) return route.fulfill({ status: 500, contentType: 'application/json', body: '{"message":"boom"}' });
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(docs) });
     }
+    if (url.includes('/rpc/map1_dc_zip_members') && dcStatus !== 200)
+      return route.fulfill({ status: dcStatus, contentType: 'application/json', body: '{"message":"boom"}' });
     if (url.includes('/rpc/map1_dc_zip_members'))
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rowsFor(rpcZip(route))) });
     if (url.includes('/rpc/app_zip_projects_markers')) {
@@ -95,7 +99,7 @@ async function open(path, { locate, docs = [DOC], docsFail = false, viewport = {
     return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
   });
   await page.goto(base + path, { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => Array.isArray(window.__HS_SITES) && window.__HS_SITES.length > 0, null, { timeout: 30000 });
+  await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
   await page.waitForTimeout(900);
   return { page, pageErrors, calls };
 }
@@ -194,6 +198,40 @@ console.log('\n6. phone width, and "Details & documents" from any pin');
   await page.evaluate(() => document.querySelector('#projPanel [data-pp="close"]').click());
   const after = await panel(page);
   ok(after && after.hidden, '6d the panel closes');
+}
+
+console.log('\n8. a lookup that cannot be read never says the project is absent');
+{
+  const { page } = await open('/homesignalmap.html?zip=20187&project=' + enc, { locate: null, locateStatus: 404 });
+  const p = await panel(page);
+  ok(p && !p.hidden && /could not be looked up just now/.test(p.text), '8a the panel says the lookup failed', p && p.text);
+  ok(p && !/not on JODY's map/.test(p.text), '8b and never that the project is not on the map');
+  const sites = await page.evaluate(() => (window.__HS_SITES || []).length);
+  ok(sites > 0, '8c the ZIP map itself still loads', sites);
+}
+{
+  // a stub or changed function answering without a state is not an answer either
+  const { page } = await open('/homesignalmap.html?zip=20187&project=' + enc, { locate: { ok: true } });
+  const p = await panel(page);
+  ok(p && /could not be looked up just now/.test(p.text), '8d an answer with no state is treated as unavailable', p && p.text);
+}
+
+console.log('\n9. found by the lookup, but the map data failed: "could not be shown", not "not on the map"');
+{
+  const { page } = await open('/homesignalmap.html?zip=20187&project=' + enc, { locate: found('20187'), dcStatus: 500 });
+  const p = await panel(page);
+  ok(p && !p.hidden && /could not be shown just now/.test(p.text) && !/not on JODY's map/.test(p.text), '9a', p && p.text);
+}
+
+console.log('\n10. a link to the old key of a merged project, after it moved from Proposed to Approved');
+{
+  const APPR = FIX.rows.find((r) => r.zip === '20187' && r.map_status === 'Approved');
+  const locate = { key: KEY, kind: 'dcrec', state: 'found', map_key: APPR.source_key, zips: ['20187'], zip: '20187' };
+  const { page } = await open('/homesignalmap.html?zip=20187&stages=proposed&project=' + enc, { locate, docs: [] });
+  const focus = await page.evaluate(() => window.__HS_PROJECT_FOCUS || null);
+  ok(focus && focus.mapKey === APPR.source_key, '10a the same link opens the project under its current map key', focus);
+  const p = await panel(page);
+  ok(p && /Approved/.test(p.text) && p.text.includes(APPR.project_name), '10b and shows its current status, although the reader had only Proposed on', p && p.text.slice(0, 120));
 }
 
 console.log('\n7. a page with no ?project= is unchanged');
