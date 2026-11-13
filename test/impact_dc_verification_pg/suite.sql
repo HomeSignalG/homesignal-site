@@ -35,6 +35,24 @@ from (values ('[{"state":"VA","county":"Fauquier County"}]'::jsonb), ('[{"state"
 insert into chk (name, ok, detail) select 'B3 no places, or places that are not a list: no ZIPs',
   public.impact_dc_topic_zips('{}') = '{}' and public.impact_dc_topic_zips('null') = '{}' and public.impact_dc_topic_zips(null) = '{}', null;
 
+-- 0b. places fallback, states, and the statewide name points (2026-11-13)
+insert into chk (name, ok, detail) select 'Q1 coverage places are used when present',
+  public.impact_dc_topic_places('{"places":[{"state":"VA","county":"Fauquier"}]}', 'Somewhere, TX') = '[{"state":"VA","county":"Fauquier"}]'::jsonb, null;
+insert into chk (name, ok, detail) select 'Q2 no coverage places: "<county>, ST" becomes a county place',
+  public.impact_dc_topic_zips(public.impact_dc_topic_places(null, 'Fauquier County, VA')) = '{20186,20187}'
+  and public.impact_dc_topic_zips(public.impact_dc_topic_places('{"places":[]}', 'Ashburn, VA')) = '{20147}', null;
+insert into chk (name, ok, detail) select 'Q3 a place that is not "<name>, ST" gives no places',
+  public.impact_dc_topic_places(null, 'Minnesota') = '[]'::jsonb and public.impact_dc_topic_places(null, null) = '[]'::jsonb, null;
+insert into chk (name, ok, detail) select 'Q4 states come from the places',
+  public.impact_dc_topic_states('[{"state":"va"},{"state":"TX","county":"Travis"},{"state":null},{"state":"Texas"}]') = '{TX,VA}'
+  and public.impact_dc_topic_states(null) = '{}', null;
+insert into chk (name, ok, detail) select 'Q5 statewide name points: every current name of a confirmed, resolved point in the state''s ZIP pages',
+  (select coalesce(array_agg(zip || ':' || project_name order by zip || ':' || project_name collate "C"), '{}')
+     from public.impact_dc_state_name_points(array['va'])) = '{20147:Ashburn Plaza DC,20187:CyrusOne Vint Hill}',
+  (select string_agg(zip || ':' || project_name, ',') from public.impact_dc_state_name_points(array['VA']));
+insert into chk (name, ok, detail) select 'Q6 another state, or none, returns nothing',
+  not exists (select 1 from public.impact_dc_state_name_points(array['TX'])) and not exists (select 1 from public.impact_dc_state_name_points(null)), null;
+
 -- 1. topic trigger
 insert into public.impact_discovery_candidates (id, category, title, place, coverage, evidence)
 values (pg_temp.c1(), 'data_centers', 'CyrusOne Vint Hill expansion', 'Fauquier County, VA', '{"places":[{"state":"VA","county":"Fauquier"}]}',

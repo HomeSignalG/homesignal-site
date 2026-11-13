@@ -4,6 +4,39 @@ drop schema if exists public cascade; create schema public;
 drop schema if exists vault cascade; create schema vault;
 drop schema if exists net cascade; create schema net;
 create extension if not exists pgcrypto with schema public;
+create extension if not exists postgis with schema public;
+drop schema if exists geo cascade; create schema geo;
+create table geo.zcta_boundary (zcta5 character(5) primary key, geom geometry);
+insert into geo.zcta_boundary values
+ ('20187', ST_SetSRID(ST_MakeEnvelope(-78.0, 38.5, -77.5, 39.0), 4269)),
+ ('20147', ST_SetSRID(ST_MakeEnvelope(-77.5, 39.0, -77.4, 39.1), 4269)),
+ ('99999', ST_SetSRID(ST_MakeEnvelope(-70.0, 30.0, -69.0, 31.0), 4269));
+-- the data-center tables public.impact_dc_state_name_points reads (canonical plane + the compatibility layer)
+create table public.dc_canonical_entity (canonical_entity_id uuid primary key, superseded_by uuid, classification text);
+create table public.dc_entity_geography (canonical_entity_id uuid primary key, geography_status text, geometry_type text,
+  lat double precision, lng double precision);
+create table public.dc_entity_observation (canonical_entity_id uuid, home_signal_observation_id uuid);
+create table public.dc_source_observation (home_signal_observation_id uuid primary key, source_native_name text, source_native_operator text);
+create table public.dc_current_observation (home_signal_observation_id uuid primary key, source_native_name text, source_native_operator text);
+create table public.national_dc_records (id serial primary key, project_name text, developer_or_operator text, lat double precision,
+  lng double precision, map_eligible boolean);
+insert into public.dc_canonical_entity values ('e0000000-0000-0000-0000-000000000001', null, 'CONFIRMED_DC'),
+  ('e0000000-0000-0000-0000-000000000002', null, 'DC_CANDIDATE'), ('e0000000-0000-0000-0000-000000000003', null, 'CONFIRMED_DC');
+insert into public.dc_entity_geography values ('e0000000-0000-0000-0000-000000000001', 'RESOLVED', 'POINT', 38.75, -77.67),
+  ('e0000000-0000-0000-0000-000000000002', 'RESOLVED', 'POINT', 38.76, -77.66),
+  ('e0000000-0000-0000-0000-000000000003', 'GEOGRAPHY_UNRESOLVED', 'POINT', 38.77, -77.65);
+insert into public.dc_source_observation values ('0b000000-0000-0000-0000-000000000001', 'CyrusOne Vint Hill', 'CyrusOne'),
+  ('0b000000-0000-0000-0000-000000000002', 'Old Vint Hill Name', 'CyrusOne'),
+  ('0b000000-0000-0000-0000-000000000003', 'Candidate Campus', 'X'), ('0b000000-0000-0000-0000-000000000004', 'Unresolved Campus', 'Y');
+insert into public.dc_current_observation select * from public.dc_source_observation
+  where home_signal_observation_id <> '0b000000-0000-0000-0000-000000000002';
+insert into public.dc_entity_observation values
+  ('e0000000-0000-0000-0000-000000000001', '0b000000-0000-0000-0000-000000000001'),
+  ('e0000000-0000-0000-0000-000000000001', '0b000000-0000-0000-0000-000000000002'),
+  ('e0000000-0000-0000-0000-000000000002', '0b000000-0000-0000-0000-000000000003'),
+  ('e0000000-0000-0000-0000-000000000003', '0b000000-0000-0000-0000-000000000004');
+insert into public.national_dc_records (project_name, developer_or_operator, lat, lng, map_eligible) values
+  ('Ashburn Plaza DC', 'Equinix', 39.05, -77.45, true), ('Hidden DC', 'Z', 39.06, -77.46, false), ('Far DC', 'Z', 30.5, -69.5, true);
 do $$ begin create role anon; exception when duplicate_object then null; end $$;
 do $$ begin create role authenticated; exception when duplicate_object then null; end $$;
 do $$ begin create role service_role; exception when duplicate_object then null; end $$;
