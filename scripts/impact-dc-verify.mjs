@@ -11,7 +11,8 @@
 //      documents (map1_project_document_propose); it never approves one;
 //   5. checks every document link, and opens the project link in a real browser at desktop and phone width;
 //   6. records the result (impact_dc_verification_record), or the failure (impact_dc_verification_fail).
-// It writes nothing else. It is started by public.impact_dc_verification_tick() through .github/workflows/impact-dc-verify.yml.
+// It writes nothing else. It is started by public.impact_dc_verification_tick() through .github/workflows/impact-dc-verify.yml,
+// which runs scripts/impact-dc-verify-run.mjs (the production wiring).
 //
 // Every outside call goes through `deps`, so test/impact-dc-verify.test.mjs runs the whole flow with no network.
 import { HS, SITE_ORIGIN, matchProject, chooseProjectKey, assessDocuments, activityFor, decide, isOfficialHost }
@@ -104,30 +105,3 @@ export async function runOnce(deps, worker = 'impact-dc-verify') {
   }
   return done;
 }
-
-// ── production wiring (only when run as a script; never in tests) ──
-async function main() {
-  const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) { console.error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.'); process.exit(2); }
-  const headers = { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' };
-  const rpc = async (fn, body) => {
-    const r = await fetch(url + '/rest/v1/rpc/' + fn, { method: 'POST', headers, body: JSON.stringify(body || {}) });
-    const t = await r.text();
-    if (!r.ok) throw new Error(fn + ' -> HTTP ' + r.status + ': ' + t.slice(0, 200));
-    return t ? JSON.parse(t) : null;
-  };
-  const fetchDoc = async (u) => {
-    try {
-      const r = await fetch(u, { redirect: 'follow', signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'JODY-link-check' } });
-      const ct = r.headers.get('content-type') || '';
-      let title = null;
-      if (r.ok && /html/.test(ct)) { const m = /<title[^>]*>([^<]{1,300})<\/title>/i.exec((await r.text()).slice(0, 200000)); title = m ? m[1].trim() : null; }
-      const loginWall = /\/(login|signin|sso)\b/i.test(r.url);
-      return { ok: r.ok && !loginWall, status: r.status, title };
-    } catch (e) { return { ok: false, status: 0, error: String(e.message || e) }; }
-  };
-  const { checkProjectPage } = await import('./lib/impact-dc-page-check.mjs');
-  const done = await runOnce({ rpc, fetchDoc, checkPage: checkProjectPage });
-  console.log(JSON.stringify(done, null, 1));
-}
-if (import.meta.url === 'file://' + process.argv[1]) main().catch((e) => { console.error(e); process.exit(1); });

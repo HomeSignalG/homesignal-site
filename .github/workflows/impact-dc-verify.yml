@@ -2,7 +2,7 @@ name: impact-dc-verify
 
 # Tab 17 data-center project check (stage 2): the worker. Claims due jobs from
 # public.impact_dc_verification_claim, checks each topic's project on Map 1 and records the result
-# (scripts/impact-dc-verify.mjs). SQL of record: docs/impact-dc-verification.sql (NOT APPLIED).
+# (scripts/impact-dc-verify.mjs, run by scripts/impact-dc-verify-run.mjs). SQL of record: docs/impact-dc-verification.sql (NOT APPLIED).
 #
 # Started ONLY by a dispatch: public.impact_dc_verification_tick() dispatches it when a job is due, at
 # most once in 10 minutes, and the cron schedule that calls the tick is NOT created. No `schedule:`
@@ -73,4 +73,4 @@ jobs:
         env:
           SUPABASE_URL: https://qwnnmljucajnexpxdgxr.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PROD_SUPABASE_SERVICE_ROLE_KEY }}
-        run: node scripts/impact-dc-verify.mjs
+        run: node scripts/impact-dc-verify-run.mjs
