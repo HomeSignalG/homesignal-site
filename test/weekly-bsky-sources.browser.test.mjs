@@ -13,7 +13,7 @@ const read = (p) => fs.readFileSync(new URL('../' + p, import.meta.url), 'utf8')
 const style = read('acquisition.html').match(/<style>[\s\S]*?<\/style>/)[0];
 const HTML = '<!doctype html><html><head><meta charset="utf-8">' + style + '</head><body><div id="t"></div><script src="/tq.js"></script></body></html>';
 const F = JSON.parse(read('test/fixtures/weekly-bsky-sources.json'));
-const DC = F.queue.leads.find((l) => l.title === 'data centers');
+const NTOPICS = F.sources.topics.length;
 
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 1300, height: 900 } });
@@ -61,11 +61,16 @@ ok(/QUALITY-of-LIFE WEEKLY REPORT:/.test(sec) && /every 2 hours/.test(sec) && /l
   '2a the section says what it imports, how often, and the last failure');
 ok(/Needs a topic \(1\)/.test(sec) && /Data Centersville/.test(sec) && (await page.locator('select[data-bsky-file]').count()) === 1,
   '2b a post with no matching topic is kept for review with a topic chooser');
-const dc = page.locator('.tq-lead[data-lead="' + DC.id + '"]');
-await page.click('.tq-tabs button[data-v="all"]');
+ok((await page.locator('.tq-bstopic').count()) === NTOPICS && new RegExp('Weekly-report topics \\(' + NTOPICS + '\\)').test(sec),
+  '2b2 every weekly-report topic (the database\'s category list) is listed, with or without posts');
+const dc = page.locator('.tq-bstopic[data-topic="Data Centers"]');
+await dc.locator('summary').first().click();
 const dcText = await dc.innerText();
-ok(/Bluesky posts \(3\)/.test(dcText) && /also matches: Data Center/.test(dcText) && /SpaceX plans/.test(dcText) && /Oakland extends/.test(dcText),
-  '2c the topic card lists its posts by headline, with the alias it answers to');
+ok(/3 posts/.test(dcText) && /also matches: Data Center/.test(dcText) && /SpaceX plans/.test(dcText) && /Oakland extends/.test(dcText),
+  '2c the Data Centers topic lists its posts by headline, with the alias it answers to');
+await page.locator('.tq-bstopic[data-topic="EMF"] summary').click();
+ok(/No posts yet/.test(await page.locator('.tq-bstopic[data-topic="EMF"]').innerText()) && (await page.locator('.tq-lead .tq-bstopic').count()) === 0,
+  '2c2 a topic with no posts says so; posts are not attached to the queue\'s own cards');
 const sp = dc.locator('.tq-bs', { hasText: 'SpaceX plans' });
 await sp.locator('summary').click();
 const spText = await sp.innerText();
@@ -79,18 +84,19 @@ ok((await page.locator('#t img').count()) === 0, '2g no third-party image is loa
 // 3 filing a review item calls the admin function with the chosen topic
 const sel = page.locator('select[data-bsky-file]');
 const sid = await sel.getAttribute('data-bsky-file');
-await sel.selectOption(DC.id);
+await sel.selectOption('Data Centers');
 await page.evaluate(() => { window.calls = []; });
 await page.click('button[data-tq="bsky-file"]');
 await page.waitForFunction(() => window.calls.some((c) => c[0] === 'hs_weekly_topic_queue'));
 const filed = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_weekly_bsky_source_file').map((c) => c[1]));
-ok(filed.length === 1 && filed[0].p_source === sid && filed[0].p_lead === DC.id, '3 "File" files the post under the chosen topic');
+ok(filed.length === 1 && filed[0].p_source === sid && filed[0].p_topic === 'Data Centers' && (await sel.locator('option').count()) === NTOPICS + 1,
+  '3 "File" files the post under the chosen weekly-report topic (one of the category list)');
 
 // 4 an edition: its posts, as published
 await page.selectOption('#tq-edition', F.edition_id);
 await page.waitForFunction(() => /Bluesky posts for this edition/.test(document.getElementById('tq-bsky').innerText));
 const edText = await page.locator('#tq-bsky').innerText();
-ok(/Bluesky posts for this edition \(2\)/.test(edText) && /as they were when its publication was recorded/.test(edText) && (await page.locator('button[data-tq="bsky-copy"]').count()) === 1,
+ok(/Bluesky posts for this edition: Data Centers \(2\)/.test(edText) && /as they were when its publication was recorded/.test(edText) && (await page.locator('button[data-tq="bsky-copy"]').count()) === 1,
   '4a an edition shows its topics\' posts, as published, with a copy button');
 const copy = await page.evaluate(() => window.HS.acqWeeklyTopics.bskyCopyText(window.F.sources_edition.edition.sources));
 ok(/https:\/\/bsky\.app\/profile\//.test(copy) && /quotes @reporter\.example \(someone else\)/.test(copy) && /continuation: First reply/.test(copy)

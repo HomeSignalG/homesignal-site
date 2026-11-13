@@ -4,13 +4,13 @@
   "note": "Statuses are derived from what was recorded. A lead, a source story or a social post is not evidence, and none of them shows that our video was published.",
   "leads": [
    {
-    "id": "f7f5e32c-4f89-4c28-b964-56988f09d6bc",
+    "id": "1526d59f-8b55-4709-b8c8-7a64c2df08db",
     "notes": null,
     "state": {
      "status": "published",
      "current": {
       "edition": {
-       "id": "d8e81f99-450d-48d1-ae18-519616070c3c",
+       "id": "1eded072-8ae8-4dda-8e4f-a1f7d954131c",
        "topic": "Data Centers",
        "closed": false,
        "series": "QUALITY-of-LIFE Weekly Report",
@@ -33,7 +33,7 @@
        "reason": null,
        "current": true,
        "edition": {
-        "id": "d8e81f99-450d-48d1-ae18-519616070c3c",
+        "id": "1eded072-8ae8-4dda-8e4f-a1f7d954131c",
         "topic": "Data Centers",
         "closed": false,
         "series": "QUALITY-of-LIFE Weekly Report",
@@ -47,8 +47,8 @@
         "published_on": "2026-11-13"
        },
        "request_id": null,
-       "assigned_at": "2026-11-13T16:13:22.033837+00:00",
-       "disposed_at": "2026-11-13T16:13:22.042174+00:00",
+       "assigned_at": "2026-11-13T17:30:26.741865+00:00",
+       "disposed_at": "2026-11-13T17:30:26.747399+00:00",
        "disposed_by": "founder@test.invalid",
        "disposition": "included"
       }
@@ -62,8 +62,8 @@
     "request": null,
     "location": null,
     "questions": [],
-    "created_at": "2026-11-13T16:13:21.816204+00:00",
-    "updated_at": "2026-11-13T16:13:21.816204+00:00",
+    "created_at": "2026-11-13T17:30:26.500163+00:00",
+    "updated_at": "2026-11-13T17:30:26.500163+00:00",
     "source_urls": [],
     "intended_date": null,
     "why_it_matters": null,
@@ -74,7 +74,7 @@
     "intended_edition_id": null
    },
    {
-    "id": "389ebc6a-0938-404d-a212-8aa5e4dc870c",
+    "id": "57c33ae7-1f17-4c0a-804d-9f430cae6f3e",
     "notes": null,
     "state": {
      "status": "captured",
@@ -90,8 +90,8 @@
     "request": null,
     "location": null,
     "questions": [],
-    "created_at": "2026-11-13T16:13:21.827802+00:00",
-    "updated_at": "2026-11-13T16:13:21.827802+00:00",
+    "created_at": "2026-11-13T17:30:26.507114+00:00",
+    "updated_at": "2026-11-13T17:30:26.507114+00:00",
     "source_urls": [],
     "intended_date": null,
     "why_it_matters": null,
@@ -102,7 +102,7 @@
     "intended_edition_id": null
    },
    {
-    "id": "d8e481fe-6d17-4c07-9884-3253bbdeeba1",
+    "id": "5c9cc8b7-34a3-46d5-9d81-8a4e48d65832",
     "notes": null,
     "state": {
      "status": "captured",
@@ -118,8 +118,8 @@
     "request": null,
     "location": null,
     "questions": [],
-    "created_at": "2026-11-13T16:13:21.831878+00:00",
-    "updated_at": "2026-11-13T16:13:21.831878+00:00",
+    "created_at": "2026-11-13T17:30:26.509738+00:00",
+    "updated_at": "2026-11-13T17:30:26.509738+00:00",
     "source_urls": [],
     "intended_date": null,
     "why_it_matters": null,
@@ -130,7 +130,7 @@
     "intended_edition_id": null
    },
    {
-    "id": "d77921a8-8fa0-4714-8c48-594be9f7298a",
+    "id": "f38a820a-c1cf-4a41-bd33-b204b5920c0f",
     "notes": null,
     "state": {
      "status": "captured",
@@ -146,8 +146,8 @@
     "request": null,
     "location": null,
     "questions": [],
-    "created_at": "2026-11-13T16:13:21.834484+00:00",
-    "updated_at": "2026-11-13T16:13:21.834484+00:00",
+    "created_at": "2026-11-13T17:30:26.511991+00:00",
+    "updated_at": "2026-11-13T17:30:26.511991+00:00",
     "source_urls": [],
     "intended_date": null,
     "why_it_matters": null,
@@ -160,21 +160,21 @@
   ],
   "views": {
    "inbox": [
-    "389ebc6a-0938-404d-a212-8aa5e4dc870c",
-    "d8e481fe-6d17-4c07-9884-3253bbdeeba1",
-    "d77921a8-8fa0-4714-8c48-594be9f7298a"
+    "57c33ae7-1f17-4c0a-804d-9f430cae6f3e",
+    "5c9cc8b7-34a3-46d5-9d81-8a4e48d65832",
+    "f38a820a-c1cf-4a41-bd33-b204b5920c0f"
    ],
    "edition": [],
    "deferred": [],
    "promised": [],
    "research": [],
    "published": [
-    "f7f5e32c-4f89-4c28-b964-56988f09d6bc"
+    "1526d59f-8b55-4709-b8c8-7a64c2df08db"
    ]
   },
   "editions": [
    {
-    "id": "d8e81f99-450d-48d1-ae18-519616070c3c",
+    "id": "1eded072-8ae8-4dda-8e4f-a1f7d954131c",
     "topic": "Data Centers",
     "closed": false,
     "series": "QUALITY-of-LIFE Weekly Report",
@@ -193,8 +193,20 @@
   ],
   "categories": [
    "Air Quality",
+   "Animal & Human Viruses / Diseases",
    "Data Centers",
-   "Water Quality"
+   "Development & Land Use",
+   "EMF",
+   "Infrastructure",
+   "Light Pollution",
+   "Livestock, Crops, Pets & Wildlife Health",
+   "Noise",
+   "Noise Pollution",
+   "Radiation",
+   "Soil Quality",
+   "Water Quality",
+   "Weather & Climate Hazards",
+   "noise"
   ],
   "capabilities": {
    "version_linking": false,
@@ -211,14 +223,16 @@
    "account_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
    "high_water_at": "2026-11-12T21:22:43+00:00",
    "account_handle": "jodytracks.com",
-   "last_failure_at": "2026-11-13T16:13:22.021889+00:00",
-   "last_success_at": "2026-11-13T16:13:22.019405+00:00",
-   "backfill_done_at": "2026-11-13T16:13:22.019405+00:00",
-   "last_run_started_at": "2026-11-13T16:13:22.027289+00:00"
+   "last_failure_at": "2026-11-13T17:30:26.724889+00:00",
+   "last_success_at": "2026-11-13T17:30:26.722535+00:00",
+   "backfill_done_at": "2026-11-13T17:30:26.722535+00:00",
+   "last_run_started_at": "2026-11-13T17:30:26.730444+00:00"
   },
   "review": [
    {
-    "id": "8d693601-3968-4bac-bd01-955fe87471fd",
+    "id": "e8285a38-2da2-4880-adc1-a0ea741fea4a",
+    "topic": null,
+    "stream": "news",
     "content": {
      "text": "QUALITY-of-LIFE WEEKLY REPORT: Data Centersville — y",
      "links": [],
@@ -228,7 +242,6 @@
      },
      "thread": []
     },
-    "lead_id": null,
     "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/bbb1",
     "post_url": "https://bsky.app/profile/jodytracks.com/post/bbb1",
     "revision": 1,
@@ -240,229 +253,305 @@
     "topic_text": "Data Centersville",
     "route_status": "unmatched",
     "author_handle": "jodytracks.com",
-    "first_seen_at": "2026-11-13T16:13:22.00278+00:00",
-    "last_fetched_at": "2026-11-13T16:13:22.00278+00:00",
+    "first_seen_at": "2026-11-13T17:30:26.699965+00:00",
+    "last_fetched_at": "2026-11-13T17:30:26.699965+00:00",
     "last_fetch_error": null,
-    "revision_saved_at": "2026-11-13T16:13:22.00278+00:00"
+    "revision_saved_at": "2026-11-13T17:30:26.699965+00:00"
    }
   ],
-  "aliases": {
-   "389ebc6a-0938-404d-a212-8aa5e4dc870c": [
-    "Water"
-   ],
-   "f7f5e32c-4f89-4c28-b964-56988f09d6bc": [
-    "Data Center"
-   ]
-  },
-  "by_lead": {
-   "389ebc6a-0938-404d-a212-8aa5e4dc870c": [
-    {
-     "id": "87d3e2f5-28a1-4c79-b56c-56d611f8cb2c",
-     "content": {
-      "text": "QUALITY-of-LIFE WEEKLY REPORT: Noise — y",
-      "links": [],
-      "media": [],
-      "quoted": {
-       "status": "none"
-      },
-      "thread": []
-     },
-     "lead_id": "389ebc6a-0938-404d-a212-8aa5e4dc870c",
-     "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/bbb2",
-     "post_url": "https://bsky.app/profile/jodytracks.com/post/bbb2",
-     "revision": 1,
-     "posted_at": "2026-11-12T21:18:17+00:00",
-     "revisions": 1,
-     "routed_by": "founder@test.invalid",
-     "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
-     "story_text": "y",
-     "topic_text": "Noise",
-     "route_status": "matched",
-     "author_handle": "jodytracks.com",
-     "first_seen_at": "2026-11-13T16:13:22.00456+00:00",
-     "last_fetched_at": "2026-11-13T16:13:22.00456+00:00",
-     "last_fetch_error": null,
-     "revision_saved_at": "2026-11-13T16:13:22.00456+00:00"
-    },
-    {
-     "id": "90bfece9-5dbc-4831-ac8e-fb9d0f3666b5",
-     "content": {
-      "text": "QUALITY-of-LIFE WEEKLY REPORT:   air   QUALITY: smoke",
-      "links": [],
-      "media": [],
-      "quoted": {
-       "status": "none"
-      },
-      "thread": []
-     },
-     "lead_id": "389ebc6a-0938-404d-a212-8aa5e4dc870c",
-     "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/bbb3",
-     "post_url": "https://bsky.app/profile/jodytracks.com/post/bbb3",
-     "revision": 1,
-     "posted_at": "2026-11-12T21:18:17+00:00",
-     "revisions": 1,
-     "routed_by": "automatic",
-     "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
-     "story_text": "smoke",
-     "topic_text": "air QUALITY",
-     "route_status": "matched",
-     "author_handle": "jodytracks.com",
-     "first_seen_at": "2026-11-13T16:13:22.006514+00:00",
-     "last_fetched_at": "2026-11-13T16:13:22.006514+00:00",
-     "last_fetch_error": null,
-     "revision_saved_at": "2026-11-13T16:13:22.006514+00:00"
-    },
-    {
-     "id": "f81e5064-1537-4e40-bb44-38f460b7988b",
-     "content": {
-      "text": "Quality-of-Life Weekly Report: Water — a story",
-      "links": [],
-      "media": [],
-      "quoted": {
-       "status": "none"
-      },
-      "thread": []
-     },
-     "lead_id": "389ebc6a-0938-404d-a212-8aa5e4dc870c",
-     "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n227ngau522p",
-     "post_url": "https://bsky.app/profile/jodytracks.com/post/3n227ngau522p",
-     "revision": 1,
-     "posted_at": "2026-11-12T21:18:17+00:00",
-     "revisions": 1,
-     "routed_by": "automatic",
-     "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
-     "story_text": "a story",
-     "topic_text": "Water",
-     "route_status": "matched",
-     "author_handle": "jodytracks.com",
-     "first_seen_at": "2026-11-13T16:13:22.000791+00:00",
-     "last_fetched_at": "2026-11-13T16:13:22.028416+00:00",
-     "last_fetch_error": null,
-     "revision_saved_at": "2026-11-13T16:13:22.000791+00:00"
-    }
-   ],
-   "f7f5e32c-4f89-4c28-b964-56988f09d6bc": [
-    {
-     "id": "1e283f9d-f00c-4f9b-9716-4d88ff1e6545",
-     "content": {
-      "text": "QUALITY-of-LIFE WEEKLY REPORT: Data Centers — a later story",
-      "links": [],
-      "media": [],
-      "quoted": {
-       "status": "none"
-      },
-      "thread": []
-     },
-     "lead_id": "f7f5e32c-4f89-4c28-b964-56988f09d6bc",
-     "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n2newpost",
-     "post_url": "https://bsky.app/profile/jodytracks.com/post/3n2newpost",
-     "revision": 1,
-     "posted_at": "2026-11-13T09:00:00+00:00",
-     "revisions": 1,
-     "routed_by": "automatic",
-     "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
-     "story_text": "a later story",
-     "topic_text": "Data Centers",
-     "route_status": "matched",
-     "author_handle": "jodytracks.com",
-     "first_seen_at": "2026-11-13T16:13:22.061429+00:00",
-     "last_fetched_at": "2026-11-13T16:13:22.061429+00:00",
-     "last_fetch_error": null,
-     "revision_saved_at": "2026-11-13T16:13:22.061429+00:00"
-    },
-    {
-     "id": "11127a2a-7edf-490e-8d8b-6671b7d3ec64",
-     "content": {
-      "text": "QUALITY-of-LIFE WEEKLY REPORT: Data Centers — SpaceX plans a $24 billion gas-powered AI facility in Texas.",
-      "links": [
-       "https://example.org/a"
-      ],
-      "media": [],
-      "quoted": {
-       "uri": "at://did:plc:other/app.bsky.feed.post/q1",
-       "text": "Their words",
-       "status": "available",
-       "author_handle": "reporter.example"
-      },
-      "thread": [
-       {
-        "uri": "at://x/app.bsky.feed.post/t1",
-        "text": "First reply",
-        "posted_at": "2026-11-12T21:25:00Z"
+  "topics": [
+   {
+    "topic": "Air Quality",
+    "aliases": [],
+    "sources": [
+     {
+      "id": "3010a8a9-a8c6-4e4f-9e58-8b2857ff5a2b",
+      "topic": "Air Quality",
+      "stream": "news",
+      "content": {
+       "text": "QUALITY-of-LIFE WEEKLY REPORT: Noise — y",
+       "links": [],
+       "media": [],
+       "quoted": {
+        "status": "none"
        },
-       {
-        "uri": "at://x/app.bsky.feed.post/t2",
-        "text": "Second reply",
-        "posted_at": "2026-11-12T21:30:00Z"
-       },
-       {
-        "uri": "at://x/app.bsky.feed.post/t3",
-        "text": "Third reply",
-        "posted_at": "2026-11-13T10:00:00Z"
-       }
-      ]
-     },
-     "lead_id": "f7f5e32c-4f89-4c28-b964-56988f09d6bc",
-     "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n25fosji4k2s",
-     "post_url": "https://bsky.app/profile/jodytracks.com/post/3n25fosji4k2s",
-     "revision": 4,
-     "posted_at": "2026-11-12T21:22:43+00:00",
-     "revisions": 4,
-     "routed_by": "automatic",
-     "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
-     "story_text": "SpaceX plans a $24 billion gas-powered AI facility in Texas.",
-     "topic_text": "Data Centers",
-     "route_status": "matched",
-     "author_handle": "jodytracks.com",
-     "first_seen_at": "2026-11-13T16:13:21.992499+00:00",
-     "last_fetched_at": "2026-11-13T16:13:22.058979+00:00",
-     "last_fetch_error": null,
-     "revision_saved_at": "2026-11-13T16:13:22.058979+00:00"
-    },
-    {
-     "id": "cf64121e-9ef8-4077-b1b7-2e4310418fbb",
-     "content": {
-      "text": "quality-of-life weekly report: data center\nOakland extends its data center moratorium for 10 months.",
-      "links": [],
-      "media": [],
-      "quoted": {
-       "status": "none"
+       "thread": []
       },
-      "thread": []
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/bbb2",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/bbb2",
+      "revision": 1,
+      "posted_at": "2026-11-12T21:18:17+00:00",
+      "revisions": 1,
+      "routed_by": "founder@test.invalid",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "y",
+      "topic_text": "Noise",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.702775+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.702775+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.702775+00:00"
      },
-     "lead_id": "f7f5e32c-4f89-4c28-b964-56988f09d6bc",
-     "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n25fguo3us2w",
-     "post_url": "https://bsky.app/profile/jodytracks.com/post/3n25fguo3us2w",
-     "revision": 1,
-     "posted_at": "2026-11-12T21:18:17+00:00",
-     "revisions": 1,
-     "routed_by": "automatic",
-     "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
-     "story_text": "Oakland extends its data center moratorium for 10 months.",
-     "topic_text": "data center",
-     "route_status": "matched",
-     "author_handle": "jodytracks.com",
-     "first_seen_at": "2026-11-13T16:13:21.998478+00:00",
-     "last_fetched_at": "2026-11-13T16:13:21.998478+00:00",
-     "last_fetch_error": null,
-     "revision_saved_at": "2026-11-13T16:13:21.998478+00:00"
-    }
-   ]
-  },
+     {
+      "id": "a6767de1-c0eb-4fad-8648-a921aedc224d",
+      "topic": "Air Quality",
+      "stream": "news",
+      "content": {
+       "text": "QUALITY-of-LIFE WEEKLY REPORT:   air   QUALITY: smoke",
+       "links": [],
+       "media": [],
+       "quoted": {
+        "status": "none"
+       },
+       "thread": []
+      },
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/bbb3",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/bbb3",
+      "revision": 1,
+      "posted_at": "2026-11-12T21:18:17+00:00",
+      "revisions": 1,
+      "routed_by": "automatic",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "smoke",
+      "topic_text": "air QUALITY",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.705895+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.705895+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.705895+00:00"
+     }
+    ]
+   },
+   {
+    "topic": "Animal & Human Viruses / Diseases",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Data Centers",
+    "aliases": [
+     "Data Center"
+    ],
+    "sources": [
+     {
+      "id": "1bc1ff1a-5e77-4f4a-b34e-a457fe883e97",
+      "topic": "Data Centers",
+      "stream": "news",
+      "content": {
+       "text": "QUALITY-of-LIFE WEEKLY REPORT: Data Centers — a later story",
+       "links": [],
+       "media": [],
+       "quoted": {
+        "status": "none"
+       },
+       "thread": []
+      },
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n2newpost",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/3n2newpost",
+      "revision": 1,
+      "posted_at": "2026-11-13T09:00:00+00:00",
+      "revisions": 1,
+      "routed_by": "automatic",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "a later story",
+      "topic_text": "Data Centers",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.768305+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.768305+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.768305+00:00"
+     },
+     {
+      "id": "620861d7-b9ec-492b-bbac-5ce67efe4b88",
+      "topic": "Data Centers",
+      "stream": "news",
+      "content": {
+       "text": "QUALITY-of-LIFE WEEKLY REPORT: Data Centers — SpaceX plans a $24 billion gas-powered AI facility in Texas.",
+       "links": [
+        "https://example.org/a"
+       ],
+       "media": [],
+       "quoted": {
+        "uri": "at://did:plc:other/app.bsky.feed.post/q1",
+        "text": "Their words",
+        "status": "available",
+        "author_handle": "reporter.example"
+       },
+       "thread": [
+        {
+         "uri": "at://x/app.bsky.feed.post/t1",
+         "text": "First reply",
+         "posted_at": "2026-11-12T21:25:00Z"
+        },
+        {
+         "uri": "at://x/app.bsky.feed.post/t2",
+         "text": "Second reply",
+         "posted_at": "2026-11-12T21:30:00Z"
+        },
+        {
+         "uri": "at://x/app.bsky.feed.post/t3",
+         "text": "Third reply",
+         "posted_at": "2026-11-13T10:00:00Z"
+        }
+       ]
+      },
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n25fosji4k2s",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/3n25fosji4k2s",
+      "revision": 4,
+      "posted_at": "2026-11-12T21:22:43+00:00",
+      "revisions": 4,
+      "routed_by": "automatic",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "SpaceX plans a $24 billion gas-powered AI facility in Texas.",
+      "topic_text": "Data Centers",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.684928+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.765394+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.765394+00:00"
+     },
+     {
+      "id": "ceb9a719-4302-47fe-877b-4f33223f868c",
+      "topic": "Data Centers",
+      "stream": "news",
+      "content": {
+       "text": "quality-of-life weekly report: data center\nOakland extends its data center moratorium for 10 months.",
+       "links": [],
+       "media": [],
+       "quoted": {
+        "status": "none"
+       },
+       "thread": []
+      },
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n25fguo3us2w",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/3n25fguo3us2w",
+      "revision": 1,
+      "posted_at": "2026-11-12T21:18:17+00:00",
+      "revisions": 1,
+      "routed_by": "automatic",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "Oakland extends its data center moratorium for 10 months.",
+      "topic_text": "data center",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.693284+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.693284+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.693284+00:00"
+     }
+    ]
+   },
+   {
+    "topic": "Development & Land Use",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "EMF",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Infrastructure",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Light Pollution",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Livestock, Crops, Pets & Wildlife Health",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Noise",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Noise Pollution",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Radiation",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Soil Quality",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Water Quality",
+    "aliases": [
+     "Water"
+    ],
+    "sources": [
+     {
+      "id": "f68801cd-e54f-4b7f-867a-aae893476582",
+      "topic": "Water Quality",
+      "stream": "news",
+      "content": {
+       "text": "Quality-of-Life Weekly Report: Water — a story",
+       "links": [],
+       "media": [],
+       "quoted": {
+        "status": "none"
+       },
+       "thread": []
+      },
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n227ngau522p",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/3n227ngau522p",
+      "revision": 1,
+      "posted_at": "2026-11-12T21:18:17+00:00",
+      "revisions": 1,
+      "routed_by": "automatic",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "a story",
+      "topic_text": "Water",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.696727+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.731324+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.696727+00:00"
+     }
+    ]
+   },
+   {
+    "topic": "Weather & Climate Hazards",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "noise",
+    "aliases": [],
+    "sources": []
+   }
+  ],
   "edition": null
  },
- "edition_id": "d8e81f99-450d-48d1-ae18-519616070c3c",
+ "edition_id": "1eded072-8ae8-4dda-8e4f-a1f7d954131c",
  "queue_edition": {
   "note": "Statuses are derived from what was recorded. A lead, a source story or a social post is not evidence, and none of them shows that our video was published.",
   "leads": [
    {
-    "id": "f7f5e32c-4f89-4c28-b964-56988f09d6bc",
+    "id": "1526d59f-8b55-4709-b8c8-7a64c2df08db",
     "notes": null,
     "state": {
      "status": "published",
      "current": {
       "edition": {
-       "id": "d8e81f99-450d-48d1-ae18-519616070c3c",
+       "id": "1eded072-8ae8-4dda-8e4f-a1f7d954131c",
        "topic": "Data Centers",
        "closed": false,
        "series": "QUALITY-of-LIFE Weekly Report",
@@ -485,7 +574,7 @@
        "reason": null,
        "current": true,
        "edition": {
-        "id": "d8e81f99-450d-48d1-ae18-519616070c3c",
+        "id": "1eded072-8ae8-4dda-8e4f-a1f7d954131c",
         "topic": "Data Centers",
         "closed": false,
         "series": "QUALITY-of-LIFE Weekly Report",
@@ -499,8 +588,8 @@
         "published_on": "2026-11-13"
        },
        "request_id": null,
-       "assigned_at": "2026-11-13T16:13:22.033837+00:00",
-       "disposed_at": "2026-11-13T16:13:22.042174+00:00",
+       "assigned_at": "2026-11-13T17:30:26.741865+00:00",
+       "disposed_at": "2026-11-13T17:30:26.747399+00:00",
        "disposed_by": "founder@test.invalid",
        "disposition": "included"
       }
@@ -514,8 +603,8 @@
     "request": null,
     "location": null,
     "questions": [],
-    "created_at": "2026-11-13T16:13:21.816204+00:00",
-    "updated_at": "2026-11-13T16:13:21.816204+00:00",
+    "created_at": "2026-11-13T17:30:26.500163+00:00",
+    "updated_at": "2026-11-13T17:30:26.500163+00:00",
     "source_urls": [],
     "intended_date": null,
     "why_it_matters": null,
@@ -526,7 +615,7 @@
     "intended_edition_id": null
    },
    {
-    "id": "389ebc6a-0938-404d-a212-8aa5e4dc870c",
+    "id": "57c33ae7-1f17-4c0a-804d-9f430cae6f3e",
     "notes": null,
     "state": {
      "status": "captured",
@@ -542,8 +631,8 @@
     "request": null,
     "location": null,
     "questions": [],
-    "created_at": "2026-11-13T16:13:21.827802+00:00",
-    "updated_at": "2026-11-13T16:13:21.827802+00:00",
+    "created_at": "2026-11-13T17:30:26.507114+00:00",
+    "updated_at": "2026-11-13T17:30:26.507114+00:00",
     "source_urls": [],
     "intended_date": null,
     "why_it_matters": null,
@@ -554,7 +643,7 @@
     "intended_edition_id": null
    },
    {
-    "id": "d8e481fe-6d17-4c07-9884-3253bbdeeba1",
+    "id": "5c9cc8b7-34a3-46d5-9d81-8a4e48d65832",
     "notes": null,
     "state": {
      "status": "captured",
@@ -570,8 +659,8 @@
     "request": null,
     "location": null,
     "questions": [],
-    "created_at": "2026-11-13T16:13:21.831878+00:00",
-    "updated_at": "2026-11-13T16:13:21.831878+00:00",
+    "created_at": "2026-11-13T17:30:26.509738+00:00",
+    "updated_at": "2026-11-13T17:30:26.509738+00:00",
     "source_urls": [],
     "intended_date": null,
     "why_it_matters": null,
@@ -582,7 +671,7 @@
     "intended_edition_id": null
    },
    {
-    "id": "d77921a8-8fa0-4714-8c48-594be9f7298a",
+    "id": "f38a820a-c1cf-4a41-bd33-b204b5920c0f",
     "notes": null,
     "state": {
      "status": "captured",
@@ -598,8 +687,8 @@
     "request": null,
     "location": null,
     "questions": [],
-    "created_at": "2026-11-13T16:13:21.834484+00:00",
-    "updated_at": "2026-11-13T16:13:21.834484+00:00",
+    "created_at": "2026-11-13T17:30:26.511991+00:00",
+    "updated_at": "2026-11-13T17:30:26.511991+00:00",
     "source_urls": [],
     "intended_date": null,
     "why_it_matters": null,
@@ -612,15 +701,15 @@
   ],
   "views": {
    "inbox": [
-    "389ebc6a-0938-404d-a212-8aa5e4dc870c",
-    "d8e481fe-6d17-4c07-9884-3253bbdeeba1",
-    "d77921a8-8fa0-4714-8c48-594be9f7298a"
+    "57c33ae7-1f17-4c0a-804d-9f430cae6f3e",
+    "5c9cc8b7-34a3-46d5-9d81-8a4e48d65832",
+    "f38a820a-c1cf-4a41-bd33-b204b5920c0f"
    ],
    "edition": [
     {
      "reason": null,
      "current": true,
-     "lead_id": "f7f5e32c-4f89-4c28-b964-56988f09d6bc",
+     "lead_id": "1526d59f-8b55-4709-b8c8-7a64c2df08db",
      "disposition": "included"
     }
    ],
@@ -628,12 +717,12 @@
    "promised": [],
    "research": [],
    "published": [
-    "f7f5e32c-4f89-4c28-b964-56988f09d6bc"
+    "1526d59f-8b55-4709-b8c8-7a64c2df08db"
    ]
   },
   "editions": [
    {
-    "id": "d8e81f99-450d-48d1-ae18-519616070c3c",
+    "id": "1eded072-8ae8-4dda-8e4f-a1f7d954131c",
     "topic": "Data Centers",
     "closed": false,
     "series": "QUALITY-of-LIFE Weekly Report",
@@ -652,14 +741,26 @@
   ],
   "categories": [
    "Air Quality",
+   "Animal & Human Viruses / Diseases",
    "Data Centers",
-   "Water Quality"
+   "Development & Land Use",
+   "EMF",
+   "Infrastructure",
+   "Light Pollution",
+   "Livestock, Crops, Pets & Wildlife Health",
+   "Noise",
+   "Noise Pollution",
+   "Radiation",
+   "Soil Quality",
+   "Water Quality",
+   "Weather & Climate Hazards",
+   "noise"
   ],
   "capabilities": {
    "version_linking": false,
    "answer_processing_installed": false
   },
-  "selected_edition": "d8e81f99-450d-48d1-ae18-519616070c3c"
+  "selected_edition": "1eded072-8ae8-4dda-8e4f-a1f7d954131c"
  },
  "sources_edition": {
   "note": "Imported from the account's own Bluesky posts that start with \"QUALITY-of-LIFE WEEKLY REPORT:\". A post is a lead, not evidence. Quoted posts are other people's writing.",
@@ -670,14 +771,16 @@
    "account_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
    "high_water_at": "2026-11-12T21:22:43+00:00",
    "account_handle": "jodytracks.com",
-   "last_failure_at": "2026-11-13T16:13:22.021889+00:00",
-   "last_success_at": "2026-11-13T16:13:22.019405+00:00",
-   "backfill_done_at": "2026-11-13T16:13:22.019405+00:00",
-   "last_run_started_at": "2026-11-13T16:13:22.027289+00:00"
+   "last_failure_at": "2026-11-13T17:30:26.724889+00:00",
+   "last_success_at": "2026-11-13T17:30:26.722535+00:00",
+   "backfill_done_at": "2026-11-13T17:30:26.722535+00:00",
+   "last_run_started_at": "2026-11-13T17:30:26.730444+00:00"
   },
   "review": [
    {
-    "id": "8d693601-3968-4bac-bd01-955fe87471fd",
+    "id": "e8285a38-2da2-4880-adc1-a0ea741fea4a",
+    "topic": null,
+    "stream": "news",
     "content": {
      "text": "QUALITY-of-LIFE WEEKLY REPORT: Data Centersville — y",
      "links": [],
@@ -687,7 +790,6 @@
      },
      "thread": []
     },
-    "lead_id": null,
     "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/bbb1",
     "post_url": "https://bsky.app/profile/jodytracks.com/post/bbb1",
     "revision": 1,
@@ -699,221 +801,300 @@
     "topic_text": "Data Centersville",
     "route_status": "unmatched",
     "author_handle": "jodytracks.com",
-    "first_seen_at": "2026-11-13T16:13:22.00278+00:00",
-    "last_fetched_at": "2026-11-13T16:13:22.00278+00:00",
+    "first_seen_at": "2026-11-13T17:30:26.699965+00:00",
+    "last_fetched_at": "2026-11-13T17:30:26.699965+00:00",
     "last_fetch_error": null,
-    "revision_saved_at": "2026-11-13T16:13:22.00278+00:00"
+    "revision_saved_at": "2026-11-13T17:30:26.699965+00:00"
    }
   ],
-  "aliases": {
-   "389ebc6a-0938-404d-a212-8aa5e4dc870c": [
-    "Water"
-   ],
-   "f7f5e32c-4f89-4c28-b964-56988f09d6bc": [
-    "Data Center"
-   ]
-  },
-  "by_lead": {
-   "389ebc6a-0938-404d-a212-8aa5e4dc870c": [
-    {
-     "id": "87d3e2f5-28a1-4c79-b56c-56d611f8cb2c",
-     "content": {
-      "text": "QUALITY-of-LIFE WEEKLY REPORT: Noise — y",
-      "links": [],
-      "media": [],
-      "quoted": {
-       "status": "none"
-      },
-      "thread": []
-     },
-     "lead_id": "389ebc6a-0938-404d-a212-8aa5e4dc870c",
-     "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/bbb2",
-     "post_url": "https://bsky.app/profile/jodytracks.com/post/bbb2",
-     "revision": 1,
-     "posted_at": "2026-11-12T21:18:17+00:00",
-     "revisions": 1,
-     "routed_by": "founder@test.invalid",
-     "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
-     "story_text": "y",
-     "topic_text": "Noise",
-     "route_status": "matched",
-     "author_handle": "jodytracks.com",
-     "first_seen_at": "2026-11-13T16:13:22.00456+00:00",
-     "last_fetched_at": "2026-11-13T16:13:22.00456+00:00",
-     "last_fetch_error": null,
-     "revision_saved_at": "2026-11-13T16:13:22.00456+00:00"
-    },
-    {
-     "id": "90bfece9-5dbc-4831-ac8e-fb9d0f3666b5",
-     "content": {
-      "text": "QUALITY-of-LIFE WEEKLY REPORT:   air   QUALITY: smoke",
-      "links": [],
-      "media": [],
-      "quoted": {
-       "status": "none"
-      },
-      "thread": []
-     },
-     "lead_id": "389ebc6a-0938-404d-a212-8aa5e4dc870c",
-     "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/bbb3",
-     "post_url": "https://bsky.app/profile/jodytracks.com/post/bbb3",
-     "revision": 1,
-     "posted_at": "2026-11-12T21:18:17+00:00",
-     "revisions": 1,
-     "routed_by": "automatic",
-     "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
-     "story_text": "smoke",
-     "topic_text": "air QUALITY",
-     "route_status": "matched",
-     "author_handle": "jodytracks.com",
-     "first_seen_at": "2026-11-13T16:13:22.006514+00:00",
-     "last_fetched_at": "2026-11-13T16:13:22.006514+00:00",
-     "last_fetch_error": null,
-     "revision_saved_at": "2026-11-13T16:13:22.006514+00:00"
-    },
-    {
-     "id": "f81e5064-1537-4e40-bb44-38f460b7988b",
-     "content": {
-      "text": "Quality-of-Life Weekly Report: Water — a story",
-      "links": [],
-      "media": [],
-      "quoted": {
-       "status": "none"
-      },
-      "thread": []
-     },
-     "lead_id": "389ebc6a-0938-404d-a212-8aa5e4dc870c",
-     "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n227ngau522p",
-     "post_url": "https://bsky.app/profile/jodytracks.com/post/3n227ngau522p",
-     "revision": 1,
-     "posted_at": "2026-11-12T21:18:17+00:00",
-     "revisions": 1,
-     "routed_by": "automatic",
-     "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
-     "story_text": "a story",
-     "topic_text": "Water",
-     "route_status": "matched",
-     "author_handle": "jodytracks.com",
-     "first_seen_at": "2026-11-13T16:13:22.000791+00:00",
-     "last_fetched_at": "2026-11-13T16:13:22.028416+00:00",
-     "last_fetch_error": null,
-     "revision_saved_at": "2026-11-13T16:13:22.000791+00:00"
-    }
-   ],
-   "f7f5e32c-4f89-4c28-b964-56988f09d6bc": [
-    {
-     "id": "1e283f9d-f00c-4f9b-9716-4d88ff1e6545",
-     "content": {
-      "text": "QUALITY-of-LIFE WEEKLY REPORT: Data Centers — a later story",
-      "links": [],
-      "media": [],
-      "quoted": {
-       "status": "none"
-      },
-      "thread": []
-     },
-     "lead_id": "f7f5e32c-4f89-4c28-b964-56988f09d6bc",
-     "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n2newpost",
-     "post_url": "https://bsky.app/profile/jodytracks.com/post/3n2newpost",
-     "revision": 1,
-     "posted_at": "2026-11-13T09:00:00+00:00",
-     "revisions": 1,
-     "routed_by": "automatic",
-     "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
-     "story_text": "a later story",
-     "topic_text": "Data Centers",
-     "route_status": "matched",
-     "author_handle": "jodytracks.com",
-     "first_seen_at": "2026-11-13T16:13:22.061429+00:00",
-     "last_fetched_at": "2026-11-13T16:13:22.061429+00:00",
-     "last_fetch_error": null,
-     "revision_saved_at": "2026-11-13T16:13:22.061429+00:00"
-    },
-    {
-     "id": "11127a2a-7edf-490e-8d8b-6671b7d3ec64",
-     "content": {
-      "text": "QUALITY-of-LIFE WEEKLY REPORT: Data Centers — SpaceX plans a $24 billion gas-powered AI facility in Texas.",
-      "links": [
-       "https://example.org/a"
-      ],
-      "media": [],
-      "quoted": {
-       "uri": "at://did:plc:other/app.bsky.feed.post/q1",
-       "text": "Their words",
-       "status": "available",
-       "author_handle": "reporter.example"
-      },
-      "thread": [
-       {
-        "uri": "at://x/app.bsky.feed.post/t1",
-        "text": "First reply",
-        "posted_at": "2026-11-12T21:25:00Z"
+  "topics": [
+   {
+    "topic": "Air Quality",
+    "aliases": [],
+    "sources": [
+     {
+      "id": "3010a8a9-a8c6-4e4f-9e58-8b2857ff5a2b",
+      "topic": "Air Quality",
+      "stream": "news",
+      "content": {
+       "text": "QUALITY-of-LIFE WEEKLY REPORT: Noise — y",
+       "links": [],
+       "media": [],
+       "quoted": {
+        "status": "none"
        },
-       {
-        "uri": "at://x/app.bsky.feed.post/t2",
-        "text": "Second reply",
-        "posted_at": "2026-11-12T21:30:00Z"
-       },
-       {
-        "uri": "at://x/app.bsky.feed.post/t3",
-        "text": "Third reply",
-        "posted_at": "2026-11-13T10:00:00Z"
-       }
-      ]
-     },
-     "lead_id": "f7f5e32c-4f89-4c28-b964-56988f09d6bc",
-     "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n25fosji4k2s",
-     "post_url": "https://bsky.app/profile/jodytracks.com/post/3n25fosji4k2s",
-     "revision": 4,
-     "posted_at": "2026-11-12T21:22:43+00:00",
-     "revisions": 4,
-     "routed_by": "automatic",
-     "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
-     "story_text": "SpaceX plans a $24 billion gas-powered AI facility in Texas.",
-     "topic_text": "Data Centers",
-     "route_status": "matched",
-     "author_handle": "jodytracks.com",
-     "first_seen_at": "2026-11-13T16:13:21.992499+00:00",
-     "last_fetched_at": "2026-11-13T16:13:22.058979+00:00",
-     "last_fetch_error": null,
-     "revision_saved_at": "2026-11-13T16:13:22.058979+00:00"
-    },
-    {
-     "id": "cf64121e-9ef8-4077-b1b7-2e4310418fbb",
-     "content": {
-      "text": "quality-of-life weekly report: data center\nOakland extends its data center moratorium for 10 months.",
-      "links": [],
-      "media": [],
-      "quoted": {
-       "status": "none"
+       "thread": []
       },
-      "thread": []
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/bbb2",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/bbb2",
+      "revision": 1,
+      "posted_at": "2026-11-12T21:18:17+00:00",
+      "revisions": 1,
+      "routed_by": "founder@test.invalid",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "y",
+      "topic_text": "Noise",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.702775+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.702775+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.702775+00:00"
      },
-     "lead_id": "f7f5e32c-4f89-4c28-b964-56988f09d6bc",
-     "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n25fguo3us2w",
-     "post_url": "https://bsky.app/profile/jodytracks.com/post/3n25fguo3us2w",
-     "revision": 1,
-     "posted_at": "2026-11-12T21:18:17+00:00",
-     "revisions": 1,
-     "routed_by": "automatic",
-     "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
-     "story_text": "Oakland extends its data center moratorium for 10 months.",
-     "topic_text": "data center",
-     "route_status": "matched",
-     "author_handle": "jodytracks.com",
-     "first_seen_at": "2026-11-13T16:13:21.998478+00:00",
-     "last_fetched_at": "2026-11-13T16:13:21.998478+00:00",
-     "last_fetch_error": null,
-     "revision_saved_at": "2026-11-13T16:13:21.998478+00:00"
-    }
-   ]
-  },
+     {
+      "id": "a6767de1-c0eb-4fad-8648-a921aedc224d",
+      "topic": "Air Quality",
+      "stream": "news",
+      "content": {
+       "text": "QUALITY-of-LIFE WEEKLY REPORT:   air   QUALITY: smoke",
+       "links": [],
+       "media": [],
+       "quoted": {
+        "status": "none"
+       },
+       "thread": []
+      },
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/bbb3",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/bbb3",
+      "revision": 1,
+      "posted_at": "2026-11-12T21:18:17+00:00",
+      "revisions": 1,
+      "routed_by": "automatic",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "smoke",
+      "topic_text": "air QUALITY",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.705895+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.705895+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.705895+00:00"
+     }
+    ]
+   },
+   {
+    "topic": "Animal & Human Viruses / Diseases",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Data Centers",
+    "aliases": [
+     "Data Center"
+    ],
+    "sources": [
+     {
+      "id": "1bc1ff1a-5e77-4f4a-b34e-a457fe883e97",
+      "topic": "Data Centers",
+      "stream": "news",
+      "content": {
+       "text": "QUALITY-of-LIFE WEEKLY REPORT: Data Centers — a later story",
+       "links": [],
+       "media": [],
+       "quoted": {
+        "status": "none"
+       },
+       "thread": []
+      },
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n2newpost",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/3n2newpost",
+      "revision": 1,
+      "posted_at": "2026-11-13T09:00:00+00:00",
+      "revisions": 1,
+      "routed_by": "automatic",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "a later story",
+      "topic_text": "Data Centers",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.768305+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.768305+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.768305+00:00"
+     },
+     {
+      "id": "620861d7-b9ec-492b-bbac-5ce67efe4b88",
+      "topic": "Data Centers",
+      "stream": "news",
+      "content": {
+       "text": "QUALITY-of-LIFE WEEKLY REPORT: Data Centers — SpaceX plans a $24 billion gas-powered AI facility in Texas.",
+       "links": [
+        "https://example.org/a"
+       ],
+       "media": [],
+       "quoted": {
+        "uri": "at://did:plc:other/app.bsky.feed.post/q1",
+        "text": "Their words",
+        "status": "available",
+        "author_handle": "reporter.example"
+       },
+       "thread": [
+        {
+         "uri": "at://x/app.bsky.feed.post/t1",
+         "text": "First reply",
+         "posted_at": "2026-11-12T21:25:00Z"
+        },
+        {
+         "uri": "at://x/app.bsky.feed.post/t2",
+         "text": "Second reply",
+         "posted_at": "2026-11-12T21:30:00Z"
+        },
+        {
+         "uri": "at://x/app.bsky.feed.post/t3",
+         "text": "Third reply",
+         "posted_at": "2026-11-13T10:00:00Z"
+        }
+       ]
+      },
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n25fosji4k2s",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/3n25fosji4k2s",
+      "revision": 4,
+      "posted_at": "2026-11-12T21:22:43+00:00",
+      "revisions": 4,
+      "routed_by": "automatic",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "SpaceX plans a $24 billion gas-powered AI facility in Texas.",
+      "topic_text": "Data Centers",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.684928+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.765394+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.765394+00:00"
+     },
+     {
+      "id": "ceb9a719-4302-47fe-877b-4f33223f868c",
+      "topic": "Data Centers",
+      "stream": "news",
+      "content": {
+       "text": "quality-of-life weekly report: data center\nOakland extends its data center moratorium for 10 months.",
+       "links": [],
+       "media": [],
+       "quoted": {
+        "status": "none"
+       },
+       "thread": []
+      },
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n25fguo3us2w",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/3n25fguo3us2w",
+      "revision": 1,
+      "posted_at": "2026-11-12T21:18:17+00:00",
+      "revisions": 1,
+      "routed_by": "automatic",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "Oakland extends its data center moratorium for 10 months.",
+      "topic_text": "data center",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.693284+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.693284+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.693284+00:00"
+     }
+    ]
+   },
+   {
+    "topic": "Development & Land Use",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "EMF",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Infrastructure",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Light Pollution",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Livestock, Crops, Pets & Wildlife Health",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Noise",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Noise Pollution",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Radiation",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Soil Quality",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Water Quality",
+    "aliases": [
+     "Water"
+    ],
+    "sources": [
+     {
+      "id": "f68801cd-e54f-4b7f-867a-aae893476582",
+      "topic": "Water Quality",
+      "stream": "news",
+      "content": {
+       "text": "Quality-of-Life Weekly Report: Water — a story",
+       "links": [],
+       "media": [],
+       "quoted": {
+        "status": "none"
+       },
+       "thread": []
+      },
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n227ngau522p",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/3n227ngau522p",
+      "revision": 1,
+      "posted_at": "2026-11-12T21:18:17+00:00",
+      "revisions": 1,
+      "routed_by": "automatic",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "a story",
+      "topic_text": "Water",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.696727+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.731324+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.696727+00:00"
+     }
+    ]
+   },
+   {
+    "topic": "Weather & Climate Hazards",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "noise",
+    "aliases": [],
+    "sources": []
+   }
+  ],
   "edition": {
-   "id": "d8e81f99-450d-48d1-ae18-519616070c3c",
-   "as_of": "2026-11-13T16:13:22.046179+00:00",
+   "id": "1eded072-8ae8-4dda-8e4f-a1f7d954131c",
+   "as_of": "2026-11-13T17:30:26.751893+00:00",
+   "topic": "Data Centers",
    "sources": [
     {
-     "id": "cf64121e-9ef8-4077-b1b7-2e4310418fbb",
+     "id": "ceb9a719-4302-47fe-877b-4f33223f868c",
+     "topic": "Data Centers",
+     "stream": "news",
      "content": {
       "text": "quality-of-life weekly report: data center\nOakland extends its data center moratorium for 10 months.",
       "links": [],
@@ -923,7 +1104,6 @@
       },
       "thread": []
      },
-     "lead_id": "f7f5e32c-4f89-4c28-b964-56988f09d6bc",
      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n25fguo3us2w",
      "post_url": "https://bsky.app/profile/jodytracks.com/post/3n25fguo3us2w",
      "revision": 1,
@@ -935,13 +1115,15 @@
      "topic_text": "data center",
      "route_status": "matched",
      "author_handle": "jodytracks.com",
-     "first_seen_at": "2026-11-13T16:13:21.998478+00:00",
-     "last_fetched_at": "2026-11-13T16:13:21.998478+00:00",
+     "first_seen_at": "2026-11-13T17:30:26.693284+00:00",
+     "last_fetched_at": "2026-11-13T17:30:26.693284+00:00",
      "last_fetch_error": null,
-     "revision_saved_at": "2026-11-13T16:13:21.998478+00:00"
+     "revision_saved_at": "2026-11-13T17:30:26.693284+00:00"
     },
     {
-     "id": "11127a2a-7edf-490e-8d8b-6671b7d3ec64",
+     "id": "620861d7-b9ec-492b-bbac-5ce67efe4b88",
+     "topic": "Data Centers",
+     "stream": "news",
      "content": {
       "text": "QUALITY-of-LIFE WEEKLY REPORT: Data Centers — SpaceX plans a $24 billion gas-powered AI facility in Texas.",
       "links": [
@@ -967,7 +1149,6 @@
        }
       ]
      },
-     "lead_id": "f7f5e32c-4f89-4c28-b964-56988f09d6bc",
      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n25fosji4k2s",
      "post_url": "https://bsky.app/profile/jodytracks.com/post/3n25fosji4k2s",
      "revision": 3,
@@ -979,10 +1160,10 @@
      "topic_text": "Data Centers",
      "route_status": "matched",
      "author_handle": "jodytracks.com",
-     "first_seen_at": "2026-11-13T16:13:21.992499+00:00",
-     "last_fetched_at": "2026-11-13T16:13:22.058979+00:00",
+     "first_seen_at": "2026-11-13T17:30:26.684928+00:00",
+     "last_fetched_at": "2026-11-13T17:30:26.765394+00:00",
      "last_fetch_error": null,
-     "revision_saved_at": "2026-11-13T16:13:22.016034+00:00"
+     "revision_saved_at": "2026-11-13T17:30:26.719139+00:00"
     }
    ],
    "published": true

@@ -3,7 +3,8 @@
 -- public._hs_is_admin. Replaces NO function of files 1-7 (the publication lock is untouched). One transaction, idempotent.
 --
 -- What it does: the founder's own Bluesky posts that START WITH "QUALITY-of-LIFE WEEKLY REPORT:" are filed, one source
--- per root post, under the existing Tab 20 topic (a weekly_topic_leads row) whose title or alias follows the prefix:
+-- per root post, under the weekly-report topic named after the prefix. The topics are the 13 Local News categories
+-- (public.alert_topic_catalog, stream 'news'), the same list a report edition is made for (weekly_editions.topic):
 --   "QUALITY-of-LIFE WEEKLY REPORT: Data Centers — Oakland extends its data center moratorium for 10 months."
 --      prefix ............................ topic "Data Centers" ...... story "Oakland extends ..."
 -- The writer is homesignal-ingest scripts/weekly_bsky_sources.mjs (workflow weekly-bsky-sources.yml, service role).
@@ -15,13 +16,14 @@
 --   - ONE source per Bluesky root post: post_uri is unique. A repeated or overlapping run updates, never duplicates.
 --   - Only the configured account's posts are accepted (its DID is pinned on the first run and never changes), and only
 --     posts whose OWN text starts with the prefix (checked again here, case-insensitive, any hyphen-like character).
---   - ROUTING is decided here, once: the topic must match a lead's title or one of its explicit aliases, ignoring case
---     and runs of whitespace, ending at a word boundary. No match, or two different leads matching, keeps the source
+--   - ROUTING is decided here, once: the topic must match a category's name or one of its explicit aliases, ignoring
+--     case and runs of whitespace, ending at a word boundary. No match, or two different categories matching, keeps the source
 --     for admin review (route_status unmatched / ambiguous). Nothing creates a topic or guesses one.
 --   - Content is kept as append-only REVISIONS. A refresh never loses saved material: continuation replies are merged
 --     by uri, and an unavailable quoted post never replaces one already saved.
---   - A PUBLISHED edition keeps what it was published with: its view reads each source's revision as of the moment the
---     edition's publication was recorded, and leaves out sources first saved after it.
+--   - An edition shows the sources of its own category. A PUBLISHED edition keeps what it was published with: its view
+--     reads each source's revision as of the moment the edition's publication was recorded, and leaves out sources first
+--     saved after it.
 --   - Nothing here creates, assigns, closes or publishes an edition, posts anywhere, or starts a job.
 -- Imported text is someone's writing (the founder's, or a quoted account's): it is data, never an instruction.
 
@@ -42,13 +44,15 @@ create or replace function public.weekly_bsky_prefix_rest(t text) returns text l
 $$;
 
 -- ── explicit aliases for a topic ─────────────────────────────────────────────────────────────────────────────────
-create table if not exists public.weekly_topic_lead_aliases (
-  lead_id uuid not null references public.weekly_topic_leads (id),
+create table if not exists public.weekly_topic_aliases (
+  stream text not null default 'news',
+  topic text not null,
   alias text not null check (char_length(btrim(alias)) between 1 and 120),
   alias_key text generated always as (public.weekly_topic_key(alias)) stored,
   created_by text not null,
   created_at timestamptz not null default now(),
-  primary key (lead_id, alias_key)
+  primary key (alias_key),                                -- one alias names one category
+  constraint weekly_topic_aliases_topic_fk foreign key (stream, topic) references public.alert_topic_catalog (stream, topic)
 );
 
 -- ── sources ──────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -61,7 +65,8 @@ create table if not exists public.weekly_bsky_sources (
   posted_at timestamptz not null,
   topic_text text check (char_length(topic_text) <= 300),
   story_text text check (char_length(story_text) <= 3000),
-  lead_id uuid references public.weekly_topic_leads (id),
+  stream text not null default 'news',
+  topic text,                                             -- the category; null while it needs review
   route_status text not null check (route_status in ('matched', 'unmatched', 'ambiguous')),
   routed_by text not null default 'automatic',
   routed_at timestamptz not null default now(),
@@ -70,9 +75,10 @@ create table if not exists public.weekly_bsky_sources (
   last_fetched_at timestamptz not null default now(),
   last_changed_at timestamptz not null default now(),
   last_fetch_error text check (char_length(last_fetch_error) <= 1000),
-  constraint weekly_bsky_sources_route_ck check ((route_status = 'matched') = (lead_id is not null))
+  constraint weekly_bsky_sources_route_ck check ((route_status = 'matched') = (topic is not null)),
+  constraint weekly_bsky_sources_topic_fk foreign key (stream, topic) references public.alert_topic_catalog (stream, topic)
 );
-create index if not exists weekly_bsky_sources_lead_ix on public.weekly_bsky_sources (lead_id, posted_at);
+create index if not exists weekly_bsky_sources_topic_ix on public.weekly_bsky_sources (stream, topic, posted_at);
 
 create table if not exists public.weekly_bsky_source_revisions (
   source_id uuid not null references public.weekly_bsky_sources (id),
@@ -101,13 +107,10 @@ create table if not exists public.weekly_bsky_sync (
 );
 insert into public.weekly_bsky_sync (id) values (1) on conflict (id) do nothing;
 
--- the founder's ruling: the "data centers" topic also answers to "Data Center". Computed here, never a typed id:
--- added only when exactly one lead is titled "data centers".
-insert into public.weekly_topic_lead_aliases (lead_id, alias, created_by)
-select l.id, 'Data Center', 'system:weekly-bluesky-sources'
-from public.weekly_topic_leads l
-where public.weekly_topic_key(l.title) = 'data centers'
-  and (select count(*) from public.weekly_topic_leads x where public.weekly_topic_key(x.title) = 'data centers') = 1
+-- the founder's ruling: "Data Centers" also answers to "Data Center". Added only when that category exists.
+insert into public.weekly_topic_aliases (stream, topic, alias, created_by)
+select c.stream, c.topic, 'Data Center', 'system:weekly-bluesky-sources'
+from public.alert_topic_catalog c where c.stream = 'news' and c.topic = 'Data Centers'
 on conflict do nothing;
 
 -- ── guards ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -130,27 +133,27 @@ begin
   drop trigger if exists weekly_bsky_source_revisions_append_only on public.weekly_bsky_source_revisions;
   create trigger weekly_bsky_source_revisions_append_only before update or delete on public.weekly_bsky_source_revisions
     for each row execute function public.weekly_append_only();
-  drop trigger if exists weekly_topic_lead_aliases_append_only on public.weekly_topic_lead_aliases;
-  create trigger weekly_topic_lead_aliases_append_only before update or delete on public.weekly_topic_lead_aliases
+  drop trigger if exists weekly_topic_aliases_append_only on public.weekly_topic_aliases;
+  create trigger weekly_topic_aliases_append_only before update or delete on public.weekly_topic_aliases
     for each row execute function public.weekly_append_only();
-  foreach t in array array['weekly_topic_lead_aliases', 'weekly_bsky_sources', 'weekly_bsky_source_revisions', 'weekly_bsky_sync'] loop
+  foreach t in array array['weekly_topic_aliases', 'weekly_bsky_sources', 'weekly_bsky_source_revisions', 'weekly_bsky_sync'] loop
     execute format('alter table public.%I enable row level security', t);
     execute format('revoke all on public.%I from public, anon, authenticated', t);
   end loop;
 end $$;
 
 -- ── routing: the one decision ────────────────────────────────────────────────────────────────────────────────────
--- p_rest is the text after the prefix. The longest lead title or alias that the text starts with, ending at a word
--- boundary, wins; two different leads at that length is ambiguous; none is unmatched.
+-- p_rest is the text after the prefix. The longest category name or alias (stream 'news') that the text starts with,
+-- ending at a word boundary, wins; two different categories at that length is ambiguous; none is unmatched.
 create or replace function public.weekly_bsky_route(p_rest text)
-returns table (lead_id uuid, route_status text, topic_text text, story_text text)
+returns table (topic text, route_status text, topic_text text, story_text text)
 language plpgsql stable security definer set search_path = public as $$
 declare s text := btrim(regexp_replace(coalesce(p_rest, ''), '\s+', ' ', 'g'));
-        k text := lower(s); best int; n int; lid uuid;
+        k text := lower(s); best int; n int; hit text;
 begin
   with names as (
-    select l.id, public.weekly_topic_key(l.title) as key from public.weekly_topic_leads l
-    union select a.lead_id, a.alias_key from public.weekly_topic_lead_aliases a
+    select c.topic as id, public.weekly_topic_key(c.topic) as key from public.alert_topic_catalog c where c.stream = 'news'
+    union select a.topic, a.alias_key from public.weekly_topic_aliases a where a.stream = 'news'
   ), hits as (
     select distinct id, char_length(key) as len from names
     where key <> '' and left(k, char_length(key)) = key
@@ -158,7 +161,7 @@ begin
   )
   select max(len) into best from hits;
   if best is null then
-    lead_id := null; route_status := 'unmatched';
+    topic := null; route_status := 'unmatched';
     -- for the review list: what follows the prefix up to the first spaced separator (at most 80 characters)
     topic_text := left(btrim(regexp_replace(split_part(btrim(coalesce(p_rest, ''), E' \t\r\n'), E'\n', 1),
                   E'(\\s(—|–|-|\\|)|:)(\\s.*)?$', '')), 80);
@@ -167,14 +170,14 @@ begin
     return next; return;
   end if;
   with names as (
-    select l.id, public.weekly_topic_key(l.title) as key from public.weekly_topic_leads l
-    union select a.lead_id, a.alias_key from public.weekly_topic_lead_aliases a
+    select c.topic as id, public.weekly_topic_key(c.topic) as key from public.alert_topic_catalog c where c.stream = 'news'
+    union select a.topic, a.alias_key from public.weekly_topic_aliases a where a.stream = 'news'
   )
-  select count(distinct id), min(id::text)::uuid into n, lid from names
+  select count(distinct id), min(id) into n, hit from names
   where char_length(key) = best and left(k, best) = key;
   topic_text := left(s, best);
   story_text := left(nullif(btrim(substr(s, best + 1), E' \u2014\u2013-:|'), ''), 3000);
-  if n = 1 then lead_id := lid; route_status := 'matched'; else lead_id := null; route_status := 'ambiguous'; end if;
+  if n = 1 then topic := hit; route_status := 'matched'; else topic := null; route_status := 'ambiguous'; end if;
   return next;
 end $$;
 
@@ -262,18 +265,18 @@ begin
   if not found then
     select * into r from public.weekly_bsky_route(rest);
     insert into public.weekly_bsky_sources (post_uri, post_url, author_did, author_handle, posted_at, topic_text, story_text,
-      lead_id, route_status)
+      topic, route_status)
     values (uri, p_post ->> 'url', acct, p_post ->> 'author_handle', (p_post ->> 'posted_at')::timestamptz, r.topic_text,
-      r.story_text, r.lead_id, r.route_status)
+      r.story_text, r.topic, r.route_status)
     returning * into src;
     merged := p_post -> 'content'; rev := 1; created := true;
   else
-    -- an automatic route is retried while it has no topic (e.g. the topic was created or aliased later);
+    -- an automatic route is retried while it has no category (e.g. an alias was added later);
     -- a matched source, or one an admin filed, keeps its topic
     if src.route_status <> 'matched' and src.routed_by = 'automatic' then
       select * into r from public.weekly_bsky_route(rest);
       if r.route_status = 'matched' then
-        update public.weekly_bsky_sources set lead_id = r.lead_id, route_status = 'matched', topic_text = r.topic_text,
+        update public.weekly_bsky_sources set topic = r.topic, route_status = 'matched', topic_text = r.topic_text,
           story_text = r.story_text, routed_at = now() where id = src.id;
       end if;
     end if;
@@ -324,7 +327,7 @@ create or replace function public.weekly_bsky_source_json(p_source uuid, p_as_of
 language sql stable security definer set search_path = public as $$
   select jsonb_build_object('id', s.id, 'post_uri', s.post_uri, 'post_url', s.post_url, 'author_handle', s.author_handle,
     'author_did', s.author_did, 'posted_at', s.posted_at, 'topic_text', s.topic_text, 'story_text', s.story_text,
-    'lead_id', s.lead_id, 'route_status', s.route_status, 'routed_by', s.routed_by, 'first_seen_at', s.first_seen_at,
+    'stream', s.stream, 'topic', s.topic, 'route_status', s.route_status, 'routed_by', s.routed_by, 'first_seen_at', s.first_seen_at,
     'last_fetched_at', s.last_fetched_at, 'last_fetch_error', s.last_fetch_error,
     'revision', r.revision, 'revisions', s.current_revision, 'revision_saved_at', r.created_at, 'content', r.content)
   from public.weekly_bsky_sources s
@@ -333,9 +336,9 @@ language sql stable security definer set search_path = public as $$
   where s.id = p_source
 $$;
 
--- p_edition null: every source by topic, the review list and the sync status.
--- p_edition set: the sources of the topics assigned to that edition. A published edition shows each source as it was
--- when its publication was recorded, and nothing first saved after that.
+-- p_edition null: every source by category (all 13 listed, with or without posts), the review list and the sync status.
+-- p_edition set: also the sources of that edition's category. A published edition shows each source as it was when its
+-- publication was recorded, and nothing first saved after that.
 create or replace function public.hs_weekly_bsky_sources(p_edition uuid default null) returns jsonb
 language plpgsql stable security definer set search_path = public as $$
 declare e text := public._hs_is_admin(); ed public.weekly_editions; as_of timestamptz; ed_part jsonb;
@@ -346,7 +349,7 @@ begin
     as_of := ed.publication_recorded_at;
     select coalesce(jsonb_agg(public.weekly_bsky_source_json(s.id, as_of) order by s.posted_at, s.id), '[]'::jsonb) into ed_part
     from public.weekly_bsky_sources s
-    where s.lead_id in (select a.lead_id from public.weekly_topic_lead_events a where a.kind = 'assigned' and a.edition_id = p_edition)
+    where s.stream = ed.stream and s.topic = ed.topic
       and (as_of is null or exists (select 1 from public.weekly_bsky_source_revisions x where x.source_id = s.id and x.created_at <= as_of));
   end if;
   return jsonb_build_object(
@@ -355,41 +358,46 @@ begin
              'backfill_done_at', backfill_done_at, 'last_run_started_at', last_run_started_at, 'last_success_at', last_success_at,
              'last_failure_at', last_failure_at, 'last_error', last_error, 'last_stats', last_stats,
              'running', lease_until is not null and lease_until > now()) from public.weekly_bsky_sync where id = 1),
-    'by_lead', (select coalesce(jsonb_object_agg(g.lead_id::text, g.items), '{}'::jsonb) from (
-        select s.lead_id, jsonb_agg(public.weekly_bsky_source_json(s.id) order by s.posted_at desc, s.id) as items
-        from public.weekly_bsky_sources s where s.lead_id is not null group by s.lead_id) g),
+    'topics', (select coalesce(jsonb_agg(jsonb_build_object('topic', c.topic,
+          'aliases', (select coalesce(jsonb_agg(a.alias order by a.alias), '[]'::jsonb) from public.weekly_topic_aliases a
+                      where a.stream = c.stream and a.topic = c.topic),
+          'sources', (select coalesce(jsonb_agg(public.weekly_bsky_source_json(s.id) order by s.posted_at desc, s.id), '[]'::jsonb)
+                      from public.weekly_bsky_sources s where s.stream = c.stream and s.topic = c.topic))
+        order by c.topic), '[]'::jsonb) from public.alert_topic_catalog c where c.stream = 'news'),
     'review', (select coalesce(jsonb_agg(public.weekly_bsky_source_json(s.id) order by s.posted_at desc, s.id), '[]'::jsonb)
-               from public.weekly_bsky_sources s where s.lead_id is null),
-    'aliases', (select coalesce(jsonb_object_agg(g.lead_id::text, g.a), '{}'::jsonb) from (
-        select lead_id, jsonb_agg(alias order by alias) as a from public.weekly_topic_lead_aliases group by lead_id) g),
-    'edition', case when p_edition is null then null else jsonb_build_object('id', p_edition, 'published', as_of is not null,
+               from public.weekly_bsky_sources s where s.topic is null),
+    'edition', case when p_edition is null then null else jsonb_build_object('id', p_edition, 'topic', ed.topic, 'published', as_of is not null,
                  'as_of', as_of, 'sources', ed_part) end);
 end $$;
 
--- File a source under a topic by hand (an unmatched or ambiguous one, or a correction). Changes no edition.
-create or replace function public.hs_weekly_bsky_source_file(p_source uuid, p_lead uuid) returns jsonb
+-- File a source under a category by hand (an unmatched or ambiguous one, or a correction). Changes no edition.
+create or replace function public.hs_weekly_bsky_source_file(p_source uuid, p_topic text) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare e text := public._hs_is_admin();
 begin
-  if not exists (select 1 from public.weekly_topic_leads where id = p_lead) then raise exception 'no such topic' using errcode = '22023'; end if;
-  update public.weekly_bsky_sources set lead_id = p_lead, route_status = 'matched', routed_by = e, routed_at = now() where id = p_source;
+  if not exists (select 1 from public.alert_topic_catalog where stream = 'news' and topic = p_topic) then
+    raise exception 'no such topic: %', p_topic using errcode = '22023';
+  end if;
+  update public.weekly_bsky_sources set stream = 'news', topic = p_topic, route_status = 'matched', routed_by = e, routed_at = now() where id = p_source;
   if not found then raise exception 'no such source' using errcode = '22023'; end if;
   return public.weekly_bsky_source_json(p_source);
 end $$;
 
--- Another name a topic answers to after the prefix ("Data Center" for "data centers"). One alias names one topic.
-create or replace function public.hs_weekly_topic_alias_add(p_lead uuid, p_alias text) returns jsonb
+-- Another name a category answers to after the prefix ("Data Center" for "Data Centers"). One alias names one category.
+create or replace function public.hs_weekly_topic_alias_add(p_topic text, p_alias text) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare e text := public._hs_is_admin(); k text := public.weekly_topic_key(coalesce(p_alias, ''));
 begin
-  if not exists (select 1 from public.weekly_topic_leads where id = p_lead) then raise exception 'no such topic' using errcode = '22023'; end if;
+  if not exists (select 1 from public.alert_topic_catalog where stream = 'news' and topic = p_topic) then
+    raise exception 'no such topic: %', p_topic using errcode = '22023';
+  end if;
   if k = '' then raise exception 'an alias is required' using errcode = '22023'; end if;
-  if exists (select 1 from public.weekly_topic_lead_aliases where alias_key = k and lead_id <> p_lead)
-     or exists (select 1 from public.weekly_topic_leads where public.weekly_topic_key(title) = k and id <> p_lead) then
+  if exists (select 1 from public.weekly_topic_aliases where alias_key = k and topic <> p_topic)
+     or exists (select 1 from public.alert_topic_catalog where stream = 'news' and public.weekly_topic_key(topic) = k and topic <> p_topic) then
     raise exception 'that name already belongs to another topic' using errcode = '23505';
   end if;
-  insert into public.weekly_topic_lead_aliases (lead_id, alias, created_by) values (p_lead, btrim(p_alias), e) on conflict do nothing;
-  return jsonb_build_object('lead_id', p_lead, 'alias', btrim(p_alias));
+  insert into public.weekly_topic_aliases (stream, topic, alias, created_by) values ('news', p_topic, btrim(p_alias), e) on conflict do nothing;
+  return jsonb_build_object('topic', p_topic, 'alias', btrim(p_alias));
 end $$;
 
 -- ── grants ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -400,14 +408,14 @@ begin
     'weekly_bsky_route(text)', 'weekly_bsky_merge(jsonb,jsonb)', 'weekly_bsky_sync_claim(text,text,text,integer,integer,integer)',
     '_wk_bsky_lease(text)', 'weekly_bsky_source_upsert(text,jsonb)', 'weekly_bsky_source_fetch_failed(text,text,text)',
     'weekly_bsky_sync_finish(text,boolean,timestamptz,boolean,text,jsonb)', 'weekly_bsky_source_json(uuid,timestamptz)',
-    'hs_weekly_bsky_sources(uuid)', 'hs_weekly_bsky_source_file(uuid,uuid)', 'hs_weekly_topic_alias_add(uuid,text)'] loop
+    'hs_weekly_bsky_sources(uuid)', 'hs_weekly_bsky_source_file(uuid,text)', 'hs_weekly_topic_alias_add(text,text)'] loop
     execute format('revoke all on function public.%s from public, anon, authenticated', f);
   end loop;
   foreach f in array array['weekly_bsky_sync_claim(text,text,text,integer,integer,integer)', 'weekly_bsky_source_upsert(text,jsonb)',
     'weekly_bsky_source_fetch_failed(text,text,text)', 'weekly_bsky_sync_finish(text,boolean,timestamptz,boolean,text,jsonb)'] loop
     execute format('grant execute on function public.%s to service_role', f);
   end loop;
-  foreach f in array array['hs_weekly_bsky_sources(uuid)', 'hs_weekly_bsky_source_file(uuid,uuid)', 'hs_weekly_topic_alias_add(uuid,text)'] loop
+  foreach f in array array['hs_weekly_bsky_sources(uuid)', 'hs_weekly_bsky_source_file(uuid,text)', 'hs_weekly_topic_alias_add(text,text)'] loop
     execute format('grant execute on function public.%s to authenticated', f);
   end loop;
 end $$;

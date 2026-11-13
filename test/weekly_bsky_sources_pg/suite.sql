@@ -21,6 +21,7 @@ create temp table ids (k text primary key, v uuid);
 create temp table r (k text primary key, j jsonb);   -- a write's answer, read by a LATER statement
 insert into ids select 'dc', id from public.weekly_topic_leads where title = 'data centers';
 insert into ids select 'air', id from public.weekly_topic_leads where title = 'Air Quality';
+create temp table cat0 as select count(*) as n from public.alert_topic_catalog;
 
 -- ── the prefix rule ─────────────────────────────────────────────────────────────────────────────────────────────
 select 'B01|' || (
@@ -45,30 +46,30 @@ select 'B05|' || pg_temp.raises($q$ select public.weekly_bsky_source_upsert('r2'
 create temp table spacex as select E'QUALITY-of-LIFE WEEKLY REPORT: Data Centers — SpaceX plans a $24 billion gas-powered AI facility in Texas.'::text as t;
 insert into r values ('b06', public.weekly_bsky_source_upsert('r1', pg_temp.post('3n25fosji4k2s', (select t from spacex), '{}', at => '2026-11-12T21:22:43Z')));
 select 'B06|' || ((select count(*) from public.weekly_editions) = 0 and (select (j ->> 'created')::boolean from r where k = 'b06'))::text;
-select 'B07|' || ((select lead_id from public.weekly_bsky_sources where post_uri like '%3n25fosji4k2s') = (select v from ids where k = 'dc')
+select 'B07|' || ((select topic from public.weekly_bsky_sources where post_uri like '%3n25fosji4k2s') = 'Data Centers'
   and (select topic_text || '|' || story_text from public.weekly_bsky_sources where post_uri like '%3n25fosji4k2s')
       = 'Data Centers|SpaceX plans a $24 billion gas-powered AI facility in Texas.')::text;
 -- the alias "Data Center" (seeded by the file) routes to the same topic; a story on the next line is the story
 insert into r values ('b08', public.weekly_bsky_source_upsert('r1', pg_temp.post('3n25fguo3us2w',
         E'quality-of-life weekly report: data center\nOakland extends its data center moratorium for 10 months.')));
 select 'B08|' || ((select j ->> 'route_status' from r where k = 'b08') = 'matched'
-  and (select lead_id from public.weekly_bsky_sources where post_uri like '%3n25fguo3us2w') = (select v from ids where k = 'dc')
+  and (select topic from public.weekly_bsky_sources where post_uri like '%3n25fguo3us2w') = 'Data Centers'
   and (select story_text from public.weekly_bsky_sources where post_uri like '%3n25fguo3us2w') = 'Oakland extends its data center moratorium for 10 months.')::text;
--- no topic named "Water": kept for review, not guessed, not created
+-- "Water" is not "Water Quality" (no partial match): kept for review, not guessed, nothing created
 insert into r values ('b09', public.weekly_bsky_source_upsert('r1', pg_temp.post('3n227ngau522p', 'Quality-of-Life Weekly Report: Water — a story')));
 select 'B09|' || ((select j ->> 'route_status' from r where k = 'b09') = 'unmatched'
-  and (select lead_id is null and topic_text = 'Water' from public.weekly_bsky_sources where post_uri like '%3n227ngau522p')
-  and (select count(*) from public.weekly_topic_leads) = 4)::text;
+  and (select topic is null and topic_text = 'Water' from public.weekly_bsky_sources where post_uri like '%3n227ngau522p')
+  and (select count(*) from public.alert_topic_catalog) = (select n from cat0) and (select count(*) from public.weekly_topic_leads) = 4)::text;
 -- word boundary: "Data Centersville" is not "Data Centers"
 insert into r values ('b10', public.weekly_bsky_source_upsert('r1', pg_temp.post('bbb1', 'QUALITY-of-LIFE WEEKLY REPORT: Data Centersville — y')));
 select 'B10|' || ((select j ->> 'route_status' from r where k = 'b10') = 'unmatched')::text;
--- two topics with the same name: ambiguous, kept for review
+-- two categories that differ only by case: ambiguous, kept for review
 insert into r values ('b11', public.weekly_bsky_source_upsert('r1', pg_temp.post('bbb2', 'QUALITY-of-LIFE WEEKLY REPORT: Noise — y')));
 select 'B11|' || ((select j ->> 'route_status' from r where k = 'b11') = 'ambiguous')::text;
 -- case and runs of whitespace are ignored; a colon after the topic is a separator
 insert into r values ('b12', public.weekly_bsky_source_upsert('r1', pg_temp.post('bbb3', E'QUALITY-of-LIFE WEEKLY REPORT:   air   QUALITY: smoke')));
 select 'B12|' || ((select j ->> 'route_status' from r where k = 'b12') = 'matched'
-  and (select lead_id from public.weekly_bsky_sources where post_uri like '%bbb3') = (select v from ids where k = 'air')
+  and (select topic from public.weekly_bsky_sources where post_uri like '%bbb3') = 'Air Quality'
   and (select story_text from public.weekly_bsky_sources where post_uri like '%bbb3') = 'smoke')::text;
 -- refused: another account, a post that does not start with the prefix
 select 'B13|' || (pg_temp.raises($q$ select public.weekly_bsky_source_upsert('r1', pg_temp.post('ccc1', 'QUALITY-of-LIFE WEEKLY REPORT: Data Centers', did => 'did:plc:someoneelse')) $q$, '22023')
@@ -116,20 +117,23 @@ select 'B20|' || (select high_water_at = '2026-11-12T21:22:43Z' and last_error =
 select 'B21|' || pg_temp.raises($q$ select public.weekly_bsky_sync_claim('r4', 'did:plc:someoneelse', 'x') $q$, '22023')::text;
 
 -- ── review: file by hand; an alias added later routes on the next refresh ────────────────────────────────────────
-insert into r values ('b22', public.hs_weekly_bsky_source_file((select id from public.weekly_bsky_sources where post_uri like '%bbb2'), (select v from ids where k = 'air')));
+insert into r values ('b22', public.hs_weekly_bsky_source_file((select id from public.weekly_bsky_sources where post_uri like '%bbb2'), 'Air Quality'));
 select 'B22|' || ((select j ->> 'route_status' from r where k = 'b22') = 'matched'
   and (select routed_by from public.weekly_bsky_sources where post_uri like '%bbb2') = 'founder@test.invalid')::text;
-select 'B23|' || pg_temp.raises($q$ select public.hs_weekly_topic_alias_add((select v from ids where k = 'air'), 'data centers') $q$, '23505')::text;
-select public.hs_weekly_topic_alias_add((select v from ids where k = 'air'), 'Water');
+select 'B23|' || (pg_temp.raises($q$ select public.hs_weekly_topic_alias_add('Air Quality', 'data centers') $q$, '23505')
+  and pg_temp.raises($q$ select public.hs_weekly_topic_alias_add('Not A Category', 'x') $q$, '22023'))::text;
+select public.hs_weekly_topic_alias_add('Water Quality', 'Water');
 select public.weekly_bsky_sync_claim('r5', 'did:plc:wn7c3svjrzpspuzmlecuqqeo', 'jodytracks.com');
 insert into r values ('b24', public.weekly_bsky_source_upsert('r5', pg_temp.post('3n227ngau522p', 'Quality-of-Life Weekly Report: Water — a story')));
 select 'B24|' || ((select j ->> 'route_status' from r where k = 'b24') = 'matched'
-  and (select lead_id from public.weekly_bsky_sources where post_uri like '%3n227ngau522p') = (select v from ids where k = 'air'))::text;
+  and (select topic from public.weekly_bsky_sources where post_uri like '%3n227ngau522p') = 'Water Quality')::text;
 
 -- ── editions: available when assigned; a published edition keeps what it had ────────────────────────────────────
 create temp table ed as select (public.hs_weekly_edition_create('Data Centers', '2026-11-09') ->> 'id')::uuid as id;
+-- an edition shows the sources of its own category, with no topic assigned to it
+select 'B25|' || (select jsonb_array_length(public.hs_weekly_bsky_sources((select id from ed)) -> 'edition' -> 'sources') = 2
+  and (select count(*) from public.weekly_topic_lead_events where kind = 'assigned') = 0)::text;
 select public.hs_weekly_lead_assign((select v from ids where k = 'dc'), (select id from ed));
-select 'B25|' || (select jsonb_array_length(public.hs_weekly_bsky_sources((select id from ed)) -> 'edition' -> 'sources') = 2)::text;
 select public.hs_weekly_lead_disposition((select v from ids where k = 'dc'), (select id from ed), 'included');
 select public.hs_weekly_edition_publish((select id from ed), 'https://www.youtube.com/watch?v=ourvideo', current_date);
 select pg_sleep(0.01);
@@ -142,10 +146,12 @@ select 'B26|' || (with v as (select public.hs_weekly_bsky_sources((select id fro
     and (select (s ->> 'revisions')::int from v, jsonb_array_elements(j -> 'edition' -> 'sources') s where s ->> 'post_uri' like '%3n25fosji4k2s') = 4
   from v)::text;
 -- the general view shows the newest revision and the new story
-select 'B27|' || (with v as (select public.hs_weekly_bsky_sources() as j)
-  select jsonb_array_length(j -> 'by_lead' -> (select v::text from ids where k = 'dc')) = 3
-    and (select (s ->> 'revision')::int from v, jsonb_array_elements(j -> 'by_lead' -> (select v::text from ids where k = 'dc')) s
-         where s ->> 'post_uri' like '%3n25fosji4k2s') = 4 from v)::text;
+select 'B27|' || (with v as (select public.hs_weekly_bsky_sources() as j),
+  dc as (select x -> 'sources' as s from v, jsonb_array_elements(v.j -> 'topics') x where x ->> 'topic' = 'Data Centers')
+  select jsonb_array_length((select s from dc)) = 3
+    and jsonb_array_length((select j -> 'topics' from v)) = (select count(*) from public.alert_topic_catalog where stream = 'news')
+    and (select x -> 'aliases' from v, jsonb_array_elements(v.j -> 'topics') x where x ->> 'topic' = 'Data Centers') = '["Data Center"]'::jsonb
+    and (select (e ->> 'revision')::int from dc, jsonb_array_elements(dc.s) e where e ->> 'post_uri' like '%3n25fosji4k2s') = 4 from v)::text;
 -- the publication lock is untouched: nothing new can be assigned to the published edition
 select 'B28|' || pg_temp.raises($q$ select public.hs_weekly_lead_assign((select v from ids where k = 'air'), (select id from ed)) $q$)::text;
 select 'B29|' || ((select count(*) from public.weekly_editions) = 1

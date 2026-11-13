@@ -13,8 +13,13 @@ run_once() {   # $1 = the bluesky-sources file to apply
         drop schema if exists net cascade; drop schema if exists storage cascade; create schema public;" >/dev/null 2>&1
   P -f "$here/../weekly_stage2_pg/fixture.sql" >/dev/null 2>&1
   for f in "${WEEKLY_QUEUE_ONLY[@]}"; do P -f "$WEEKLY_DOCS/$f" >/dev/null 2>&1; done
-  # the topics as Tab 20 has them: "data centers" with no report category (as in production), and test topics
+  # the 13 Local News categories as production has them (the fixture carries 3 of them), two TEST categories that differ
+  # only by case (for the ambiguous case), and Tab 20 topics as production has them ("data centers", no category)
   P >/dev/null 2>&1 <<'SQL'
+insert into public.alert_topic_catalog (stream, topic) values ('news', 'Animal & Human Viruses / Diseases'), ('news', 'Development & Land Use'),
+  ('news', 'EMF'), ('news', 'Infrastructure'), ('news', 'Light Pollution'), ('news', 'Livestock, Crops, Pets & Wildlife Health'),
+  ('news', 'Noise Pollution'), ('news', 'Radiation'), ('news', 'Soil Quality'), ('news', 'Weather & Climate Hazards'),
+  ('news', 'Noise'), ('news', 'noise') on conflict do nothing;
 set test.jwt = '{"email":"founder@test.invalid"}';
 select public.hs_weekly_lead_save(null, '{"title":"data centers"}');
 select public.hs_weekly_lead_save(null, '{"title":"Air Quality","topic":"Air Quality"}');
@@ -45,7 +50,7 @@ PY
   echo "  mutation $1: killed"
 }
 mutate no-word-boundary "and (char_length(k) = char_length(key) or substr(k, char_length(key) + 1, 1) !~ '[[:alnum:]]')" ""
-mutate ambiguous-picks-one "if n = 1 then lead_id" "if n >= 1 then lead_id"
+mutate ambiguous-picks-one "if n = 1 then topic" "if n >= 1 then topic"
 mutate merge-drops-old "union all select x, 1 from jsonb_array_elements(coalesce(p_old -> 'thread'" "union all select x, 1 from jsonb_array_elements(coalesce(null::jsonb"
 mutate no-lease-check "perform public._wk_bsky_lease(p_owner);
   select account_did into acct" "select account_did into acct"
@@ -53,4 +58,5 @@ mutate published-reads-newest "(p_as_of is null or x.created_at <= p_as_of)" "tr
 mutate checkpoint-moves-back "greatest(coalesce(high_water_at, p_high_water), p_high_water)" "p_high_water"
 mutate any-account "if p_post ->> 'author_did' is distinct from acct or" "if false and"
 mutate prefix-anywhere "select case when t ~* E'^" "select case when t ~* E'"
+mutate edition-any-category "where s.stream = ed.stream and s.topic = ed.topic" "where s.topic is not null"
 echo "BLUESKY SOURCES: all mutations killed"
