@@ -77,13 +77,13 @@ ok(disagreements.length === 0,
   `§2a shipped lib/map.js agrees with the SQL projection on all 426 inputs` +
   (disagreements.length ? ` — first: #${disagreements[0].idx} ${JSON.stringify(disagreements[0].site.label)}` : ''));
 const jsTrue = rows.filter((r) => isDataCenterType(r.site)).length;
-ok(jsTrue === 411, `§2b 411 of 426 classify as Data center (got ${jsTrue})`);
-// The 15 negatives are the classifier's own guards, and they are the half a bad projection
+ok(jsTrue === 412, `§2b 412 of 426 classify as Data center (got ${jsTrue})`);
+// The 14 negatives are the classifier's own guards, and they are the half a bad projection
 // would quietly lose. Named, so a regression says WHICH rule stopped working.
 const neg = rows.filter((r) => !r.expect);
-ok(neg.length === 15, `§2c exactly 15 frozen negatives (got ${neg.length})`);
-ok(neg.filter((r) => (r.site.use_type || '') === 'other project').length === 12,
-  '§2d 12 negatives are TERMINAL_NEUTRAL "other project" — an explicit unresolved type outranks the name');
+ok(neg.length === 14, `§2c exactly 14 frozen negatives (got ${neg.length})`);
+ok(neg.filter((r) => (r.site.use_type || '') === 'other project').length === 11,
+  '§2d 11 negatives are TERMINAL_NEUTRAL "other project" — an explicit unresolved type outranks the name');
 ok(neg.some((r) => r.site.registry_id && (r.site.layer || '') === 'energy'),
   '§2e a facility stamped `energy` whose NAME says "DATA HALL" is NOT a data centre (classOnly)');
 ok(neg.filter((r) => !r.site.registry_id && (r.site.use_type || '') === 'unclassified').length === 2,
@@ -102,7 +102,8 @@ const jsRe = (name) => {
 };
 // JS -> POSIX ARE: non-capturing groups have no POSIX spelling, \b is \y, \d is [0-9].
 const toPosix = (s) => s.replace(/\(\?:/g, '(').replace(/\\b/g, '\\y').replace(/\\d/g, '[0-9]');
-for (const name of ['DATACENTER_RE', 'DATACENTER_NOT_RE', 'DATACENTER_SERVING_RE', 'DATACENTER_COMPETING_RE']) {
+for (const name of ['DATACENTER_RE', 'DATACENTER_NOT_RE', 'DATACENTER_SERVING_RE', 'DATACENTER_COMPETING_RE',
+                    'COMPUTE_FACILITY_RE', 'COMPUTE_FACILITY_JOINED_RE', 'DC_BUILD_SCOPE_RE', 'DC_EQUIPMENT_ONLY_RE']) {
   const want = toPosix(jsRe(name));
   ok(sql.includes(want), `§3 ${name} appears in the SQL exactly as lib/map.js spells it`);
 }
