@@ -2,7 +2,7 @@
 //
 // The live ZIP page lists Map 1's data-center listings (lib/data.js HS.data.zipDevelopment); the
 // document the build writes at /community/<zip>/ now prints them too, from the per-ZIP rows
-// docs/map1-dc-zip-listing.sql stores (map1_dc_zip_members' own 'member' rows).
+// docs/zip-dc-listing.sql stores (map1_dc_zip_members' own 'member' rows).
 //   1. The same rows give the same words in the browser and in the build: the status label, the
 //      third-party note and the "Opens <host>, the page <source> cites" note.
 //   2. A real build: fresh rows print, stale / truncated / missing rows print nothing, nothing ever
@@ -44,7 +44,7 @@ const ROWS = [
     raw_status: null, normalized_status: null, source_licence: null, developer_or_operator: null,
     source_url: 'https://Example.COM/x' }),
 ];
-// What docs/map1-dc-zip-listing.sql stores per row.
+// What docs/zip-dc-listing.sql stores per row.
 const STORED = (r) => ({
   source_key: r.source_key, source_name: r.source_name, source_url: r.source_url, source_licence: r.source_licence,
   project_name: r.project_name, developer_or_operator: r.developer_or_operator, raw_status: r.raw_status,

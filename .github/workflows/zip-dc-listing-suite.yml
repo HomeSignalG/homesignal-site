@@ -1,18 +1,18 @@
-name: map1-dc-zip-listing-suite
+name: zip-dc-listing-suite
 
-# docs/map1-dc-zip-listing.sql (the per-ZIP data-center listings the ZIP page build prints) against a DISPOSABLE Postgres
+# docs/zip-dc-listing.sql (the per-ZIP data-center listings the ZIP page build prints) against a DISPOSABLE Postgres
 # with stand-ins for production. No Supabase credential is used or reachable here.
 on:
   pull_request:
     paths:
-      - 'docs/map1-dc-zip-listing.sql'
-      - 'test/map1_dc_zip_listing_pg/**'
-      - '.github/workflows/map1-dc-zip-listing-suite.yml'
+      - 'docs/zip-dc-listing.sql'
+      - 'test/zip_dc_listing_pg/**'
+      - '.github/workflows/zip-dc-listing-suite.yml'
   push:
     branches: [main]
     paths:
-      - 'docs/map1-dc-zip-listing.sql'
-      - 'test/map1_dc_zip_listing_pg/**'
+      - 'docs/zip-dc-listing.sql'
+      - 'test/zip_dc_listing_pg/**'
   workflow_dispatch: {}
 
 permissions:
@@ -31,4 +31,4 @@ jobs:
           fi
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql
       - name: Run the suite (exit code is the result)
-        run: bash test/map1_dc_zip_listing_pg/run.sh
+        run: bash test/zip_dc_listing_pg/run.sh

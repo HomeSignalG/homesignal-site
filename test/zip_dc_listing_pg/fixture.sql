@@ -1,4 +1,4 @@
--- Stand-ins for what docs/map1-dc-zip-listing.sql uses: Supabase roles, pg_cron, the ZIP registry
+-- Stand-ins for what docs/zip-dc-listing.sql uses: Supabase roles, pg_cron, the ZIP registry
 -- and map1_dc_zip_members (same signature as production, rows from a table).
 do $$ begin
   if not exists (select 1 from pg_roles where rolname='anon') then create role anon; end if;

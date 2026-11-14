@@ -11,12 +11,12 @@
 -- that ZIP. It DECIDES NOTHING: membership, lifecycle and every value come from that one reader,
 -- called per ZIP. No spatial join, no second membership rule (CLAUDE.md "ONE CANONICAL TRUTH PATH").
 --
---   public.map1_dc_zip_listing          one row per registry ZIP: the member rows (stable fields
+--   public.zip_dc_listing          one row per registry ZIP: the member rows (stable fields
 --                                        only), their count, whether the reader truncated, when the
 --                                        ZIP was last checked and when its listings last changed.
---   public.map1_dc_zip_listing_refresh  checks the p_batch ZIPs checked longest ago. A ZIP whose
+--   public.zip_dc_listing_refresh  checks the p_batch ZIPs checked longest ago. A ZIP whose
 --                                        read fails keeps its previous row and records the error.
---   pg_cron 'map1-dc-zip-listing'       every 10 minutes, 1,500 ZIPs (measured 2026-11-14: about
+--   pg_cron 'zip-dc-listing'       every 10 minutes, 1,500 ZIPs (measured 2026-11-14: about
 --                                        5 ms a ZIP warm, so ~8 s a run; every ZIP within ~90 min).
 --
 -- The build reads rows with member_count > 0 and prints a ZIP's listings only when its row was
@@ -31,7 +31,7 @@
 
 begin;
 
-create table if not exists public.map1_dc_zip_listing (
+create table if not exists public.zip_dc_listing (
   zip           text primary key,
   listings      jsonb       not null default '[]'::jsonb,
   member_count  integer     not null default 0,
@@ -39,21 +39,21 @@ create table if not exists public.map1_dc_zip_listing (
   checked_at    timestamptz not null default now(),
   changed_at    timestamptz not null default now(),
   last_error    text,
-  constraint map1_dc_zip_listing_zip_check check (zip ~ '^[0-9]{5}$'),
-  constraint map1_dc_zip_listing_array check (jsonb_typeof(listings) = 'array'),
-  constraint map1_dc_zip_listing_count check (member_count = jsonb_array_length(listings))
+  constraint zip_dc_listing_zip_check check (zip ~ '^[0-9]{5}$'),
+  constraint zip_dc_listing_array check (jsonb_typeof(listings) = 'array'),
+  constraint zip_dc_listing_count check (member_count = jsonb_array_length(listings))
 );
 
-create index if not exists map1_dc_zip_listing_checked_idx on public.map1_dc_zip_listing (checked_at);
+create index if not exists zip_dc_listing_checked_idx on public.zip_dc_listing (checked_at);
 
-alter table public.map1_dc_zip_listing enable row level security;
+alter table public.zip_dc_listing enable row level security;
 -- The same rows anyone can already read through map1_dc_zip_members (anon EXECUTE). Read-only.
-drop policy if exists map1_dc_zip_listing_read on public.map1_dc_zip_listing;
-create policy map1_dc_zip_listing_read on public.map1_dc_zip_listing for select using (true);
-revoke all on public.map1_dc_zip_listing from anon, authenticated;
-grant select on public.map1_dc_zip_listing to anon, authenticated, supabase_read_only_user;
+drop policy if exists zip_dc_listing_read on public.zip_dc_listing;
+create policy zip_dc_listing_read on public.zip_dc_listing for select using (true);
+revoke all on public.zip_dc_listing from anon, authenticated;
+grant select on public.zip_dc_listing to anon, authenticated, supabase_read_only_user;
 
-create or replace function public.map1_dc_zip_listing_refresh(p_batch integer default 1500)
+create or replace function public.zip_dc_listing_refresh(p_batch integer default 1500)
 returns integer
 language plpgsql
 security definer
@@ -67,18 +67,18 @@ declare
   trunc  boolean;
 begin
   -- One run at a time; a second run started while one is going does nothing.
-  if not pg_try_advisory_xact_lock(hashtext('map1_dc_zip_listing_refresh')) then
+  if not pg_try_advisory_xact_lock(hashtext('zip_dc_listing_refresh')) then
     return 0;
   end if;
 
   -- A ZIP that left the registry has no page, so its row goes.
-  delete from public.map1_dc_zip_listing l
+  delete from public.zip_dc_listing l
    where not exists (select 1 from public.canonical_zip_registry r where r.zip = l.zip);
 
   for z in
     select r.zip
       from public.canonical_zip_registry r
-      left join public.map1_dc_zip_listing l on l.zip = r.zip
+      left join public.zip_dc_listing l on l.zip = r.zip
      where r.zip ~ '^[0-9]{5}$'
      order by l.checked_at nulls first, r.zip
      limit greatest(coalesce(p_batch, 1500), 1)
@@ -102,7 +102,7 @@ begin
         into rows_j, cnt, trunc
         from public.map1_dc_zip_members(z) m;
 
-      insert into public.map1_dc_zip_listing as l
+      insert into public.zip_dc_listing as l
              (zip, listings, member_count, truncated, checked_at, changed_at, last_error)
       values (z, rows_j, cnt, trunc, now(), now(), null)
       on conflict (zip) do update
@@ -117,7 +117,7 @@ begin
     exception when others then
       -- A failed read is not an empty one: keep the previous listings, record why, and leave
       -- checked_at alone so the build sees the row ageing.
-      insert into public.map1_dc_zip_listing as l (zip, last_error, checked_at, changed_at)
+      insert into public.zip_dc_listing as l (zip, last_error, checked_at, changed_at)
       values (z, left(sqlerrm, 500), '-infinity', '-infinity')
       on conflict (zip) do update set last_error = excluded.last_error;
     end;
@@ -127,21 +127,21 @@ begin
 end
 $fn$;
 
-alter function public.map1_dc_zip_listing_refresh(integer) owner to postgres;
-revoke all on function public.map1_dc_zip_listing_refresh(integer) from public, anon, authenticated;
-grant execute on function public.map1_dc_zip_listing_refresh(integer) to service_role;
+alter function public.zip_dc_listing_refresh(integer) owner to postgres;
+revoke all on function public.zip_dc_listing_refresh(integer) from public, anon, authenticated;
+grant execute on function public.zip_dc_listing_refresh(integer) to service_role;
 
 do $$
 begin
-  perform cron.unschedule(j.jobid) from cron.job j where j.jobname = 'map1-dc-zip-listing';
-  perform cron.schedule('map1-dc-zip-listing', '*/10 * * * *',
-                        $c$select public.map1_dc_zip_listing_refresh(1500)$c$);
+  perform cron.unschedule(j.jobid) from cron.job j where j.jobname = 'zip-dc-listing';
+  perform cron.schedule('zip-dc-listing', '*/10 * * * *',
+                        $c$select public.zip_dc_listing_refresh(1500)$c$);
 end $$;
 
 commit;
 
 -- ── ROLLBACK (by hand) ──────────────────────────────────────────────────────────────────────
--- select cron.unschedule(jobid) from cron.job where jobname = 'map1-dc-zip-listing';
--- drop function if exists public.map1_dc_zip_listing_refresh(integer);
--- drop table if exists public.map1_dc_zip_listing;
+-- select cron.unschedule(jobid) from cron.job where jobname = 'zip-dc-listing';
+-- drop function if exists public.zip_dc_listing_refresh(integer);
+-- drop table if exists public.zip_dc_listing;
 -- The build treats a missing table (PostgREST 404 / PGRST205) as "no listings printed".

@@ -59,7 +59,7 @@ RULE_D_MIN = 3                               # >= 3 publishable Development enti
 RULE_D_PLANE_MAX_AGE_HOURS = 36
 # A manual identity-only cutover dispatch may accept an older plane (pages.yml `plane_max_age_hours`); never longer than this.
 RULE_D_PLANE_MAX_AGE_CEILING_HOURS = 336
-# Data-center listings on the ZIP document (docs/map1-dc-zip-listing.sql). A ZIP's stored row is
+# Data-center listings on the ZIP document (docs/zip-dc-listing.sql). A ZIP's stored row is
 # used only when it was checked within this many hours and the reader did not truncate it.
 DC_LISTING_MAX_AGE_HOURS = 48
 DC_LISTING_CAP = 12                          # listings printed; the rest are named, with a map link
@@ -193,23 +193,23 @@ def fetch_data(key, now_iso):
 
 
 def fetch_dc_listings(key):
-    """Data-center listings stored per ZIP (docs/map1-dc-zip-listing.sql): what
+    """Data-center listings stored per ZIP (docs/zip-dc-listing.sql): what
     public.map1_dc_zip_members returns as 'member' for each ZIP, refreshed by pg_cron. Only ZIPs
     with at least one listing are read. A table that is not there yet (HTTP 404) means "print no
     listings" and is said in the log; any other failure stops the build like every other read."""
-    url = f"{SUPA}/rest/v1/map1_dc_zip_listing?select=zip&limit=1"
+    url = f"{SUPA}/rest/v1/zip_dc_listing?select=zip&limit=1"
     req = urllib.request.Request(url, headers={"apikey": key, "Authorization": f"Bearer {key}"})
     try:
         with urllib.request.urlopen(req, timeout=REQ_TIMEOUT):
             pass
     except urllib.error.HTTPError as e:
         if e.code == 404:
-            print("  data-center listings: map1_dc_zip_listing not found (HTTP 404) - none printed",
+            print("  data-center listings: zip_dc_listing not found (HTTP 404) - none printed",
                   flush=True)
             return None
     except Exception:
         pass                                    # transient: fetch_all retries or fails loudly
-    return fetch_all("map1_dc_zip_listing", key,
+    return fetch_all("zip_dc_listing", key,
                      "zip,listings,member_count,truncated,checked_at",
                      "&member_count=gt.0", keyset="zip")
 
@@ -819,7 +819,7 @@ LISTING_STATUS_ORDER = {"Proposed": 0, "Approved": 1, "Operating": 2}
 def attach_dc_listings(pages, rows, now_iso):
     """Put each ZIP's stored data-center listings on its page record (p["dc_listings"]).
 
-    The rows are map1_dc_zip_members' own 'member' rows for that ZIP (docs/map1-dc-zip-listing.sql);
+    The rows are map1_dc_zip_members' own 'member' rows for that ZIP (docs/zip-dc-listing.sql);
     nothing is decided here. A row older than DC_LISTING_MAX_AGE_HOURS, truncated, or not for a
     page is skipped, and that means "not printed", never "no data centers"."""
     now = datetime.fromisoformat(now_iso.replace("Z", "+00:00")) if now_iso else None
