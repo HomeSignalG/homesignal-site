@@ -6989,8 +6989,13 @@ was missing from both lists and from the Development tile (Behring 415 20th Stre
     absence sentence. Up to 12 per ZIP (Proposed, Approved, Operating), the rest named with a map link. The
     section is `class="zsec zdcl"` with a lead paragraph, so the live proof never counts it as Alerts. Its words are
     lib/templates.js's, ported to Python and checked on the same rows by `test/zip-page-dc-listings.test.mjs`.
-    SQL suite: `test/zip_dc_listing_pg` (`zip-dc-listing-suite.yml`). No alarm yet: if the cron job
-    stops, rows age past 48 h and the sections quietly drop (the build log counts them).
+    SQL suite: `test/zip_dc_listing_pg` (`zip-dc-listing-suite.yml`).
+  - **Alarm (2026-11-14):** `zip_dc_listings` in the hourly `pipeline_health_tick()`
+    (`docs/zip-dc-listing-monitor.sql`, a splice) pages when a registry ZIP has no row, any row is over
+    6 h old (the job runs every 10 min, a full cycle ~90 min, the build drops rows at 48 h), any row has
+    `last_error`, or any row is truncated. Suite: `test/zip_dc_listing_monitor_pg` (in `zip-membership-suite.yml`).
+  - ⚠️ After renaming a table in production, PostgREST may answer 404 until `notify pgrst, 'reload schema'`
+    (seen 2026-11-14: the 14:46 build got 404 on the renamed table five minutes after the rename).
 
 ## TAB 17 DATA-CENTER PROJECT CHECK (2026-11-13): A MAP 1 PROJECT LINK AND A REPLY IN EACH HOT TOPICS TILE
 
