@@ -60,9 +60,9 @@
    comparison is the number on that report. The page makes no report, scores nothing and ranks nothing; to compare a new address, make its
    report first (that is a report, charged by the one rule).
 
-   Build step 11: the BILLING card. A brokerage member sees their plan in words: the free trial, the $79/month plan with how many of its 100
+   Build step 11: the BILLING card. A brokerage member sees their plan in words: the free trial, the $78/month plan with how many of its 100
    reports this month are left and when the month ends, or what is wrong with a subscription that is not active. An OWNER with no live
-   subscription may press "Subscribe for $79/month": the page asks the billing function (manage-billing) for a checkout and sends the
+   subscription may press "Subscribe for $78/month": the page asks the billing function (manage-billing) for a checkout and sends the
    browser to the payment provider's own page. Nothing about the plan changes by pressing it or by coming back: the plan changes only when
    the provider's signed event reaches HomeSignal's server, so after a checkout the page just asks again ("Check again"). The page decides
    nothing about money: which reports a brokerage may still make, which allotment one used and when the month ends are the database's,
@@ -452,7 +452,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 <main class="wrap hs-container">
   <section class="card" id="signup" aria-labelledby="signup-title" hidden>
     <h2 id="signup-title">Create your individual account</h2>
-    <p class="sub">For individual real estate agents: 100 free Development Activity reports. Paid plans are coming. Brokerages, teams and enterprise organizations: <a href="contact.html" id="signup-quote">request a custom quote</a>.</p>
+    <p class="sub">For individual real estate agents: the Professional plan is $78 per month and includes 100 Development Activity reports each month. Create your account, then subscribe. Brokerages, teams and enterprise organizations: <a href="contact.html" id="signup-quote">request a custom quote</a>.</p>
     <form id="sf" novalidate>
       <label>Your name, shown at the top of your reports<input type="text" id="signup-name" maxlength="120" autocomplete="name" placeholder="Pat Agent"></label>
       <button type="submit" class="go" id="signup-go">Create my account</button>
@@ -580,6 +580,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
         <h2 id="billing-title">Billing</h2>
         <p class="plan" id="billing-plan"></p>
         <p class="sub" id="billing-sub"></p>
+        <p class="hint" id="billing-terms">Professional plan: $78 per month. Billed monthly and renews automatically each month until you cancel. Includes 100 reports per monthly billing period, 0.5-mile radius.</p>
         <div class="row">
           <button type="button" class="go" id="subscribe" hidden>Subscribe</button>
           <button type="button" class="go ghost" id="buy-partner" hidden>Buy 6 months (one time)</button>
@@ -684,7 +685,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   // so it can never use a second free report; any answer from the server ends that request and the next report gets a new key.
   var attempt = null; // { key, address }
   var invite = null;
-  // Arriving on #billing (the landing page's "Join for $79/month" link, and the payment page's return address) means "take me to the plan card":
+  // Arriving on #billing (the landing page's Professional "Get Started" link, and the payment page's return address) means "take me to the plan card":
   // a signed-out visitor is asked to sign in, and a signed-in member is scrolled to the card. This never presses Subscribe: starting a checkout is
   // the owner's own click, and the checkout itself is still made by manage-billing (the one signed path).
   var wantBilling = (location.hash || '') === '#billing', billingAsked = false;
@@ -808,7 +809,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     count.className = 'count';
     var left = trial && typeof trial.credits_remaining === 'number' ? trial.credits_remaining : null;
     if (a === 'trial') {
-      // usage reads as "7 of 100 free reports used"; only when the allowance is not yet known does it fall back to the count left
+      // usage reads as "N of M free reports used"; only when the allowance is not yet known does it fall back to the count left
       count.textContent = freeLimit !== null && left !== null ? (freeLimit - left) + ' of ' + freeLimit + ' free reports used' : (left === 1 ? '1 free report left' : left + ' free reports left');
       sub.textContent = mine()
         ? 'A report with no development data (“No data ingested”) does not use one.'
@@ -816,6 +817,10 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     } else if (a === 'admin') {
       count.textContent = 'Signed in as a HomeSignal admin';
       sub.textContent = 'Reports you make here show what a customer sees, and never use a free report.';
+    } else if (a === 'complete' && freeLimit === 0 && !isPaid()) {
+      // a NEW individual account (founder, 2026-11-14): no free reports at all. The database reports a free limit of 0; this page holds no number of its own.
+      count.textContent = 'No reports yet'; count.className = 'count out';
+      sub.textContent = 'Professional is $78 per month and includes 100 reports each month. Subscribe to make your first report. Your saved reports stay available.';
     } else if (a === 'complete') {
       count.textContent = freeLimit !== null ? freeLimit + ' of ' + freeLimit + ' free reports used' : 'All ' + freeWords() + ' are used'; count.className = 'count out';
       sub.textContent = mine() ? 'Your free trial is complete. Your saved reports stay available.' : "Your brokerage's free trial is complete.";
@@ -849,7 +854,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 
   // ---- the tile's commercial action: always present for a member, whatever the free reports say --------------------------
   function ctaSay(text, isError){ var s = $('trial-cta-status'); s.textContent = text || ''; s.className = isError ? 'err' : ''; }
-  /** "Subscribe — $79/month" until the plan is paid; "Manage plan" once it is (or while a payment needs attention). Shown with free reports left or none. */
+  /** "Subscribe — $78/month" until the plan is paid; "Manage plan" once it is (or while a payment needs attention). Shown with free reports left or none. */
   function showTrialCta(a){
     var wrap = $('trial-cta-wrap'), btn = $('trial-cta');
     ctaSay('', false);
@@ -888,7 +893,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       return;
     }
     var owner = plan.role === 'owner';
-    var offer = ' Paid plans are coming.';
+    var offer = ' Professional plan: $78 a month, billed monthly and renewing automatically until you cancel, with 100 reports each billing period, each covering 0.5 mile around the property.';
     var who = owner ? '' : " Only your brokerage's owner can subscribe.";
     var closed = '';
     if (plan.state === 'paid') {
@@ -896,16 +901,16 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       if (plan.access_ends_at) {
         // the Private Partner Offer: six months, paid once, no renewal. The page says when access ENDS, from the database's own date.
         p.textContent = 'Private Partner access: ' + plan.credits_used + ' of ' + plan.credit_limit + ' reports used this month';
-        sub.textContent = 'Your access ends ' + dateWords(plan.access_ends_at) + '. It does not renew by itself. ' + (end && end !== dateWords(plan.access_ends_at) ? 'This month ends ' + end + '. ' : '') + "The plan's reports are separate from your " + freeWords() + ', which are kept as they were.';
+        sub.textContent = 'Your access ends ' + dateWords(plan.access_ends_at) + '. It does not renew by itself. ' + (end && end !== dateWords(plan.access_ends_at) ? 'This month ends ' + end + '. ' : '') + (freeLimit === 0 ? 'Your plan includes 100 reports each month.' : "The plan's reports are separate from your " + freeWords() + ', which are kept as they were.');
         return;
       }
       p.textContent = 'Paid plan: ' + plan.credits_used + ' of ' + plan.credit_limit + ' reports used this month';
-      sub.textContent = (end ? 'This month ends ' + end + '. ' : '') + "The plan's reports are separate from your brokerage's " + freeWords() + ", which are kept as they were.";
+      sub.textContent = (end ? 'This month ends ' + end + '. ' : '') + (freeLimit === 0 ? 'Your plan includes 100 reports each month.' : "The plan's reports are separate from your brokerage's " + freeWords() + ", which are kept as they were.");
       return;
     }
     if (plan.state === 'none' || plan.state === 'test_only') {
-      p.textContent = plan.state === 'test_only' ? 'Test subscription only' : (access === 'trial' ? 'Free trial' : 'Free trial used');
-      sub.textContent = (plan.state === 'test_only' ? 'This brokerage has a test subscription, which does not give any reports.' : (mine() ? 'Your ' : "Your brokerage's ") + freeWords() + " are separate from the plan.") + offer + who + closed;
+      p.textContent = plan.state === 'test_only' ? 'Test subscription only' : (access === 'trial' ? 'Free trial' : (freeLimit === 0 ? 'No plan yet' : 'Free trial used'));
+      sub.textContent = (plan.state === 'test_only' ? 'This brokerage has a test subscription, which does not give any reports.' : (freeLimit === 0 ? 'Your account includes no free reports.' : (mine() ? 'Your ' : "Your brokerage's ") + freeWords() + " are separate from the plan.")) + offer + who + closed;
     } else if (plan.state === 'canceled') {
       $('account').open = true; p.className = 'plan out'; p.textContent = 'Your subscription has ended';
       sub.textContent = 'Your saved reports stay available. Subscribe again for 100 new reports each month.' + who + closed;
@@ -953,7 +958,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       if (member) { document.body.classList.add('to-billing'); $('account').open = true; $('billing').scrollIntoView(); }   // to-billing: room below the last section, so the card can be brought to the top
       else {
         var ts = $('trial-sub');
-        ts.textContent = 'This email does not have an account yet. Create your individual account below to start with 100 free reports and subscribe from there. For a brokerage, team or enterprise organization: ';
+        ts.textContent = 'This email does not have an account yet. Create your individual account below, then subscribe to Professional ($78 per month, 100 reports each month). For a brokerage, team or enterprise organization: ';
         var ca = document.createElement('a'); ca.href = 'contact.html'; ca.textContent = 'Request a custom quote'; ts.appendChild(ca);
       }
     }
@@ -1970,7 +1975,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       return (body.limited_by === 'brokerage' ? 'Your brokerage has asked for a lot of reports in a short time.' : 'You have asked for a lot of reports in a short time.')
         + ' Try again in ' + waitWords(body.retry_after_seconds) + '. This did not use ' + oneOf() + '.';
     }
-    if (httpStatus === 403 && body.error === 'evaluation_complete') return freeLimit === null ? "All of your brokerage's free reports are used." : "All " + freeLimit + " of your brokerage's free reports are used.";
+    if (httpStatus === 403 && body.error === 'evaluation_complete') return freeLimit === 0 ? 'Your account needs an active Professional plan to make a report. Subscribe to continue.' : freeLimit === null ? "All of your brokerage's free reports are used." : "All " + freeLimit + " of your brokerage's free reports are used.";
     if (httpStatus === 403 && body.error === 'allotment_complete') return "All 100 of your brokerage's reports for this month are used.";
     if (httpStatus === 403) return 'This account cannot make reports right now.';
     if (httpStatus === 409) return 'That report could not be made. Try again.';

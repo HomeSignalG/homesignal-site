@@ -1645,8 +1645,8 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   const { ctx, page, errors, foreign, billingCalls, checkouts } = await open({ w });
   await waitBilling(page, /Free trial/);
   const t = await billingText(page);
-  ok(await billingShown(page) && /Billing/.test(t) && /Free trial/.test(t) && /Paid plans are coming\./.test(t) && /10 free reports are separate from the plan/.test(t),
-    '12a an owner with no plan sees the Billing card: the free trial, and the "Paid plans are coming" line (free-only, founder 2026-10-15)', t);
+  ok(await billingShown(page) && /Billing/.test(t) && /Free trial/.test(t) && /Professional plan: \$78 a month, billed monthly and renewing automatically until you cancel/.test(t) && /10 free reports are separate from the plan/.test(t),
+    '12a an owner with no plan sees the Billing card: the free trial, and the $78/month Professional line with recurring billing disclosed (founder 2026-11-14)', t);
   ok(billingCalls.length === 1 && billingCalls[0].body.action === 'status' && billingCalls[0].auth === 'Bearer user-token' && JSON.stringify(billingCalls[0].body) === '{"action":"status"}',
     '12b the plan is read with ONE status call carrying the person\'s own token and nothing else', billingCalls.map((c) => c.body));
   ok(await page.$eval('#subscribe', (e) => !e.hidden && /^Subscribe$/.test(e.textContent.trim())), '12c the owner is offered "Subscribe" (no price; free-only copy)');
@@ -1726,8 +1726,8 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
 
   o = await open({ w: world({ role: 'owner', configured: false }) });
   await waitBilling(o.page, /Free trial/);
-  ok(await o.page.$eval('#subscribe', (e) => e.hidden) && await o.page.$eval('#trial-cta', (e) => e.parentElement.hidden) && /Paid plans are coming\./.test(await billingText(o.page)) && !/Subscribing is not open yet/.test(await billingText(o.page)) && (await text(o.page, '#trial-count')).length > 0,
-    '12f with the processor not set up (free-only, founder 2026-10-15) there is NO Subscribe button anywhere, the card says paid plans are coming, and the free trial still works');
+  ok(await o.page.$eval('#subscribe', (e) => e.hidden) && await o.page.$eval('#trial-cta', (e) => e.parentElement.hidden) && /\$78 a month, billed monthly and renewing automatically/.test(await billingText(o.page)) && !/Subscribing is not open yet/.test(await billingText(o.page)) && (await text(o.page, '#trial-count')).length > 0,
+    '12f with the processor not set up (free-only, founder 2026-10-15) there is NO Subscribe button anywhere, the card states the $78/month plan and its recurring billing, and the free trial still works');
   await o.page.evaluate(() => document.getElementById('subscribe').click()); // a script presses the hidden button anyway
   await settled(o.page);
   ok(o.checkouts.length === 0 && o.billingCalls.length === 1, '12f2 pressing the hidden button asks for nothing: no checkout is requested while the processor is not set up');
@@ -1925,8 +1925,8 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   const { ctx, page } = await open({ w });
   await page.waitForFunction(() => !document.getElementById('signup').hidden, null, { timeout: 8000 }).catch(() => {});
   ok(await page.$eval('#signup', (e) => !e.hidden) && /not part of a trial/.test(await text(page, '#trial-count')), '14a signed in with no account: the signup card shows');
-  ok(/100 free Development Activity reports\. Paid plans are coming/.test(await text(page, '#signup')) && await page.$eval('#signup-quote', (a) => a.getAttribute('href') === 'contact.html'),
-    '14b it states the offer in the founder\'s words and links brokerages to the contact page');
+  ok(/Professional plan is \$78 per month and includes 100 Development Activity reports each month/.test(await text(page, '#signup')) && !/free/i.test(await text(page, '#signup')) && await page.$eval('#signup-quote', (a) => a.getAttribute('href') === 'contact.html'),
+    '14b the signup card states $78 per month with 100 reports (no free reports) and links brokerages to the contact page');
   await page.click('#signup-go');
   ok(w.signedUp.length === 0 && /Type your name/.test(await text(page, '#signup-status')), '14c an empty name is stopped on the page: nothing is sent');
   await page.fill('#signup-name', '  Ann   Agent ');

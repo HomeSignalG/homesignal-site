@@ -10,7 +10,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { makeDeps } from './data.ts';
 import { makeHandler } from './handler.ts';
 import { withSafeLog } from '../_shared/safe-log.ts';
-import { CHECKOUT_ENABLED } from '../_shared/billing-switch.ts';
+import { CHECKOUT_ENABLED, PARTNER_OFFER_ENABLED } from '../_shared/billing-switch.ts';
 
 const url = Deno.env.get('SUPABASE_URL') ?? '';
 const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -24,4 +24,4 @@ const billing = {
 };
 
 // one fixed-text log line per request (name, status, milliseconds): _shared/safe-log.ts. Nothing from the request or the answer is ever logged.
-Deno.serve(withSafeLog('manage-billing', makeHandler({ ...makeDeps({ url, serviceKey, billing }, (input, init) => fetch(input, init)), checkoutEnabled: () => CHECKOUT_ENABLED }), (line) => console.log(line), () => Date.now()));
+Deno.serve(withSafeLog('manage-billing', makeHandler({ ...makeDeps({ url, serviceKey, billing }, (input, init) => fetch(input, init)), checkoutEnabled: () => CHECKOUT_ENABLED, partnerOffered: () => PARTNER_OFFER_ENABLED }), (line) => console.log(line), () => Date.now()));

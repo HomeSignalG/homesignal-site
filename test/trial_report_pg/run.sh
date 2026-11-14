@@ -40,4 +40,6 @@ P -f "$(docsql report-rate-limit)" >/dev/null 2>&1 || { echo "FAIL — the repor
 # Order L2 (docs/individual-agent-signup.sql): the trial function now also reads the account type, so the SQL it reads must be there (applied twice, as the others are)
 P -f "$root/docs/individual-agent-signup.sql" >/dev/null 2>&1 || { echo "FAIL — the individual signup does not apply"; exit 1; }
 P -f "$root/docs/individual-agent-signup.sql" >/dev/null 2>&1 || { echo "FAIL — the individual signup does not apply a second time"; exit 1; }
+P -f "$root/docs/paddle-billing.sql" >/dev/null 2>&1 || { echo "FAIL — the Paddle billing layer does not apply"; exit 1; }
+P -f "$root/docs/paddle-billing.sql" >/dev/null 2>&1 || { echo "FAIL — the Paddle billing layer does not apply a second time"; exit 1; }
 exec node "$here/roundtrip.mjs"

@@ -4,7 +4,7 @@
 //
 // WHO MAY CALL: whoever holds the webhook's signing secret, and nobody else. The Paddle-Signature header (`ts=...;h1=...`) must carry the HMAC-SHA256 of
 // "<ts>:<RAW request body>" under that secret, with ts inside the tolerance, compared in constant time and BEFORE the body is parsed
-// (_shared/paddle-billing.ts `verifySignature`). When the secret or either price id is not configured every request is refused: a missing secret must
+// (_shared/paddle-billing.ts `verifySignature`). When the secret or the Professional price id is not configured every request is refused: a missing secret must
 // never read as "no signature needed".
 //
 // WHAT IT DOES: turns a verified body into the one event the ledger records (`translate`), and records it for the brokerage a HomeSignal checkout
@@ -60,7 +60,7 @@ function reply(body: unknown, status = 200): Response {
 }
 
 export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
-  const configured = () => !!deps.secret && isPriceId(deps.prices.professional) && isPriceId(deps.prices.partner);
+  const configured = () => !!deps.secret && isPriceId(deps.prices.professional);
   return async (req: Request): Promise<Response> => {
     // a browser never calls this, so no CORS grant is made; the preflight is answered with nothing
     if (req.method === 'OPTIONS') return new Response(null, { status: 204 });

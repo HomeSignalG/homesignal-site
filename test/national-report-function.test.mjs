@@ -628,7 +628,7 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
   }
   ok(shape === 6, '9h an answer whose allotment is unknown, whose paid report names no month, or whose free report names one, is a failure and never a stored report (six shapes)', shape);
   reqs.length = 0;
-  d = mk([[/rpc\/billing_usage/, () => json([{ brokerage_id: 'b0b0b0b0-1111-4222-8333-444444444444', role: 'owner', state: 'paid', credit_limit: 100, credits_used: 1, credits_remaining: 99, period_ends_at: '2026-11-04T12:00:00+00:00' }])]]);
+  d = mk([[/rpc\/billing_usage/, () => json([{ brokerage_id: 'b0b0b0b0-1111-4222-8333-444444444444', role: 'owner', state: 'paid', credit_limit: 100, credits_used: 1, credits_remaining: 99, period_ends_at: '2026-11-04T12:00:00+00:00', access_ends_at: null }])]]);
   const pl = await d.planOf(USER);
   ok(pl.state === 'paid' && reqs.length === 1 && reqs[0].url === BASE + '/rest/v1/rpc/billing_usage' && JSON.parse(reqs[0].init.body).p_user_id === USER && Object.keys(JSON.parse(reqs[0].init.body)).length === 1,
     '9i the plan is ONE call to public.billing_usage by user id, through the shared reader (never an email, never a count made here)');

@@ -147,6 +147,7 @@ function mdeps(over = {}) {
     clientConfig: () => ('clientConfig' in over ? over.clientConfig : { environment: 'sandbox', token: 'test_0123456789abcdef' }),
     configured: () => over.configured ?? true,
     checkoutEnabled: () => over.checkoutEnabled ?? true,
+    partnerOffered: () => over.partnerOffered ?? true,   // the handler's logic is tested with the private offer ON; the committed default (false) is pinned in 2p1-2p3 below
     createCheckout: rec('createCheckout', over.createCheckout ?? (async () => ORIGIN + '/development-activity-reports.html?_ptxn=txn_abc#billing')),
     checkoutClaim: rec('checkoutClaim', over.checkoutClaim ?? (async () => ({ outcome: 'CLAIMED' }))),
     checkoutRelease: rec('checkoutRelease', over.checkoutRelease ?? (async () => undefined)),
@@ -344,7 +345,9 @@ async function hook(d, raw, { sig, method = 'POST', headers = {} } = {}) {
   r = await hook(wdeps({ prices: { professional: '', partner: PARTNER } }), undefined, { method: 'GET' });
   ok(r.json.configured === false, '3c and when the Professional price is missing');
   r = await hook(wdeps({ prices: { professional: PRO, partner: 'abc' } }), undefined, { method: 'GET' });
-  ok(r.json.configured === false, '3d and when the Private Partner price is not a Paddle price id');
+  ok(r.json.configured === true, '3d the webhook needs ONLY the Professional price: an absent or malformed Private Partner price (an offer that is not sold) does not stop Professional events');
+  r = await hook(wdeps({ prices: { professional: PRO, partner: '' } }), undefined, { method: 'GET' });
+  ok(r.json.configured === true, '3d2 with no Partner price at all it is still configured');
   r = await hook(wdeps(), undefined, { method: 'OPTIONS' });
   ok(r.status === 204 && r.acao === null, '3e a browser preflight is answered with nothing and no cross-origin grant: no page ever calls this');
   r = await hook(wdeps(), '{}', { method: 'PUT' });
@@ -353,7 +356,7 @@ async function hook(d, raw, { sig, method = 'POST', headers = {} } = {}) {
 {
   // not set up: every request refused, and the body is never trusted
   const raw = await body();
-  for (const [label, over] of [['no secret', { secret: '' }], ['no Professional price', { prices: { professional: '', partner: PARTNER } }], ['a malformed Partner price', { prices: { professional: PRO, partner: 'x' } }]]) {
+  for (const [label, over] of [['no secret', { secret: '' }], ['no Professional price', { prices: { professional: '', partner: PARTNER } }], ['a malformed Professional price', { prices: { professional: 'x', partner: PARTNER } }]]) {
     const r = await hook(wdeps(over), raw, { sig: pSig(over.secret === '' ? '' : SECRET, raw) });
     ok(r.status === 503 && r.json.error === 'not_set_up' && wcalls.length === 0, '3g with ' + label + ' EVERY request is refused 503, even one signed under the empty secret, and nothing is recorded');
   }
@@ -560,8 +563,16 @@ async function hook(d, raw, { sig, method = 'POST', headers = {} } = {}) {
   ok(/export const CHECKOUT_ENABLED = false;/.test(read('supabase/functions/_shared/billing-switch.ts')),
     '2sw4 the SHIPPED switch is off (free evaluation: the Terms say nothing is sold); turning it on is a reviewed edit of this file and this pin');
   const idx = read('supabase/functions/manage-billing/index.ts');
-  ok(/import \{ CHECKOUT_ENABLED \} from '\.\.\/_shared\/billing-switch\.ts'/.test(idx) && /checkoutEnabled: \(\) => CHECKOUT_ENABLED/.test(idx),
+  ok(/import \{ CHECKOUT_ENABLED, PARTNER_OFFER_ENABLED \} from '\.\.\/_shared\/billing-switch\.ts'/.test(idx) && /checkoutEnabled: \(\) => CHECKOUT_ENABLED/.test(idx),
     '2sw5 the deployed function reads the committed switch and nothing else (no environment setting can turn checkout on)');
+  // THE PRIVATE PARTNER OFFER IS NOT PUBLIC (founder, 2026-11-14): off in the committed switch, so neither listed nor startable by anyone.
+  ok(/export const PARTNER_OFFER_ENABLED = false;/.test(read('supabase/functions/_shared/billing-switch.ts')) && /partnerOffered: \(\) => PARTNER_OFFER_ENABLED/.test(idx),
+    '2p1 the SHIPPED partner switch is off and the deployed function reads it');
+  const stP = await ask(mdeps({ partnerOffered: false, configured: true }), { action: 'status' });
+  ok(stP.status === 200 && JSON.stringify(stP.json.offers) === '["professional"]', '2p2 with the partner switch off, status lists only Professional', stP.json);
+  const coP = await ask(mdeps({ partnerOffered: false, configured: true }), { action: 'checkout', offer: 'partner' });
+  ok(coP.status === 403 && coP.json.detail === 'offer_not_available', '2p3 with the partner switch off, a partner checkout is refused before the slot or Paddle is touched', coP);
+
 }
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);

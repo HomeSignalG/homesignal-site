@@ -3,3 +3,7 @@
 // settings are. It is a committed constant, not an environment setting, so turning checkout back on is a reviewed code change plus a deploy, never a
 // secret edit. It gates ONLY the start of a checkout: the plan status read and the webhook that records events for subscriptions that already exist are untouched.
 export const CHECKOUT_ENABLED = false;
+
+// The Private Partner Offer ($234 once, six months, individual agents) is NOT a public offer (founder, 2026-11-14): it never appears on the pricing page or in a signed-in
+// person's Billing card. Its checkout is a separate piece of work. While this is false manage-billing neither lists it nor starts it; the webhook still understands a grant.
+export const PARTNER_OFFER_ENABLED = false;

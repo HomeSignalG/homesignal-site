@@ -49,8 +49,8 @@ ok(!/development-activity-reports/.test(read('sitemap.xml')) && !/development-ac
   const landing = read('development-activity.html').replace(/<!--[\s\S]*?-->/g, '').replace(/<script[\s\S]*?<\/script>/g, '');
   const links = landing.match(/development-activity-reports[^"'\s<]*/g) || [];
   // Founder, 2026-10-17: the Free column links "My reports" so a visitor knows where to start. That is the plain page, never the Billing card.
-  ok(links.length === 1 && links[0] === 'development-activity-reports.html' && /<a class="mbtn" href="development-activity-reports\.html" id="daMyReports">/.test(landing),
-    '1f free-only (founder, 2026-10-15): the landing page does not link the Billing card (the Join link is gone); its one link is the plain "My reports" start link (2026-10-17)', links);
+  ok(links.length === 1 && links[0] === 'development-activity-reports.html#billing' && /<a class="mbtn" href="development-activity-reports\.html#billing" id="daProfessional">Get Started<\/a>/.test(landing),
+    '1f founder, 2026-11-14: the landing page\'s one link here is Professional\'s Get Started, which goes to the Billing card (where the owner signs in and the signed checkout is made)', links);
 }
 ok(/<meta name="referrer" content="no-referrer">/.test(page), '1g it sends no referrer');
 // 1h. THE SITE BAR (founder, 2026-10-11): this page is a standalone document on purpose (no shell: the shell boots account hydration, a follows sync and a
@@ -274,6 +274,16 @@ ok(/sessionEpoch\+\+;/.test(code) && /var epochAtAsk = sessionEpoch;/.test(code)
   const iTrial = body.indexOf('id="trial"');
   ok(iTrial > 0 && iTrial < iHeaderEnd && body.indexOf('id="trial-cta"') < iHeaderEnd && body.indexOf('id="trial-count"') < iHeaderEnd, '11c the report usage and its Subscribe / Manage plan action are in the header account strip, not above the form');
   ok(!/<section class="card" id="trial"/.test(body), '11d usage is no longer a large card');
+}
+
+// founder, 2026-11-14: a NEW individual account has no free reports. The page holds no number of its own (the database reports a free limit of 0) and says so in words.
+{
+  const page = read('development-activity-reports.html');
+  ok(!/100 free (Development Activity )?reports/i.test(page.replace(/<!--[\s\S]*?-->/g, '')) && !/Paid plans are coming/.test(page) && !/start with 100 free/.test(page),
+    '5a no "100 free reports", "Paid plans are coming" or "start with 100 free" wording remains on the Reports page');
+  ok(/freeLimit === 0 && !isPaid\(\)/.test(page) && /No reports yet/.test(page) && /Subscribe to make your first report/.test(page) && /needs an active Professional plan to make a report/.test(page),
+    '5b a free limit of 0 reads "No reports yet" and says a plan is needed, instead of "0 of 0 free reports used"');
+  ok(/\$78 per month and includes 100 reports each month/.test(page), '5c the signup card and the Billing card state $78 per month with 100 reports each month');
 }
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
