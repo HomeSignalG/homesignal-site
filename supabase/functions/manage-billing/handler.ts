@@ -1,5 +1,5 @@
 // manage-billing — a brokerage member reads their plan, and a brokerage OWNER starts the monthly checkout (Development Activity build step 11;
-// docs/development-activity-build-steps-100526.md: "$79/month checkout on the existing Lemon Squeezy connection: 100 reports a month, Billing tab").
+// docs/development-activity-build-steps-100526.md: "monthly checkout (since corrected to $78) on the existing Lemon Squeezy connection: 100 reports a month, Billing tab").
 //
 // TWO ACTIONS:
 //   status    { action: "status" }     the caller's plan: its state, this month's allotment, the caller's own role, and whether the caller may start a checkout.
@@ -33,6 +33,9 @@ export { DataUnavailable };
 /** The processor could not give a checkout. The reason is for the log, never for the browser. */
 export class CheckoutUnavailable extends Error {}
 
+/** What the browser is given to open Paddle's overlay: the environment, Paddle.js's PUBLIC client-side token, and the id of a transaction THIS SERVER made. Never an account id, a price or a secret. */
+export type PaddleCheckout = { environment: 'production' | 'sandbox'; token: string; transaction_id: string };
+
 export type Deps = AdminGateDeps & {
   usageOf: (userId: string) => Promise<BillingUsage | null>;
   /** Whether the processor's settings are all present. A boolean: the values never leave the server. */
@@ -40,6 +43,10 @@ export type Deps = AdminGateDeps & {
   /** The committed kill switch (_shared/billing-switch.ts). False refuses every checkout. */
   checkoutEnabled: () => boolean;
   createCheckout: (brokerageId: string) => Promise<string>;
+  /** Paddle (docs/paddle-billing-2026-11-14.md): whether its settings are all present, whether it is the processor in use, whether its checkout may open, and the server-made transaction. */
+  paddleConfigured: () => boolean;
+  paddleEnabled: () => boolean;
+  createPaddleTransaction: (brokerageId: string) => Promise<PaddleCheckout>;
   /** The brokerage's single checkout slot (docs/da-owner-safeguards.sql, part C): one open checkout at a time. */
   checkoutClaim: (brokerageId: string) => Promise<CheckoutSlot>;
   checkoutRelease: (brokerageId: string) => Promise<void>;
@@ -47,13 +54,13 @@ export type Deps = AdminGateDeps & {
 
 export const CAPABILITY = {
   product: 'HOMESIGNAL DEVELOPMENT ACTIVITY',
-  method: 'POST { action: "status" } | { action: "checkout" }',
+  method: 'POST { action: "status" } | { action: "checkout" } | { action: "paddle_checkout" }',
   access: 'signed-in brokerage member; status for any member, checkout for the brokerage owner only',
   writes: [],
 };
 
 /** The fields each action may carry. Anything else is a malformed request. */
-const FIELDS: Record<string, string[]> = { status: ['action'], checkout: ['action'] };
+const FIELDS: Record<string, string[]> = { status: ['action'], checkout: ['action'], paddle_checkout: ['action'] };
 
 /**
  * Who may start a checkout and why not: the ONE reading of it, used by `status` to say so and by `checkout` to refuse. A checkout is offered only
@@ -92,8 +99,13 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
     try {
       const usage = await deps.usageOf(who.userId);
       if (!usage) return reply(req, { error: 'forbidden' }, 403);     // no brokerage, no billing
-      const availability = checkoutAvailability(usage, deps.configured(), deps.checkoutEnabled());
-      if (action === 'status') return reply(req, { status: 'OK', plan: planSummary(usage), checkout: availability });
+      // Paddle is the processor in use whenever its settings are present; Lemon Squeezy stays as it was for a deployment that has only its settings.
+      const paddle = deps.paddleConfigured();
+      const availability = paddle ? checkoutAvailability(usage, true, deps.paddleEnabled()) : checkoutAvailability(usage, deps.configured(), deps.checkoutEnabled());
+      if (action === 'status') return reply(req, { status: 'OK', plan: planSummary(usage), checkout: availability, paddle });
+      // each action belongs to one processor: the other one's is refused before anything is claimed or asked
+      if (action === 'paddle_checkout' && !paddle) return reply(req, { error: 'billing_not_set_up' }, 503);
+      if (action === 'checkout' && paddle) return reply(req, { error: 'wrong_processor' }, 409);
 
       // checkout: an owner, not already paid, with the processor set up
       if (availability === 'not_owner') return reply(req, { error: 'forbidden', detail: 'owner_only' }, 403);
@@ -105,13 +117,15 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
       // checkouts: the second is told one was just opened. No slot, no checkout: a failed claim is a 502.
       const slot = await deps.checkoutClaim(usage.brokerage_id);
       if (slot.outcome === 'BUSY') return reply(req, { error: 'checkout_in_progress' }, 409);
-      let url: string;
+      let url: string | undefined, paddleCheckout: PaddleCheckout | undefined;
       try {
-        url = await deps.createCheckout(usage.brokerage_id);
+        if (action === 'paddle_checkout') paddleCheckout = await deps.createPaddleTransaction(usage.brokerage_id);
+        else url = await deps.createCheckout(usage.brokerage_id);
       } catch (e) {
         await deps.checkoutRelease(usage.brokerage_id).catch(() => { /* the slot frees itself in two minutes */ });
         throw e;
       }
+      if (paddleCheckout) return reply(req, { status: 'OK', paddle: paddleCheckout });
       return reply(req, { status: 'OK', url });
     } catch (e) {
       if (e instanceof CheckoutUnavailable) return reply(req, { error: 'checkout_unavailable' }, 502);

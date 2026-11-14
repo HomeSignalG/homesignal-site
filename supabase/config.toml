@@ -64,3 +64,8 @@ verify_jwt = true
 # an event for the brokerage a HomeSignal checkout named (public.billing_event_apply) and writes nothing else.
 [functions.development-activity-billing-webhook]
 verify_jwt = false
+
+# Paddle's signed subscription events (2026-11-14). Same posture as the Lemon webhook above: Paddle sends no Supabase token, so the Paddle-Signature HMAC over the raw
+# body is the only credential, and the function refuses every request when no Paddle environment's secret and price are configured.
+[functions.development-activity-paddle-webhook]
+verify_jwt = false

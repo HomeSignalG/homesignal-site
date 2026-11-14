@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: https://*.paddle.com; font-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.paddle.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.paddle.com; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co https://checkout-service.paddle.com https://sandbox-checkout-service.paddle.com; frame-src https://buy.paddle.com https://sandbox-buy.paddle.com; form-action 'self'">
 <meta name="referrer" content="no-referrer">
 <title>HomeSignal — Development Activity reports</title>
 <meta name="description" content="Make Development Activity reports for your brokerage's HomeSignal trial.">
@@ -641,6 +641,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 <script src="lib/da-report-view.js?v=39cc47d8"></script>
 <script src="lib/da-report-compare.js?v=a97e336e"></script>
 <script src="lib/share-modal.js?v=971e0041"></script>
+<script src="paddle-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script>
 // ============================================================================
@@ -675,7 +676,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   function freeWords(){ return freeLimit === null ? 'free reports' : freeLimit + ' free reports'; }
   var acctType = null;  // 'individual' | 'brokerage' | null: what the trial function says; it only changes WORDS, the database decides what is allowed
   function mine(){ return acctType === 'individual'; }
-  var plan = null, checkoutState = null, subscribing = false; // build step 11: the brokerage's plan as the billing function tells it, whether this person may start a checkout, and a checkout being opened
+  var plan = null, checkoutState = null, paddleOn = false, subscribing = false; // build step 11: the brokerage's plan as the billing function tells it, whether this person may start a checkout, and a checkout being opened
   var watchFor = null, watchId = null, watchBusy = false; // build step 9: the saved report on screen that can be watched, its watch (if any), and a start or stop in flight
   var step = 'email', pendingEmail = '';
   // One options value for the first send AND the resend, so the two cannot differ.
@@ -921,8 +922,8 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     var r = await post(BILLING_FN, { action: 'status' });
     var b = r.body;
     if (r.status === 200 && b && b.status === 'OK' && b.plan && typeof b.plan.state === 'string' && typeof b.plan.credits_remaining === 'number') {
-      plan = b.plan; checkoutState = typeof b.checkout === 'string' ? b.checkout : null;
-    } else { plan = null; checkoutState = null; }
+      plan = b.plan; checkoutState = typeof b.checkout === 'string' ? b.checkout : null; paddleOn = b.paddle === true;
+    } else { plan = null; checkoutState = null; paddleOn = false; }
   }
   /** Show the trial and the plan together, for a person the trial function has just answered about. */
   async function present(a, trial, note){
@@ -958,9 +959,73 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   function checkoutOk(url){
     try { var u = new URL(url); var h = u.hostname.toLowerCase(); return u.protocol === 'https:' && !u.username && !u.password && (h === 'lemonsqueezy.com' || /\.lemonsqueezy\.com$/.test(h)); } catch (e) { return false; }
   }
+  // ---- Paddle (docs/paddle-billing-2026-11-14.md). The SERVER makes the transaction for the signed-in account (manage-billing paddle_checkout): the price, the account it binds to and its signature
+  // are fixed there, and this page is given only the environment, Paddle.js's PUBLIC client token and the transaction's id. Paying changes NOTHING here: access exists only when Paddle's SIGNED event
+  // reaches HomeSignal's server, so after the overlay reports a completed payment the page just asks the billing function again until it says the plan is paid.
+  var paddleJs = null;   // the one Paddle.js instance, and the settings it was started with
+  function paddleEnv(e){ return e === 'live' || e === 'production' ? 'production' : e === 'sandbox' ? 'sandbox' : null; }
+  function loadPaddleScript(){
+    return new Promise(function (resolve, reject) {
+      if (window.Paddle) { resolve(window.Paddle); return; }
+      var sc = document.createElement('script');
+      sc.src = 'https://cdn.paddle.com/paddle/v2/paddle.js'; sc.async = true;
+      sc.onload = function () { window.Paddle ? resolve(window.Paddle) : reject(new Error('paddle')); };
+      sc.onerror = function () { reject(new Error('paddle')); };
+      document.head.appendChild(sc);
+    });
+  }
+  /** Start Paddle.js once. The token must match the environment (live_ for production, test_ for sandbox), and a second request for a different one is refused. */
+  async function startPaddle(environment, token){
+    var env = paddleEnv(environment);
+    if (!env || typeof token !== 'string' || token.indexOf(env === 'production' ? 'live_' : 'test_') !== 0) throw new Error('config');
+    if (paddleJs) { if (paddleJs.env !== env || paddleJs.token !== token) throw new Error('mismatch'); return paddleJs.paddle; }
+    var Paddle = await loadPaddleScript();
+    if (env === 'sandbox') Paddle.Environment.set('sandbox');
+    Paddle.Initialize({ token: token, eventCallback: onPaddleEvent });
+    paddleJs = { paddle: Paddle, env: env, token: token };
+    return Paddle;
+  }
+  /** The page-load start that makes a default-payment-link visit (?_ptxn=...) open its checkout: only when this deployment has set its public config. */
+  async function startConfiguredPaddle(){
+    var c = window.HS_PADDLE;
+    if (!c || !c.environment || !c.token) return;
+    try { await startPaddle(c.environment, c.token); } catch (e) { /* unconfigured or unreachable: checkout stays as the billing function reports it */ }
+  }
+  var confirming = 0;
+  function onPaddleEvent(ev){
+    if (!ev || typeof ev.name !== 'string') return;
+    if (ev.name === 'checkout.completed') { billingSay('Payment received. Confirming it with the payment service. This usually takes under a minute.', false); confirmPayment(++confirming); }
+    else if (ev.name === 'checkout.closed') { subscribing = false; $('subscribe').disabled = false; }
+  }
+  /** Ask the billing function until it says the plan is paid. The checkout's own success event proves nothing: only the server's answer opens access. */
+  async function confirmPayment(token){
+    for (var i = 0; i < 24 && token === confirming; i++) {
+      await new Promise(function (r) { setTimeout(r, i < 3 ? 2000 : 5000); });
+      if (token !== confirming || !session) return;
+      await refreshBilling(true);
+      if (plan && plan.state === 'paid') { billingSay('Your plan is active.', false); return; }
+    }
+    if (token === confirming) billingSay('Your payment is taking longer than usual to confirm. Press Check again in a few minutes. You will not be charged twice.', false);
+  }
+  async function paddleCheckout(){
+    var r = await post(BILLING_FN, { action: 'paddle_checkout' });
+    var b = r.body || {};
+    var pc = b.paddle;
+    if (r.status === 200 && b.status === 'OK' && pc && typeof pc.transaction_id === 'string' && /^txn_[a-z0-9]{20,40}$/.test(pc.transaction_id)) {
+      var Paddle;
+      try { Paddle = await startPaddle(pc.environment, pc.token); } catch (e) { billingSay('The payment page could not be opened just now. Try again in a minute.', true); return; }
+      billingSay('', false);
+      var email = session && session.user && typeof session.user.email === 'string' ? session.user.email : null;
+      Paddle.Checkout.open({ transactionId: pc.transaction_id, settings: { displayMode: 'overlay', variant: 'one-page' }, ...(email ? { customer: { email: email } } : {}) });
+      return;
+    }
+    billingSay(billingMessage(r.status, b), true);
+    if (r.status === 409 || r.status === 403) await refreshBilling(true);
+  }
   async function subscribe(){
     if (subscribing || !session || !plan || plan.role !== 'owner' || checkoutState !== 'available') return;
     subscribing = true; $('subscribe').disabled = true; billingSay('Opening the payment page…', false);
+    if (paddleOn) { await paddleCheckout(); subscribing = false; $('subscribe').disabled = false; return; }
     var r = await post(BILLING_FN, { action: 'checkout' });
     subscribing = false; $('subscribe').disabled = false;
     var b = r.body || {};
@@ -2081,6 +2146,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     window.addEventListener('resize', closeMenuIfMoved);
     client.auth.getSession().then(function(res){ onSession(res && res.data ? res.data.session : null); });
     client.auth.onAuthStateChange(function(evt, s){ onSession(s); });
+    startConfiguredPaddle();   // loads Paddle.js only where this deployment set its public config; makes a default-payment-link visit (?_ptxn=) open its checkout
   });
 })();
 </script>

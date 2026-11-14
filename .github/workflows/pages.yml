@@ -308,6 +308,15 @@ jobs:
           set -euo pipefail
           python3 scripts/brand_stage.py --dir _site --identity "$(python3 scripts/brand_host.py --identity)" | tee -a "$RUNNER_TEMP/receipts.txt"
 
+      # Paddle's PUBLIC browser settings (2026-11-14). The environment and the client-side token come from repository VARIABLES (not secrets: Paddle.js needs them in the
+      # browser) and are written into the artifact only; the committed paddle-config.js stays the empty safe default. Unset = no Paddle.js. Set but wrong (a token whose
+      # prefix is not the environment's) = the build FAILS, so checkout can never silently point at the wrong Paddle account.
+      - name: Write Paddle public config
+        env:
+          PADDLE_ENVIRONMENT: ${{ vars.PADDLE_ENVIRONMENT }}
+          PADDLE_CLIENT_TOKEN: ${{ vars.PADDLE_CLIENT_TOKEN }}
+        run: python3 scripts/write_paddle_config.py --dir _site | tee -a "$RUNNER_TEMP/receipts.txt"
+
       # `deploy` precedes `indexnow`, so a failed notification leaves its pages live and inside the
       # NEXT baseline: they would never differ again. Pick them up from the earlier run's stored
       # delta, so a notification outage self-heals on the next build with no one asked to act.

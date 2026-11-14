@@ -86,7 +86,7 @@ ok(/shouldCreateUser:\s*true/.test(code) && !/shouldCreateUser:\s*false/.test(co
 
 // ---- 3. two functions, no decisions -----------------------------------------------------------------------------------------------------------
 const urls = [...new Set([...code.matchAll(/https:\/\/[^'"\s)]+/g)].map((m) => m[0]))];
-ok(JSON.stringify(urls) === JSON.stringify(['https://qwnnmljucajnexpxdgxr.supabase.co'])
+ok(JSON.stringify(urls) === JSON.stringify(['https://qwnnmljucajnexpxdgxr.supabase.co', 'https://cdn.paddle.com/paddle/v2/paddle.js'])
    && /var REPORT_FN = SB_URL \+ '\/functions\/v1\/get-development-activity-report';/.test(code) && /var TRIAL_FN = SB_URL \+ '\/functions\/v1\/development-activity-trial';/.test(code)
    && /var SHARE_FN = SB_URL \+ '\/functions\/v1\/manage-shared-report';/.test(code) && /var WATCH_FN = SB_URL \+ '\/functions\/v1\/manage-property-watch';/.test(code)
    && /var BILLING_FN = SB_URL \+ '\/functions\/v1\/manage-billing';/.test(code)
@@ -100,8 +100,8 @@ ok(!/canonicalLifecycle|classifyProjectType|STAGE_EVIDENCE|presentationStage|rep
 ok(/V\.mount\(\$\('report'\), body, \{ subject: address, label: field\('label'\), brokerage: hd\.brokerage, agent: hd\.agent, live: shareable \? \['share', 'watch', 'pdf', 'compare'\] : \['share', 'pdf'\], hide: COMPARE_AT_LAUNCH \? \[\] : \['compare'\] \}\)/.test(code) && /<script src="lib\/da-report-view\.js\?v=[0-9a-f]{8}"><\/script>/.test(page),
   '3e the report is drawn by the shared view (lib/da-report-view.js), loaded with its content key');
 const csp = /http-equiv="Content-Security-Policy" content="([^"]*)"/.exec(page)[1];
-ok(/connect-src 'self' https:\/\/qwnnmljucajnexpxdgxr\.supabase\.co wss:\/\/qwnnmljucajnexpxdgxr\.supabase\.co;/.test(csp) && /script-src 'self' 'unsafe-inline' https:\/\/cdn\.jsdelivr\.net;/.test(csp),
-  '3f the page may connect only to itself and this Supabase project', csp);
+ok(/connect-src 'self' https:\/\/qwnnmljucajnexpxdgxr\.supabase\.co wss:\/\/qwnnmljucajnexpxdgxr\.supabase\.co https:\/\/checkout-service\.paddle\.com https:\/\/sandbox-checkout-service\.paddle\.com;/.test(csp) && /script-src 'self' 'unsafe-inline' https:\/\/cdn\.jsdelivr\.net https:\/\/cdn\.paddle\.com;/.test(csp),
+  '3f the page may connect only to itself, this Supabase project and (2026-11-14) Paddle\'s two checkout services; scripts only from itself, jsDelivr and cdn.paddle.com (pinned whole in test/paddle-checkout-page.test.mjs)', csp);
 const showTrial = fn('showTrial');
 const canMake = fn('canMake');
 ok(/\$\('go'\)\.disabled = busy \|\| !canMake\(\);/.test(showTrial) && /!canMake\(\)/.test(fn('run'))

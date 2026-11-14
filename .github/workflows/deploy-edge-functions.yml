@@ -102,6 +102,12 @@ jobs:
             supabase functions deploy "$FN" --yes \
               --project-ref "$SUPABASE_PROJECT_REF" \
               --no-verify-jwt
+          elif [ "$FN" = "development-activity-paddle-webhook" ]; then
+            # (4) the Paddle twin of (3), on the same terms: Paddle sends no Supabase token, so the Paddle-Signature HMAC
+            # over the raw body is the only credential, and the function refuses everything when no environment's secret is set.
+            supabase functions deploy "$FN" --yes \
+              --project-ref "$SUPABASE_PROJECT_REF" \
+              --no-verify-jwt
           else
             supabase functions deploy "$FN" --yes \
               --project-ref "$SUPABASE_PROJECT_REF"

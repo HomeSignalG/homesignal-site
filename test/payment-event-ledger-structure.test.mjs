@@ -141,12 +141,12 @@ ok(/constraint payment_event_idempotency\s+unique \(processor, idempotency_key\)
 ok(/\(r\.subscription_ref, r\.event_name, r\.processor_status, r\.occurred_at, r\.product_ref, r\.variant_ref, r\.livemode\)\s+is distinct from \(v_sub, v_name, v_status, v_occ, v_prod, v_var, v_live\) then\s+raise exception 'payment_event: this idempotency key was already recorded for a different event'\s+using errcode = '23505', constraint = 'payment_event_idempotency_key_reused'/.test(RECORDER.body),
   '6c: a key that was already recorded for a DIFFERENT event — any difference in subscription, event, status, time, product, variant or mode — is refused (23505, a named constraint) the moment the two differ, with no other condition between the comparison and the refusal, instead of being returned as a duplicate');
 const elses = [...MAP.body.matchAll(/\belse\s+'([^']*)'/g)].map((m) => m[1]);
-ok(elses.length === 2 && elses.every((e) => e === 'unknown') && count(CODE, /\bcase\b/gi) === 2 && /when p_processor = 'lemonsqueezy' then/.test(MAP.body),
-  '6d: the ONE mapping has exactly two fall-through branches (a status it does not know, a processor it does not know) and both are \'unknown\' — never \'active\'', elses.join(','));
+ok(elses.length === 3 && elses.every((e) => e === 'unknown') && count(CODE, /\bcase\b/gi) === 3 && /when p_processor = 'lemonsqueezy' then/.test(MAP.body) && /when p_processor = 'paddle' then/.test(MAP.body),
+  '6d: the ONE mapping has one fall-through for a status it does not know inside each of its two reviewed processor branches (Lemon Squeezy, Paddle) and one for a processor it does not know, all three \'unknown\' (the case count is pinned too) (a status it does not know, a processor it does not know) and both are \'unknown\' — never \'active\'', elses.join(','));
 const mapped = [...MAP.body.matchAll(/then\s+'(\w+)'/g)].map((m) => m[1]);
-ok(JSON.stringify([...new Set(mapped)].sort()) === JSON.stringify(['active', 'canceled', 'past_due', 'paused', 'trialing', 'unpaid']) && mapped.length === 7
+ok(JSON.stringify([...new Set(mapped)].sort()) === JSON.stringify(['active', 'canceled', 'past_due', 'paused', 'trialing', 'unpaid']) && mapped.length === 14
    && /mapped_status in \('trialing', 'active', 'paused', 'past_due', 'unpaid', 'canceled', 'unknown'\)/.test(TABLE),
-  '6e: the mapping produces only the six known values (seven words map to them: expired and cancelled both to canceled), and the table closes the vocabulary at those six plus \'unknown\'', mapped.join(','));
+  '6e: the mapping produces only the six known values (seven Lemon Squeezy words and seven Paddle words map to them: expired, cancelled, refunded and charged_back all end in canceled), and the table closes the vocabulary at those six plus \'unknown\'', mapped.join(','));
 ok(/pg_advisory_xact_lock\(hashtextextended\(/.test(RECORDER.body) && RECORDER.body.indexOf('pg_advisory_xact_lock') < RECORDER.body.indexOf('insert into public.payment_event'),
   '6f: calls for one subscription are serialised by a transaction-scoped advisory lock taken BEFORE the insert, so is_latest is accurate for events recorded at the same moment');
 ok(/livemode/.test(LATEST.body) && /p_livemode/.test(LATEST.body) && /v_live::text/.test(RECORDER.body),
@@ -204,7 +204,7 @@ ok(scanned.length > 100 && namesLedger.includes(SQL_PATH),
 const BILLING_SQL_PATH = 'docs/brokerage-billing.sql', BILLING_READS_PATH = 'supabase/functions/_shared/billing-reads.ts';
 const billingCode = stripSql(read(BILLING_SQL_PATH));
 const readsCode = read(BILLING_READS_PATH).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-ok(namesLedger.every((f) => [SQL_PATH, WF_PATH, BILLING_SQL_PATH, BILLING_READS_PATH].includes(f)) && namesLedger.includes(BILLING_SQL_PATH) && namesLedger.includes(BILLING_READS_PATH)
+ok(namesLedger.every((f) => [SQL_PATH, WF_PATH, BILLING_SQL_PATH, BILLING_READS_PATH, 'docs/paddle-billing.sql'].includes(f)) && namesLedger.includes(BILLING_SQL_PATH) && namesLedger.includes(BILLING_READS_PATH)
    && (billingCode.match(/public\.payment_event_record\(/g) || []).length === 2 && /select \* into r from public\.payment_event_record\(p_event\);/.test(billingCode)
    && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(only\s+)?public\.payment_event\b/i.test(billingCode)
    && (readsCode.match(/\bpayment_event\w*/g) || []).join() === 'payment_event' && /\/\^payment_event:\|\^billing_event_apply:\//.test(readsCode),
@@ -212,7 +212,7 @@ ok(namesLedger.every((f) => [SQL_PATH, WF_PATH, BILLING_SQL_PATH, BILLING_READS_
 const fnDirs = readdirSync(join(ROOT, 'supabase/functions'));
 const processorDirs = fnDirs.filter((d) => /lemon|squeez|payment|webhook|checkout|stripe|billing/i.test(d)).sort();
 ok(fnDirs.length >= 5 && fnDirs.includes('get-address-report') && !fnDirs.includes('lemonsqueezy-webhook')
-   && JSON.stringify(processorDirs) === '["development-activity-billing-webhook","manage-billing"]',
+   && JSON.stringify(processorDirs) === '["development-activity-billing-webhook","development-activity-paddle-webhook","manage-billing"]',
   '9b: the map product\'s user-scoped processor webhook (lemonsqueezy-webhook) is NOT in this repo (it lives in homesignal-ingest and stays there); the only function directories here that are a webhook, a checkout or a payment handler are the two build step 11 added for a BROKERAGE\'s subscription — manage-billing and development-activity-billing-webhook, exactly these (control: the directory lists other functions)', fnDirs.join(','));
 ok(!/\b(lemonsqueezy|lemon squeezy)\b/i.test(CODE) && /'lemonsqueezy'/.test(MAP.body),
   '9c: the only processor named in executable code is the mapping\'s one reviewed branch for it; the recorder, the table and the ordering are processor-neutral');
