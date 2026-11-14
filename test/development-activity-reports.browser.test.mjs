@@ -197,7 +197,7 @@ function world({ trial = 'active', used = 0, admin = false, untraceable = false,
     ...gate,
     usageOf: async () => { if (w.billingFails) throw new RH.DataUnavailable('x'); return usage(); },
     accountTypeOf: async () => w.acctType || 'brokerage',
-    clientConfig: () => w.clientCfg || null,
+    clientConfig: () => w.clientCfg || null, partnerOffered: () => true,
     configured: () => w.configured, checkoutEnabled: () => true,
     createCheckout: async (_b, offer) => { w.offerAsked = offer; if (w.checkoutFails) throw new BH.CheckoutUnavailable('x'); w.checkoutMade++; return CHECKOUT_URL; },
     // the brokerage's single checkout slot (audit item D): held for ten minutes by whoever claimed it; the address of a checkout is kept nowhere
