@@ -136,9 +136,9 @@
 <script src="config.js"></script>
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
-<script src="lib/data.js?v=4dd6cfeb"></script>
+<script src="lib/data.js?v=4033ae3a"></script>
 <script src="lib/topic-prefs.js?v=fe87d99b"></script>
-<script src="lib/templates.js?v=0418fd07"></script>
+<script src="lib/templates.js?v=7373e258"></script>
 <script src="lib/project-type.js?v=ed9e58be"></script>
 <script src="lib/premium-waitlist.js?v=3cb9baaf"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
@@ -239,7 +239,7 @@
   // ---- the local records column --------------------------------------------------------
   // The list beside the map is HS.data.projects(zip): local permit and planning records, in
   // the order the read returns them, the first three only when the read is complete. It does
-  // not claim to be every Map 1 marker (the map also draws other planes). Type and lifecycle
+  // includes the data-centre listings Map 1 draws (zipDevelopment, 2026-11-14), labelled third-party. Type and lifecycle
   // labels come from lib/project-type.js and are never decided here.
   var esc = function (s) { return HS.esc(s == null ? '' : String(s)); };
   function isHttp(u) { return /^https?:\/\//i.test(String(u || '')); }
@@ -250,6 +250,16 @@
     var badges = (t ? '<span class="home-index__badge" data-type-key="' + esc(t.typeKey) + '">' + esc(t.label) + '</span>' : '')
       + (lc ? '<span class="home-index__badge home-index__badge--stage" data-lifecycle="' + esc(lc.key) + '">' + esc(lc.label) + '</span>' : '');
     var name = esc(p.name || 'Development record');
+    // A data-centre listing has no HomeSignal record page: its name opens the page its source
+    // cites, and it says it is a third-party listing (2026-11-14).
+    if (HS.tpl && HS.tpl.isThirdPartyListing && HS.tpl.isThirdPartyListing(p)) {
+      var lh = HS.tpl.recordHref(p);
+      return '<article class="home-index__record" data-provenance="third_party_listing">'
+        + (badges ? '<div class="home-index__record-badges">' + badges + '</div>' : '')
+        + (lh ? '<a class="home-index__record-name" href="' + esc(lh) + '" target="_blank" rel="noopener">' + name + '</a>' : '<span class="home-index__record-name">' + name + '</span>')
+        + '<div class="home-index__record-meta">' + esc(HS.tpl.browsingStatusLabel(p)) + (p.source_name ? ' · ' + esc(p.source_name) : '') + '</div>'
+        + '</article>';
+    }
     var title = p.id
       ? '<a class="home-index__record-name" href="development.html?id=' + encodeURIComponent(p.id) + '">' + name + '</a>'
       : '<span class="home-index__record-name">' + name + '</span>';
@@ -265,11 +275,13 @@
   function setRecordsMessage(text) { $('homeRecordList').innerHTML = '<p class="home-index__records-note">' + esc(text) + '</p>'; }
   async function loadRecords(zip, runId, emptyText) {
     var projects = null;
-    try { projects = await HS.data.projects(zip, null); } catch (e) { projects = null; }
+    try { projects = await (HS.data.zipDevelopment ? HS.data.zipDevelopment(zip, null) : HS.data.projects(zip, null)); } catch (e) { projects = null; }
     if (runId !== homeSearchRunId) return;
     if (!projects || projects.complete !== true) { setRecordsMessage('Recent development list unavailable right now.'); return; }
     if (!projects.length) { setRecordsMessage(emptyText); return; }
-    $('homeRecordList').innerHTML = projects.slice(0, 3).map(recordCard).join('');
+    // pickTopCards keeps the read's order and gives the first data-centre listing a slot.
+    var top = (HS.tpl && HS.tpl.pickTopCards) ? HS.tpl.pickTopCards(projects, 3).shown : projects.slice(0, 3);
+    $('homeRecordList').innerHTML = top.map(recordCard).join('');
   }
 
   // ---- search ------------------------------------------------------------------------

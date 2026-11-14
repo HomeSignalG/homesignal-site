@@ -99,6 +99,22 @@ console.log('\n2. A third-party listing is never presented as an official filing
   ok(!T.isThirdPartyListing(auth) && T.browsingStatusLabel(auth) === 'Approved' && /development\.html\?id=1/.test(T.devCard(auth)), '2i an official record\'s card is unchanged');
 }
 
+console.log('\n2b. The card says whose word the status is and where its link goes (2026-11-14)');
+{
+  const UC = Object.assign({}, BEHRING, { source_key: 'dc:uc', map_status: 'Approved', raw_status: 'under_construction', normalized_status: 'under_construction' });
+  const HS = load({ app_projects_for_zip: { data: [], error: null }, map1_dc_zip_members: { data: [BEHRING, UC], error: null } });
+  const r = await HS.data.zipDevelopment('94612', null);
+  const T = HS.tpl;
+  const b = r.find((p) => p.id === BEHRING.source_key), u = r.find((p) => p.id === 'dc:uc');
+  ok(T.browsingStatusLabel(u) === 'Approved · listed as under construction', '2b1 the map column and the source\'s own word, when they differ');
+  ok(/^Listed as under construction by Compute Atlas/.test(u.sowhat), '2b2 the record line uses the source\'s word');
+  ok(T.browsingStatusLabel(b) === 'Proposed · third-party listing', '2b3 the same word is not repeated');
+  const card = T.devCard(b);
+  ok(/Opens kqed\.org, the page Compute Atlas \(Edward Kubiak\) cites/.test(card), '2b4 the card names the host its link opens and that the source cites it');
+  const off = T.linkNote({ record_url: 'https://city.example/r/1' }, 'https://city.example/r/1');
+  ok(!/the page .* cites/.test(off), '2b5 an official record\'s link note is unchanged');
+}
+
 console.log('\n3. Failures are reported, never read as "none"');
 {
   const HS = load({ app_projects_for_zip: { data: [devRow(1, 'Approved')], error: null }, map1_dc_zip_members: { data: null, error: { message: 'boom' } } });
@@ -124,6 +140,15 @@ console.log('\n4. Both list pages read the one combiner; no page re-decides memb
     ok(!/zip_membership|map1_dc_zip_members|provenance_kind\s*=/.test(s), `4d ${n} decides neither membership nor provenance`);
   }
   ok(/isThirdPartyListing\(p\)/.test(dv), '4e development.html sends a listing to its source, not to a dossier');
+  // Every page that lists a ZIP's development reads the combiner; a direct projects() call is
+  // only the fallback beside it (2026-11-14).
+  for (const f of ['lib/community-page.js', 'development.html', 'property.html', 'properties.html', 'index.html']) {
+    const src = exec(read(f));
+    const direct = (src.match(/HS\.data\.projects\(/g) || []).length;
+    const combined = (src.match(/HS\.data\.zipDevelopment\(/g) || []).length;
+    ok(combined >= 1 && direct <= combined, `4f ${f}: every ZIP list reads zipDevelopment (direct projects() only as its fallback)`, );
+  }
+  ok(/pickTopCards\(topProjects, 3\)/.test(cp), '4g the ZIP page picks its three cards with pickTopCards');
 }
 
 console.log('\n5. The official-portal register: states are facts about what was checked');
