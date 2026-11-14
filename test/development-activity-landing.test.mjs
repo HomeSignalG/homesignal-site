@@ -77,13 +77,12 @@ const COPY = [
   'See what’s being proposed, approved, and built around a property — before it surprises your client.',
   'HomeSignal gives real-estate professionals a sourced view of Development Activity around a property, organized by Type and Stage.',
   'You know what’s there. HomeSignal shows you what’s changing.',
-  'Start free — 100 reports', 'View a sample report →',
+  'View a sample report →',
   'Click Type or Stage',
   'What’s changing near your next property?', 'Enter an address or ZIP code to check available development activity.', 'Enter property address or ZIP', 'Check coverage',
-  'Pricing', 'Free during beta', '100 Development Activity reports free', 'No credit card required.', 'Start Free',
-  'Professional', 'Individual Agents', 'Paid plans coming after beta', 'For agents who need ongoing property intelligence.',
-  'We’ll notify you before beta ends. You won’t be charged unless you choose a paid plan.',
-  'Brokerage & Enterprise', 'Custom Pricing', 'Tailored reporting for teams, brokerages, and enterprise organizations.', 'Request a Quote',
+  'Pricing', 'Professional', '$78/month', '100 Development Activity reports per month.', 'Get Started',
+  '0.5-mile radius around each property. Billed monthly and renews automatically each month until you cancel.',
+  'Brokerage & Enterprise', 'Custom Pricing', 'Annual packages for brokerages, MLSs, and teams.', 'Request a Quote',
   'Brokerage or enterprise? Contact us'
 ];
 const plain = text.replace(/\s*\/\s*month/, '/month');
@@ -140,11 +139,13 @@ const REMOVED = [
   ['an invented replacement price, crossed-out price, or urgency', /\$129|normally \$|<s>|<del>|limited time|only \d+ (spots|left)|ends (soon|today)/i]
 ];
 REMOVED.forEach(([label, re]) => ok(!re.test(text), 'the page does not bring back ' + label, (text.match(re) || [])[0]));
-// Founder, 2026-11-12 (second instruction, which replaced the same day's planned-price card): free access is a temporary BETA offer and
-// NO individual subscription price is shown, not even a planned one.
-ok((text.match(/\$\d+/g) || []).length === 0, 'no price appears anywhere on the page (founder, 2026-11-12: no $78 or any other individual subscription price)', text.match(/\$\d+/g));
+// Founder, 2026-11-14: the free-beta offer is replaced by paid pricing. The ONLY price on the page is Professional's $78/month; no organization-wide price and no discount.
+ok(JSON.stringify(text.match(/\$\d+/g)) === '["$78"]', 'the only price on the page is $78 (Professional, per month)', text.match(/\$\d+/g));
+ok(!/partner|discount|\$234|six months|promo|coupon/i.test(text), 'no partner discount or promotion is advertised (founder, 2026-11-14)');
+ok(!/beta|free|no credit card|start free|paid plans coming|notify you before/i.test(text), 'no free-beta messaging remains on the page', text.match(/beta|free|no credit card|start free|paid plans coming|notify you before/i));
+ok(((markup.match(/<div class="da-plan">/g)) || []).length === 2, 'exactly two pricing cards');
 ok(!/Walk into the conversation|Show them the record|Clear enough for your client|before your client asks/i.test(text), 'founder, 2026-10-18: the use-case, trust and closing sections are gone');
-ok(['Free during beta', 'Professional', 'Brokerage &amp; Enterprise'].every((b) => new RegExp('<p class="da-plan-name">' + b + '</p>').test(markup)), 'the pricing hierarchy is Free / Professional / Brokerage / Enterprise');
+ok(['Professional', 'Brokerage &amp; Enterprise'].every((b) => new RegExp('<p class="da-plan-name">' + b + '</p>').test(markup)), 'the pricing cards are Professional and Brokerage / Enterprise, in that order');
 const coverageAt = at(/id="coverage"/), pricingAt = at(/id="pricing"/);
 ok((markup.slice(coverageAt).match(/id="daCoverBtn"/g) || []).length === 1 && (markup.match(/id="daCoverBtn"/g) || []).length === 1, 'the coverage checker exists once, inside the coverage section');
 ok(!/href="#coverage"/.test(markup), 'nothing links to the coverage section from the hero or the close: it is an availability utility, not a call to action');
@@ -169,43 +170,24 @@ const shipped = stage.includes("'" + PAGE + "'");
 const inSitemap = sitemap.includes('/' + PAGE);
 const noindex = /<meta name="robots" content="noindex, nofollow">/.test(src);
 const cta = [...markup.matchAll(/<button[^>]*data-cta="([^"]+)"[^>]*>([^<]*)<\/button>/g)].map((m) => ({ cta: m[1], label: m[2], tag: m[0] }));
-ok(cta.length === 2 && cta.every((c) => c.cta === 'start-free'),
-  'the hero and pricing "Start free — 100 reports" buttons are present (Join for $79/month is a link now, checked below)', cta.map((c) => c.cta));
-// Founder, 2026-10-15: FREE-ONLY. The "Join for $79/month" link is gone with the price; no page link goes to a Billing card or a checkout.
+ok(cta.length === 0 && !/data-commerce|\bda-off\b|aria-disabled/.test(markup), 'no inert, hidden or "Start free" commerce button remains (founder, 2026-11-14)', cta.map((c) => c.cta));
+ok(/<a class="mbtn" href="development-activity-reports\.html#billing" id="daProfessional">Get Started<\/a>/.test(markup), 'Professional\'s Get Started is a plain link to the account Billing card, where the signed checkout is made');
+ok(/Billed monthly and renews automatically/.test(text), 'recurring monthly billing is disclosed on the card before purchase');
 const joins = [...markup.matchAll(/<a\b[^>]*data-cta="join"[^>]*>([^<]*)<\/a>/g)];
-ok(joins.length === 0 && !/Join for|Cancel anytime|Subscribe|Buy now|Pay now|\/month|per month|credit card information|card details/i.test(text),
-  'there is no Join link, no subscribe/pay action, no "/month" and no "Cancel anytime" on the landing page', joins.map((j) => j[0]));
-const betaNote = (markup.match(/<p class="da-beta-note">([^<]*)<\/p>/) || [])[1] || '';
-ok(/Paid plans coming after beta/.test(text) && betaNote === 'We’ll notify you before beta ends. You won’t be charged unless you choose a paid plan.' && at(/class="da-beta-note"/) > at(/class="da-plans"/) && at(/class="da-beta-note"/) < at(/id="sample"/),
-  'free is labelled a beta offer, paid plans are "coming after beta", and the notice-and-no-charge note sits beneath the pricing cards');
-ok(!/beta (ends|closes|ending) (on|in|by) |until (january|february|march|april|may|june|july|august|september|october|november|december)|\b20\d\d\b[^<]{0,40}beta|beta[^<]{0,40}\b20\d\d\b|(january|february|march|april|may|june|july|august|september|october|november|december) \d{1,2}/i.test(text),
-  'no beta end date or launch date is named');
-ok(cta.every((c) => /aria-disabled="true"/.test(c.tag) && !/\shref=|onclick=|type="submit"/.test(c.tag)),
-  'each commerce button is inert (aria-disabled, no href, no handler): the 10-report entitlement and the $79 checkout do not exist yet', cta.map((c) => c.tag));
+ok(joins.length === 0 && !/Join for|Cancel anytime|Buy now|Pay now|credit card information|card details/i.test(text), 'no Join link, no pay-now action and no card-detail request on the landing page', joins.map((j) => j[0]));
 const scriptCode = (noComments.match(/<script>[\s\S]*?<\/script>/g) || []).join('\n').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 const hrefs = [...markup.matchAll(/\shref="([^"]*)"/g)].map((m) => m[1]);
 ok(!hrefs.some((h) => /checkout|lemonsqueezy|stripe|subscribe/i.test(h)) && hrefs.filter((h) => /billing/i.test(h)).every((h) => h === 'development-activity-reports.html#billing') && !/lemonsqueezy|stripe|checkout/i.test(scriptCode),
   'the page links to no checkout or payment processor (its only billing link is the internal Reports-page Billing card) and its code calls none', hrefs.filter((h) => /checkout|lemonsqueezy|stripe|subscribe|billing/i.test(h)));
-ok(!/HS\.requireAuth|HS\.openAuth|signin=1/.test(noComments), 'the inert buttons are not wired to sign-in, which would imply an entitlement that is not there');
-const inert = cta.some((c) => /aria-disabled="true"/.test(c.tag));
+ok(!/HS\.requireAuth|HS\.openAuth|signin=1/.test(noComments), 'the landing page itself never opens sign-in; the Billing card does');
 // sitemap.xml is not a link a visitor follows: it is judged by the sitemap tripwire below.
 const otherSources = ['index.html', 'about.html', 'contact.html', 'how-it-works.html', 'privacy.html', 'terms.html', 'dashboard.html', 'alerts.html',
   'development.html', 'properties.html', 'property.html', 'reports.html', 'community.html', 'homesignalmap.html', 'partials/shell.html', 'shell.js',
   'scripts/gen_zip_pages.py', 'lib/community-page.js'];
 const linkedFrom = otherSources.filter((f) => { try { return read(f).includes(PAGE); } catch (e) { return false; } });
 ok(shipped, 'DEPLOYED (founder, 2026-09-29): the page is in the scripts/stage_site.py allowlist, so it publishes');
-// Founder, 2026-10-02: listed now, with the inert buttons hidden. Each commerce button sits,
-// with its "Opens at launch." note, inside its own <div data-commerce hidden>, and nothing else does.
-const wrappers = [...markup.matchAll(/<div data-commerce( hidden)?>\s*(<button[^>]*data-cta="[^"]+"[^>]*>[^<]*<\/button>)\s*<span class="da-soon">Opens at launch\.<\/span>\s*<\/div>/g)]
-  .map((m) => ({ hidden: !!m[1], tag: m[2] }));
-// Counted, not matched by tag: three buttons share one tag, so a tag match would let an unhidden
-// "Start free — 100 reports" borrow a hidden sibling's wrapper.
-const isInert = (tag) => /aria-disabled="true"/.test(tag);
-const visibleInert = cta.filter((c) => isInert(c.tag)).length > wrappers.filter((w) => w.hidden && isInert(w.tag)).length;
-ok(wrappers.length === 2 && (markup.match(/data-commerce/g) || []).length === 2 && wrappers.every((w) => cta.some((c) => c.tag === w.tag)),
-  'each of the two inert Start free buttons sits, with its "Opens at launch." note, in its own <div data-commerce>', wrappers);
-ok(wrappers.every((w) => w.hidden) && !visibleInert, 'HIDDEN (founder, 2026-10-02): every inert commerce button is inside a hidden wrapper', wrappers);
 ok(/\[hidden\]\{display:none!important\}/.test(cssBlock), 'the page CSS makes [hidden] win over any display rule, so a hidden wrapper cannot reappear');
+const visibleInert = false; // no inert commerce button exists any more (asserted in section 4)
 const indexable = /<meta name="robots" content="index, follow">/.test(src) && !/noindex/i.test(noComments);
 ok(indexable && !noindex, 'LISTED (founder, 2026-10-02): the page is index, follow, like about.html and contact.html');
 ok(!(visibleInert && !noindex), 'TRIPWIRE: a page that shows an inert commerce button must stay noindex', { visibleInert, noindex });
