@@ -82,7 +82,7 @@ const COPY = [
   'What’s changing near your next property?', 'Enter an address or ZIP code to check available development activity.', 'Enter property address or ZIP', 'Check coverage',
   'Pricing', 'Professional', '$78/month', '100 Development Activity reports per month.', 'Get Started',
   '0.5-mile radius around each property. Billed monthly and renews automatically each month until you cancel.',
-  'Brokerage & Enterprise', 'Custom Pricing', 'Annual packages for brokerages, MLSs, and teams.', 'Request a Quote',
+  'Brokerage & Enterprise', 'Custom Pricing', 'Packages for brokerages, MLSs, and teams.', 'Request a Quote',
   'Brokerage or enterprise? Contact us'
 ];
 const plain = text.replace(/\s*\/\s*month/, '/month');
