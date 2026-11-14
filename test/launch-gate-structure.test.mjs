@@ -25,10 +25,10 @@ const count = (s, re) => (s.match(re) || []).length;
 // ---- 1. the setup script --------------------------------------------------------------------------------------------------------------------
 const RUN = stripSh(read('test/launch_gate_pg/run.sh'));
 const LAYERS = ['brokerage-account-spine', 'report-private-context', 'report-snapshot', 'evaluation-entitlement', 'saved-reports', 'report-share', 'report-share-delivery',
-  'property-watch', 'payment-event-ledger', 'report-header', 'brokerage-billing', 'saved-reports-archive', 'report-rate-limit', 'da-owner-safeguards', 'individual-agent-signup'];
+  'property-watch', 'payment-event-ledger', 'report-header', 'brokerage-billing', 'saved-reports-archive', 'report-rate-limit', 'da-owner-safeguards', 'individual-agent-signup', 'paddle-billing'];
 const applied = (/for f in ([^;]+); do/.exec(RUN) || [, ''])[1].trim().split(/\s+/);
 ok(RUN.length > 400 && applied.length > 5, '1a the setup script is read and lists the layers it applies (positive control)', applied.length);
-ok(JSON.stringify(applied) === JSON.stringify(LAYERS), '1b it applies exactly the fifteen layers the product stands on, in the order production applied them (the billing file, remove-from-my-list, the report rate limit, the owner safeguards, then the individual-agent signup, which the trial function status now reads)', applied.join(','));
+ok(JSON.stringify(applied) === JSON.stringify(LAYERS), '1b it applies exactly the sixteen layers the product stands on, in the order production applied them (the billing file, remove-from-my-list, the report rate limit, the owner safeguards, then the individual-agent signup, which the trial function status now reads, then the Paddle billing layer that is the live billing path)', applied.join(','));
 ok(/case "\$PGDATABASE" in \*disposable\*\)/.test(RUN) && /exit 1/.test(RUN) && /SUPABASE_DB_URL/.test(RUN) && /SUPABASE_ACCESS_TOKEN/.test(RUN) && /SUPABASE_WRITE_KEY/.test(RUN),
   '1c it refuses a database not named disposable and refuses to run when any Supabase credential is present');
 ok(LAYERS.every((f) => existsSync(join(ROOT, 'docs', f + '.sql'))) && existsSync(join(ROOT, 'test/evaluation_entitlement_pg/fixture.sql')), '1d every layer it applies, and the roles fixture, exist');
@@ -43,7 +43,7 @@ const RTRAW = read('test/launch_gate_pg/roundtrip.mjs');
 const RT = stripJs(RTRAW);
 const importsOf = [...RT.matchAll(/await import\('([^']+)'\)/g)].map((m) => m[1]);
 const WANT = ['get-development-activity-report/handler.ts', 'get-development-activity-report/data.ts', 'development-activity-trial/handler.ts', 'development-activity-trial/data.ts',
-  'manage-billing/handler.ts', 'manage-billing/data.ts', 'development-activity-billing-webhook/handler.ts', 'development-activity-billing-webhook/data.ts', '_shared/lemon-billing.ts']
+  'manage-billing/handler.ts', 'manage-billing/data.ts', 'development-activity-billing-webhook/handler.ts', 'development-activity-billing-webhook/data.ts', '_shared/paddle-billing.ts']
   .map((f) => '../../supabase/functions/' + f);
 ok(RT.length > 8000 && importsOf.length >= WANT.length, '2a the round trip is read and imports modules (positive control)', importsOf.length);
 ok(WANT.every((f) => importsOf.includes(f)) && WANT.every((f) => existsSync(join(ROOT, 'test/launch_gate_pg', f))),
@@ -56,13 +56,13 @@ ok(rpcNames.length >= 10 && ['brokerage_report_issue', 'billing_usage', 'billing
 ok(!rpcNames.includes('evaluation_report_issue') && !/public\.evaluation_report_issue\(/.test(rpcBlock),
   '2e and does NOT answer the free evaluation\'s own issue function: a handler calling it directly would be a second way to charge a report, and an unlisted call stops the run');
 ok(/if \(!RPC\[rpc\[1\]\]\) throw new Error\('unexpected rpc '/.test(RT) && /throw new Error\('unexpected request '/.test(RT), '2f a call to a function that is not listed, or any other request, stops the run');
-ok(!/process\.env|Deno\.env/.test(RT) && !/SUPABASE_[A-Z_]*KEY|LEMON_SQUEEZY_[A-Z_]+/.test(RT), '2g it reads no environment variable and names no real secret: every key and secret in it is a fixture');
+ok(!/process\.env|Deno\.env/.test(RT) && !/SUPABASE_[A-Z_]*KEY|PADDLE_[A-Z_]+/.test(RT), '2g it reads no environment variable and names no real secret: every key and secret in it is a fixture');
 const fixtures = [...RT.matchAll(/(apiKey|secret|serviceKey): '([^']+)'/g)].map((m) => m[2]);
 ok(fixtures.length >= 3 && fixtures.every((v) => /fixture|not-real/.test(v)), '2h every key and secret value in it is plainly marked as a fixture', fixtures.join(' | '));
 const hosts = new Set([...RT.matchAll(/https?:\/\/([a-z0-9.-]+)/g)].map((m) => m[1]));
-const allowedHosts = ['proj.supabase.co', 'x', 'jodytracks.com', 'api.lemonsqueezy.com', 'fixture-store.lemonsqueezy.com', 'data.wsdot.wa.gov'];
+const allowedHosts = ['proj.supabase.co', 'x', 'jodytracks.com', 'api.paddle.com', 'data.wsdot.wa.gov'];
 ok([...hosts].every((h) => allowedHosts.includes(h)), '2i it names no host but the fixture project, the processor and its stand-in\'s own domain', [...hosts].join(','));
-ok(/u\.origin === 'https:\/\/api\.lemonsqueezy\.com'\) return lemonStandIn\(/.test(RT) && !/\bawait fetch\(|globalThis\.fetch|node:https?|node:net/.test(RT),
+ok(/u\.origin === 'https:\/\/api\.paddle\.com'\) return paddleStandIn\(/.test(RT) && !/\bawait fetch\(|globalThis\.fetch|node:https?|node:net/.test(RT),
   '2j the payment processor is answered by a stand-in that records the request, and the round trip opens no connection of its own');
 
 // ---- 3. the scenario ------------------------------------------------------------------------------------------------------------------------
@@ -74,7 +74,7 @@ const must = {
   '8b': /retrying the same delivery is a duplicate/, '8e': /nobody is billed twice/, '9c': /one hundred paid reports/, '9e': /ordinals 1 to 100 with no gap, and the reports are numbered 11 to 110/,
   '10a': /101st report is refused \(403 allotment_complete\)/, '10b': /the DATABASE refuses the 101st/, '10c': /the cap is a CONSTRAINT/, '11a': /all 110 reports/,
   '11d': /other brokerage sees none of them/, '12c': /binding_conflict/, '13b': /plan reads "canceled"/, '13d': /nothing was deleted/, '13e': /OLDER event arriving late/,
-  '2d': /CARRY a plan/, '7h2': /payment notice/,
+  '2d': /CARRY a plan/, '7h2': /import/,
   '14a': /every billing invariant reads zero/, '14b': /controls that are not zero/, '14d': /NO table of the public schema/,
 };
 for (const [id, re] of Object.entries(must)) ok(new RegExp("'" + id + ' ').test(RTRAW) && re.test(RTRAW), '3c check ' + id + ' is present and says what the sequence needs');
@@ -90,10 +90,10 @@ const job = (/\n  launch-gate:\n([\s\S]*?)(?=\n  [a-z][a-z-]*:\n|$)/.exec(WF) ||
 ok(job.length > 500, '4a the workflow has a launch-gate job (positive control)', job.length);
 ok(/bash test\/launch_gate_pg\/run\.sh/.test(job) && /POSTGRES_DB: dev_change_disposable/.test(job) && /node-version: '22'/.test(job) && /image: mirror\.gcr\.io\/library\/postgres:17/.test(job),
   '4b it runs the gate against the disposable container on node 22');
-ok(/SUPABASE_DB_URL/.test(job) && /LEMON_SQUEEZY_API_KEY/.test(job) && /exit 1/.test(job) && !/\$\{\{\s*secrets\./.test(job), '4c it refuses to run with a Supabase credential or a processor key present, and takes no repository secret');
+ok(/SUPABASE_DB_URL/.test(job) && /PADDLE_API_KEY/.test(job) && /exit 1/.test(job) && !/\$\{\{\s*secrets\./.test(job), '4c it refuses to run with a Supabase credential or a processor key present, and takes no repository secret');
 const pr = (/\n  pull_request:\n([\s\S]*?)\n  push:/.exec(WF) || [, ''])[1], push = (/\n  push:\n([\s\S]*?)\n  workflow_dispatch/.exec(WF) || [, ''])[1];
-ok(['test/launch_gate_pg/**', 'test/launch-gate-structure.test.mjs', 'docs/brokerage-billing.sql', 'supabase/functions/manage-billing/**', 'supabase/functions/development-activity-billing-webhook/**',
-    'supabase/functions/get-development-activity-report/**', 'supabase/functions/development-activity-trial/**', 'supabase/functions/_shared/lemon-billing.ts', 'supabase/functions/_shared/report-snapshot.ts']
+ok(['test/launch_gate_pg/**', 'test/launch-gate-structure.test.mjs', 'docs/brokerage-billing.sql', 'docs/paddle-billing.sql', 'supabase/functions/manage-billing/**', 'supabase/functions/development-activity-billing-webhook/**',
+    'supabase/functions/get-development-activity-report/**', 'supabase/functions/development-activity-trial/**', 'supabase/functions/_shared/paddle-billing.ts', 'supabase/functions/_shared/report-snapshot.ts']
   .every((p) => pr.includes("'" + p + "'") && push.includes("'" + p + "'")), '4d it runs on a pull request and on main whenever the gate, a handler it drives or the billing SQL changes');
 ok(count(read('.github/workflows/report-snapshot-suite.yml'), /launch_gate_pg/g) >= 4, '4e (control) the workflow names the gate in its path lists and its job');
 ok(existsSync(join(ROOT, 'test/launch_gate_mutants.py')), '4f the mutation loop that proves the gate can see a break is committed');

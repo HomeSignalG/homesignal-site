@@ -148,7 +148,14 @@ const l2Code = code(L2_SQL);
 // It writes no row of the spine, calls neither the resolver nor any issue function, and the report page and the issuance functions are untouched.
 const ACQ_SQL = 'docs/acquisition-attribution.sql';
 const acqCode = code(ACQ_SQL);
-ok(sorted(naming) === sorted([SQL_FILE, L1_SQL, EVAL_READS, SAVED_SQL, HEADER_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, RATE_SQL, DA_SQL, L2_SQL, ACQ_SQL])
+// docs/paddle-billing.sql (2026-11-14, Paddle replaces Lemon Squeezy) and docs/paid-only-individual-signup.sql (2026-11-14, new individuals have no free reports): the first
+// reads the account row (type and status) for the billing state and its one-time grant, the second adds ONE column to the evaluation and splices three existing functions.
+// Neither creates an account, a membership or an account table, and neither calls the resolver from outside the functions it replaces.
+const PADDLE_SQL = 'docs/paddle-billing.sql';
+const PAID_ONLY_SQL = 'docs/paid-only-individual-signup.sql';
+// supabase/functions/_shared/billing-reads.ts calls the read-only reader public.brokerage_account_type_of (Paddle build, 2026-11-14) to know whether a signed-in owner is an individual; it names no table and writes nothing.
+const BILLING_READS = 'supabase/functions/_shared/billing-reads.ts';
+ok(sorted(naming) === sorted([SQL_FILE, L1_SQL, EVAL_READS, SAVED_SQL, HEADER_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, RATE_SQL, DA_SQL, L2_SQL, ACQ_SQL, PADDLE_SQL, PAID_ONLY_SQL, BILLING_READS])
    && !/\b(insert\s+into|update|delete\s+from|truncate|alter\s+table|drop\s+table|create\s+table)\s+(only\s+)?public\.(brokerage_|evaluation)/i.test(acqCode) && !/brokerage_membership_of|evaluation_report_issue|brokerage_report_issue/.test(acqCode)
    && (acqCode.match(/\bpublic\.brokerage_member\b/g) || []).length === 1 && /\bfrom b join public\.brokerage_member mm\b|\bjoin public\.brokerage_member mm\b/.test(acqCode)
    && (daCode.match(/from public\.brokerage_membership_of\(p_actor\) r/g) || []).length === 2 && !/\b(insert\s+into|delete\s+from|truncate|alter\s+table|drop\s+table|create\s+table)\s+(only\s+)?public\.brokerage_(account|member)/i.test(daCode)

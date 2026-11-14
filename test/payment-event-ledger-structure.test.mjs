@@ -201,14 +201,17 @@ ok(scanned.length > 100 && namesLedger.includes(SQL_PATH),
 // payment_event_record once and reads the ledger through payment_event_latest_id and the stored mapped_status, and is reached only through the shared reader
 // (_shared/billing-reads.ts), which names the ledger in one place: the pattern that recognises the ledger's own refusal text. Nothing else names it.
 // test/brokerage_billing_pg proves the behaviour; test/billing-structure.test.mjs pins the rest.
-const BILLING_SQL_PATH = 'docs/brokerage-billing.sql', BILLING_READS_PATH = 'supabase/functions/_shared/billing-reads.ts';
+const BILLING_SQL_PATH = 'docs/brokerage-billing.sql', PADDLE_SQL_PATH = 'docs/paddle-billing.sql', BILLING_READS_PATH = 'supabase/functions/_shared/billing-reads.ts';
 const billingCode = stripSql(read(BILLING_SQL_PATH));
+const paddleCode = stripSql(read(PADDLE_SQL_PATH));
 const readsCode = read(BILLING_READS_PATH).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-ok(namesLedger.every((f) => [SQL_PATH, WF_PATH, BILLING_SQL_PATH, BILLING_READS_PATH].includes(f)) && namesLedger.includes(BILLING_SQL_PATH) && namesLedger.includes(BILLING_READS_PATH)
+ok(namesLedger.every((f) => [SQL_PATH, WF_PATH, BILLING_SQL_PATH, PADDLE_SQL_PATH, BILLING_READS_PATH].includes(f)) && namesLedger.includes(BILLING_SQL_PATH) && namesLedger.includes(PADDLE_SQL_PATH)
+   && (paddleCode.match(/public\.payment_event_record\(/g) || []).length === 1 && /select \* into r from public\.payment_event_record\(p_event\);/.test(paddleCode)
+   && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(only\s+)?public\.payment_event\b/i.test(paddleCode) && namesLedger.includes(BILLING_READS_PATH)
    && (billingCode.match(/public\.payment_event_record\(/g) || []).length === 2 && /select \* into r from public\.payment_event_record\(p_event\);/.test(billingCode)
    && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(only\s+)?public\.payment_event\b/i.test(billingCode)
    && (readsCode.match(/\bpayment_event\w*/g) || []).join() === 'payment_event' && /\/\^payment_event:\|\^billing_event_apply:\//.test(readsCode),
-  '9: ONE CALLER — only the SQL of record, its own check workflow, the billing SQL (build step 11: calls the recorder once, from billing_event_apply, writes no row of the ledger itself) and the shared billing reader (which names the ledger once, to recognise its refusal text) name the ledger or its recorder; no page, script, function handler, library or other SQL does', namesLedger.join(','));
+  '9: ONE CALLER — only the SQL of record, its own check workflow, the billing SQL and the Paddle billing SQL (build step 11 and its 2026-11-14 successor: each calls the recorder from billing_event_apply and writes no row of the ledger itself) and the shared billing reader (which names the ledger once, to recognise its refusal text) name the ledger or its recorder; no page, script, function handler, library or other SQL does', namesLedger.join(','));
 const fnDirs = readdirSync(join(ROOT, 'supabase/functions'));
 const processorDirs = fnDirs.filter((d) => /lemon|squeez|payment|webhook|checkout|stripe|billing/i.test(d)).sort();
 ok(fnDirs.length >= 5 && fnDirs.includes('get-address-report') && !fnDirs.includes('lemonsqueezy-webhook')

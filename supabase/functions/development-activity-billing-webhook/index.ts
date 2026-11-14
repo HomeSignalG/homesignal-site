@@ -1,10 +1,10 @@
-// development-activity-billing-webhook — the processor's signed subscription events, recorded for the brokerage a HomeSignal checkout named
+// development-activity-billing-webhook — Paddle's signed events, recorded for the brokerage a HomeSignal checkout named
 // (Development Activity build step 11).
 //
-// Wiring only. The request logic is handler.ts, the one database call is data.ts (_shared/billing-reads.ts `applyEvent`), and every shape the
-// processor has is _shared/lemon-billing.ts. JWT verification is OFF for this function (supabase/config.toml and the deploy workflow): the
-// processor sends no Supabase token, and the gate is the processor's own HMAC signature over the raw body, checked in the handler before the body
-// is parsed. When the signing secret or the variant id is not configured EVERY request is refused (503): a missing secret must never read as "no
+// Wiring only. The request logic is handler.ts, the one database call is data.ts (_shared/billing-reads.ts `applyEvent`), and every shape
+// the processor has is _shared/paddle-billing.ts. JWT verification is OFF for this function (supabase/config.toml and the deploy workflow): the
+// processor sends no Supabase token, and the gate is Paddle's own HMAC signature over the timestamp and the raw body, checked in the handler before
+// the body is parsed. When the signing secret or either price id is not configured EVERY request is refused (503): a missing secret must never read as "no
 // signature needed". Both are read here and nowhere else; neither is ever printed, returned or logged.
 //
 // This is a SECOND webhook, with its own URL and its own signing secret, for a different product (a brokerage's subscription). It does not touch
@@ -18,8 +18,9 @@ import { withSafeLog } from '../_shared/safe-log.ts';
 
 const url = Deno.env.get('SUPABASE_URL') ?? '';
 const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-const secret = Deno.env.get('LEMONSQUEEZY_BILLING_WEBHOOK_SECRET') ?? '';
-const variantId = Deno.env.get('LEMONSQUEEZY_BILLING_VARIANT_ID') ?? '';
+const secret = Deno.env.get('PADDLE_WEBHOOK_SECRET') ?? '';
+const prices = { professional: Deno.env.get('PADDLE_PRICE_PROFESSIONAL') ?? '', partner: Deno.env.get('PADDLE_PRICE_PARTNER') ?? '' };
+const livemode = (Deno.env.get('PADDLE_ENVIRONMENT') ?? '') === 'production';   // anything but the exact word records as a test: a missing setting never grants
 
 // one fixed-text log line per request (name, status, milliseconds): _shared/safe-log.ts. Nothing from the request or the answer is ever logged.
-Deno.serve(withSafeLog('development-activity-billing-webhook', makeHandler(makeDeps({ url, serviceKey, secret, variantId }, (input, init) => fetch(input, init))), (line) => console.log(line), () => Date.now()));
+Deno.serve(withSafeLog('development-activity-billing-webhook', makeHandler(makeDeps({ url, serviceKey, secret, prices, livemode }, (input, init) => fetch(input, init))), (line) => console.log(line), () => Date.now()));
