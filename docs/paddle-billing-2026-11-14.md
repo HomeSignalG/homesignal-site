@@ -96,12 +96,12 @@ Brokerage & Enterprise: custom pricing, "Request a Quote" (contact page). The pr
 | Paddle adapter (signature, checkout request, webhook translation, binding) | `supabase/functions/_shared/paddle-billing.ts` | written by the earlier session (branch `claude/laughing-shannon-53ecgd`, commit `dcf52308`, never merged, no PR); merged into this branch; unit-tested |
 | `manage-billing`, `development-activity-billing-webhook` | `supabase/functions/*` | Paddle versions, JWT on / off as before; NOT deployed |
 | Paddle SQL (ledger map, six-month grant) | `docs/paddle-billing.sql` | NOT applied; suite `test/paddle_billing_pg` passes (27 checks) |
-| Paid-only individual signup | `docs/paid-only-individual-signup.sql` | NOT applied; suite `test/paid_only_signup_pg` passes (20 checks) |
+| Paid-only individual signup | `docs/paddle-billing.sql` | NOT applied; suite `test/paid_only_signup_pg` passes (20 checks) |
 | Paddle catalog (product, $78 price) | Paddle dashboard | **UNVERIFIED**: no Paddle credential exists in this environment, so the catalog could not be read. Another session reported creating the price; its id is not in the repo. Nothing was created here. |
 
 ## Apply order (when the founder approves)
 1. Review and apply `docs/paddle-billing.sql` (additive; rollback in its footer).
-2. Review and apply `docs/paid-only-individual-signup.sql` (additive; impact and recovery in its header; it prints before/after counts and refuses on any mismatch).
+2. Review and apply `docs/paddle-billing.sql` (additive; impact and recovery in its header; it prints before/after counts and refuses on any mismatch).
 3. Set the function secrets (see the list below), deploy `manage-billing` and `development-activity-billing-webhook`.
 4. Run the Paddle SANDBOX test (below). Only then edit `billing-switch.ts` (`CHECKOUT_ENABLED = true`) in a reviewed PR and deploy.
 
@@ -122,3 +122,32 @@ Brokerage & Enterprise: custom pricing, "Request a Quote" (contact page). The pr
 
 ## Remaining credentials and dashboard actions (do one at a time)
 See the final report of the session that wrote this file. In short: Paddle sandbox API key; the Professional price id (check the catalog first); a notification destination pointing at the webhook (its secret); a client-side token; the checkout page domain approved in Paddle; then the same set for live.
+
+---
+
+## Consolidation record (2026-11-14, owned by the "Paddle product catalog setup" session)
+
+Three PRs had been opened for this work; none was merged and nothing was deployed or applied (checked 2026-11-14 16:1xZ: production has no `access_months` column,
+no `billing_grant_of`, the five billing function bodies are byte-identical to before, 0 Paddle ledger events or bindings, and the Paddle edge functions do not exist).
+- **#2918 (this branch) is the base.** It is the superset of the shared ancestor `dcf5230` that #2919 also built on, and it carries the six-month grant, expiry, refunds and chargebacks.
+- **#2919** (paid-only new individual signup, Professional-only public flow, `PARTNER_OFFER_ENABLED = false`, webhook needs only the Professional price) is **merged in**.
+  Its separate `docs/paid-only-individual-signup.sql` is now **Part B of the single `docs/paddle-billing.sql`** migration.
+- **#2920** is closed after porting: subscription refunds and chargebacks (`billing_subscription_brokerage`, `chargeback_warranty`, no restore for a subscription), and its
+  runbook content (below). Not ported, on purpose: a second webhook function name (this build keeps `development-activity-billing-webhook`), a build-time `paddle-config.js`
+  writer (the public client token reaches the page from `manage-billing`'s status answer), and a separate sandbox kill switch in the PRODUCTION project (sandbox is tested in a
+  separate staging project, below, so production never runs a sandbox checkout).
+
+### Refund and chargeback rules, final
+| Adjustment | One-time Private Partner grant | Professional subscription |
+|---|---|---|
+| Approved FULL refund | access ends | access ends |
+| Partial refund | no change | no change |
+| Approved chargeback or chargeback_warranty | access ends | access ends |
+| Chargeback reversed | restored, never extended | not acted on (only a later genuine subscription event restores) |
+| Pending or rejected | none | none |
+| Transaction we never bound | none | none |
+
+### Webhook
+`https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/development-activity-billing-webhook` (LIVE project). Events to subscribe: `subscription.created`, `subscription.activated`,
+`subscription.updated`, `subscription.trialing`, `subscription.past_due`, `subscription.paused`, `subscription.resumed`, `subscription.canceled`, `transaction.completed`,
+`adjustment.created`, `adjustment.updated`. A sandbox destination points at the STAGING project's function URL, never at this one.

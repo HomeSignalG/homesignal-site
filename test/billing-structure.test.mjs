@@ -150,7 +150,7 @@ ok([BR, LB, ...Object.values(MB), ...Object.values(WB)].every((t) => t.length > 
   const iConf = h.indexOf('!configured()'), iText = h.indexOf('req.text()'), iSig = h.indexOf('verifySignature('), iParse = h.indexOf('JSON.parse('), iTrans = h.indexOf('translate('), iApply = h.indexOf('deps.applyEvent(');
   ok(iConf > 0 && iText > iConf && iSig > iText && iParse > iSig && iTrans > iParse && iApply > iTrans,
     '2f the webhook\'s order is fixed: refuse everything when it is not set up, read the RAW text, check the signature of that raw text, only then parse it, translate it and record it', [iConf, iText, iSig, iParse, iTrans, iApply].join());
-  ok(count(h, /JSON\.parse\(/g) === 1 && count(h, /req\.json\(\)/g) === 0 && count(h, /deps\.applyEvent\(/g) === 2 && count(h, /deps\.grantOf\(/g) === 1,
+  ok(count(h, /JSON\.parse\(/g) === 1 && count(h, /req\.json\(\)/g) === 0 && count(h, /deps\.applyEvent\(/g) === 3 && count(h, /deps\.grantOf\(/g) === 1 && count(h, /deps\.subscriptionOf\(/g) === 1,
     '2g the body is parsed once and only from the text that was signed (never req.json()), and one event is recorded per request (an adjustment records through the grant it names, the other events through their own checkout)');
   ok(!/\bsubscriptions\b|user_id|users\b|\bemail\b|\bprofiles?\b/i.test(h + stripJs(WB.data)) && !/public\.subscriptions|user_id|\busers\b|\bemail\b|\bprofiles?\b/i.test(stripJs(LB)) && !/lemonsqueezy-webhook/.test(h),
     '2h the webhook names no table or id of the map product (subscriptions, users, a user id) and never calls the other webhook: the two ignore each other\'s events');

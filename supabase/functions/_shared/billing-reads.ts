@@ -135,6 +135,15 @@ export function makeBillingReads(rpc: ServiceRpc) {
       return { brokerageId: g.brokerage_id, accessMonths: g.access_months };
     },
 
+    /** The brokerage a recurring Paddle subscription we bound belongs to (public.billing_subscription_brokerage), or null. */
+    async subscriptionOf(subscriptionId: string, livemode: boolean): Promise<string | null> {
+      const { data, error } = await rpc('billing_subscription_brokerage', { p_ref: subscriptionId, p_livemode: livemode });
+      if (error) throw new DataUnavailable('billing_subscription_brokerage');
+      if (data === null || data === undefined) return null;
+      if (typeof data !== 'string' || !UUID.test(data)) throw new DataUnavailable('shape');
+      return data.toLowerCase();
+    },
+
     /**
      * Record one processor event for one brokerage, and bind its subscription to that brokerage if this is the first the database has seen of it
      * (public.billing_event_apply: ONE transaction, through the payment ledger's one writer). A retried delivery is `DUPLICATE`. The refusals are

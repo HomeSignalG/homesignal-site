@@ -1,5 +1,5 @@
 -- =====================================================================================
--- PAID-ONLY INDIVIDUAL SIGNUP: EXECUTABLE SUITE  (docs/paid-only-individual-signup.sql)
+-- PAID-ONLY INDIVIDUAL SIGNUP: EXECUTABLE SUITE  (docs/paddle-billing.sql)
 -- run.sh seeds LEGACY accounts under the unmodified layers, applies the file, then runs this. Every expected answer is a hard-coded constant.
 -- Output: one row per check (name|pass|detail).
 -- =====================================================================================

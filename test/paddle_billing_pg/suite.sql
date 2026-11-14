@@ -176,5 +176,15 @@ select pg_temp._ck('P33 a reversed chargeback restores the purchase and does NOT
 select pg_temp._ck('P34 a replayed refund event is a DUPLICATE and changes nothing (duplicate webhook delivery)',
   pg_temp._pay(pg_temp._acct(2), 'txn_partner2', 'adjustment.updated', 'refunded', '2026-11-16T10:00:00Z', true, 6) like 'DUPLICATE/%');
 
+select pg_temp._ck('P35 billing_subscription_brokerage finds a RECURRING Paddle subscription only (not a grant, not the other environment, not an unknown id)',
+  (select public.billing_subscription_brokerage('sub_prof1', true)) = pg_temp._acct(1)
+  and (select public.billing_subscription_brokerage('txn_partner2', true)) is null
+  and (select public.billing_subscription_brokerage('sub_prof1', false)) is null
+  and (select public.billing_subscription_brokerage('sub_none', true)) is null);
+select pg_temp._ck('P36 billing_subscription_brokerage is executable by service_role alone',
+  has_function_privilege('service_role','public.billing_subscription_brokerage(text, boolean)','execute')
+  and not has_function_privilege('anon','public.billing_subscription_brokerage(text, boolean)','execute')
+  and not has_function_privilege('authenticated','public.billing_subscription_brokerage(text, boolean)','execute'));
+
 \o
 select check_name || '|' || case when pass then 't' else 'f' end || '|' || coalesce(detail, '') from _r order by n;

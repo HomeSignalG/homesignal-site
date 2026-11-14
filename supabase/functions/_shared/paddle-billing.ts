@@ -150,7 +150,7 @@ export type WebhookConfig = { secret: string; prices: OfferPrices; livemode: boo
  */
 export type Translation =
   | { kind: 'event'; brokerageId: string; event: LedgerEvent; offer: OfferKey; accessMonths: number | null }
-  | { kind: 'adjustment'; transactionId: string; event: LedgerEvent }
+  | { kind: 'adjustment'; transactionId: string; subscriptionId: string | null; event: LedgerEvent }
   | { kind: 'ignore'; reason: string }
   | { kind: 'invalid'; reason: string };
 
@@ -184,6 +184,9 @@ function offerOf(items: unknown, prices: OfferPrices): { offer: OfferKey; priceI
 //   * a FULL refund that Paddle has APPROVED ends that purchase's access (ledger status `refunded`, which the status map reads as canceled);
 //   * a PARTIAL refund NEVER changes access: the buyer keeps what remains of the six months, and the refund is acknowledged (IGNORED partial_refund);
 //   * an approved CHARGEBACK ends it (`charged_back`), whatever its amount; a chargeback warning does nothing;
+//   * a SUBSCRIPTION's refund or chargeback (the adjusted transaction is not a one-time grant but belongs to a subscription we bound): an approved FULL refund or an
+//     approved chargeback ends that subscription's access, with the same ledger words; a reversal is NOT acted on for a subscription (only a later genuine subscription
+//     event restores it), so a refund followed by a reversal can never revive a subscription that was cancelled in the meantime;
 //   * a chargeback that is REVERSED (action chargeback_reverse approved, or an adjustment whose status becomes reversed) restores it (`completed`);
 //   * a refund that is pending or rejected does nothing.
 // Access ending early is not extended by anything: the six months are counted from the original binding, so a restore never grants more time.
@@ -194,7 +197,7 @@ function adjustmentStatus(data: Record<string, unknown>): { status: string } | {
   if (typeof action !== 'string' || typeof status !== 'string') return { ignore: 'shape' };
   if (action === 'chargeback_reverse') return status === 'approved' ? { status: 'completed' } : { ignore: 'chargeback_reverse_not_approved' };
   if (status === 'reversed') return action === 'chargeback' || action === 'refund' ? { status: 'completed' } : { ignore: 'action' };
-  if (action === 'chargeback') return status === 'approved' ? { status: 'charged_back' } : { ignore: 'chargeback_not_approved' };
+  if (action === 'chargeback' || action === 'chargeback_warranty') return status === 'approved' ? { status: 'charged_back' } : { ignore: 'chargeback_not_approved' };
   if (action === 'refund') {
     if (status !== 'approved') return { ignore: 'refund_not_approved' };
     if (kind !== 'full') return { ignore: 'partial_refund' };
@@ -212,7 +215,8 @@ function translateAdjustment(payload: Record<string, unknown>, data: Record<stri
   if (txn === null) return { kind: 'invalid', reason: 'transaction_id' };
   const decided = adjustmentStatus(data);
   if ('ignore' in decided) return { kind: 'ignore', reason: decided.ignore };
-  return { kind: 'adjustment', transactionId: txn, event: {
+  const subId = asRef(data.subscription_id);
+  return { kind: 'adjustment', transactionId: txn, subscriptionId: subId, event: {
     processor: PROCESSOR, idempotency_key: eventId, subscription_ref: txn, event_name: String(payload.event_type),
     processor_status: decided.status, occurred_at: occurred, livemode: cfg.livemode } };
 }

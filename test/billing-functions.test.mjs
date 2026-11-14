@@ -295,6 +295,7 @@ const named = (name) => mcalls.filter((c) => c[0] === name);
 // ---- 3. the webhook ---------------------------------------------------------------------------------------------------------------------------
 const wcalls = [];
 const gcalls = [];
+const scalls = [];
 const goodApplied = { outcome: 'RECORDED', bound: true, state: 'paid', is_latest: true };
 function wdeps(over = {}) {
   return {
@@ -304,6 +305,7 @@ function wdeps(over = {}) {
     now: () => over.now ?? NOW,
     applyEvent: async (...a) => { wcalls.push(a); if (over.applyEvent) return over.applyEvent(...a); return goodApplied; },
     grantOf: async (...a) => { gcalls.push(a); return 'grant' in over ? over.grant : { brokerageId: BK, accessMonths: 6 }; },
+    subscriptionOf: async (...a) => { scalls.push(a); return 'sub' in over ? over.sub : null; },
   };
 }
 async function body(over = {}) {
@@ -411,6 +413,19 @@ async function hook(d, raw, { sig, method = 'POST', headers = {} } = {}) {
   gcalls.length = 0;
   r = await hook(wdeps(), adjBody({ type: 'partial' }));
   ok(r.status === 200 && r.json.reason === 'partial_refund' && wcalls.length === 0 && gcalls.length === 0, '3p4 a partial refund changes no access and does not even look a grant up');
+  // a SUBSCRIPTION's refund or chargeback: acts on that subscription only, never restores
+  const subAdj = (d = {}) => adjBody({ transaction_id: 'txn_01hv8x8d6dxy3k7h2m0ggggggg', subscription_id: 'sub_01hv8x8d6dxy3k7h2m0bbbbbbb', ...d });
+  scalls.length = 0;
+  r = await hook(wdeps({ grant: null, sub: BK }), subAdj());
+  ok(r.status === 200 && r.json.outcome === 'RECORDED' && scalls.length === 1 && scalls[0][0] === 'sub_01hv8x8d6dxy3k7h2m0bbbbbbb' && wcalls.length === 1 && wcalls[0][0] === BK
+     && wcalls[0][1].subscription_ref === 'sub_01hv8x8d6dxy3k7h2m0bbbbbbb' && wcalls[0][1].processor_status === 'refunded' && wcalls[0][2] === null,
+    '3p5a a full refund of a subscription payment is recorded on THAT subscription (its own id, no fixed length)');
+  r = await hook(wdeps({ grant: null, sub: BK }), subAdj({ action: 'chargeback_warranty', type: 'partial' }));
+  ok(r.status === 200 && wcalls.length === 1 && wcalls[0][1].processor_status === 'charged_back', '3p5b a chargeback_warranty counts as a chargeback');
+  r = await hook(wdeps({ grant: null, sub: BK }), subAdj({ action: 'chargeback_reverse' }));
+  ok(r.status === 200 && r.json.reason === 'no_grant' && wcalls.length === 0, '3p5c a reversal on a subscription changes nothing (a later subscription event restores it)');
+  r = await hook(wdeps({ grant: null, sub: null }), subAdj());
+  ok(r.status === 200 && r.json.reason === 'no_grant' && wcalls.length === 0, '3p5d a refund on a subscription we never bound changes nothing');
   r = await hook(wdeps(), adjBody({ action: 'chargeback' }), { sig: 'ts=1;h1=' + 'a'.repeat(64) });
   ok(r.status === 401 && wcalls.length === 0, '3p5 an unsigned adjustment is refused like any other event');
   r = await hook(wdeps(), await body({ mutate: (p) => { p.event_type = 'address.created'; } }));

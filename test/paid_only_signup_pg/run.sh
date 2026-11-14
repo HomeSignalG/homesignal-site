@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Executable suite for PAID-ONLY individual signup (docs/paid-only-individual-signup.sql) against a DISPOSABLE Postgres (never production).
+# Executable suite for PAID-ONLY individual signup (docs/paddle-billing.sql) against a DISPOSABLE Postgres (never production).
 # 1. every layer is applied UNMUTATED in production's order (the Paddle billing file included); LEGACY accounts are seeded and fingerprinted;
 #    THEN the file is applied and the legacy rows must be byte-identical; then suite.sql (every check must pass);
 # 2. the file applies twice with an identical result; it REFUSES, changing nothing, when a layer is absent or an anchor moved;
@@ -11,7 +11,7 @@ if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" 
 here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
 . "$root/test/lib/docsql.sh"
 P() { psql -X -q -v ON_ERROR_STOP=1 "$@"; }
-SQL="${PAID_ONLY_SQL:-$root/docs/paid-only-individual-signup.sql}"
+SQL="${PAID_ONLY_SQL:-$root/docs/paddle-billing.sql}"
 DEPS=(brokerage-account-spine report-private-context report-snapshot evaluation-entitlement saved-reports report-share report-share-delivery property-watch payment-event-ledger report-header brokerage-billing saved-reports-archive individual-agent-signup paddle-billing)
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 reset_db() { P -c "drop schema if exists auth cascade; drop schema public cascade; create schema public;" >/dev/null 2>&1; P -f "$root/test/individual_signup_pg/fixture.sql" >/dev/null; }
@@ -37,7 +37,7 @@ base() { reset_db; apply_deps; seed_legacy; }
 
 # ---- 1. legacy rows unchanged, then the suite -------------------------------------------------------------------------------------
 base; F0="$(fp)"; C0="$(credfp)"
-P -f "$SQL" >/dev/null 2>"$tmp/apply.err" || { echo "FAIL — docs/paid-only-individual-signup.sql does not apply"; head -5 "$tmp/apply.err"; exit 1; }
+P -f "$SQL" >/dev/null 2>"$tmp/apply.err" || { echo "FAIL — docs/paddle-billing.sql does not apply"; head -5 "$tmp/apply.err"; exit 1; }
 [ "$(fp)" = "$F0" ] && [ "$(credfp)" = "$C0" ] && ok "the legacy evaluations and every free credit are byte-identical after the apply" || bad "a legacy row changed"
 out="$(suite)"; echo "$out" | awk -F'|' '{printf "%s %s\n", ($2=="t"?"PASS":"FAIL"), $1}'
 [ "$(fails_of "$out")" = 0 ] && [ "$(grep -c '|t|' <<<"$out")" -ge 20 ] && ok "the suite: every check passes ($(grep -c '|t|' <<<"$out") checks)" || { bad "the suite has failing checks"; echo "$out" | grep '|f|' | head; }

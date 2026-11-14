@@ -43,6 +43,8 @@ export type Deps = {
   applyEvent: (brokerageId: string, event: LedgerEvent, accessMonths: number | null) => Promise<AppliedEvent>;
   /** The one-time grant bound under a Paddle transaction id, or null. A refund or chargeback acts only through this: no grant, no effect. */
   grantOf: (transactionId: string, livemode: boolean) => Promise<{ brokerageId: string; accessMonths: number } | null>;
+  /** The brokerage a RECURRING subscription we bound belongs to (by its subscription id), or null. A subscription's refund or chargeback acts only through this. */
+  subscriptionOf: (subscriptionId: string, livemode: boolean) => Promise<string | null>;
 };
 
 /** A real subscription event is a few kilobytes. This is far above that and far below anything that could exhaust the function. */
@@ -84,9 +86,19 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
       if (t.kind === 'invalid') return reply({ error: 'invalid', reason: t.reason }, 422);
       if (t.kind === 'adjustment') {
         const grant = await deps.grantOf(t.transactionId, deps.livemode);
-        if (grant === null) return reply({ status: 'IGNORED', reason: 'no_grant' });
-        const done = await deps.applyEvent(grant.brokerageId, t.event, grant.accessMonths);
-        return reply({ status: 'OK', outcome: done.outcome });
+        if (grant !== null) {
+          const done = await deps.applyEvent(grant.brokerageId, t.event, grant.accessMonths);
+          return reply({ status: 'OK', outcome: done.outcome });
+        }
+        // not a one-time grant: a refund or chargeback of a subscription's payment ends THAT subscription's access, and only a refund or chargeback does (never a restore)
+        if (t.subscriptionId !== null && t.event.processor_status !== 'completed') {
+          const brokerage = await deps.subscriptionOf(t.subscriptionId, deps.livemode);
+          if (brokerage !== null) {
+            const done = await deps.applyEvent(brokerage, { ...t.event, subscription_ref: t.subscriptionId }, null);
+            return reply({ status: 'OK', outcome: done.outcome });
+          }
+        }
+        return reply({ status: 'IGNORED', reason: 'no_grant' });
       }
       const applied = await deps.applyEvent(t.brokerageId, t.event, t.accessMonths);
       return reply({ status: 'OK', outcome: applied.outcome });

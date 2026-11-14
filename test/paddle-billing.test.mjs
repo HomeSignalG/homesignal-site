@@ -189,6 +189,9 @@ const cfg = { secret: SECRET, prices: PRICES, livemode: true };
   ok(rev.kind === 'adjustment' && rev.event.processor_status === 'completed' && rev2.kind === 'adjustment' && rev2.event.processor_status === 'completed', '6f a reversed chargeback restores the purchase (status completed)');
   ok(await why({ action: 'credit' }) === 'action', '6g an action this build does not act on (credit) is ignored');
   ok((await go({ transaction_id: 'bad id!' })).kind === 'invalid' && (await go({}, { event_id: 5 })).kind === 'invalid', '6h a malformed adjustment is refused loudly');
+  const sa = await go({ subscription_id: 'sub_01hv8x8d6dxy3k7h2m0bbbbbbb', action: 'chargeback_warranty', type: 'partial' });
+  ok(sa.kind === 'adjustment' && sa.subscriptionId === 'sub_01hv8x8d6dxy3k7h2m0bbbbbbb' && sa.event.processor_status === 'charged_back' && full.subscriptionId === null,
+    '6k an adjustment carries its subscription id when it has one, and chargeback_warranty is a chargeback');
   ok(!JSON.stringify(full).includes('ctm_secret'), '6i nothing personal is carried across');
   ok(PADDLE_STATUS_OK(full.event.processor_status), '6j the status words are the ledger map\'s');
 }

@@ -156,9 +156,8 @@ const l2Code = code(L2_SQL);
 // It writes no row of the spine, calls neither the resolver nor any issue function, and the report page and the issuance functions are untouched.
 const ACQ_SQL = 'docs/acquisition-attribution.sql';
 const acqCode = code(ACQ_SQL);
-// docs/paid-only-individual-signup.sql (2026-11-14, new individuals have no free reports) adds ONE column to the evaluation and splices three existing functions; it creates no account, membership or account table.
-const PAID_ONLY_SQL = 'docs/paid-only-individual-signup.sql';
-ok(sorted(naming) === sorted([SQL_FILE, L1_SQL, EVAL_READS, SAVED_SQL, HEADER_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, PADDLE_SQL, PAID_ONLY_SQL, BILLING_READS, RATE_SQL, DA_SQL, L2_SQL, ACQ_SQL])
+// docs/paddle-billing.sql Part B (2026-11-14, new individuals have no free reports) adds ONE column to the evaluation and splices three existing functions; it creates no account, membership or account table.
+ok(sorted(naming) === sorted([SQL_FILE, L1_SQL, EVAL_READS, SAVED_SQL, HEADER_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, PADDLE_SQL, BILLING_READS, RATE_SQL, DA_SQL, L2_SQL, ACQ_SQL])
    && !/\bpublic\.brokerage_(account|member)\b|\.from\(['"]brokerage_/.test(billingReadsCode)
    && (paddleCode.match(/brokerage_membership_of\(p_user_id\)/g) || []).length === 1 && !/brokerage_member\b/.test(paddleCode)
    && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(only\s+)?public\.brokerage_(account|member)\b/i.test(paddleCode)
