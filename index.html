@@ -254,7 +254,7 @@
     // cites, and it says it is a third-party listing (2026-11-14).
     if (HS.tpl && HS.tpl.isThirdPartyListing && HS.tpl.isThirdPartyListing(p)) {
       var lh = HS.tpl.recordHref(p);
-      return '<article class="home-index__record" data-provenance="third_party_listing">'
+      return '<article class="home-index__record" data-listing="1">'
         + (badges ? '<div class="home-index__record-badges">' + badges + '</div>' : '')
         + (lh ? '<a class="home-index__record-name" href="' + esc(lh) + '" target="_blank" rel="noopener">' + name + '</a>' : '<span class="home-index__record-name">' + name + '</span>')
         + '<div class="home-index__record-meta">' + esc(HS.tpl.browsingStatusLabel(p)) + (p.source_name ? ' · ' + esc(p.source_name) : '') + '</div>'
