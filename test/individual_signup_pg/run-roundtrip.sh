@@ -12,7 +12,7 @@ here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
 P() { psql -X -q -v ON_ERROR_STOP=1 "$@"; }
 P -c "drop schema if exists auth cascade; drop schema public cascade; create schema public;" >/dev/null 2>&1
 P -f "$here/fixture.sql" >/dev/null
-for f in brokerage-account-spine report-private-context report-snapshot evaluation-entitlement saved-reports report-share report-share-delivery property-watch payment-event-ledger report-header brokerage-billing report-rate-limit individual-agent-signup paddle-billing; do
+for f in brokerage-account-spine report-private-context report-snapshot evaluation-entitlement saved-reports report-share report-share-delivery property-watch payment-event-ledger report-header brokerage-billing report-rate-limit individual-agent-signup paddle-billing-a; do
   P -f "$(docsql "$f")" >/dev/null 2>"$here/.dep.err" || { echo "FAIL — docs/$f.sql does not apply"; head -3 "$here/.dep.err"; rm -f "$here/.dep.err"; exit 1; }
 done
 rm -f "$here/.dep.err"

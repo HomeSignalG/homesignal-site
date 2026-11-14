@@ -11,7 +11,8 @@ if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" 
 here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
 . "$root/test/lib/docsql.sh"
 P() { psql -X -q -v ON_ERROR_STOP=1 "$@"; }
-SQL="${PADDLE_SQL:-$root/docs/paddle-billing.sql}"
+# this suite tests PART A of the one migration (billing); Part B (paid-only new individuals) has its own suite, which also applies the whole file
+SQL="${PADDLE_SQL:-$(docsql paddle-billing-a)}"
 DEPS=(brokerage-account-spine report-private-context report-snapshot evaluation-entitlement saved-reports report-share report-share-delivery property-watch payment-event-ledger report-header brokerage-billing saved-reports-archive individual-agent-signup)
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 reset_db() { P -c "drop schema if exists auth cascade; drop schema public cascade; create schema public;" >/dev/null 2>&1; P -f "$root/test/individual_signup_pg/fixture.sql" >/dev/null; }

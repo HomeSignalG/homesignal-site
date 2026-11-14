@@ -12,7 +12,7 @@ here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
 . "$root/test/lib/docsql.sh"
 P() { psql -X -q -v ON_ERROR_STOP=1 "$@"; }
 SQL="${PAID_ONLY_SQL:-$root/docs/paddle-billing.sql}"
-DEPS=(brokerage-account-spine report-private-context report-snapshot evaluation-entitlement saved-reports report-share report-share-delivery property-watch payment-event-ledger report-header brokerage-billing saved-reports-archive individual-agent-signup paddle-billing)
+DEPS=(brokerage-account-spine report-private-context report-snapshot evaluation-entitlement saved-reports report-share report-share-delivery property-watch payment-event-ledger report-header brokerage-billing saved-reports-archive individual-agent-signup paddle-billing-a)
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 reset_db() { P -c "drop schema if exists auth cascade; drop schema public cascade; create schema public;" >/dev/null 2>&1; P -f "$root/test/individual_signup_pg/fixture.sql" >/dev/null; }
 apply_deps() { local f; for f in "${DEPS[@]}"; do P -f "$(docsql "$f")" >/dev/null 2>"$tmp/dep.err" || { echo "FAIL - docs/$f.sql does not apply"; head -3 "$tmp/dep.err"; exit 1; }; done; }
@@ -44,7 +44,7 @@ out="$(suite)"; echo "$out" | awk -F'|' '{printf "%s %s\n", ($2=="t"?"PASS":"FAI
 
 # ---- 2. twice, identical; refuses without its layers ----------------------------------------------------------------------------------
 base; P -f "$SQL" >/dev/null; D1="$(defs)"; P -f "$SQL" >/dev/null 2>"$tmp/twice.err" && [ "$(defs)" = "$D1" ] && ok "applies twice with an identical definition set" || bad "applying twice changed something"
-reset_db; if P -f "$SQL" >/dev/null 2>"$tmp/ref.err"; then bad "applied on an empty database"; else grep -q "apply docs/evaluation-entitlement.sql" "$tmp/ref.err" && ok "refuses without the layers it stands on" || bad "refused for the wrong reason"; fi
+reset_db; if P -f "$SQL" >/dev/null 2>"$tmp/ref.err"; then bad "applied on an empty database"; else grep -q "apply docs/" "$tmp/ref.err" && ok "refuses without the layers it stands on" || bad "refused for the wrong reason"; fi
 base; python3 - "$SQL" "$tmp/anchor.sql" <<'PY'
 import sys
 s=open(sys.argv[1]).read(); o="insert into public.evaluation (brokerage_id, seat_limit) values (v_acct, 0)"
