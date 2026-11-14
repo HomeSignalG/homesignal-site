@@ -1,4 +1,4 @@
-// manage-billing — a brokerage member reads their plan, and a brokerage OWNER starts the $79 a month checkout (build step 11).
+// manage-billing — a brokerage member reads their plan, and a brokerage OWNER starts the monthly Professional ($78) checkout (build step 11).
 //
 // Wiring only. The request logic is handler.ts, the reads are data.ts, every plan read is _shared/billing-reads.ts (the same module the report gate
 // uses), every shape the processor has is _shared/lemon-billing.ts, and the gate is _shared/admin-gate.ts. JWT verification stays ON

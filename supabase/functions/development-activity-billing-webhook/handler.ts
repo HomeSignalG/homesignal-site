@@ -31,7 +31,7 @@ export { DataUnavailable };
 export type Deps = {
   /** The webhook's signing secret. Empty when it is not configured, which refuses every request. */
   secret: string;
-  /** The $79 product's variant id (a number as text). Empty when it is not configured. */
+  /** The Professional product's variant id (a number as text). Empty when it is not configured. */
   variantId: string;
   applyEvent: (brokerageId: string, event: LedgerEvent) => Promise<AppliedEvent>;
 };

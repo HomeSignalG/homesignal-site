@@ -1,5 +1,5 @@
 // manage-billing — a brokerage member reads their plan, and a brokerage OWNER starts the monthly checkout (Development Activity build step 11;
-// docs/development-activity-build-steps-100526.md: "$79/month checkout on the existing Lemon Squeezy connection: 100 reports a month, Billing tab").
+// docs/development-activity-build-steps-100526.md: "monthly checkout (since corrected to $78) on the existing Lemon Squeezy connection: 100 reports a month, Billing tab").
 //
 // TWO ACTIONS:
 //   status    { action: "status" }     the caller's plan: its state, this month's allotment, the caller's own role, and whether the caller may start a checkout.

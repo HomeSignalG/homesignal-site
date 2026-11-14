@@ -1,0 +1,62 @@
+name: paddle-billing-suite
+
+# Paddle fulfilment (docs/paddle-billing-2026-11-14.md) against the REAL billing SQL on a DISPOSABLE Postgres. PR-triggered only; holds no
+# Supabase credential and refuses to run if one is present. Deliveries are signed, verified and translated by the real adapter, then replayed
+# through billing_event_apply: duplicates, out-of-order, cancel, refund, chargeback, monthly reset, 100/month cap, test mode, binding conflict.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/paddle-billing.sql'
+      - 'docs/payment-event-ledger.sql'
+      - 'test/paddle_billing_pg/**'
+      - 'supabase/functions/_shared/paddle-billing.ts'
+      - 'supabase/functions/development-activity-paddle-webhook/**'
+      - '.github/workflows/paddle-billing-suite.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  paddle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: mirror.gcr.io/library/postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: paddle_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Paddle fulfilment passes against the real SQL
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: paddle_disposable
+        run: |
+          set -o pipefail
+          bash test/paddle_billing_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/paddle.log

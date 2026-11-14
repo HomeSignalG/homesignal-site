@@ -195,7 +195,7 @@ function world({ trial = 'active', used = 0, admin = false, untraceable = false,
   w.billingHandler = BH.makeHandler({
     ...gate,
     usageOf: async () => { if (w.billingFails) throw new RH.DataUnavailable('x'); return usage(); },
-    configured: () => w.configured, checkoutEnabled: () => true,
+    configured: () => w.configured, checkoutEnabled: () => true, paddleConfigured: () => !!w.paddle, paddleEnabled: () => !!w.paddle, createPaddleTransaction: async () => { w.paddleMade = (w.paddleMade || 0) + 1; return { environment: 'sandbox', token: 'test_0123456789abcdef0123456789a', transaction_id: 'txn_01hv8x0000000000000000abcd' }; },
     createCheckout: async () => { if (w.checkoutFails) throw new BH.CheckoutUnavailable('x'); w.checkoutMade++; return CHECKOUT_URL; },
     // the brokerage's single checkout slot (audit item D): held for ten minutes by whoever claimed it; the address of a checkout is kept nowhere
     checkoutClaim: async () => (w.checkoutBusy ? { outcome: 'BUSY' } : { outcome: 'CLAIMED' }),
@@ -300,6 +300,7 @@ async function open({ compare = true, w = world(), signedIn = true, hash = '', w
     }
     // the provider's own checkout page: the browser is sent here and nothing is exchanged with it; this stands in for it
     if (url.startsWith('https://homesignal.lemonsqueezy.com/')) { checkouts.push(url); return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>Checkout</title><p>Checkout</p>' }); }
+    if (url === 'https://cdn.paddle.com/paddle/v2/paddle.js') return route.fulfill({ status: 200, contentType: 'application/javascript', body: "window.__pd={env:null,init:null,opened:[]};window.Paddle={Environment:{set:function(e){window.__pd.env=e;}},Initialize:function(o){window.__pd.init=o;window.__pd.cb=o.eventCallback;},Checkout:{open:function(o){window.__pd.opened.push(o);}}};" });
     if (url === WATCH_FN) {
       const body = r.postData() ? JSON.parse(r.postData()) : null;
       watchCalls.push({ auth: r.headers().authorization || null, apikey: r.headers().apikey || null, body });
@@ -2419,6 +2420,28 @@ for (const [w, h] of [[1440, 900], [1920, 1080], [390, 844]]) {
   await page.click('#rail-actions [data-da-action="watch"]');
   ok((await drawn(page, '#watch-start')) && /Start watching/.test(await text(page, '#watch-start')), 'O6 Watch Property reveals the existing watch panel with its start control');
   ok(errors.length === 0, 'O7 no page error', errors);
+  await ctx.close();
+}
+
+// ---- 14. Paddle checkout: the browser opens the server-made transaction; a redirect or `checkout.completed` alone never shows a paid plan -----------
+{
+  const w = world({ role: 'owner' }); w.paddle = true;
+  const { ctx, page, errors, billingCalls } = await open({ w });
+  await waitBilling(page, /Free trial|Subscribe/);
+  await page.click('#subscribe');
+  await page.waitForFunction(() => window.__pd && window.__pd.opened.length === 1, null, { timeout: 8000 }).catch(() => {});
+  const pd = await page.evaluate(() => JSON.parse(JSON.stringify({ env: window.__pd.env, tok: window.__pd.init && window.__pd.init.token, opened: window.__pd.opened })));
+  ok(pd.env === 'sandbox' && /^test_/.test(pd.tok || ''), '14a Paddle.js is set to sandbox and initialised with the public client token', pd);
+  ok(w.paddleMade === 1 && billingCalls.some((c) => c.body.action === 'paddle_checkout') && !billingCalls.some((c) => c.body.action === 'checkout'), '14b one server-made transaction is requested through paddle_checkout, never the Lemon checkout');
+  const o0 = pd.opened[0] || {};
+  ok(o0.transactionId === 'txn_01hv8x0000000000000000abcd' && o0.settings && o0.settings.displayMode === 'overlay' && o0.settings.variant === 'one-page' && !o0.items, '14c Checkout.open gets the transaction id with the overlay / one-page settings and no price or items from the browser', o0);
+  await page.evaluate(() => window.__pd.cb({ name: 'checkout.completed' }));
+  await page.waitForFunction(() => /Payment received/i.test(document.getElementById('billing-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(/Payment received/i.test(await text(page, '#billing-status')) && !/Your plan is active/i.test(await billingText(page)), '14d checkout.completed alone shows "Payment received. Confirming" and does NOT show an active plan');
+  w.plan = 'paid'; // only the signed webhook (the database) can make this true
+  await page.waitForFunction(() => /plan is active|Professional plan is active|100 reports/i.test(document.getElementById('billing').textContent), null, { timeout: 20000 }).catch(() => {});
+  ok(/active|100/i.test(await billingText(page)), '14e the plan shows as active only after the server reports it paid');
+  ok(errors.length === 0, '14f no page error', errors);
   await ctx.close();
 }
 
