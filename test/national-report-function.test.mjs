@@ -530,7 +530,7 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
   ok(r.status === 502 && r.json.error === 'data_unavailable' && !f.calls.includes('geocode') && !f.calls.includes('issue'), '8l7 a plan that cannot be read is 502, with no address looked up and nothing charged (never "no plan", which would refuse or free a paid report)');
   f = trialFakes({ planOf: async () => null });
   r = await call(f.deps, { ...REQ, idempotency_key: KEY }, TAUTH);
-  ok(r.status === 200 && JSON.stringify(r.json.plan) === '{"state":"none","role":null,"credit_limit":0,"credits_used":0,"credits_remaining":0,"period_ends_at":null}', '8l8 a member the plan read does not know is "none" with no role, and the free trial works as before');
+  ok(r.status === 200 && JSON.stringify(r.json.plan) === '{"state":"none","role":null,"credit_limit":0,"credits_used":0,"credits_remaining":0,"period_ends_at":null,"access_ends_at":null}', '8l8 a member the plan read does not know is "none" with no role, and the free trial works as before');
   f = trialFakes();
   r = await call(f.deps, { ...REQ, idempotency_key: KEY }, TAUTH);
   ok(f.calls.filter((c) => c === 'planOf').length === 1, '8l9 the plan is read ONCE per request');

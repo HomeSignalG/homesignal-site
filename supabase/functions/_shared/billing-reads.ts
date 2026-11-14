@@ -70,6 +70,8 @@ export function makeBillingReads(rpc: ServiceRpc) {
       if (!Array.isArray(data)) throw new DataUnavailable('shape');
       if (data.length === 0) return null;
       const u = data[0];
+      // a database that has not had docs/paddle-billing.sql applied yet does not return access_ends_at: that is "no grant end" (null), so deploying before applying cannot break the plan read
+      if (u && typeof u === 'object' && u.access_ends_at === undefined) u.access_ends_at = null;
       if (data.length !== 1 || !u || typeof u.brokerage_id !== 'string' || !UUID.test(u.brokerage_id) || (u.role !== 'owner' && u.role !== 'agent')
           || !(PLAN_STATES as readonly string[]).includes(u.state) || !Number.isInteger(u.credit_limit) || !Number.isInteger(u.credits_used)
           || !Number.isInteger(u.credits_remaining) || u.credits_used < 0 || u.credits_remaining < 0
