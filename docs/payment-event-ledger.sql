@@ -117,6 +117,20 @@ as $$
         when 'expired'   then 'canceled'
         else 'unknown'
       end
+    when p_processor = 'paddle' then
+      -- Paddle Billing subscription statuses (active, trialing, past_due, paused, canceled) plus two words the Paddle ADAPTER writes itself for an
+      -- approved adjustment that takes the money back: 'refunded' (a full refund) and 'charged_back' (a chargeback). Both end access, like a
+      -- cancellation. A refund or chargeback is recorded as an event of the subscription it belongs to, so the one ordering rule decides it.
+      case p_status
+        when 'trialing'     then 'trialing'
+        when 'active'       then 'active'
+        when 'paused'       then 'paused'
+        when 'past_due'     then 'past_due'
+        when 'canceled'     then 'canceled'
+        when 'refunded'     then 'canceled'
+        when 'charged_back' then 'canceled'
+        else 'unknown'
+      end
     else 'unknown'
   end
 $$;

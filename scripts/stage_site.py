@@ -99,6 +99,7 @@ ROOT_FILES = (
     'config.js',
     'events.js',
     'hs-resolve.js',
+    'paddle-config.js',
     'share.js',
     'shell.js',
     'topics.js',

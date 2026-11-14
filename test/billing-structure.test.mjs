@@ -131,7 +131,7 @@ ok([BR, LB, ...Object.values(MB), ...Object.values(WB)].every((t) => t.length > 
     '2c the processor is named in the one shared module (and, as environment variable names, in the two index files): the handlers, the data layers and every other function know no processor word', naming(/lemonsqueezy/i).join());
   const envReaders = fnFiles.filter((f) => /Deno\.env\.get\('(LEMONSQUEEZY_[A-Z_]+)'\)/.test(read(f))).sort();
   ok(JSON.stringify(envReaders) === JSON.stringify([FN + '/development-activity-billing-webhook/index.ts', FN + '/manage-billing/index.ts'].sort())
-     && JSON.stringify([...stripJs(MB.index).matchAll(/Deno\.env\.get\('(\w+)'\)/g)].map((m) => m[1])) === '["SUPABASE_URL","SUPABASE_SERVICE_ROLE_KEY","LEMONSQUEEZY_API_KEY","LEMONSQUEEZY_STORE_ID","LEMONSQUEEZY_BILLING_VARIANT_ID","LEMONSQUEEZY_BILLING_WEBHOOK_SECRET","LEMONSQUEEZY_TEST_MODE"]'
+     && JSON.stringify([...stripJs(MB.index).matchAll(/Deno\.env\.get\('(\w+)'\)/g)].map((m) => m[1]).filter((k) => !/^PADDLE_/.test(k))) === '["SUPABASE_URL","SUPABASE_SERVICE_ROLE_KEY","LEMONSQUEEZY_API_KEY","LEMONSQUEEZY_STORE_ID","LEMONSQUEEZY_BILLING_VARIANT_ID","LEMONSQUEEZY_BILLING_WEBHOOK_SECRET","LEMONSQUEEZY_TEST_MODE"]'
      && JSON.stringify([...stripJs(WB.index).matchAll(/Deno\.env\.get\('(\w+)'\)/g)].map((m) => m[1])) === '["SUPABASE_URL","SUPABASE_SERVICE_ROLE_KEY","LEMONSQUEEZY_BILLING_WEBHOOK_SECRET","LEMONSQUEEZY_BILLING_VARIANT_ID"]',
     '2d the processor\'s settings are read from the environment in the two index files alone, and each reads only what it needs (the webhook never holds the API key)');
   ok(stripJs(MB.index).includes("testMode: (Deno.env.get('LEMONSQUEEZY_TEST_MODE') ?? '') === 'true'") && !/LEMONSQUEEZY_TEST_MODE/.test(stripJs(WB.index)),
@@ -159,13 +159,13 @@ ok([BR, LB, ...Object.values(MB), ...Object.values(WB)].every((t) => t.length > 
   const h = stripJs(MB.handler), d = stripJs(MB.data);
   ok(/authorizeSignedIn\(req, deps\)/.test(h) && h.indexOf('authorizeSignedIn(') < h.indexOf('readBounded(') && h.indexOf('readBounded(') < h.indexOf('deps.usageOf('),
     '2j the gate refuses BEFORE the body is read, and the body is read before anything about billing is asked');
-  ok(/deps\.createCheckout\(usage\.brokerage_id\)/.test(h) && !/\bb\.(brokerage|url|price|plan|email)/.test(h) && /const FIELDS: Record<string, string\[\]> = \{ status: \['action'\], checkout: \['action'\] \};/.test(h),
+  ok(/deps\.createCheckout\(usage\.brokerage_id\)/.test(h) && !/\bb\.(brokerage|url|price|plan|email)/.test(h) && /const FIELDS: Record<string, string\[\]> = \{ status: \['action'\], checkout: \['action'\], paddle_checkout: \['action'\] \};/.test(h),
     '2k a checkout is made for the brokerage the DATABASE names for the signed-in person, never one the request names, and each action\'s field set is closed to the word "action"');
   const iOwner = h.indexOf("availability === 'not_owner'"), iPaid = h.indexOf("availability === 'already_paid'"), iExists = h.indexOf("availability === 'subscription_exists'"), iSet = h.indexOf("availability === 'not_set_up'"), iMake = h.indexOf('deps.createCheckout(');
   ok(iOwner > 0 && iPaid > iOwner && iExists > iPaid && iSet > iExists && iMake > iSet, '2l the checkout is refused for a non-owner, over a paid or live subscription and when the processor is not set up, in that order, and only then asked for', [iOwner, iPaid, iExists, iSet, iMake].join());
   ok(/u\.state !== 'none' && u\.state !== 'canceled' && u\.state !== 'test_only'/.test(h), '2m a checkout is offered only where a NEW subscription is needed: never subscribed, ended, or test-only (a second one over a live subscription would bill twice)');
-  ok(count(d, /fetchFn\(/g) === 1 && /checkoutUrlFrom\(await r\.json\(\)/.test(d) && d.indexOf('if (!r.ok)') < d.indexOf('r.json()') && !/return[^;]*r\.(text|json)\(\)[^;]*\bthrow\b/.test(d),
-    '2n the one request to the processor is the checkout; its answer is read only when it succeeded (a refusal\'s body can name the buyer) and only its address is kept, after the domain check');
+  ok(count(d, /fetchFn\(/g) === 2 && /checkoutUrlFrom\(await r\.json\(\)/.test(d) && /transactionIdFrom\(await r\.json\(\)/.test(d) && d.indexOf('if (!r.ok)') < d.indexOf('r.json()') && !/return[^;]*r\.(text|json)\(\)[^;]*\bthrow\b/.test(d),
+    '2n the only requests to a processor are the two checkouts (Lemon\'s and Paddle\'s transaction); its answer is read only when it succeeded (a refusal\'s body can name the buyer) and only its address is kept, after the domain check');
   ok(!/brokerage_id|bind|secret|apiKey/.test(h.replace(/usage\.brokerage_id/g, '').replace(/deps\.configured/g, '').replace(/BillingUsage/g, '')) || count(h, /reply\([^)]*\b(secret|apiKey|bind)\b/g) === 0,
     '2o no reply of the Billing function carries a secret, a key or a signature');
 }
@@ -211,8 +211,8 @@ ok([BR, LB, ...Object.values(MB), ...Object.values(WB)].every((t) => t.length > 
 {
   const noYaml = (t) => t.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
   const DEPLOY = noYaml(read('.github/workflows/deploy-edge-functions.yml'));
-  ok(count(DEPLOY, /--no-verify-jwt/g) === 3 && /elif \[ "\$FN" = "development-activity-billing-webhook" \]/.test(DEPLOY) && !/manage-billing/.test(DEPLOY),
-    '5a the deploy workflow turns JWT off for the webhook (the processor sends no token) and for no other new function; manage-billing keeps it on');
+  ok(count(DEPLOY, /--no-verify-jwt/g) === 4 && /elif \[ "\$FN" = "development-activity-billing-webhook" \]/.test(DEPLOY) && /elif \[ "\$FN" = "development-activity-paddle-webhook" \]/.test(DEPLOY) && !/manage-billing/.test(DEPLOY),
+    '5a the deploy workflow turns JWT off for the two webhooks (neither processor sends a token) and for no other new function; manage-billing keeps it on');
   const cfg = read('supabase/config.toml');
   ok(/\[functions\.manage-billing\]\s*\nverify_jwt = true/.test(cfg) && /\[functions\.development-activity-billing-webhook\]\s*\nverify_jwt = false/.test(cfg),
     '5b config.toml records the Billing function with JWT on and the webhook with it off');

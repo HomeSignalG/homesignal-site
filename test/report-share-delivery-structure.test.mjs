@@ -172,12 +172,12 @@ ok(namers(/report_private_context_read/).sort().join() === 'supabase/functions/_
   const wf = read('.github/workflows/deploy-edge-functions.yml');
   const cmds = wf.split('\n').filter((l) => /--no-verify-jwt/.test(l) && !/^\s*#/.test(l));
   const branches = (wf.match(/^\s*(?:el)?if \[ "\$FN" = "[a-z-]+" \][^\n]*$/gm) || []).map((l) => l.trim());
-  ok(cmds.length === 3 && branches.length === 3 && branches.join() === 'if [ "$FN" = "get-address-report" ]; then,elif [ "$FN" = "view-shared-report" ]; then,elif [ "$FN" = "development-activity-billing-webhook" ]; then',
-    '2s the deploy turns JWT verification off for exactly THREE functions: the report engine, the client link\'s function and (build step 11) the payment processor\'s webhook', branches);
+  ok(cmds.length === 4 && branches.length === 4 && branches.join() === 'if [ "$FN" = "get-address-report" ]; then,elif [ "$FN" = "view-shared-report" ]; then,elif [ "$FN" = "development-activity-billing-webhook" ]; then,elif [ "$FN" = "development-activity-paddle-webhook" ]; then',
+    '2s the deploy turns JWT verification off for exactly FOUR functions: the report engine, the client link\'s function and the two payment processors\' webhooks (Lemon Squeezy, build step 11; Paddle, 2026-11-14)', branches);
   const cfg = read('supabase/config.toml');
   const off = [...cfg.matchAll(/\[functions\.([a-z-]+)\]\s*\nverify_jwt = (true|false)/g)].filter((m) => m[2] === 'false').map((m) => m[1]);
   const on = [...cfg.matchAll(/\[functions\.([a-z-]+)\]\s*\nverify_jwt = (true|false)/g)].filter((m) => m[2] === 'true').map((m) => m[1]);
-  ok(off.join() === 'view-shared-report,development-activity-billing-webhook' && on.includes('manage-shared-report') && on.includes('development-activity-trial') && on.includes('manage-billing'), '2t config.toml records exactly two verify_jwt = false (the client\'s function and, from build step 11, the payment processor\'s webhook) and keeps the agent\'s functions on', off.join() + ' / ' + on.join());
+  ok(off.join() === 'view-shared-report,development-activity-billing-webhook,development-activity-paddle-webhook' && on.includes('manage-shared-report') && on.includes('development-activity-trial') && on.includes('manage-billing'), '2t config.toml records exactly three verify_jwt = false (the client\'s function and, from build step 11, the payment processor\'s webhook) and keeps the agent\'s functions on', off.join() + ' / ' + on.join());
 }
 
 // ---- 3. the pages ------------------------------------------------------------------------------------------------------------------------------

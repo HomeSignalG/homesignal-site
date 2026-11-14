@@ -96,10 +96,11 @@ CONTENT_KEYED.forEach((rel) => {
 // shell.js was keyless on all 14 pages for the life of the repo and this pin reported
 // nothing, which is the failure mode §2 exists to prevent: an absence that reads as a pass.
 // Now shell.js is content-keyed above and the rest are pinned at measured membership.
+// paddle-config.js (2026-11-14) is keyless on purpose: the Pages build REWRITES it from repository variables, so a content hash committed with the page could never match the deployed bytes.
 const KNOWN_KEYLESS = new Set([
   'lib/impact.js', 'lib/gov-notice-copy.js',
   'lib/coverage-copy.js', 'lib/why.js',
-  'config.js', 'seed/delvalle.js', 'share.js', 'assets/acquisition-video-producer.js'
+  'config.js', 'paddle-config.js', 'seed/delvalle.js', 'share.js', 'assets/acquisition-video-producer.js'
 ]);
 // A leading "/" is the generator's absolute form, not a different file (same rule as
 // test/zip-page-shared-runtime.test.mjs). Absolute http(s) sources are third-party CDN

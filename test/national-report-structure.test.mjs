@@ -115,7 +115,7 @@ const all = Object.values(src).map(code).join('\n');
   // build step 8 adds the SECOND, deliberate exception: view-shared-report, for the client who opens a private share link and has no account; build step 11 adds
   // the THIRD: development-activity-billing-webhook, for the payment processor, which sends no Supabase token (its HMAC signature is the credential).
   // The pin is exactly those three branches, so a fourth cannot arrive unnoticed (test/report-share-delivery-structure.test.mjs and test/billing-structure.test.mjs pin the others).
-  ok(noJwt === 3 && /if \[ "\$FN" = "get-address-report" \]/.test(wf) && /elif \[ "\$FN" = "view-shared-report" \]/.test(wf) && /elif \[ "\$FN" = "development-activity-billing-webhook" \]/.test(wf) && !/get-development-activity-report/.test(wf),
+  ok(noJwt === 4 && /if \[ "\$FN" = "get-address-report" \]/.test(wf) && /elif \[ "\$FN" = "view-shared-report" \]/.test(wf) && /elif \[ "\$FN" = "development-activity-billing-webhook" \]/.test(wf) && !/get-development-activity-report/.test(wf),
     '4b the deploy workflow\'s only --no-verify-jwt exceptions are get-address-report, view-shared-report and development-activity-billing-webhook, and this function is not in them', noJwt);
   const h = code(src.handler);
   const g = code(src.gate);

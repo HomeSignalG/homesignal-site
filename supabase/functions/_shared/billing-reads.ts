@@ -101,6 +101,15 @@ export function makeBillingReads(rpc: ServiceRpc) {
       if (error) throw new DataUnavailable('billing_checkout_release');
     },
 
+    /** The brokerage a processor subscription is already bound to, or null (public.billing_binding_brokerage). Used for refunds, which carry no custom data. */
+    async bindingOf(processor: string, livemode: boolean, subscriptionRef: string): Promise<string | null> {
+      const { data, error } = await rpc('billing_binding_brokerage', { p_processor: processor, p_livemode: livemode, p_subscription_ref: subscriptionRef });
+      if (error) throw new DataUnavailable('billing_binding_brokerage');
+      if (data === null || data === undefined) return null;
+      if (typeof data !== 'string' || !UUID.test(data)) throw new DataUnavailable('shape');
+      return data.toLowerCase();
+    },
+
     /**
      * Record one processor event for one brokerage, and bind its subscription to that brokerage if this is the first the database has seen of it
      * (public.billing_event_apply: ONE transaction, through the payment ledger's one writer). A retried delivery is `DUPLICATE`. The refusals are

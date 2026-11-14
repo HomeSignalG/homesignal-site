@@ -124,6 +124,9 @@ function mdeps(over = {}) {
     usageOf: rec('usageOf', over.usageOf ?? (async () => usage())),
     configured: () => over.configured ?? true,
     checkoutEnabled: () => over.checkoutEnabled ?? true,
+    paddleConfigured: () => over.paddleConfigured ?? false,
+    paddleEnabled: () => over.paddleEnabled ?? false,
+    createPaddleTransaction: rec('createPaddleTransaction', over.createPaddleTransaction ?? (async () => ({ environment: 'sandbox', token: 'test_abc', transaction_id: 'txn_01hv8x9y0z1a2b3c4d5e6f7g8h' }))),
     createCheckout: rec('createCheckout', over.createCheckout ?? (async () => 'https://homesignal.lemonsqueezy.com/checkout/custom/abc')),
     checkoutClaim: rec('checkoutClaim', over.checkoutClaim ?? (async () => ({ outcome: 'CLAIMED' }))),
     checkoutRelease: rec('checkoutRelease', over.checkoutRelease ?? (async () => undefined)),
@@ -443,7 +446,7 @@ async function hook(d, raw, { sig, method = 'POST', headers = {} } = {}) {
   ok(/export const CHECKOUT_ENABLED = false;/.test(read('supabase/functions/_shared/billing-switch.ts')),
     '2sw4 the SHIPPED switch is off (free evaluation: the Terms say nothing is sold); turning it on is a reviewed edit of this file and this pin');
   const idx = read('supabase/functions/manage-billing/index.ts');
-  ok(/import \{ CHECKOUT_ENABLED \} from '\.\.\/_shared\/billing-switch\.ts'/.test(idx) && /checkoutEnabled: \(\) => CHECKOUT_ENABLED/.test(idx),
+  ok(/import \{ CHECKOUT_ENABLED, PADDLE_SANDBOX_CHECKOUT_ENABLED \} from '\.\.\/_shared\/billing-switch\.ts'/.test(idx) && /checkoutEnabled: \(\) => CHECKOUT_ENABLED/.test(idx),
     '2sw5 the deployed function reads the committed switch and nothing else (no environment setting can turn checkout on)');
 }
 
