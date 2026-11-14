@@ -47,6 +47,8 @@ export type Deps = AdminGateDeps & {
   configured: () => boolean;
   /** The committed kill switch (_shared/billing-switch.ts). False refuses every checkout. */
   checkoutEnabled: () => boolean;
+  /** Whether the PRIVATE partner offer may be pressed at all. False in production until its private checkout exists (founder, 2026-11-14: it is not a public offer). */
+  partnerOffered: () => boolean;
   createCheckout: (brokerageId: string, offer: OfferKey) => Promise<string>;
   /** The brokerage's single checkout slot (docs/da-owner-safeguards.sql, part C): one open checkout at a time. */
   checkoutClaim: (brokerageId: string) => Promise<CheckoutSlot>;
@@ -109,7 +111,7 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
       const individual = (await deps.accountTypeOf(who.userId)) === 'individual';
       if (action === 'status') {
         // the offers this person may press, in the order the page lists them; empty unless a checkout is available at all
-        const offers: OfferKey[] = availability === 'available' ? (individual ? ['professional', 'partner'] : ['professional']) : [];
+        const offers: OfferKey[] = availability === 'available' ? (individual && deps.partnerOffered() ? ['professional', 'partner'] : ['professional']) : [];
         return reply(req, { status: 'OK', plan: planSummary(usage), checkout: availability, offers, client: availability === 'available' ? deps.clientConfig() : null });
       }
 
@@ -120,6 +122,7 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
       if (availability === 'disabled') return reply(req, { error: 'checkout_disabled' }, 503);
       if (availability === 'not_set_up') return reply(req, { error: 'billing_not_set_up' }, 503);
       // the Private Partner Offer is an INDIVIDUAL agent's: a brokerage account is refused here, and the database refuses a grant for one regardless
+      if (offer === 'partner' && !deps.partnerOffered()) return reply(req, { error: 'forbidden', detail: 'offer_not_available' }, 403);
       if (offer === 'partner' && !individual) return reply(req, { error: 'forbidden', detail: 'individual_only' }, 403);
       // ONE CHECKOUT AT A TIME. The slot is claimed in the database BEFORE the processor is asked, so two presses (or two tabs) cannot make two
       // checkouts: the second is told one was just opened. No slot, no checkout: a failed claim is a 502.

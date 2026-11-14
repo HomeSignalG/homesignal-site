@@ -1871,8 +1871,8 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   const { ctx, page } = await open({ w });
   await page.waitForFunction(() => !document.getElementById('signup').hidden, null, { timeout: 8000 }).catch(() => {});
   ok(await page.$eval('#signup', (e) => !e.hidden) && /not part of a trial/.test(await text(page, '#trial-count')), '14a signed in with no account: the signup card shows');
-  ok(/100 free Development Activity reports\. Paid plans are coming/.test(await text(page, '#signup')) && await page.$eval('#signup-quote', (a) => a.getAttribute('href') === 'contact.html'),
-    '14b it states the offer in the founder\'s words and links brokerages to the contact page');
+  ok(/Professional plan is \$78 per month and includes 100 Development Activity reports each month/.test(await text(page, '#signup')) && !/free/i.test(await text(page, '#signup')) && await page.$eval('#signup-quote', (a) => a.getAttribute('href') === 'contact.html'),
+    '14b the signup card states $78 per month with 100 reports (no free reports) and links brokerages to the contact page');
   await page.click('#signup-go');
   ok(w.signedUp.length === 0 && /Type your name/.test(await text(page, '#signup-status')), '14c an empty name is stopped on the page: nothing is sent');
   await page.fill('#signup-name', '  Ann   Agent ');

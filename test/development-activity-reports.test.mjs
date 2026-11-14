@@ -276,5 +276,15 @@ ok(/sessionEpoch\+\+;/.test(code) && /var epochAtAsk = sessionEpoch;/.test(code)
   ok(!/<section class="card" id="trial"/.test(body), '11d usage is no longer a large card');
 }
 
+// founder, 2026-11-14: a NEW individual account has no free reports. The page holds no number of its own (the database reports a free limit of 0) and says so in words.
+{
+  const page = read('development-activity-reports.html');
+  ok(!/100 free (Development Activity )?reports/i.test(page.replace(/<!--[\s\S]*?-->/g, '')) && !/Paid plans are coming/.test(page) && !/start with 100 free/.test(page),
+    '5a no "100 free reports", "Paid plans are coming" or "start with 100 free" wording remains on the Reports page');
+  ok(/freeLimit === 0 && !isPaid\(\)/.test(page) && /No reports yet/.test(page) && /Subscribe to make your first report/.test(page) && /needs an active Professional plan to make a report/.test(page),
+    '5b a free limit of 0 reads "No reports yet" and says a plan is needed, instead of "0 of 0 free reports used"');
+  ok(/\$78 per month and includes 100 reports each month/.test(page), '5c the signup card and the Billing card state $78 per month with 100 reports each month');
+}
+
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);
