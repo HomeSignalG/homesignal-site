@@ -6979,9 +6979,18 @@ was missing from both lists and from the Development tile (Behring 415 20th Stre
     data center. Both still list; linking them is a founder decision.
   - `supabase_read_only_user` may execute `map1_dc_zip_members` (`docs/map1-dc-zip-members-read-only-grant.sql`), so
     the audit runs through db-read.
-  - **Not done:** the pre-built `/community/<zip>/` text still omits listings. The build reads no per-ZIP
-    development rows, and there is no bulk reader of national members (a national pass exceeds 60 s), so it needs a
-    stored per-ZIP table first.
+  - ~~**Not done:** the pre-built `/community/<zip>/` text still omits listings.~~ **Done 2026-11-14:** the build
+    prints a "Data-center listings" section from `public.zip_dc_listing` (`docs/zip-dc-listing.sql`,
+    applied 2026-11-14): `map1_dc_zip_members`' own 'member' rows per registry ZIP, stored by
+    `zip_dc_listing_refresh` (pg_cron `zip-dc-listing`, every 10 min, 1,500 ZIPs, oldest checked first;
+    a failed read keeps the previous row and records `last_error`). The build (`gen_zip_pages.py`
+    `fetch_dc_listings` / `attach_dc_listings` / `_dc_listing_items`) prints a ZIP's listings only when its row
+    was checked within 48 h and not truncated; a missing table, stale or truncated row prints nothing, never an
+    absence sentence. Up to 12 per ZIP (Proposed, Approved, Operating), the rest named with a map link. The
+    section is `class="zsec zdcl"` with a lead paragraph, so the live proof never counts it as Alerts. Its words are
+    lib/templates.js's, ported to Python and checked on the same rows by `test/zip-page-dc-listings.test.mjs`.
+    SQL suite: `test/zip_dc_listing_pg` (`zip-dc-listing-suite.yml`). No alarm yet: if the cron job
+    stops, rows age past 48 h and the sections quietly drop (the build log counts them).
 
 ## TAB 17 DATA-CENTER PROJECT CHECK (2026-11-13): A MAP 1 PROJECT LINK AND A REPLY IN EACH HOT TOPICS TILE
 
