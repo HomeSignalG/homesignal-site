@@ -79,7 +79,7 @@ async function trialAsk(userId, body) {
   return { status: res.status, json: await res.json() };
 }
 async function billingAsk(userId, body) {
-  const real = BD.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc', billing: { apiKey: '', storeId: '', variantId: '', secret: '', testMode: true } }, fetchToSql);
+  const real = BD.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc', billing: { apiKey: '', secret: '', prices: { professional: '', partner: '' }, environment: 'sandbox', clientToken: '' } }, fetchToSql);
   const h = BH.makeHandler({ ...real, checkoutEnabled: () => true, authenticate: async () => ({ email: 'x@example.test', id: userId }), isAdmin: async () => false });
   const res = await h(new Request('https://x/functions/v1/manage-billing', { method: 'POST', headers: { authorization: 'Bearer t', 'content-type': 'application/json' }, body: JSON.stringify(body) }));
   return { status: res.status, json: await res.json() };
