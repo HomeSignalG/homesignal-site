@@ -141,12 +141,12 @@ ok(/constraint payment_event_idempotency\s+unique \(processor, idempotency_key\)
 ok(/\(r\.subscription_ref, r\.event_name, r\.processor_status, r\.occurred_at, r\.product_ref, r\.variant_ref, r\.livemode\)\s+is distinct from \(v_sub, v_name, v_status, v_occ, v_prod, v_var, v_live\) then\s+raise exception 'payment_event: this idempotency key was already recorded for a different event'\s+using errcode = '23505', constraint = 'payment_event_idempotency_key_reused'/.test(RECORDER.body),
   '6c: a key that was already recorded for a DIFFERENT event — any difference in subscription, event, status, time, product, variant or mode — is refused (23505, a named constraint) the moment the two differ, with no other condition between the comparison and the refusal, instead of being returned as a duplicate');
 const elses = [...MAP.body.matchAll(/\belse\s+'([^']*)'/g)].map((m) => m[1]);
-ok(elses.length === 2 && elses.every((e) => e === 'unknown') && count(CODE, /\bcase\b/gi) === 2 && /when p_processor = 'lemonsqueezy' then/.test(MAP.body),
-  '6d: the ONE mapping has exactly two fall-through branches (a status it does not know, a processor it does not know) and both are \'unknown\' — never \'active\'', elses.join(','));
+ok(elses.length === 3 && elses.every((e) => e === 'unknown') && count(CODE, /\bcase\b/gi) === 3 && /when p_processor = 'lemonsqueezy' then/.test(MAP.body) && /when p_processor = 'paddle' then/.test(MAP.body),
+  '6d: the ONE mapping has exactly three fall-through branches (a status it does not know, for each of two processors, and a processor it does not know) and all are \'unknown\' — never \'active\'', elses.join(','));
 const mapped = [...MAP.body.matchAll(/then\s+'(\w+)'/g)].map((m) => m[1]);
-ok(JSON.stringify([...new Set(mapped)].sort()) === JSON.stringify(['active', 'canceled', 'past_due', 'paused', 'trialing', 'unpaid']) && mapped.length === 7
+ok(JSON.stringify([...new Set(mapped)].sort()) === JSON.stringify(['active', 'canceled', 'past_due', 'paused', 'trialing', 'unpaid']) && mapped.length === 15
    && /mapped_status in \('trialing', 'active', 'paused', 'past_due', 'unpaid', 'canceled', 'unknown'\)/.test(TABLE),
-  '6e: the mapping produces only the six known values (seven words map to them: expired and cancelled both to canceled), and the table closes the vocabulary at those six plus \'unknown\'', mapped.join(','));
+  '6e: the mapping produces only the six known values (seven Lemon words and eight Paddle words map to them), and the table closes the vocabulary at those six plus \'unknown\'', mapped.join(','));
 ok(/pg_advisory_xact_lock\(hashtextextended\(/.test(RECORDER.body) && RECORDER.body.indexOf('pg_advisory_xact_lock') < RECORDER.body.indexOf('insert into public.payment_event'),
   '6f: calls for one subscription are serialised by a transaction-scoped advisory lock taken BEFORE the insert, so is_latest is accurate for events recorded at the same moment');
 ok(/livemode/.test(LATEST.body) && /p_livemode/.test(LATEST.body) && /v_live::text/.test(RECORDER.body),

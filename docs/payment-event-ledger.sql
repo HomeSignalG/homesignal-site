@@ -117,6 +117,20 @@ as $$
         when 'expired'   then 'canceled'
         else 'unknown'
       end
+    when p_processor = 'paddle' then
+      -- Paddle Billing (2026-11-14; mirrored from docs/paddle-billing.sql so a replay of this file cannot remove it). 'completed' is a paid one-time transaction;
+      -- 'refunded' (an approved FULL refund) and 'charged_back' (an approved chargeback) are written by the Paddle adapter and end that purchase's access.
+      case p_status
+        when 'trialing'     then 'trialing'
+        when 'active'       then 'active'
+        when 'completed'    then 'active'
+        when 'paused'       then 'paused'
+        when 'past_due'     then 'past_due'
+        when 'canceled'     then 'canceled'
+        when 'refunded'     then 'canceled'
+        when 'charged_back' then 'canceled'
+        else 'unknown'
+      end
     else 'unknown'
   end
 $$;
