@@ -273,7 +273,7 @@ async function open({ compare = true, w = world(), signedIn = true, hash = '', w
   const realCheck = page.check.bind(page);
   page.check = async (sel, o) => { if (/#saved-list/.test(sel) && !(await page.$eval('#saved', (e) => e.classList.contains('cmp-on')))) await page.click('#compare-mode'); return realCheck(sel, o); };
   await page.exposeFunction('__hsNameSaved', (v) => { w.header = { ...w.header, agent: E.cleanDisplayName(v, 80) }; }); // the server reads the saved name from the account
-  const errors = [], reports = [], trials = [], foreign = [], saved = [], shareCalls = [], watchCalls = [], billingCalls = [], checkouts = [];
+  const errors = [], reports = [], trials = [], foreign = [], saved = [], shareCalls = [], watchCalls = [], billingCalls = [], checkouts = [], paddleJs = [];
   page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
   await page.route('**/*', async (route) => {
@@ -302,6 +302,7 @@ async function open({ compare = true, w = world(), signedIn = true, hash = '', w
       return route.fulfill({ status: res.status, contentType: 'application/json', body: await res.text() });
     }
     // the provider's own checkout page: the browser is sent here and nothing is exchanged with it; this stands in for it
+    if (url === 'https://cdn.paddle.com/paddle/v2/paddle.js') { paddleJs.push(url); return route.fulfill({ status: 200, contentType: 'application/javascript', body: 'window.Paddle={Environment:{set:function(e){window.__penv=e}},Initialize:function(o){window.__pinit=o}};' }); }
     if (url.startsWith('https://buy.paddle.com/')) { checkouts.push(url); return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>Checkout</title><p>Checkout</p>' }); }
     if (url === WATCH_FN) {
       const body = r.postData() ? JSON.parse(r.postData()) : null;
@@ -333,7 +334,7 @@ async function open({ compare = true, w = world(), signedIn = true, hash = '', w
   // "Account and administration" (Billing, Invite an agent) is a <details> that is CLOSED until wanted, so a control inside it has no box. The
   // checks of those cards are about the cards, so they are read with the section open; the closed default is asserted on its own (Part L, accountClosed).
   if (!accountClosed) await page.evaluate(() => { document.getElementById('account').open = true; });
-  return { ctx, page, errors, reports, trials, foreign, saved, shareCalls, watchCalls, billingCalls, checkouts, w };
+  return { ctx, page, errors, reports, trials, foreign, saved, shareCalls, watchCalls, billingCalls, checkouts, paddleJs, w };
 }
 const text = (page, sel) => page.$eval(sel, (e) => e.textContent.trim());
 // WHAT A PERSON SEES, not what the attribute says. `el.hidden` is only the attribute: a page rule that sets a display (the cards below are display:grid by id)
@@ -1658,6 +1659,59 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   ok(billingCalls.length === 2 && JSON.stringify(billingCalls[1].body) === '{"action":"checkout","offer":"professional"}', '12d2 the checkout request carries no brokerage id, no price and no address: the server knows whose it is', billingCalls.map((c) => c.body));
   ok(foreign.length === 0 && errors.length === 0, '12d3 nothing else was fetched and the page raised no error', [foreign, errors]);
   await ctx.close();
+}
+
+{
+  // 12p. the Private Partner Offer (six months, one payment, individual accounts only) and Paddle's own checkout window
+  const TOKEN = 'test_0123456789abcdef0123456789';
+  const mk = (over = {}) => { const w = world({ role: 'owner', used: 3, ...over }); return w; };
+  let w = mk(); w.acctType = 'individual'; w.clientCfg = { environment: 'sandbox', token: TOKEN };
+  let o = await open({ w });
+  await waitBilling(o.page, /Free trial/);
+  ok(await o.page.$eval('#buy-partner', (e) => !e.hidden && /Buy 6 months/.test(e.textContent)) && await o.page.$eval('#subscribe', (e) => !e.hidden),
+    '12p1 an individual agent is offered both: Subscribe (monthly) and Buy 6 months (one time)');
+  await o.page.click('#buy-partner');
+  await o.page.waitForFunction(() => /checkout/i.test(document.title), null, { timeout: 8000 }).catch(() => {});
+  ok(w.checkoutMade === 1 && w.offerAsked === 'partner' && JSON.stringify(o.billingCalls[1].body) === '{"action":"checkout","offer":"partner"}',
+    '12p2 pressing it asks for the PARTNER checkout and carries only the offer word: no price, no length, no brokerage id', [w.offerAsked, o.billingCalls.map((c) => c.body)]);
+  await o.ctx.close();
+
+  w = mk(); // a brokerage owner (default account type)
+  o = await open({ w });
+  await waitBilling(o.page, /Free trial/);
+  ok(await o.page.$eval('#buy-partner', (e) => e.hidden) && await o.page.$eval('#subscribe', (e) => !e.hidden), '12p3 a brokerage account is never offered the one-time partner button');
+  await o.page.evaluate(() => document.getElementById('buy-partner').click());
+  ok(o.billingCalls.length === 1 && w.checkoutMade === 0, '12p3b and pressing the hidden button anyway asks for nothing');
+  await o.ctx.close();
+
+  w = mk({ plan: 'paid', paidUsed: 4 }); w.acctType = 'individual'; w.grantEnds = '2027-05-04T12:00:00+00:00';
+  o = await open({ w });
+  await waitBilling(o.page, /Private Partner access/);
+  const gt = await billingText(o.page);
+  ok(/Private Partner access: 4 of 100 reports used this month/.test(gt) && /Your access ends .*2027/.test(gt) && /does not renew by itself/.test(gt),
+    '12p4 an active grant says how many reports are used and the date access ENDS, and that it does not renew', gt);
+  await o.ctx.close();
+
+  w = mk({ plan: 'expired' }); w.acctType = 'individual'; w.grantEnds = '2027-05-04T12:00:00+00:00';
+  o = await open({ w });
+  await waitBilling(o.page, /six months of access have ended/);
+  ok(/Your saved reports stay available/.test(await billingText(o.page)) && await o.page.$eval('#buy-partner', (e) => !e.hidden) && await o.page.$eval('#subscribe', (e) => /Subscribe again/.test(e.textContent)),
+    '12p5 an expired grant says so, keeps saved reports, and offers monthly again or six more months', await billingText(o.page));
+  await o.ctx.close();
+
+  w = mk(); w.clientCfg = { environment: 'sandbox', token: TOKEN };
+  o = await open({ w, hash: '?_ptxn=txn_01hv8x8d6dxy3k7h2m0ddddddd' });
+  await waitBilling(o.page, /Free trial/);
+  await o.page.waitForFunction(() => window.__pinit, null, { timeout: 8000 }).catch(() => {});
+  ok(o.paddleJs.length === 1 && await o.page.evaluate((t) => window.__penv === 'sandbox' && window.__pinit && window.__pinit.token === t, TOKEN),
+    '12p6 arriving with a Paddle transaction id loads Paddle.js once, in SANDBOX mode, with the public client token and nothing else', o.paddleJs);
+  await o.ctx.close();
+
+  w = mk(); w.clientCfg = { environment: 'sandbox', token: TOKEN };
+  o = await open({ w });
+  await waitBilling(o.page, /Free trial/);
+  ok(o.paddleJs.length === 0, '12p7 a page opened without a transaction id never loads Paddle.js');
+  await o.ctx.close();
 }
 {
   // 12e-12h. an agent, a processor that is not set up, a refusal, and a lost answer

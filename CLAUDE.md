@@ -7010,3 +7010,16 @@ project's documents for review. Nothing is posted; the founder copies the reply 
 - Tests: `test/impact-dc-verify.test.mjs`, `test/impact-dc-page-check.browser.test.mjs`, `test/impact-dc-check.browser.test.mjs`,
   `test/map1-project-panel.test.mjs`, `test/map1-project-link.browser.test.mjs`, `test/impact_dc_verification_pg`,
   `test/map1_project_link_pg` (both in `zip-membership-suite.yml`).
+
+## PADDLE REPLACES LEMON SQUEEZY; THE PRIVATE PARTNER SIX-MONTH GRANT; REFUNDS (2026-11-14) — BUILT, CHECKOUT OFF, SQL NOT APPLIED
+
+Full record: `docs/paddle-billing-2026-11-14.md`. Professional is $78/month recurring (100 reports a month, no trial). The Private Partner Offer is $234 once for six months,
+individual accounts only, its own one-time price (no discount code), not on the public pricing page. Brokerage & Enterprise is custom quoted; nothing sells it.
+- Adapter `supabase/functions/_shared/paddle-billing.ts` (replaces `lemon-billing.ts`): `Paddle-Signature` HMAC over the raw body, checkout binding, price id -> offer,
+  access length from the SERVER (`OFFER_ACCESS_MONTHS`), never a payload. Sandbox vs live is `PADDLE_ENVIRONMENT`, never a payload.
+- SQL of record `docs/paddle-billing.sql` (NOT applied; review against production and the rollback are in the doc): `access_months`, `expired` plan state, credit guard, 3-argument
+  `billing_event_apply`, `billing_usage.access_ends_at`, `billing_grant_of`. Tests: `test/paddle_billing_pg` (34 checks, 16 breaks).
+- **Refund rules (explicit):** approved FULL refund or approved chargeback ends THAT purchase's access; a PARTIAL refund never changes access; a reversed chargeback restores it
+  without extending the six months; an adjustment on any transaction that is not a one-time grant does nothing. Adjustments are found through the grant's own transaction id.
+- ⛔ `CHECKOUT_ENABLED` stays false until a SANDBOX/STAGING pass of: purchases, account binding, report allowance, renewal, cancellation, six-month expiry, refunds, duplicate
+  webhooks. Sandbox events are recorded `livemode=false` and read `test_only`; never point a sandbox secret at the production function.

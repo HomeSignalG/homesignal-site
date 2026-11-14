@@ -150,8 +150,8 @@ ok([BR, LB, ...Object.values(MB), ...Object.values(WB)].every((t) => t.length > 
   const iConf = h.indexOf('!configured()'), iText = h.indexOf('req.text()'), iSig = h.indexOf('verifySignature('), iParse = h.indexOf('JSON.parse('), iTrans = h.indexOf('translate('), iApply = h.indexOf('deps.applyEvent(');
   ok(iConf > 0 && iText > iConf && iSig > iText && iParse > iSig && iTrans > iParse && iApply > iTrans,
     '2f the webhook\'s order is fixed: refuse everything when it is not set up, read the RAW text, check the signature of that raw text, only then parse it, translate it and record it', [iConf, iText, iSig, iParse, iTrans, iApply].join());
-  ok(count(h, /JSON\.parse\(/g) === 1 && count(h, /req\.json\(\)/g) === 0 && count(h, /deps\.applyEvent\(/g) === 1,
-    '2g the body is parsed once and only from the text that was signed (never req.json()), and one event is recorded per request');
+  ok(count(h, /JSON\.parse\(/g) === 1 && count(h, /req\.json\(\)/g) === 0 && count(h, /deps\.applyEvent\(/g) === 2 && count(h, /deps\.grantOf\(/g) === 1,
+    '2g the body is parsed once and only from the text that was signed (never req.json()), and one event is recorded per request (an adjustment records through the grant it names, the other events through their own checkout)');
   ok(!/\bsubscriptions\b|user_id|users\b|\bemail\b|\bprofiles?\b/i.test(h + stripJs(WB.data)) && !/public\.subscriptions|user_id|\busers\b|\bemail\b|\bprofiles?\b/i.test(stripJs(LB)) && !/lemonsqueezy-webhook/.test(h),
     '2h the webhook names no table or id of the map product (subscriptions, users, a user id) and never calls the other webhook: the two ignore each other\'s events');
   const t = stripJs(LB);
@@ -196,7 +196,7 @@ ok([BR, LB, ...Object.values(MB), ...Object.values(WB)].every((t) => t.length > 
   ok(page.length > 30000 && /id="billing"/.test(page) && /id="subscribe"/.test(page) && /id="subscribe"[^>]*hidden>Subscribe<\/button>/.test(page), '4-control: the page carries the Billing card and its button');
   ok(count(js, /location\.assign\(/g) === 1 && js.indexOf('checkoutOk(b.url)') > 0 && js.indexOf('checkoutOk(b.url)') < js.indexOf('location.assign(b.url)'),
     '4a the browser is sent anywhere by ONE call, after the address passed the page\'s own check');
-  ok(/h === 'lemonsqueezy\.com' \|\| \/\\\.lemonsqueezy\\\.com\$\/\.test\(h\)/.test(js) && /u\.protocol === 'https:' && !u\.username && !u\.password/.test(js),
+  ok(/h === location\.hostname\.toLowerCase\(\) \|\| h === 'paddle\.com' \|\| \/\\\.paddle\\\.\(com\|io\)\$\/\.test\(h\)/.test(js) && /u\.protocol === 'https:' && !u\.username && !u\.password/.test(js),
     '4b that check is: https, no credentials, the provider\'s own domain');
   ok(!/brokerage_id|b0b0|\.brokerage_id/.test(js) && count(js, /BILLING_FN/g) >= 3 && !/JSON\.stringify\(\{ action: 'checkout'[^}]*,/.test(js),
     '4c the page names no brokerage id and sends the checkout request with the action alone');

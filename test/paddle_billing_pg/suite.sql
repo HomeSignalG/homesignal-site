@@ -146,5 +146,35 @@ select pg_temp._ck('P25 the billing functions are executable by service_role alo
 select pg_temp._ck('P26 control: the suite really created grants and subscriptions (a zero here would make the rest vacuous)',
   (select count(*) from public.brokerage_subscription where access_months = 6) >= 4 and (select count(*) from public.brokerage_subscription where access_months is null and processor = 'paddle') >= 1);
 
+-- ---- refunds and chargebacks: only the purchase they belong to ----------------------------------------------------------------------
+select pg_temp._ck('P28 a chargeback (charged_back) maps to canceled, like a full refund',
+  public.payment_event_map_status('paddle','charged_back') = 'canceled' and public.payment_event_map_status('paddle','refunded') = 'canceled');
+select pg_temp._ck('P29 billing_grant_of finds a grant by its transaction id and livemode, and nothing else (not a recurring subscription, not the other environment)',
+  (select brokerage_id from public.billing_grant_of('txn_partner2', true)) = pg_temp._acct(2)
+  and (select access_months from public.billing_grant_of('txn_partner2', true)) = 6
+  and not exists (select 1 from public.billing_grant_of('sub_prof1', true))
+  and not exists (select 1 from public.billing_grant_of('txn_partner2', false))
+  and (select brokerage_id from public.billing_grant_of('txn_sandbox', false)) = pg_temp._acct(6)
+  and not exists (select 1 from public.billing_grant_of('txn_nope', true)));
+select pg_temp._ck('P30 billing_grant_of is executable by service_role alone',
+  has_function_privilege('service_role','public.billing_grant_of(text, boolean)','execute')
+  and not has_function_privilege('anon','public.billing_grant_of(text, boolean)','execute')
+  and not has_function_privilege('authenticated','public.billing_grant_of(text, boolean)','execute'));
+create temp table _g4 as select s.subscription_ref ref, (select access_ends_at from public.billing_usage(pg_temp._u(4))) ends_before,
+  (select state from public.billing_plan_of(pg_temp._acct(1))) s1, (select state from public.billing_plan_of(pg_temp._acct(7))) s7,
+  (select state from public.billing_plan_of(pg_temp._acct(2))) s2
+  from public.brokerage_subscription s where s.brokerage_id = pg_temp._acct(4);
+create temp table _g4b as select pg_temp._pay(pg_temp._acct(4), (select ref from _g4), 'adjustment.updated', 'charged_back', to_char(now(),'YYYY-MM-DD"T"HH24:MI:SS"Z"'), true, 6) cb;
+select pg_temp._ck('P31 a chargeback ends THAT grant: its state is canceled and a report is no longer charged to the paid allotment',
+  (select cb from _g4b) like 'RECORDED/false/canceled' and pg_temp._issue(4, 7) like 'trial/%', (select cb from _g4b));
+select pg_temp._ck('P32 it touches no other purchase: the other accounts read exactly what they read before',
+  (select state from public.billing_plan_of(pg_temp._acct(1))) = (select s1 from _g4) and (select state from public.billing_plan_of(pg_temp._acct(7))) = (select s7 from _g4)
+  and (select state from public.billing_plan_of(pg_temp._acct(2))) = (select s2 from _g4));
+create temp table _g4c as select pg_temp._pay(pg_temp._acct(4), (select ref from _g4), 'adjustment.updated', 'completed', to_char(now() + interval '1 second','YYYY-MM-DD"T"HH24:MI:SS"Z"'), true, 6, 'evt_reverse4') rv;
+select pg_temp._ck('P33 a reversed chargeback restores the purchase and does NOT extend it: access ends exactly when it did before',
+  (select rv from _g4c) like 'RECORDED/false/paid' and (select access_ends_at from public.billing_usage(pg_temp._u(4))) = (select ends_before from _g4), (select rv from _g4c));
+select pg_temp._ck('P34 a replayed refund event is a DUPLICATE and changes nothing (duplicate webhook delivery)',
+  pg_temp._pay(pg_temp._acct(2), 'txn_partner2', 'adjustment.updated', 'refunded', '2026-11-16T10:00:00Z', true, 6) like 'DUPLICATE/%');
+
 \o
 select check_name || '|' || case when pass then 't' else 'f' end || '|' || coalesce(detail, '') from _r order by n;

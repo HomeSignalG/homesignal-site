@@ -25,7 +25,7 @@ fail=0; ok() { echo "PASS — $1"; }; bad() { echo "FAIL — $1"; fail=1; }
 # ---- 1. the suite on the real SQL -------------------------------------------------------------------------------------------------
 base; P -f "$SQL" >/dev/null 2>"$tmp/apply.err" || { echo "FAIL — docs/paddle-billing.sql does not apply"; head -5 "$tmp/apply.err"; exit 1; }
 out="$(suite)"; echo "$out" | awk -F'|' '{printf "%s %s\n", ($2=="t"?"PASS":"FAIL"), $1}'
-[ "$(fails_of "$out")" = 0 ] && [ "$(grep -c '|t|' <<<"$out")" -ge 27 ] && ok "the suite: every check passes ($(grep -c '|t|' <<<"$out") checks)" || { bad "the suite has failing checks"; echo "$out" | grep '|f|' | head; }
+[ "$(fails_of "$out")" = 0 ] && [ "$(grep -c '|t|' <<<"$out")" -ge 34 ] && ok "the suite: every check passes ($(grep -c '|t|' <<<"$out") checks)" || { bad "the suite has failing checks"; echo "$out" | grep '|f|' | head; }
 
 # ---- 2. twice, identical ----------------------------------------------------------------------------------------------------------
 base; P -f "$SQL" >/dev/null; D1="$(defs)"; P -f "$SQL" >/dev/null 2>"$tmp/twice.err" && [ "$(defs)" = "$D1" ] && ok "applies twice with an identical definition set" || bad "applying twice changed something"
@@ -64,4 +64,12 @@ mutate expiry_a_month_early "case when pl.state in ('paid', 'expired') and g.acc
               then ((pl.bound_at at time zone 'UTC') + g.access_months * interval '1 month')" "case when pl.state in ('paid', 'expired') and g.access_months is not null
               then ((pl.bound_at at time zone 'UTC') + (g.access_months - 1) * interval '1 month')"
 mutate usage_open_to_anon "grant execute on function public.billing_usage(uuid) to service_role;" "grant execute on function public.billing_usage(uuid) to service_role, anon;"
+mutate charged_back_unmapped "when 'charged_back' then 'canceled'" "when 'charged_back' then 'unknown'"
+mutate grant_of_matches_recurring "and s.access_months is not null
+\$\$;
+revoke all on function public.billing_grant_of" "
+\$\$;
+revoke all on function public.billing_grant_of"
+mutate grant_of_ignores_environment "and s.livemode = p_livemode and s.subscription_ref = p_ref" "and s.subscription_ref = p_ref"
+mutate grant_of_open_to_anon "grant execute on function public.billing_grant_of(text, boolean) to service_role;" "grant execute on function public.billing_grant_of(text, boolean) to service_role, anon;"
 [ "$fail" = 0 ] && echo "ALL PASS" || { echo "FAILURES"; exit 1; }

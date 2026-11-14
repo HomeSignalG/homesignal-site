@@ -293,6 +293,7 @@ const named = (name) => mcalls.filter((c) => c[0] === name);
 
 // ---- 3. the webhook ---------------------------------------------------------------------------------------------------------------------------
 const wcalls = [];
+const gcalls = [];
 const goodApplied = { outcome: 'RECORDED', bound: true, state: 'paid', is_latest: true };
 function wdeps(over = {}) {
   return {
@@ -301,6 +302,7 @@ function wdeps(over = {}) {
     livemode: over.livemode ?? true,
     now: () => over.now ?? NOW,
     applyEvent: async (...a) => { wcalls.push(a); if (over.applyEvent) return over.applyEvent(...a); return goodApplied; },
+    grantOf: async (...a) => { gcalls.push(a); return 'grant' in over ? over.grant : { brokerageId: BK, accessMonths: 6 }; },
   };
 }
 async function body(over = {}) {
@@ -392,6 +394,22 @@ async function hook(d, raw, { sig, method = 'POST', headers = {} } = {}) {
   ok(!JSON.stringify(wcalls).includes('pat.payer') && !JSON.stringify(wcalls).includes('customer_email'), '3r nothing personal reaches the recorder, though the body held an email');
   r = await hook(wdeps({ applyEvent: async () => ({ ...goodApplied, outcome: 'DUPLICATE', bound: false }) }), await body());
   ok(r.status === 200 && r.json.outcome === 'DUPLICATE', '3s a retried delivery is 200 DUPLICATE (Paddle stops retrying)');
+
+  // refunds and chargebacks reach only the grant bound under the adjusted transaction
+  const adjBody = (d = {}) => JSON.stringify({ event_id: 'evt_01hv8x8d6dxy3k7h2m0eeeeeee', event_type: 'adjustment.updated', occurred_at: '2026-12-01T10:00:00Z',
+    data: { id: 'adj_01hv8x8d6dxy3k7h2m0fffffff', action: 'refund', type: 'full', status: 'approved', transaction_id: 'txn_01hv8x8d6dxy3k7h2m0ddddddd', ...d } });
+  gcalls.length = 0;
+  r = await hook(wdeps(), adjBody());
+  ok(r.status === 200 && r.json.outcome === 'RECORDED' && gcalls.length === 1 && gcalls[0][0] === 'txn_01hv8x8d6dxy3k7h2m0ddddddd' && gcalls[0][1] === true
+     && wcalls.length === 1 && wcalls[0][0] === BK && wcalls[0][1].processor_status === 'refunded' && wcalls[0][1].subscription_ref === 'txn_01hv8x8d6dxy3k7h2m0ddddddd' && wcalls[0][2] === 6,
+    '3p2 an approved full refund is recorded against the brokerage and grant length found under THAT transaction, and nothing else');
+  r = await hook(wdeps({ grant: null }), adjBody());
+  ok(r.status === 200 && r.json.reason === 'no_grant' && wcalls.length === 0, '3p3 a refund of a transaction that is not one of our grants (a renewal, another product) is acknowledged and changes nothing');
+  gcalls.length = 0;
+  r = await hook(wdeps(), adjBody({ type: 'partial' }));
+  ok(r.status === 200 && r.json.reason === 'partial_refund' && wcalls.length === 0 && gcalls.length === 0, '3p4 a partial refund changes no access and does not even look a grant up');
+  r = await hook(wdeps(), adjBody({ action: 'chargeback' }), { sig: 'ts=1;h1=' + 'a'.repeat(64) });
+  ok(r.status === 401 && wcalls.length === 0, '3p5 an unsigned adjustment is refused like any other event');
   r = await hook(wdeps(), await body({ mutate: (p) => { p.event_type = 'address.created'; } }));
   ok(r.status === 200 && r.json.status === 'IGNORED' && r.json.reason === 'event_type' && wcalls.length === 0, '3t an event type this build does not use is acknowledged 200 and recorded nowhere');
   r = await hook(wdeps(), await body({ mutate: (p) => { delete p.data.custom_data; } }));

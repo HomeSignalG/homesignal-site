@@ -115,7 +115,7 @@ const cfg = { secret: SECRET, prices: PRICES, livemode: true };
 }
 {
   const ign = async (p, c = cfg) => { const r = await P.translate(p, c); return r.kind === 'ignore' ? r.reason : r.kind + ':' + r.reason; };
-  ok(await ign(sub({ event_type: 'subscription.imported' })) === 'event_type' && await ign(sub({ event_type: 'transaction.paid' })) === 'event_type' && await ign(sub({ event_type: 'adjustment.updated' })) === 'event_type',
+  ok(await ign(sub({ event_type: 'subscription.imported' })) === 'event_type' && await ign(sub({ event_type: 'transaction.paid' })) === 'event_type',
     '3j an event type this build does not act on is ignored (acknowledged, recorded nowhere)');
   ok(await ign(sub({}, { custom_data: undefined })) === 'no_binding' && await ign(sub({}, { custom_data: { brokerage_id: BROKERAGE } })) === 'no_binding', '3k a payment with no signed brokerage id is ignored');
   ok(await ign(sub({}, { custom_data: { brokerage_id: OTHER_BROKERAGE, bind: bound } })) === 'bad_binding' && await ign(sub({}, { custom_data: { brokerage_id: BROKERAGE, bind: 'a'.repeat(64) } })) === 'bad_binding',
@@ -168,6 +168,31 @@ const cfg = { secret: SECRET, prices: PRICES, livemode: true };
   ok(refused === 11, '5c an http, look-alike, credentialed, malformed or over-long address is never handed to a browser (eleven values)', refused);
   ok(P.checkoutUrlFrom(null, own) === null && P.checkoutUrlFrom({}, own) === null && P.checkoutUrlFrom({ data: {} }, own) === null && P.checkoutUrlFrom({ data: { checkout: {} } }, own) === null, '5d an answer without a checkout address is refused');
 }
+
+// ---- 6. refunds and chargebacks: explicit rules, and only the purchase they belong to -------------------------------------------------------
+{
+  const TXN = 'txn_01hv8x8d6dxy3k7h2m0ddddddd';
+  const adj = (dataOver = {}, over = {}) => ({ event_id: 'evt_01hv8x8d6dxy3k7h2m0eeeeeee', event_type: 'adjustment.updated', occurred_at: '2026-12-01T10:00:00Z',
+    data: { id: 'adj_01hv8x8d6dxy3k7h2m0fffffff', action: 'refund', type: 'full', status: 'approved', transaction_id: TXN, customer_id: 'ctm_secret', ...dataOver }, ...over });
+  const go = async (d, o) => P.translate(adj(d, o), cfg);
+  const full = await go();
+  ok(full.kind === 'adjustment' && full.transactionId === TXN && full.event.subscription_ref === TXN && full.event.processor_status === 'refunded' && full.event.livemode === true
+     && full.event.idempotency_key === 'evt_01hv8x8d6dxy3k7h2m0eeeeeee', '6a an approved FULL refund is a ledger event on the grant\'s own transaction id, status refunded');
+  const why = async (d) => { const r = await go(d); return r.kind === 'ignore' ? r.reason : r.kind; };
+  ok(await why({ type: 'partial' }) === 'partial_refund', '6b a PARTIAL refund never changes access (acknowledged, recorded nowhere)');
+  ok(await why({ status: 'pending_approval' }) === 'refund_not_approved' && await why({ status: 'rejected' }) === 'refund_not_approved', '6c a pending or rejected refund does nothing');
+  const cb = await go({ action: 'chargeback', type: 'partial' });
+  ok(cb.kind === 'adjustment' && cb.event.processor_status === 'charged_back', '6d an approved chargeback ends access whatever its amount');
+  ok(await why({ action: 'chargeback_warning' }) === 'action' && await why({ action: 'chargeback', status: 'pending_approval' }) === 'chargeback_not_approved', '6e a chargeback warning or an unapproved chargeback does nothing');
+  const rev = await go({ action: 'chargeback_reverse' });
+  const rev2 = await go({ action: 'chargeback', status: 'reversed' });
+  ok(rev.kind === 'adjustment' && rev.event.processor_status === 'completed' && rev2.kind === 'adjustment' && rev2.event.processor_status === 'completed', '6f a reversed chargeback restores the purchase (status completed)');
+  ok(await why({ action: 'credit' }) === 'action', '6g an action this build does not act on (credit) is ignored');
+  ok((await go({ transaction_id: 'bad id!' })).kind === 'invalid' && (await go({}, { event_id: 5 })).kind === 'invalid', '6h a malformed adjustment is refused loudly');
+  ok(!JSON.stringify(full).includes('ctm_secret'), '6i nothing personal is carried across');
+  ok(PADDLE_STATUS_OK(full.event.processor_status), '6j the status words are the ledger map\'s');
+}
+function PADDLE_STATUS_OK(s) { return ['refunded', 'charged_back', 'completed'].includes(s); }
 
 console.log('\n' + (n - bad) + '/' + n + ' passed');
 process.exit(bad ? 1 : 0);

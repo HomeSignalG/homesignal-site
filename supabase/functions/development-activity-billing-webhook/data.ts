@@ -14,5 +14,5 @@ export type Config = { url: string; serviceKey: string; secret: string; prices: 
 export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
   const { rpc } = makeServiceReads(cfg, fetchFn);
   const billing = makeBillingReads(rpc);
-  return { secret: cfg.secret, prices: cfg.prices, livemode: cfg.livemode, now: () => Math.floor(Date.now() / 1000), applyEvent: billing.applyEvent };
+  return { secret: cfg.secret, prices: cfg.prices, livemode: cfg.livemode, now: () => Math.floor(Date.now() / 1000), applyEvent: billing.applyEvent, grantOf: billing.grantOf };
 }

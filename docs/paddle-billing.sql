@@ -23,9 +23,15 @@
 --      account_type = 'individual' account (EV013 OFFER_NOT_FOR_ACCOUNT otherwise). The two-argument form stays and means "recurring".
 --   6. public.billing_usage gains access_ends_at (when a grant's access ends, NULL for a subscription) so the page can say it.
 --
+--   7. public.billing_grant_of(ref, livemode): a refund or chargeback names a TRANSACTION, not a brokerage; a grant is bound under its transaction
+--      id, so this is the one way back, and it matches a one-time grant only.
+--
+-- REFUNDS AND CHARGEBACKS (founder 2026-11-14: "define partial-refund behavior explicitly, ensure changes affect only the entitlement from the relevant
+--   purchase"): an approved FULL refund or an approved chargeback ends that purchase's access; a PARTIAL refund never changes access; a reversed
+--   chargeback restores it (never extending the six months). Recorded as ledger events on the grant's own transaction id, so they can reach nothing else.
+--
 -- WHAT IT DELIBERATELY DOES NOT CHANGE: billing_report_limit() = 100; the paid ledger and its cap; brokerage_report_issue and billing_paid_issue;
---   the checkout slot; the free evaluation; any existing row. A refund or chargeback does NOT revoke a grant yet: Paddle sends adjustments with
---   no custom data, so tying one back to a brokerage needs the transaction id stored. OPEN ITEM, stated rather than hidden.
+--   the checkout slot; the free evaluation; any existing row.
 --
 -- ACCESS: system-only, exactly as the billing file: the new function is executable by service_role alone.
 -- Idempotent: safe to run twice. Fail-closed: every splice states its anchor count. ROLLBACK is at the foot of this file.
@@ -49,7 +55,8 @@ begin
 end $pre$;
 
 -- ---- 1. THE STATUS MAP: Paddle's words (the Lemon branch stays, for the rows already recorded) ---------------------------
--- Paddle spells it "canceled". 'completed' is a one-time transaction that was paid; 'refunded' is reserved for the day refunds are wired.
+-- Paddle spells it "canceled". 'completed' is a one-time transaction that was paid; 'refunded' (an approved FULL refund) and 'charged_back' (an approved
+-- chargeback) end that purchase's access. A partial refund records nothing here: it never changes access (see _shared/paddle-billing.ts).
 create or replace function public.payment_event_map_status(p_processor text, p_status text) returns text
 language sql immutable
 set search_path = public, pg_temp
@@ -75,6 +82,7 @@ as $$
         when 'past_due'  then 'past_due'
         when 'canceled'  then 'canceled'
         when 'refunded'  then 'canceled'
+        when 'charged_back' then 'canceled'
         else 'unknown'
       end
     else 'unknown'
@@ -203,6 +211,21 @@ create or replace function public.billing_event_apply(p_brokerage uuid, p_event 
 returns table (outcome text, event_id bigint, is_latest boolean, bound boolean, state text)
 language sql security definer set search_path = public, pg_temp
 as $$ select * from public.billing_event_apply(p_brokerage, p_event, null::integer) $$;
+
+-- ---- 5b. A REFUND'S WAY BACK TO ITS PURCHASE -----------------------------------------------------------------------------------
+-- A Paddle adjustment (refund, chargeback) carries no custom data. It names the TRANSACTION it adjusts, and a one-time grant is bound under that
+-- transaction id. This answers: which brokerage, and which grant length, was bound under that id? Nothing else is returned, and a recurring
+-- subscription (access_months null) never matches, so a refund of one monthly charge cannot reach the subscription.
+create or replace function public.billing_grant_of(p_ref text, p_livemode boolean)
+returns table (brokerage_id uuid, access_months integer)
+language sql stable security definer set search_path = public, pg_temp
+as $$
+  select s.brokerage_id, s.access_months
+    from public.brokerage_subscription s
+   where s.processor = 'paddle' and s.livemode = p_livemode and s.subscription_ref = p_ref and s.access_months is not null
+$$;
+revoke all on function public.billing_grant_of(text, boolean) from public, anon, authenticated;
+grant execute on function public.billing_grant_of(text, boolean) to service_role;
 
 -- ---- 6. THE READER: access_ends_at ----------------------------------------------------------------------------------------
 -- A column is added, so the function is replaced (dropped and created), then its privileges are set again exactly as the billing file set them.

@@ -41,6 +41,8 @@ export type Deps = {
   /** Seconds since the epoch, for the signature's timestamp tolerance. Injected so a test fixes the clock. */
   now: () => number;
   applyEvent: (brokerageId: string, event: LedgerEvent, accessMonths: number | null) => Promise<AppliedEvent>;
+  /** The one-time grant bound under a Paddle transaction id, or null. A refund or chargeback acts only through this: no grant, no effect. */
+  grantOf: (transactionId: string, livemode: boolean) => Promise<{ brokerageId: string; accessMonths: number } | null>;
 };
 
 /** A real subscription event is a few kilobytes. This is far above that and far below anything that could exhaust the function. */
@@ -80,6 +82,12 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
       const t = await translate(payload, { secret: deps.secret, prices: deps.prices, livemode: deps.livemode });
       if (t.kind === 'ignore') return reply({ status: 'IGNORED', reason: t.reason });
       if (t.kind === 'invalid') return reply({ error: 'invalid', reason: t.reason }, 422);
+      if (t.kind === 'adjustment') {
+        const grant = await deps.grantOf(t.transactionId, deps.livemode);
+        if (grant === null) return reply({ status: 'IGNORED', reason: 'no_grant' });
+        const done = await deps.applyEvent(grant.brokerageId, t.event, grant.accessMonths);
+        return reply({ status: 'OK', outcome: done.outcome });
+      }
       const applied = await deps.applyEvent(t.brokerageId, t.event, t.accessMonths);
       return reply({ status: 'OK', outcome: applied.outcome });
     } catch (e) {

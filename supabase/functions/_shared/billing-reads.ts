@@ -120,6 +120,20 @@ export function makeBillingReads(rpc: ServiceRpc) {
     },
 
     /**
+     * The one-time grant bound under a Paddle transaction id (public.billing_grant_of), or null when none is. A refund or chargeback finds its
+     * brokerage only through this, so it can touch nothing but the purchase it belongs to.
+     */
+    async grantOf(transactionId: string, livemode: boolean): Promise<{ brokerageId: string; accessMonths: number } | null> {
+      const { data, error } = await rpc('billing_grant_of', { p_ref: transactionId, p_livemode: livemode });
+      if (error) throw new DataUnavailable('billing_grant_of');
+      if (!Array.isArray(data)) throw new DataUnavailable('shape');
+      if (data.length === 0) return null;
+      const g = data[0];
+      if (data.length !== 1 || !g || typeof g.brokerage_id !== 'string' || !UUID.test(g.brokerage_id) || !Number.isInteger(g.access_months)) throw new DataUnavailable('shape');
+      return { brokerageId: g.brokerage_id, accessMonths: g.access_months };
+    },
+
+    /**
      * Record one processor event for one brokerage, and bind its subscription to that brokerage if this is the first the database has seen of it
      * (public.billing_event_apply: ONE transaction, through the payment ledger's one writer). A retried delivery is `DUPLICATE`. The refusals are
      * named; any other failure is DataUnavailable so the webhook answers 5xx and the processor retries.

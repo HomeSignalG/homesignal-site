@@ -150,6 +150,7 @@ export type WebhookConfig = { secret: string; prices: OfferPrices; livemode: boo
  */
 export type Translation =
   | { kind: 'event'; brokerageId: string; event: LedgerEvent; offer: OfferKey; accessMonths: number | null }
+  | { kind: 'adjustment'; transactionId: string; event: LedgerEvent }
   | { kind: 'ignore'; reason: string }
   | { kind: 'invalid'; reason: string };
 
@@ -173,11 +174,55 @@ function offerOf(items: unknown, prices: OfferPrices): { offer: OfferKey; priceI
   return null;
 }
 
+// ---- refunds and chargebacks (Paddle "adjustments") -----------------------------------------------------------------------------------
+// An adjustment carries NO custom data, so it cannot name a brokerage. It names the TRANSACTION it adjusts, and a one-time Private Partner grant is
+// bound under that very transaction id (its `subscription_ref`). The handler therefore looks the grant up by that id (`grantOf`), so an adjustment can only
+// ever touch the entitlement of the purchase it belongs to: any other transaction (a subscription's renewal, another product, another brokerage's) finds
+// no grant and is acknowledged and ignored.
+//
+// THE RULES (explicit, and pinned by tests):
+//   * a FULL refund that Paddle has APPROVED ends that purchase's access (ledger status `refunded`, which the status map reads as canceled);
+//   * a PARTIAL refund NEVER changes access: the buyer keeps what remains of the six months, and the refund is acknowledged (IGNORED partial_refund);
+//   * an approved CHARGEBACK ends it (`charged_back`), whatever its amount; a chargeback warning does nothing;
+//   * a chargeback that is REVERSED (action chargeback_reverse approved, or an adjustment whose status becomes reversed) restores it (`completed`);
+//   * a refund that is pending or rejected does nothing.
+// Access ending early is not extended by anything: the six months are counted from the original binding, so a restore never grants more time.
+export const ADJUSTMENT_EVENTS: readonly string[] = ['adjustment.created', 'adjustment.updated'];
+
+function adjustmentStatus(data: Record<string, unknown>): { status: string } | { ignore: string } {
+  const action = data.action, status = data.status, kind = data.type;
+  if (typeof action !== 'string' || typeof status !== 'string') return { ignore: 'shape' };
+  if (action === 'chargeback_reverse') return status === 'approved' ? { status: 'completed' } : { ignore: 'chargeback_reverse_not_approved' };
+  if (status === 'reversed') return action === 'chargeback' || action === 'refund' ? { status: 'completed' } : { ignore: 'action' };
+  if (action === 'chargeback') return status === 'approved' ? { status: 'charged_back' } : { ignore: 'chargeback_not_approved' };
+  if (action === 'refund') {
+    if (status !== 'approved') return { ignore: 'refund_not_approved' };
+    if (kind !== 'full') return { ignore: 'partial_refund' };
+    return { status: 'refunded' };
+  }
+  return { ignore: 'action' };
+}
+
+function translateAdjustment(payload: Record<string, unknown>, data: Record<string, unknown>, cfg: WebhookConfig): Translation {
+  const eventId = asRef(payload.event_id);
+  if (eventId === null) return { kind: 'invalid', reason: 'event_id' };
+  const occurred = payload.occurred_at;
+  if (typeof occurred !== 'string' || !ISO_WITH_OFFSET.test(occurred) || !Number.isFinite(Date.parse(occurred))) return { kind: 'invalid', reason: 'occurred_at' };
+  const txn = asRef(data.transaction_id);
+  if (txn === null) return { kind: 'invalid', reason: 'transaction_id' };
+  const decided = adjustmentStatus(data);
+  if ('ignore' in decided) return { kind: 'ignore', reason: decided.ignore };
+  return { kind: 'adjustment', transactionId: txn, event: {
+    processor: PROCESSOR, idempotency_key: eventId, subscription_ref: txn, event_name: String(payload.event_type),
+    processor_status: decided.status, occurred_at: occurred, livemode: cfg.livemode } };
+}
+
 export async function translate(payload: unknown, cfg: WebhookConfig): Promise<Translation> {
   if (!isObj(payload) || !isObj(payload.data)) return { kind: 'invalid', reason: 'shape' };
   const data = payload.data;
   const type = payload.event_type;
   if (typeof type !== 'string' || !EVENT_NAME.test(type)) return { kind: 'invalid', reason: 'event_type' };
+  if (ADJUSTMENT_EVENTS.includes(type)) return translateAdjustment(payload, data, cfg);
   const isSub = SUBSCRIPTION_EVENTS.includes(type), isOneTime = type === ONE_TIME_EVENT;
   if (!isSub && !isOneTime) return { kind: 'ignore', reason: 'event_type' };
 
