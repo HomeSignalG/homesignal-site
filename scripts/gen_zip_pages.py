@@ -26,7 +26,7 @@ Rule D: >= 3 publishable Development entities from the compact ingest plane
 (`data/development_seo_plane.json`). The site does not re-decide materiality. A ZIP
 absent from the plane is not eligible. INDEX = Rule F OR Rule D.
 """
-import argparse, hashlib, html, json, os, re, subprocess, sys, tempfile, time, unicodedata, urllib.parse, urllib.request
+import argparse, hashlib, html, json, os, re, subprocess, sys, tempfile, time, unicodedata, urllib.error, urllib.parse, urllib.request
 from datetime import datetime, timezone
 
 # Loaded by path in some tests (importlib spec_from_file_location), where this directory is not
@@ -59,6 +59,10 @@ RULE_D_MIN = 3                               # >= 3 publishable Development enti
 RULE_D_PLANE_MAX_AGE_HOURS = 36
 # A manual identity-only cutover dispatch may accept an older plane (pages.yml `plane_max_age_hours`); never longer than this.
 RULE_D_PLANE_MAX_AGE_CEILING_HOURS = 336
+# Data-center listings on the ZIP document (docs/map1-dc-zip-listing.sql). A ZIP's stored row is
+# used only when it was checked within this many hours and the reader did not truncate it.
+DC_LISTING_MAX_AGE_HOURS = 48
+DC_LISTING_CAP = 12                          # listings printed; the rest are named, with a map link
 SIB_CAP = 10                                 # sibling ZIP links per page (see link_siblings)
 WEATHER_AGENCY = "api.weather.gov"
 GN_CATEGORIES = ("Government & civic", "Planning & zoning")
@@ -184,7 +188,30 @@ def fetch_data(key, now_iso):
     d["meetings"] = fetch_all("meetings", key,
                               "id,community_id,title,meeting_date,category,source_url,is_cancelled",
                               f"&meeting_date=gte.{urllib.parse.quote(meeting_cutoff(now_iso))}")
+    d["dc_listings"] = fetch_dc_listings(key)
     return d
+
+
+def fetch_dc_listings(key):
+    """Data-center listings stored per ZIP (docs/map1-dc-zip-listing.sql): what
+    public.map1_dc_zip_members returns as 'member' for each ZIP, refreshed by pg_cron. Only ZIPs
+    with at least one listing are read. A table that is not there yet (HTTP 404) means "print no
+    listings" and is said in the log; any other failure stops the build like every other read."""
+    url = f"{SUPA}/rest/v1/map1_dc_zip_listing?select=zip&limit=1"
+    req = urllib.request.Request(url, headers={"apikey": key, "Authorization": f"Bearer {key}"})
+    try:
+        with urllib.request.urlopen(req, timeout=REQ_TIMEOUT):
+            pass
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            print("  data-center listings: map1_dc_zip_listing not found (HTTP 404) - none printed",
+                  flush=True)
+            return None
+    except Exception:
+        pass                                    # transient: fetch_all retries or fails loudly
+    return fetch_all("map1_dc_zip_listing", key,
+                     "zip,listings,member_count,truncated,checked_at",
+                     "&member_count=gt.0", keyset="zip")
 
 
 # ---------------------------------------------------------------- assemble (pure half)
@@ -769,6 +796,7 @@ def assemble(d, now_iso):
                             "date": (c.get("occurred_at") or "")[:10], "cat": cat})
     for z in pages:
         pages[z]["um"] = meetings_for(z)
+    attach_dc_listings(pages, d.get("dc_listings"), now_iso)
 
     for p in pages.values():
         # The url is the final tie-break. app_changes is deleted and reinserted on every ZIP
@@ -783,6 +811,42 @@ def assemble(d, now_iso):
         p["rule_f"] = p["rule_f_count"] >= RULE_F_MIN
     link_siblings(pages)
     return pages
+
+
+LISTING_STATUS_ORDER = {"Proposed": 0, "Approved": 1, "Operating": 2}
+
+
+def attach_dc_listings(pages, rows, now_iso):
+    """Put each ZIP's stored data-center listings on its page record (p["dc_listings"]).
+
+    The rows are map1_dc_zip_members' own 'member' rows for that ZIP (docs/map1-dc-zip-listing.sql);
+    nothing is decided here. A row older than DC_LISTING_MAX_AGE_HOURS, truncated, or not for a
+    page is skipped, and that means "not printed", never "no data centers"."""
+    now = datetime.fromisoformat(now_iso.replace("Z", "+00:00")) if now_iso else None
+    if now is not None and now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    used = stale = trunc = 0
+    for r in rows or []:
+        p = pages.get(r.get("zip"))
+        if p is None:
+            continue
+        age = _plane_age_hours(r.get("checked_at"), now)
+        if age is None or age > DC_LISTING_MAX_AGE_HOURS:
+            stale += 1
+            continue
+        if r.get("truncated") is True:
+            trunc += 1
+            continue
+        items = [x for x in (r.get("listings") or [])
+                 if isinstance(x, dict) and x.get("project_name") and safe_url(x.get("source_url"))]
+        items.sort(key=lambda x: (LISTING_STATUS_ORDER.get(x.get("map_status"), 3),
+                                  str(x.get("project_name")).lower(), str(x.get("source_key"))))
+        if items:
+            p["dc_listings"] = items
+            used += 1
+    if rows is not None:
+        print(f"  data-center listings: {used} ZIP pages, {stale} skipped as older than "
+              f"{DC_LISTING_MAX_AGE_HOURS}h, {trunc} skipped as truncated", flush=True)
 
 
 def link_siblings(pages):
@@ -863,6 +927,75 @@ def _dev_items(items):
     if not li:
         return ""
     return f'<section class="zsec"><h2>Development</h2><ul>' + "".join(li) + "</ul></section>"
+
+
+# ── DATA-CENTER LISTINGS (2026-11-14) ─────────────────────────────────────────────────────
+# The words below are lib/templates.js's (listingSourceWord, browsingStatusLabel for a listing,
+# listingLinkNote, thirdPartyListingNote). test/zip-page-dc-listings.test.mjs runs both on the same
+# rows and fails if they differ. A listing is its publisher's own record, not an official filing.
+def listing_source_word(x):
+    w = str(x.get("raw_status") or x.get("normalized_status") or "").strip()
+    return re.sub(r"\s+", " ", re.sub(r"_+", " ", w)).lower()
+
+
+def listing_status_label(x):
+    raw = str(x.get("map_status") or "").strip()
+    word = listing_source_word(x)
+    same = bool(word) and word.lower() == raw.lower()
+    return (raw + " · " if raw else "") + ("listed as " + word if word and not same else "third-party listing")
+
+
+def listing_link_host(href):
+    try:
+        h = urllib.parse.urlparse(href).hostname or ""
+    except ValueError:
+        return ""
+    return re.sub(r"^www\.", "", h)
+
+
+def listing_link_note(x, href):
+    host = listing_link_host(href)
+    if not host:
+        return ""
+    src = str(x.get("source_name") or "").strip()
+    return "Opens " + host + (", the page " + src + " cites" if src else "")
+
+
+def listing_note(x):
+    src = str(x.get("source_name") or "a third-party source").strip()
+    lic = ", " + str(x.get("source_licence")).strip() if x.get("source_licence") else ""
+    st = listing_source_word(x) or str(x.get("map_status") or "").strip().lower()
+    dev = x.get("developer_or_operator")
+    return (("Listed as " + st + " by ") if st else "Listed by ") + src + lic + ", a third-party source." \
+        + " Not an official application, approval or permit; no official filing has been verified." \
+        + (" Developer or operator named by the source: " + str(dev).strip() + "." if dev else "")
+
+
+def _dc_listing_items(items, z):
+    """The ZIP's data-center listings, as Map 1 draws them. Omitted when there are none or the
+    stored row was not usable: this function never prints an absence sentence. Its own class
+    beside zsec, and a lead paragraph before the list, so the live proof
+    (scripts/prove-zip-pages-live.mjs) never counts it as an Alerts section."""
+    li = []
+    for x in items[:DC_LISTING_CAP]:
+        u = safe_url(x.get("source_url"))
+        name = esc(x.get("project_name") or "")
+        if not u or not name:
+            continue
+        note = listing_link_note(x, u)
+        li.append(f'<li><a href="{esc(u)}" rel="nofollow noopener">{name}</a>'
+                  f' <span class="quiet">{esc(listing_status_label(x))}</span>'
+                  + (f' <span class="quiet">{esc(note)}</span>' if note else "")
+                  + f'<br><span class="quiet">{esc(listing_note(x))}</span></li>')
+    if not li:
+        return ""
+    more = len(items) - len(li)
+    tail = (f'<p class="quiet"><a href="/map/{esc(z)}/">{more} more data-center listing'
+            f'{"s" if more != 1 else ""} on the development map for {esc(z)}</a></p>' if more > 0 else "")
+    return ('<section class="zsec zdcl"><h2>Data-center listings</h2>'
+            '<p class="quiet">Data centers that third-party sources list in this ZIP, as drawn on the '
+            'development map. These are the sources\' own listings, not official filings.</p>'
+            '<ul>' + "".join(li) + '</ul>' + tail + '</section>')
 
 
 # A weather alert's stored URL is the NWS API (raw GeoJSON, and a 404 once the API forgets the alert), so the
@@ -1035,6 +1168,7 @@ def render(p, built):
            f'<p>{lead} that apply to the whole of '
            f'ZIP {esc(z)}{county_bit}.</p></header>')
         + ("" if cov else _dev_items(p.get("dev_entities") or []))
+        + ("" if cov else _dc_listing_items(p.get("dc_listings") or [], z))
         + _items(p["gn"][:GN_CAP], "Government notices",
                  "No government notices on file for this ZIP yet.", "gn")
         + _items(um_items, "Upcoming public meetings",
