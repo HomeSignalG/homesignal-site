@@ -1,0 +1,22 @@
+{
+ "note": "TEST FIXTURE ONLY. These two entries are UNVERIFIED research leads as the founder described them on 2026-11-11. They are not evidence, they carry no source address, no social-post address and no public commitment, because none was supplied. This file is NOT a durable live queue: nothing reads it outside the tests, and the leads exist nowhere in production until docs/weekly-topic-queue.sql is applied and a person captures them in the Weekly Report tab.",
+ "leads": [
+  {
+   "title": "SpaceX proposed Cochise County, Arizona data center",
+   "topic": "Data Centers",
+   "location": "Cochise County, Arizona",
+   "questions": ["What is the power demand?", "Who funds the infrastructure?", "What ratepayer protections exist?",
+                 "What are the water requirements?", "What is the approval status?", "How can the public take part?"],
+   "notes": "UNVERIFIED LEAD. No source address was supplied."
+  },
+  {
+   "title": "Oregon lake drawdown and drinking-water concerns",
+   "topic": "Water Quality",
+   "location": "Oregon (the lake is not yet identified)",
+   "questions": ["Which lake is it?", "What does the court order say?", "What is the project's purpose?",
+                 "Which communities are affected?", "What risks are documented?", "What monitoring is in place?",
+                 "What safeguards exist?", "What is the appeal status?"],
+   "notes": "UNVERIFIED LEAD. No source address was supplied."
+  }
+ ]
+}

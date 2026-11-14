@@ -132,6 +132,82 @@ $fn$;
 revoke all on function public.impact_dc_topic_zips(jsonb) from public;
 grant execute on function public.impact_dc_topic_zips(jsonb) to service_role;
 
+-- The topic's places. Hot Topics' coverage places when it computed them; otherwise the place text when it reads
+-- "<county or city>, <two-letter state>" (2026-11-13: two topics carried no coverage places, e.g. "Box Elder County, UT").
+create or replace function public.impact_dc_topic_places(p_coverage jsonb, p_place text)
+returns jsonb language sql immutable set search_path to 'public', 'pg_temp' as $fn$
+  select case
+    when jsonb_typeof(p_coverage->'places') = 'array' and jsonb_array_length(p_coverage->'places') > 0 then p_coverage->'places'
+    when p_place ~ '^\s*[^,]+,\s*[A-Za-z]{2}\s*$' then
+      jsonb_build_array(jsonb_build_object(
+        'state', upper(btrim(split_part(p_place, ',', 2))),
+        'county', case when btrim(split_part(p_place, ',', 1)) ~* '\s(county|parish|borough|census area)$'
+                       then btrim(split_part(p_place, ',', 1)) end,
+        'city', case when btrim(split_part(p_place, ',', 1)) !~* '\s(county|parish|borough|census area)$'
+                     then btrim(split_part(p_place, ',', 1)) end))
+    else '[]'::jsonb end
+$fn$;
+revoke all on function public.impact_dc_topic_places(jsonb, text) from public;
+grant execute on function public.impact_dc_topic_places(jsonb, text) to service_role;
+
+-- The two-letter states of a topic's places.
+create or replace function public.impact_dc_topic_states(p_places jsonb)
+returns text[] language sql immutable set search_path to 'public', 'pg_temp' as $fn$
+  select coalesce(array_agg(distinct st order by st), '{}')
+    from jsonb_array_elements(case when jsonb_typeof(p_places) = 'array' then p_places else '[]'::jsonb end) p
+    cross join lateral (select upper(nullif(btrim(p->>'state'), '')) st) q
+   where st ~ '^[A-Z]{2}$'
+$fn$;
+revoke all on function public.impact_dc_topic_states(jsonb) from public;
+grant execute on function public.impact_dc_topic_states(jsonb) to service_role;
+
+-- STATEWIDE NAME POINTS (2026-11-13). Most topics name only a state ("Minnesota"), whose ZIP pages are far too many to
+-- read one by one, so the county rule above finds nothing. This lists every data-center point in those states that
+-- Map 1 could draw, with its NAMES and the ZIP page it falls in, so the worker can pick the few ZIPs whose project the
+-- topic names. It is only a way to choose ZIPs: the worker still reads map1_dc_zip_members for them, and only a project
+-- that reader returns, matched by NAME, can be linked. Names: every current observation of a canonical entity (an
+-- entity can carry several), and the compatibility layer's own name.
+create or replace function public.impact_dc_state_name_points(p_states text[])
+returns table(zip text, project_name text, developer_or_operator text)
+language plpgsql stable security definer set search_path to 'public', 'geo', 'pg_temp' set jit to 'off' as $fn$
+declare v_pages text[];
+begin
+  -- the states' ZIP pages, first and as a plain array: inside a function, a CTE here let the planner compare every
+  -- point with every page (over 60 s for TX), where an array membership test keeps it to the boundary index lookups
+  select array_agg(distinct zc) into v_pages
+    from public.communities z cross join lateral unnest(z.zip_codes) zc
+   where z.level = 'zip' and zc ~ '^[0-9]{5}$'
+     and upper(z.state) = any (select upper(s) from unnest(coalesce(p_states, '{}')) s where upper(s) ~ '^[A-Z]{2}$');
+  if v_pages is null then return; end if;
+  return query
+  -- each point's ZCTA through the boundary index, kept only when that ZCTA is one of the states' ZIP pages;
+  -- placed first, named second, so only entities in those pages are joined to their names
+  with ents as materialized (
+    select z.zc, ge.canonical_entity_id
+      from public.dc_entity_geography ge
+      join public.dc_canonical_entity e on e.canonical_entity_id = ge.canonical_entity_id
+       and e.superseded_by is null and e.classification = 'CONFIRMED_DC'
+      cross join lateral (select b.zcta5::text zc from geo.zcta_boundary b
+                           where b.geom && ST_SetSRID(ST_MakePoint(ge.lng, ge.lat), 4269)
+                             and ST_Intersects(b.geom, ST_SetSRID(ST_MakePoint(ge.lng, ge.lat), 4269)) limit 1) z
+     where ge.geography_status = 'RESOLVED' and ge.geometry_type = 'POINT' and z.zc = any (v_pages)),
+  canon as (
+    select n.zc, o.source_native_name as name, nullif(btrim(o.source_native_operator), '') as op
+      from ents n
+      join public.dc_entity_observation eo on eo.canonical_entity_id = n.canonical_entity_id
+      join public.dc_current_observation o on o.home_signal_observation_id = eo.home_signal_observation_id),
+  compat as materialized (
+    select z.zc, r.project_name as name, nullif(btrim(r.developer_or_operator), '') as op
+      from public.national_dc_records r
+      cross join lateral (select b.zcta5::text zc from geo.zcta_boundary b
+                           where b.geom && ST_SetSRID(ST_MakePoint(r.lng, r.lat), 4269)
+                             and ST_Intersects(b.geom, ST_SetSRID(ST_MakePoint(r.lng, r.lat), 4269)) limit 1) z
+     where r.map_eligible and z.zc = any (v_pages))
+  select distinct u.zc, u.name, u.op from (select * from canon union all select * from compat) u where u.name is not null;
+end $fn$;
+revoke all on function public.impact_dc_state_name_points(text[]) from public;
+grant execute on function public.impact_dc_state_name_points(text[]) to service_role;
+
 -- 1. TOPIC CHANGES
 create or replace function public.impact_dc_verification_topic_change()
 returns trigger language plpgsql security definer set search_path to 'public', 'pg_temp' as $fn$
@@ -252,7 +328,9 @@ begin
     out := out || jsonb_build_array(jsonb_build_object('run_id', rid, 'candidate_id', r.candidate_id, 'reason', r.queued_reason,
       'candidate', jsonb_build_object('title', r.title, 'place', r.place, 'subject', r.subject, 'coverage', r.coverage,
         'evidence', r.evidence, 'lead_url', r.lead_url, 'related', r.related, 'link_keys', to_jsonb(r.link_keys),
-        'discovered_at', r.discovered_at, 'zips', to_jsonb(public.impact_dc_topic_zips(r.coverage->'places'))),
+        'discovered_at', r.discovered_at,
+        'zips', to_jsonb(public.impact_dc_topic_zips(public.impact_dc_topic_places(r.coverage, r.place))),
+        'states', to_jsonb(public.impact_dc_topic_states(public.impact_dc_topic_places(r.coverage, r.place)))),
       'previous_project_key', r.result_project_key));
   end loop;
   return out;

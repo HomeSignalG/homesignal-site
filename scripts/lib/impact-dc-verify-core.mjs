@@ -56,7 +56,8 @@ export function topicEvidence(c) {
  *   developer_or_operator, source_url, ... }. Being in the topic's place is the LOCATION identifier; a project also needs a
  *   NAME, OPERATOR or shared SOURCE LINK to match. A name or a place alone is never enough. A tie is ambiguous, never a guess.
  */
-export function matchProject(candidate, records) {
+export function matchProject(candidate, records, opts) {
+  const requireName = !!(opts && opts.requireName);
   const t = topicEvidence(candidate);
   const byKey = new Map();
   for (const r of records || []) {
@@ -69,12 +70,12 @@ export function matchProject(candidate, records) {
   for (const r of byKey.values()) {
     const ids = [];
     const nameTok = distinctive(r.project_name);
-    if (nameTok.length && nameTok.every((w) => t.words.has(w))) ids.push('name');
+    if (requireName ? namesProjectStatewide(t, r.project_name) : (nameTok.length && nameTok.every((w) => t.words.has(w)))) ids.push('name');
     const opTok = distinctive(r.developer_or_operator);
     if (opTok.length && t.words.has(opTok[0])) ids.push('operator');
     const su = normUrl(r.source_url);
     if (su && t.urlKeys.has(su)) ids.push('source_link');
-    if (!ids.length) continue;
+    if (!ids.length || (requireName && !ids.includes('name'))) continue;
     ids.push('location');
     scored.push({ record: r, identifiers: ids, score: ids.length + (ids.includes('name') ? 0.5 : 0) });
   }
@@ -87,6 +88,33 @@ export function matchProject(candidate, records) {
   }
   return { state: 'matched', record: scored[0].record, identifiers: scored[0].identifiers,
     alternatives: scored.slice(1, 4).map(summary) };
+}
+
+/**
+ * A name that is only a brand ("Google", "NTT", "Google Data Center") says who, not which site: across a whole state it
+ * is an operator match in disguise. Statewide, a name counts only with at least TWO distinctive words, all in the topic
+ * ("Amazon Project Rainier", "Google Michigan City Data Center").
+ */
+export const STATEWIDE_MIN_NAME_WORDS = 2;
+export function namesProjectStatewide(t, name) {
+  const tok = distinctive(name);
+  return tok.length >= STATEWIDE_MIN_NAME_WORDS && tok.every((w) => t.words.has(w));
+}
+
+/**
+ * STATEWIDE SEARCH (2026-11-13). A topic that names only a state has too many ZIP pages to read, so the worker asks
+ * public.impact_dc_state_name_points for every data-center point Map 1 could draw in those states, with its names, and
+ * keeps the ZIPs whose project the topic names IN FULL (every distinctive word of a name is in the topic). This only
+ * chooses ZIPs; map1_dc_zip_members still decides what is drawn, and matchProject (with requireName) what is matched.
+ */
+export function zipsNamedByTopic(candidate, points) {
+  const t = topicEvidence(candidate);
+  const out = new Set();
+  for (const p of points || []) {
+    if (!p || !/^\d{5}$/.test(String(p.zip || ''))) continue;
+    if (namesProjectStatewide(t, p.project_name)) out.add(String(p.zip));
+  }
+  return [...out].sort();
 }
 
 /** One project key per matched project, from the keys public.map1_project_stable_keys returns. Deterministic. */

@@ -1,0 +1,129 @@
+name: weekly-stage2-suite
+
+# The weekly SQL files (docs/weekly-1..7; docs/weekly-release-order.md), as the queue-only release and as the full
+# configuration, against a DISPOSABLE Postgres. Never production:
+# no secrets, no Supabase URL, and the job refuses to run if any Supabase credential is present.
+on:
+  pull_request:
+    paths:
+      - 'docs/weekly-*.sql'
+      - 'lib/acq-weekly-slice.js'
+      - 'test/weekly_stage2_pg/**'
+      - 'test/weekly_bsky_sources_pg/**'
+      - 'test/fixtures/weekly-*.json'
+      - '.github/workflows/weekly-stage2-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/weekly-*.sql'
+      - 'lib/acq-weekly-slice.js'
+      - 'test/weekly_stage2_pg/**'
+      - 'test/weekly_bsky_sources_pg/**'
+      - 'test/fixtures/weekly-*.json'
+      - '.github/workflows/weekly-stage2-suite.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: mirror.gcr.io/library/postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: weekly_stage2_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Queue-only release (files 1 and 2) holds, survives the later upgrade, and matches the page test's recording
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: weekly_stage2_disposable
+        run: |
+          set -o pipefail
+          bash test/weekly_stage2_pg/run_queue_only.sh 2>&1 | grep -v NOTICE
+      - name: Publication lock (file 2a) refuses work on a published edition; every prohibited mutation is caught
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: weekly_stage2_disposable
+        run: |
+          set -o pipefail
+          bash test/weekly_stage2_pg/run_publication_lock.sh 2>&1 | grep -v NOTICE
+      - name: Every topic has its Local News category (file 2b); every prohibited mutation is caught
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: weekly_stage2_disposable
+        run: |
+          set -o pipefail
+          bash test/weekly_stage2_pg/run_lead_category.sh 2>&1 | grep -v NOTICE
+      - name: Research requests are answered by Perplexity's API within its limits (perplexity file); every prohibited mutation is caught
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: weekly_stage2_disposable
+        run: |
+          set -o pipefail
+          bash test/weekly_stage2_pg/run_perplexity.sh 2>&1 | grep -v NOTICE
+      - name: Full configuration - slice rules hold; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: weekly_stage2_disposable
+        run: |
+          set -o pipefail
+          bash test/weekly_stage2_pg/run.sh 2>&1 | grep -v NOTICE
+      - name: Full configuration - topic queue rules hold; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: weekly_stage2_disposable
+        run: |
+          set -o pipefail
+          bash test/weekly_stage2_pg/run_topic_queue.sh 2>&1 | grep -v NOTICE
+      - name: Bluesky sources (docs/weekly-bluesky-sources.sql) - routing, dedupe, revisions, published freeze, access; every mutation killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: weekly_stage2_disposable
+        run: |
+          set -o pipefail
+          bash test/weekly_bsky_sources_pg/run.sh 2>&1 | grep -v NOTICE

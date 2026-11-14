@@ -1,6 +1,8 @@
 -- docs/decision-provenance-migration.sql
 --
 -- PARKED. NOT APPLIED. Applying it is a separately gated production change.
+-- (2026-11-13: anchor corrected; the original refused on the live body. Rollout, pilot and rollback:
+--  docs/decision-provenance-rollout-2026-11-13.md; rollback script: docs/decision-provenance-migration.rollback.sql.)
 --
 -- ── WHAT IS ALREADY WORKING WITHOUT THIS ─────────────────────────────────────────────
 -- Read this first, because the important half needs NO migration at all and a future
@@ -50,7 +52,15 @@ begin;
 do $mig$
 declare
   _def   text;
-  _anchor text := $anchor$        'source_vintage', _vintage$anchor$;
+  -- ⚠️ CORRECTED 2026-11-13. The anchor used to be the single line `'source_vintage', _vintage`, which the
+  -- live body contains TWICE: in the development provenance object AND in the facility one (measured on
+  -- md5 7718e5db…, anchor_count 2). The fail-closed count below therefore refused this file, and had it
+  -- matched the first hit only, a facility row would also have carried a development decision. The
+  -- three-line anchor starts at `canonical_addr`, a key only the DEVELOPMENT object has, so it matches once.
+  _anchor text := $anchor$        'canonical_addr', nullif(el->>'canonical_addr',''),
+        'refreshed_at',   _refreshed,
+        'source_vintage', _vintage$anchor$;
+  _reviewed_md5 constant text := '7718e5dbd2f4702048be9cba3b59ae13';
   _n     int;
   _before text;
   _after  text;
@@ -63,18 +73,27 @@ begin
   end if;
   _before := md5(_def);
 
+  -- Idempotent: a second apply is a no-op rather than a second copy of the key.
+  if position('''decision'',       el->''decision''' in _def) > 0 then
+    raise notice 'decision already carried in provenance — nothing to do';
+    return;
+  end if;
+
+  -- FAIL CLOSED ON DRIFT. This file was reviewed against the live body with md5 `_reviewed_md5`
+  -- (the 2026-10-28 "hold never displays" splice). If someone has since changed the function, stop and
+  -- re-derive the anchor against the new body rather than splicing into text nobody read. A splice from
+  -- the live body already preserves other edits; the pin is about the ANCHOR still meaning what it did.
+  if _before <> _reviewed_md5 then
+    raise exception 'live app_refresh_zip md5 % differs from the reviewed %; re-review the anchor before applying',
+                    _before, _reviewed_md5;
+  end if;
+
   -- FAIL CLOSED ON THE ANCHOR. A splice that silently matches twice edits something it
   -- was not shown; a splice that matches zero times reports success over nothing.
   _n := (length(_def) - length(replace(_def, _anchor, ''))) / length(_anchor);
   if _n <> 1 then
     raise exception 'anchor found % time(s), expected exactly 1 — the function body moved; '
                     're-derive the anchor rather than loosening it', _n;
-  end if;
-
-  -- Idempotent: a second apply is a no-op rather than a second copy of the key.
-  if position('''decision'',       el->''decision''' in _def) > 0 then
-    raise notice 'decision already carried in provenance — nothing to do';
-    return;
   end if;
 
   _def := replace(_def, _anchor, _anchor || ',
