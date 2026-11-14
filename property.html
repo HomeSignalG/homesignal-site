@@ -20,9 +20,9 @@
      HS.zipAuthOutcome, and this page renders HS.zipAuthUnmeasuredFact instead of a
      verified-absence claim. Fails CLOSED if absent (outcome 'unavailable', no claim). -->
 <script src="lib/zip-authoritative.js?v=20261029a"></script>
-<script src="lib/data.js?v=4dd6cfeb"></script>
+<script src="lib/data.js?v=4033ae3a"></script>
 <script src="lib/topic-prefs.js?v=fe87d99b"></script>
-<script src="lib/templates.js?v=0418fd07"></script>
+<script src="lib/templates.js?v=7373e258"></script>
 <script src="lib/impact.js"></script>
 <!-- NO MAP LIBRARIES ON THIS PAGE. The Address context map is an IFRAME of
      homesignalmap.html, so lib/map.js, lib/residential-qualify.js and lib/n5-radius.js
@@ -102,7 +102,9 @@ HS.onReady(async function () {
   var projects = [], changes = [], env = null;
   try {
     var loaded = await Promise.all([
-      HS.data.projects(zip, p),
+      // The same set Map 1 and the ZIP page list: official records plus data-centre listings,
+      // each listing labelled third-party (lib/data.js zipDevelopment, 2026-11-14).
+      (HS.data.zipDevelopment ? HS.data.zipDevelopment(zip, p) : HS.data.projects(zip, p)),
       HS.data.changes(zip, p),
       HS.data.envRisk(zip)
     ]);
@@ -233,6 +235,17 @@ HS.onReady(async function () {
     + contextMap
     + '<div class="block"><div class="bt-row"><h2>What\'s changing near this property</h2><a href="' + HS.esc(HS.navHref('development.html', p.zip)) + '">All projects →</a></div>'
     + near.map(function (pr) {
+        // A data-centre listing is its source's word, not a filing: its card says so and opens
+        // the page the source cites (HS.tpl, 2026-11-14).
+        if (HS.tpl.isThirdPartyListing && HS.tpl.isThirdPartyListing(pr)) {
+          var lh = HS.tpl.recordHref(pr);
+          return '<' + (lh ? 'a class="card mini clickable card-link" href="' + HS.esc(lh) + '" target="_blank" rel="noopener noreferrer"' : 'div class="card mini"')
+            + ' data-provenance="third_party_listing" style="border-left-color:' + HS.barColor(pr) + ';margin-bottom:10px' + (lh ? ';display:block;text-decoration:none;color:inherit' : '') + '">'
+            + '<span class="lens"><span class="sw ' + HS.esc(pr.lens||'value') + '"></span>' + HS.esc(pr.dist||'') + ' · ' + HS.esc(HS.tpl.browsingStatusLabel(pr)) + '</span>'
+            + '<h3>' + HS.esc(pr.name) + '</h3>'
+            + '<p class="sowhat"><b>On the record:</b> ' + HS.esc(pr.sowhat||'') + '</p>'
+            + HS.tpl.linkNote(pr, lh) + '</' + (lh ? 'a' : 'div') + '>';
+        }
         return '<div class="card mini" style="border-left-color:' + HS.barColor(pr) + ';margin-bottom:10px">'
           + '<span class="lens"><span class="sw ' + HS.esc(pr.lens||'value') + '"></span>' + HS.esc(pr.dist||'') + ' · ' + HS.esc(String(pr.status || '').toLowerCase()) + '</span>'
           + '<h3>' + HS.esc(pr.name) + '</h3>'

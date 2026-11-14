@@ -135,6 +135,21 @@ for (const zip of ['01001']) {
   ok(r.html.includes(BEHRING.source_url), zip + ' its card links to the source\'s own page');
   ok(/(?:^|[^0-9])2\s*Development projects/.test(r.strip), zip + ' the Development projects tile counts both', r.strip);
 }
+// 94612's real shape (2026-11-14 audit): 205 official records ahead of the listing. The page shows
+// three cards; a plain slice showed three official rows and never the data centre.
+{
+  const many = [];
+  for (let i = 0; i < 205; i++) many.push({ id: 'o' + i, zip: '__ZIP__', name: 'Official permit ' + i, type: 'Commercial',
+    status: 'Proposed', source_ref: 'https://example.test/p/' + i, record_kind: 'development', submitted_at: '2026-08-01' });
+  const SECOND = Object.assign({}, BEHRING, { source_key: 'dc:second', canonical_entity_id: 'second', project_name: 'Second Listed Data Center' });
+  const r = await hydrate('01001', Object.assign({}, DATA, { rpc_development: many, rpc_dc: [BEHRING, SECOND] }));
+  ok(r.errors.length === 0, 'many: no uncaught page error', r.errors);
+  ok(r.text.includes(NAME), 'many: the data centre gets one of the three cards behind 205 official records');
+  ok(r.text.includes('Official permit 0') && r.text.includes('Official permit 1'), 'many: control, the first official records still show');
+  ok(!r.text.includes('Official permit 2'), 'many: still three cards, not four');
+  ok(/1 more data-center listing from third-party sources is on the map/.test(r.text), 'many: the listing not shown is named, with a link to the full list');
+  ok(/href="\/development\.html\?zip=01001"/.test(r.html), 'many: the link goes to the full development list');
+}
 console.log('='.repeat(78));
 console.log('FAILS: ' + fails);
 console.log('='.repeat(78));

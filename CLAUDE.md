@@ -6966,6 +6966,22 @@ was missing from both lists and from the Development tile (Behring 415 20th Stre
   no stable record links; no record matched to the Behring project). Nothing reads it at runtime yet.
 - Audit: `scripts/audits/map-list-parity.sql`. Tests: `test/zip-development-map-parity.test.mjs`,
   `test/zip-development-list.browser.test.mjs`.
+- **Follow-ups (2026-11-14, from an adversarial review):**
+  - The ZIP page shows three cards; `HS.tpl.pickTopCards` gives the first listing a slot (a plain slice showed
+    only official rows: Behring sat behind 205) and a line names the listings not shown, linking the full list.
+  - A listing's link is the page its source CITES (`map1_dc_zip_members.source_url` = the observation's `cite`;
+    Behring's Compute Atlas listing cites KQED), so the card says "Opens kqed.org, the page Compute Atlas cites".
+  - The status keeps the map column and adds the source's own word when it differs
+    ("Approved · listed as under construction").
+  - Both reads start together. The property page, the homepage list and My Places read `zipDevelopment` too; the
+    dashboard reads no per-ZIP project list.
+  - Same building in both planes, measured: 20 of 2,049 listings sit within 150 m of an official record that names a
+    data center. Both still list; linking them is a founder decision.
+  - `supabase_read_only_user` may execute `map1_dc_zip_members` (`docs/map1-dc-zip-members-read-only-grant.sql`), so
+    the audit runs through db-read.
+  - **Not done:** the pre-built `/community/<zip>/` text still omits listings. The build reads no per-ZIP
+    development rows, and there is no bulk reader of national members (a national pass exceeds 60 s), so it needs a
+    stored per-ZIP table first.
 
 ## TAB 17 DATA-CENTER PROJECT CHECK (2026-11-13): A MAP 1 PROJECT LINK AND A REPLY IN EACH HOT TOPICS TILE
 

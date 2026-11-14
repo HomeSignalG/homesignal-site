@@ -44,9 +44,9 @@
 <script src="config.js"></script>
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
-<script src="lib/data.js?v=4dd6cfeb"></script>
+<script src="lib/data.js?v=4033ae3a"></script>
 <script src="lib/topic-prefs.js?v=fe87d99b"></script>
-<script src="lib/templates.js?v=0418fd07"></script>
+<script src="lib/templates.js?v=7373e258"></script>
 <script src="lib/dashboard-aggregate.js?v=b7d7219e"></script>
 <script src="lib/premium-waitlist.js?v=3cb9baaf"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
@@ -82,7 +82,8 @@ HS.onReady(async function () {
   var changes, projects, followedProjects;
   try {
     changes = await HS.data.changes(S.zip, null);
-    projects = await HS.data.projects(S.zip, null);
+    // The same set the ZIP page lists (official records plus labelled data-centre listings).
+    projects = await (HS.data.zipDevelopment ? HS.data.zipDevelopment(S.zip, null) : HS.data.projects(S.zip, null));
     followedProjects = await loadFollowedProjects();
   } catch (e) {
     console.warn('[my places] data load failed', e);
@@ -224,7 +225,7 @@ HS.onReady(async function () {
             // test/my-places-all-places-strip.browser.test.mjs §4a, which counts the calls.
             var list = (String(zq) === String(S.zip) && Array.isArray(projects))
               ? projects
-              : await HS.data.projects(zq);
+              : await (HS.data.zipDevelopment ? HS.data.zipDevelopment(zq, null) : HS.data.projects(zq));
             // complete === false is a FAILED or not-yet-cut-over read, not an empty ZIP. A
             // ZIP whose geography has not been cut over returns {unavailable:true}, which
             // lands here as complete:false — counting it as 0 would assert "nothing is being

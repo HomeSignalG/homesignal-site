@@ -49,7 +49,7 @@ ok(/if \(p\.type\) bits\.push\(p\.type\);/.test(fs[0]),
   '0d "On the record" still states the SOURCE type (p.type) — its semantics are not redefined here');
 
 // The card template, sliced from the shipped runtime and evaluated with its real body.
-const CARD_START = "topProjects.slice(0,3).map(function(p){";
+const CARD_START = "topCards.shown.map(function(p){";
 const i0 = RT.indexOf(CARD_START);
 const i1 = RT.indexOf("}).join('')", i0);
 ok(i0 > 0 && i1 > i0, '0e the Development & Growth card template is found in lib/community-page.js');
@@ -121,7 +121,8 @@ const preCard = new Function('HS', 'p', PRE_BADGE);
 ok(ROWS.every(([row]) => stripBadge(card(row)) === preCard(HS, normProject(row))),
   '4a with the badge removed, every card is byte-identical to the pre-badge template');
 ok(RT.includes("var topProjects = proposed.concat(active); if (!topProjects.length) topProjects = projects;")
-   && RT.includes(CARD_START), '4b membership and order logic (topProjects, slice(0,3)) is unchanged');
+   && RT.includes("var topCards = HS.tpl.pickTopCards(topProjects, 3);")
+   && RT.includes(CARD_START), '4b membership and order logic (topProjects, three cards via pickTopCards) is unchanged');
 ok(RT.includes("Development &amp; growth <span class=\"gc\">— ' + devTotal + (devTotal===1?' record':' records')"),
   '4c the record count line is unchanged');
 
