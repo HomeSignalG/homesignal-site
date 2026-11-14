@@ -9,8 +9,8 @@
 //   development-activity-billing-webhook  the processor's signed events (the test payment, the live payment, the cancellation)
 // against the SHIPPED SQL of every layer the product stands on. The only translations are the network (a request the data layer would send to PostgREST is
 // run as the same database function call through psql, and a database refusal comes back the way PostgREST returns it) and the PAYMENT PROCESSOR, which is a
-// stand-in that records the checkout request it was sent and returns an address on its own domain. Nothing here reaches Lemon Squeezy, holds a real key, or
-// charges anyone: the processor's field names are the shapes in _shared/lemon-billing.ts, not shapes confirmed against a real webhook.
+// stand-in that records the checkout request it was sent and returns an address on our own page. Nothing here reaches Paddle, holds a real key, or
+// charges anyone: the processor's field names are the shapes in _shared/paddle-billing.ts, not shapes confirmed against a real webhook.
 // The webhook body that the stand-in "processor" sends back is built from the custom data of the checkout request the REAL manage-billing handler made,
 // so the binding that ties a payment to a brokerage is exercised end to end rather than assumed.
 //   Run through: bash test/launch_gate_pg/run.sh   (it prepares the database and refuses anything not named disposable)
@@ -25,7 +25,7 @@ const BH = await import('../../supabase/functions/manage-billing/handler.ts');
 const BD = await import('../../supabase/functions/manage-billing/data.ts');
 const WH = await import('../../supabase/functions/development-activity-billing-webhook/handler.ts');
 const WD = await import('../../supabase/functions/development-activity-billing-webhook/data.ts');
-const L = await import('../../supabase/functions/_shared/lemon-billing.ts');
+const L = await import('../../supabase/functions/_shared/paddle-billing.ts');
 
 let n = 0, bad = 0;
 // A check that THROWS (an answer without a field the check reads) must still end as a named failure with the usual summary, never a bare stack trace.
@@ -51,7 +51,7 @@ const RPC = {
   evaluation_usage: (a) => [asJson("public.evaluation_usage(:'u'::uuid)"), { u: a.p_user_id }],
   billing_usage: (a) => [asJson("public.billing_usage(:'u'::uuid)"), { u: a.p_user_id }],
   // the webhook's one writer; the event is the exact object the webhook sent
-  billing_event_apply: (a) => [asJson("public.billing_event_apply(:'b'::uuid, :'e'::jsonb)"), { b: a.p_brokerage, e: JSON.stringify(a.p_event) }],
+  billing_event_apply: (a) => [asJson("public.billing_event_apply(:'b'::uuid, :'e'::jsonb, nullif(:'m', '')::integer)"), { b: a.p_brokerage, e: JSON.stringify(a.p_event), m: a.p_access_months === null ? '' : String(a.p_access_months) }],
   // the ONE issuing entry. The free evaluation's own issue function is NOT listed: a handler calling it directly would be a second way to charge a report.
   brokerage_report_issue: (a) => [asJson("public.brokerage_report_issue(:'u'::uuid, :'k'::uuid, :'b', :'h', :'v', :'i'::jsonb, nullif(:'p', '')::jsonb)"),
     { u: a.p_user_id, k: a.p_idempotency_key, b: a.p_body, h: a.p_content_hash, v: a.p_report_version, i: JSON.stringify(a.p_engine_inputs), p: a.p_private === null ? '' : JSON.stringify(a.p_private) }],
@@ -80,18 +80,18 @@ const seen = [];
 const json = (v, status = 200) => new Response(JSON.stringify(v), { status });
 
 // THE PAYMENT PROCESSOR, as a stand-in. It records every request it is sent (so a test can look at each byte) and answers as the real one is documented to:
-// an object whose data.attributes.url is an https address on its own domain. `lemon.mode` makes it fail the other ways a real one can.
-const lemon = { calls: [], mode: 'ok' };
-const CHECKOUT_URL = 'https://fixture-store.lemonsqueezy.com/checkout/custom/00000000-fixture?signature=fixture';
-async function lemonStandIn(url, init) {
-  lemon.calls.push({ url, init });
-  if (lemon.mode === 'down') return new Response('', { status: 503 });
-  return json({ data: { type: 'checkouts', attributes: { url: CHECKOUT_URL } } }, 201);
+// an object whose data.checkout.url is an https address on our own page with the transaction id appended. `paddle.mode` makes it fail the other ways a real one can.
+const paddle = { calls: [], mode: 'ok' };
+const CHECKOUT_URL = 'https://jodytracks.com/development-activity-reports.html?_ptxn=txn_00000fixture#billing';
+async function paddleStandIn(url, init) {
+  paddle.calls.push({ url, init });
+  if (paddle.mode === 'down') return new Response('', { status: 503 });
+  return json({ data: { id: 'txn_00000fixture', status: 'draft', checkout: { url: CHECKOUT_URL } } }, 201);
 }
 
 async function fetchToSql(url, init = {}) {
   const u = new URL(url);
-  if (u.origin === 'https://api.lemonsqueezy.com') return lemonStandIn(url, init);
+  if (u.origin === 'https://api.paddle.com') return paddleStandIn(url, init);
   seen.push(u.pathname + u.search);
   const rpc = /^\/rest\/v1\/rpc\/(\w+)$/.exec(u.pathname);
   if (rpc) {
@@ -121,8 +121,9 @@ one("insert into auth.users (id, email) values (:'a'::uuid, 'founder@example.tes
 
 // ---- the four functions, each built from its real handler and real data layer -------------------------------------------------------------------
 const SUPABASE = { url: 'https://proj.supabase.co', serviceKey: 'fixture-service-key-not-real' };
-const BILLING = { apiKey: 'fixture-api-key-not-real', storeId: '4242', variantId: '555', secret: 'fixture-signing-secret-not-real', testMode: false };
-const VARIANT = 555;
+const PRO_PRICE = 'pri_01fixture0professional0001', PARTNER_PRICE = 'pri_01fixture0partner0000001', OTHER_PRICE = 'pri_01fixture0otherproduct001';
+const BILLING = { apiKey: 'fixture-api-key-not-real', secret: 'fixture-signing-secret-not-real', prices: { professional: PRO_PRICE, partner: PARTNER_PRICE }, environment: 'production', clientToken: 'fixture_client_token_not_real' };
+const VARIANT = PRO_PRICE;
 const RATE_OWNER = 'f6666666-6666-4666-8666-666666666666', RATE_AGENT = 'f7777777-7777-4777-8777-777777777777'; // section 15's own brokerage
 const emailOf = (id) => ({ [ADMIN]: 'founder', [OWNER]: 'owner', [AGENT]: 'agent', [OUTSIDER]: 'outsider', [RIVAL]: 'rival', [RATE_OWNER]: 'rateowner', [RATE_AGENT]: 'rateagent' }[id]) + '@example.test';
 const post = (body, headers = {}) => new Request('https://x/functions/v1/f', { method: 'POST', headers: { authorization: 'Bearer t', 'content-type': 'application/json', ...headers }, body: typeof body === 'string' ? body : JSON.stringify(body) });
@@ -139,12 +140,13 @@ async function billingAsk(userId, body, billing = BILLING) {
   const res = await h(post(body));
   return { status: res.status, json: await res.json() };
 }
-async function hook(payload, { secret = BILLING.secret, sign = true, signature } = {}) {
+async function hook(payload, { secret = BILLING.secret, sign = true, signature, livemode = true } = {}) {
   const raw = typeof payload === 'string' ? payload : JSON.stringify(payload);
-  const real = WD.makeDeps({ ...SUPABASE, secret: BILLING.secret, variantId: BILLING.variantId }, fetchToSql);
+  const real = WD.makeDeps({ ...SUPABASE, secret: BILLING.secret, prices: BILLING.prices, livemode }, fetchToSql);
   const h = WH.makeHandler(real);
   const headers = { 'content-type': 'application/json' };
-  if (sign) headers['x-signature'] = signature ?? await L.hmacHex(secret, raw);
+  const ts = Math.floor(Date.now() / 1000);
+  if (sign) headers['paddle-signature'] = 'ts=' + ts + ';h1=' + (signature ?? await L.hmacHex(secret, ts + ':' + raw));
   const res = await h(new Request('https://x/functions/v1/development-activity-billing-webhook', { method: 'POST', headers, body: raw }));
   return { status: res.status, json: await res.json() };
 }
@@ -181,12 +183,12 @@ const addr = (i) => addressNo(i); // the launch test location: Brigham City, UT 
 const tokenOf = (link) => new URL(link).hash.slice('#invite='.length);
 const reportRpcs = () => seen.filter((s) => /rpc\/brokerage_report_issue$/.test(s)).length;
 
-// processor events, in the shape _shared/lemon-billing.ts translates. `custom` is the custom data of a checkout THIS SERVER made.
+// processor events, in the shape _shared/paddle-billing.ts translates. `custom` is the custom data of a checkout THIS SERVER made.
 const BASE = Date.now() - 3 * 3_600_000;
 const at = (k) => new Date(BASE + k * 1000).toISOString();
-const subEvent = (custom, { name = 'subscription_created', status = 'active', id = '7001', test = false, variant = VARIANT, k = 1 } = {}) => ({
-  meta: { event_name: name, test_mode: test, custom_data: custom },
-  data: { type: 'subscriptions', id: String(id), attributes: { status, variant_id: variant, product_id: 444, updated_at: at(k) } },
+const subEvent = (custom, { name = 'subscription.created', status = 'active', id = '7001', variant = VARIANT, k = 1 } = {}) => ({
+  event_id: 'evt_' + name.replace('.', '_') + '_' + id + '_' + k, event_type: name, occurred_at: at(k),
+  data: { id: String(id), status, custom_data: custom, items: [{ price: { id: variant, product_id: 'pro_01fixture0product00001' } }] },
 });
 
 // ---- 1. sign-up: an admin creates the trial, the owner joins, the owner invites an agent, the agent joins ----------------------------------------
@@ -244,28 +246,27 @@ r = await ask(AGENT, { address: addr(11), idempotency_key: key(12) });
 ok(r.status === 403 && r.json.error === 'evaluation_complete', '4c the agent is refused the same way', r.json);
 
 // ---- 5. the checkout: only the owner, only a new subscription; nothing is charged or changed by asking ---------------------------------------------------
-const lemonBefore = lemon.calls.length;
+const paddleBefore = paddle.calls.length;
 b = await billingAsk(AGENT, { action: 'checkout' });
-ok(b.status === 403 && b.json.detail === 'owner_only' && lemon.calls.length === lemonBefore, '5a an agent cannot start a checkout (403 owner_only): the processor is never contacted', b.json);
+ok(b.status === 403 && b.json.detail === 'owner_only' && paddle.calls.length === paddleBefore, '5a an agent cannot start a checkout (403 owner_only): the processor is never contacted', b.json);
 b = await billingAsk(OUTSIDER, { action: 'checkout' });
-ok(b.status === 403 && lemon.calls.length === lemonBefore, '5b a person with no brokerage cannot either');
+ok(b.status === 403 && paddle.calls.length === paddleBefore, '5b a person with no brokerage cannot either');
 b = await billingAsk(OWNER, { action: 'checkout' }, { ...BILLING, apiKey: '' });
-ok(b.status === 503 && b.json.error === 'billing_not_set_up' && lemon.calls.length === lemonBefore, '5c with the processor not set up the owner is told so (503) and the processor is never contacted', b.json);
-lemon.mode = 'down';
+ok(b.status === 503 && b.json.error === 'billing_not_set_up' && paddle.calls.length === paddleBefore, '5c with the processor not set up the owner is told so (503) and the processor is never contacted', b.json);
+paddle.mode = 'down';
 b = await billingAsk(OWNER, { action: 'checkout' });
-ok(b.status === 502 && b.json.error === 'checkout_unavailable' && lemon.calls.length === lemonBefore + 1 && !JSON.stringify(b.json).includes('fixture'),
+ok(b.status === 502 && b.json.error === 'checkout_unavailable' && paddle.calls.length === paddleBefore + 1 && !JSON.stringify(b.json).includes('fixture'),
   '5d when the processor is down the owner is told the checkout is unavailable (502), with nothing of the failure in the answer', b.json);
-lemon.mode = 'ok';
+paddle.mode = 'ok';
 b = await billingAsk(OWNER, { action: 'checkout' });
 ok(b.status === 200 && b.json.status === 'OK' && b.json.url === CHECKOUT_URL && JSON.stringify(Object.keys(b.json).sort()) === '["status","url"]' && !idsIn(b.json), '5e the owner is given the processor\'s checkout address and nothing else', b.json);
-const sent = lemon.calls[lemon.calls.length - 1], sentBody = JSON.parse(sent.init.body);
-const custom = sentBody.data.attributes.checkout_data.custom;
-ok(sent.url === L.CHECKOUT_ENDPOINT && sent.init.method === 'POST' && sent.init.headers.Authorization === 'Bearer ' + BILLING.apiKey
-   && sentBody.data.relationships.store.data.id === BILLING.storeId && sentBody.data.relationships.variant.data.id === BILLING.variantId
-   && sentBody.data.attributes.test_mode === undefined,
-  '5f the request the processor was sent: its documented endpoint, the store and the $79 variant, a live (not test) checkout, authorised by the key');
+const sent = paddle.calls[paddle.calls.length - 1], sentBody = JSON.parse(sent.init.body);
+const custom = sentBody.custom_data;
+ok(sent.url === 'https://api.paddle.com/transactions' && sent.init.method === 'POST' && sent.init.headers.Authorization === 'Bearer ' + BILLING.apiKey
+   && sentBody.items.length === 1 && sentBody.items[0].price_id === BILLING.prices.professional && sentBody.items[0].quantity === 1 && sentBody.collection_mode === 'automatic',
+  '5f the request the processor was sent: its documented endpoint, ONE unit of the $78 Professional price, authorised by the key, on the live (production) host');
 ok(custom.brokerage_id === brokerageId && await L.verifyBinding(BILLING.secret, custom.brokerage_id, custom.bind)
-   && sentBody.data.attributes.product_options.redirect_url === 'https://jodytracks.com/development-activity-reports.html#billing',
+   && sentBody.checkout.url === 'https://jodytracks.com/development-activity-reports.html#billing',
   '5g the checkout names THIS brokerage with a signature only this server\'s secret makes, and its return address only brings the person back');
 ok(!JSON.stringify(sentBody).includes('owner@example.test') && !/@/.test(JSON.stringify(sentBody)), '5h the request carries no email address');
 ok(count('brokerage_subscription') === 0 && count('payment_event') === 0 && count('brokerage_paid_credit') === 0, '5i asking for a checkout changed nothing in the database: no subscription, no event, no credit');
@@ -273,8 +274,8 @@ b = await billingAsk(OWNER, { action: 'status' });
 ok(b.json.plan?.state === 'none' && b.json.checkout === 'available', '5j and the plan is still "none"', b.json);
 
 // ---- 6. the founder's TEST payment (processor test mode): recorded, and it grants nothing ----------------------------------------------------------
-let w = await hook(subEvent(custom, { id: '9001', test: true, k: 1 }));
-ok(w.status === 200 && w.json.outcome === 'RECORDED', '6a a test-mode subscription event is recorded', w.json);
+let w = await hook(subEvent(custom, { id: '9001', k: 1 }), { livemode: false });
+ok(w.status === 200 && w.json.outcome === 'RECORDED', '6a a sandbox-environment subscription event is recorded', w.json);
 b = await billingAsk(OWNER, { action: 'status' });
 ok(b.json.plan?.state === 'test_only' && b.json.plan?.credits_remaining === 0 && b.json.checkout === 'available', '6b the plan reads "test only", with no paid reports, and a real checkout is still available', b.json);
 r = await ask(OWNER, { address: addr(11), idempotency_key: key(11) });
@@ -299,15 +300,15 @@ ok(w.status === 200 && w.json.status === 'IGNORED' && w.json.reason === 'bad_bin
   '7e a correctly SIGNED event that names another brokerage with this brokerage\'s signature is not acted on: a binding cannot be borrowed', w.json);
 w = await hook(subEvent({ brokerage_id: brokerageId }, { id: '7001', k: 10 }));
 ok(w.status === 200 && w.json.reason === 'no_binding' && count('payment_event') === eventsBefore, '7f a signed event with no binding from a checkout of ours is not acted on', w.json);
-w = await hook(subEvent(custom, { id: '7001', variant: 999, k: 10 }));
-ok(w.status === 200 && w.json.reason === 'variant' && count('payment_event') === eventsBefore, '7g a signed event for another product\'s variant is not acted on', w.json);
-w = await hook({ meta: { event_name: 'order_created', custom_data: custom }, data: { type: 'orders', id: '1', attributes: {} } });
-ok(w.status === 200 && w.json.status === 'IGNORED' && count('payment_event') === eventsBefore, '7h an order event is acknowledged and recorded nowhere', w.json);
-w = await hook(subEvent(custom, { name: 'subscription_payment_success', id: '7001', k: 10 }));
-ok(w.status === 200 && w.json.status === 'IGNORED' && w.json.reason === 'event_name' && count('payment_event') === eventsBefore,
-  '7h2 a subscription-shaped event whose NAME is not one of the lifecycle events (a payment notice) is acknowledged and recorded nowhere: the plan follows the subscription\'s own status', w.json);
-w = await hook({ ...live, data: { ...live.data, attributes: { ...live.data.attributes, updated_at: 'yesterday' } } });
-ok(w.status === 422 && w.json.reason === 'updated_at' && count('payment_event') === eventsBefore, '7i a signed event that is not shaped as expected is refused loudly (422), not guessed at', w.json);
+w = await hook(subEvent(custom, { id: '7001', variant: OTHER_PRICE, k: 10 }));
+ok(w.status === 200 && w.json.reason === 'price' && count('payment_event') === eventsBefore, '7g a signed event for another product\'s price is not acted on', w.json);
+w = await hook({ event_id: 'evt_address_created_1', event_type: 'address.created', occurred_at: at(10), data: { id: 'add_1', custom_data: custom } });
+ok(w.status === 200 && w.json.status === 'IGNORED' && count('payment_event') === eventsBefore, '7h an event type this build does not use is acknowledged and recorded nowhere', w.json);
+w = await hook(subEvent(custom, { name: 'subscription.imported', id: '7001', k: 10 }));
+ok(w.status === 200 && w.json.status === 'IGNORED' && w.json.reason === 'event_type' && count('payment_event') === eventsBefore,
+  '7h2 a subscription-shaped event whose TYPE is not one of the lifecycle events (an import) is acknowledged and recorded nowhere: the plan follows the subscription\'s own status', w.json);
+w = await hook({ ...live, occurred_at: 'yesterday' });
+ok(w.status === 422 && w.json.reason === 'occurred_at' && count('payment_event') === eventsBefore, '7i a signed event that is not shaped as expected is refused loudly (422), not guessed at', w.json);
 
 // ---- 8. the LIVE payment: the subscription is bound to the brokerage and the plan becomes paid ---------------------------------------------------------
 w = await hook(live);
@@ -320,9 +321,9 @@ ok(one("select count(*) from public.brokerage_subscription where subscription_re
 b = await billingAsk(OWNER, { action: 'status' });
 ok(b.json.plan?.state === 'paid' && b.json.plan?.credit_limit === 100 && b.json.plan?.credits_used === 0 && b.json.plan?.credits_remaining === 100 && b.json.checkout === 'already_paid'
    && typeof b.json.plan?.period_ends_at === 'string', '8d the plan is paid: a month of 100, none used (the ten free reports do not count toward it), and no second checkout is offered', b.json);
-const lemonN = lemon.calls.length;
+const paddleN = paddle.calls.length;
 b = await billingAsk(OWNER, { action: 'checkout' });
-ok(b.status === 409 && b.json.error === 'already_paid' && lemon.calls.length === lemonN, '8e a paid brokerage is refused a second checkout (409) and the processor is not contacted: nobody is billed twice', b.json);
+ok(b.status === 409 && b.json.error === 'already_paid' && paddle.calls.length === paddleN, '8e a paid brokerage is refused a second checkout (409) and the processor is not contacted: nobody is billed twice', b.json);
 b = await billingAsk(AGENT, { action: 'status' });
 ok(b.json.plan?.state === 'paid' && b.json.plan?.credits_remaining === 100 && b.json.checkout === 'not_owner', '8f the agent sees the paid plan too');
 
@@ -380,7 +381,7 @@ ok(rivalList.status === 200 && rivalList.json.reports?.length === 0 && rivalOpen
 b = await billingAsk(RIVAL, { action: 'status' });
 ok(b.json.plan?.state === 'none' && b.json.plan?.role === 'owner', '12a the other brokerage\'s plan is still "none"', b.json);
 const rivalCheckout = await billingAsk(RIVAL, { action: 'checkout' });
-const rivalCustom = JSON.parse(lemon.calls[lemon.calls.length - 1].init.body).data.attributes.checkout_data.custom;
+const rivalCustom = JSON.parse(paddle.calls[paddle.calls.length - 1].init.body).custom_data;
 ok(rivalCheckout.status === 200 && rivalCustom.brokerage_id === rivalId && rivalCustom.brokerage_id !== brokerageId, '12b it gets its own checkout, which names only itself');
 w = await hook(subEvent(rivalCustom, { id: '7001', k: 20 }));
 ok(w.status === 409 && w.json.error === 'binding_conflict' && count('payment_event') === 2 && count('brokerage_subscription') === 2,
@@ -389,7 +390,7 @@ b = await billingAsk(RIVAL, { action: 'status' });
 ok(b.json.plan?.state === 'none', '12d the other brokerage still has no paid plan');
 
 // ---- 13. cancellation: the allotment ends at once, the reports stay, a new subscription can be taken -------------------------------------------------
-w = await hook(subEvent(custom, { name: 'subscription_cancelled', status: 'cancelled', id: '7001', k: 30 }));
+w = await hook(subEvent(custom, { name: 'subscription.canceled', status: 'canceled', id: '7001', k: 30 }));
 ok(w.status === 200 && w.json.outcome === 'RECORDED', '13a the cancellation is recorded', w.json);
 b = await billingAsk(OWNER, { action: 'status' });
 ok(b.json.plan?.state === 'canceled' && b.json.plan?.credits_remaining === 0 && b.json.checkout === 'available', '13b the plan reads "canceled", with no paid reports, and a new checkout is available (D-11-1)', b.json);
@@ -399,7 +400,7 @@ const kept = await ask(OWNER, { action: 'list' });
 const keptOpen = await ask(OWNER, { action: 'open', report_id: paidFirstId });
 ok(kept.status === 200 && kept.json.reports?.length === 110 && keptOpen.status === 200 && count('brokerage_paid_credit') === 100,
   '13d but all 110 stored reports still list and open, and nothing was deleted: cancelling ends new reports, never the ones already made');
-w = await hook(subEvent(custom, { name: 'subscription_updated', status: 'active', id: '7001', k: 25 }));
+w = await hook(subEvent(custom, { name: 'subscription.updated', status: 'active', id: '7001', k: 25 }));
 b = await billingAsk(OWNER, { action: 'status' });
 ok(w.status === 200 && b.json.plan?.state === 'canceled', '13e an OLDER event arriving late does not undo the cancellation (the processor\'s own time orders them)', b.json.plan);
 
@@ -411,9 +412,9 @@ ok(Number(audit.bindings_total) === 2 && Number(audit.paid_credits_total) === 10
 const holders = (needle) => one("select string_agg(table_name, ',' order by table_name) from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE'").split(',')
   .filter((tb) => Number(one('select count(*) from public."' + tb + '" x where x::text like :\'n\'', { n: '%' + needle + '%' })) > 0);
 ok(holders('Launch Gate Realty').includes('brokerage_account') && holders('7001').includes('brokerage_subscription'), '14c (control) the scan finds a value where it is kept: the brokerage\'s name and the subscription\'s id');
-ok([BILLING.apiKey, BILLING.secret, CHECKOUT_URL, 'fixture-store.lemonsqueezy.com', 'owner@example.test'].every((v) => holders(v).length === 0),
+ok([BILLING.apiKey, BILLING.secret, CHECKOUT_URL, 'txn_00000fixture', 'owner@example.test'].every((v) => holders(v).length === 0),
   '14d the processor\'s key, the signing secret, the checkout address and the owner\'s email are written in NO table of the public schema');
-ok(['anon', 'authenticated'].every((role) => ['public.billing_usage(uuid)', 'public.billing_event_apply(uuid, jsonb)', 'public.brokerage_report_issue(uuid, uuid, text, text, text, jsonb, jsonb)']
+ok(['anon', 'authenticated'].every((role) => ['public.billing_usage(uuid)', 'public.billing_event_apply(uuid, jsonb)', 'public.billing_event_apply(uuid, jsonb, integer)', 'public.brokerage_report_issue(uuid, uuid, text, text, text, jsonb, jsonb)']
      .every((f) => one("select has_function_privilege(:'r', :'f', 'execute')", { r: role, f }) === 'f')), '14e no resident role can run the billing functions: only the system can');
 
 // ---- 15. THE REPORT RATE LIMIT (added with docs/report-rate-limit.sql; sections 1-14 above are unchanged) ----------------------------------------------------

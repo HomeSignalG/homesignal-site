@@ -1,24 +1,24 @@
 // THE TWO BILLING FUNCTIONS, edge half (Development Activity build step 11) — offline, against the REAL handlers and data layers.
 //   supabase/functions/_shared/billing-reads.ts                       the plan's one reader, and the webhook's one writer's caller
 //   supabase/functions/manage-billing                                  a member reads their plan; the OWNER starts the checkout (signed in)
-//   supabase/functions/development-activity-billing-webhook            the processor's signed events (NOT signed in: its HMAC is the gate)
+//   supabase/functions/development-activity-billing-webhook            Paddle's signed events (NOT signed in: its HMAC is the gate)
 //
 //   1. the plan reads: the database's answer is checked for shape (a row that is not what it should be is a fault, never "no plan"), and what a
 //      BROWSER is told is the state, the month's figures and the person's own role, never the brokerage id;
-//   2. manage-billing: the gate refuses BEFORE the body is read, the field set is closed per action, only an OWNER may start a checkout, a
-//      brokerage that is already paid cannot start another, an unset processor is 503 and never a guess, and no answer carries an id, a key or a
+//   2. manage-billing: the gate refuses BEFORE the body is read, the field set is closed per action (a checkout may also name an OFFER from a closed list), only an OWNER may start a checkout, the Private Partner Offer is
+//      an INDIVIDUAL account's alone, a brokerage that is already paid cannot start another, an unset processor is 503 and never a guess, and no answer carries an id, a key or a
 //      processor word;
-//   3. the webhook: with no secret or no variant EVERY request is refused; a request whose signature is not the HMAC of the RAW body is refused
+//   3. the webhook: with no secret or no price EVERY request is refused; a request whose Paddle-Signature is not the HMAC of "<ts>:<RAW body>" is refused (or is stale)
 //      before anything is parsed; a body that is not ours is acknowledged and recorded nowhere; every refusal of the database has its own answer;
 //   4. the real data layers: exactly the requests each makes, the API key only in the processor request's header, and nothing else.
-// test/brokerage_billing_pg proves the database half; test/billing-structure.test.mjs pins the structure; test/lemon-billing.test.mjs proves the shapes.
+// test/brokerage_billing_pg proves the database half; test/billing-structure.test.mjs pins the structure; test/paddle-billing.test.mjs proves the shapes; test/paddle_billing_pg the six-month grant.
 // Run: node test/billing-functions.test.mjs
 import { createHmac } from 'node:crypto';
 import { readFileSync as __rf } from 'node:fs';
 const PUBLISHED = JSON.parse(__rf(new URL('../docs/brand/brand-contract.v1.json', import.meta.url), 'utf8')); // the contract's CURRENT identity: these links follow it
 const ORIGIN = PUBLISHED.identities[PUBLISHED.current_identity].origin;
 
-const L = await import('../supabase/functions/_shared/lemon-billing.ts');
+const L = await import('../supabase/functions/_shared/paddle-billing.ts');
 const B = await import('../supabase/functions/_shared/billing-reads.ts');
 const Svc = await import('../supabase/functions/_shared/service-rest.ts');
 const MH = await import('../supabase/functions/manage-billing/handler.ts');
@@ -32,14 +32,19 @@ const hmac = (secret, msg) => createHmac('sha256', secret).update(msg).digest('h
 
 const UID = 'a1111111-1111-4111-8111-111111111111';
 const BK = 'b0b0b0b0-1111-4222-8333-444444444444';
-const SECRET = 'whsec_test_0123456789abcdef';
-const API_KEY = 'lsk_secret_api_key_value';
-const VARIANT = '123456';
+const SECRET = 'pdl_ntfset_test_0123456789abcdef';
+const API_KEY = 'pdl_live_secret_api_key_value';
+const PRO = 'pri_01m7d6kede6hqr2kh9b78mb25j', PARTNER = 'pri_01m7d6q4yw2yzygm5cz92s5abg';
+const PRICES = { professional: PRO, partner: PARTNER };
+const NOW = 1_800_000_000;
+const VARIANT = PRO;
+const pSig = (secret, raw, ts = NOW) => 'ts=' + ts + ';h1=' + hmac(secret, ts + ':' + raw);
 const SERVICE = 'service-key-xyz';
 const BASE = 'https://qwnnmljucajnexpxdgxr.supabase.co';
 
-const usage = (over = {}) => ({ brokerage_id: BK, role: 'owner', state: 'none', credit_limit: 100, credits_used: 0, credits_remaining: 0, period_ends_at: null, ...over });
+const usage = (over = {}) => ({ brokerage_id: BK, role: 'owner', state: 'none', credit_limit: 100, credits_used: 0, credits_remaining: 0, period_ends_at: null, access_ends_at: null, ...over });
 const PAID = usage({ state: 'paid', credits_used: 3, credits_remaining: 97, period_ends_at: '2026-11-04T12:00:00+00:00' });
+const GRANT = usage({ state: 'paid', credits_used: 1, credits_remaining: 99, period_ends_at: '2026-11-04T12:00:00+00:00', access_ends_at: '2027-05-04T12:00:00+00:00' });
 const rpcWith = (table) => { const calls = []; const rpc = async (fn, args) => { calls.push([fn, args]); const a = table[fn]; if (!a) throw new Svc.DataUnavailable('no script for ' + fn); return typeof a === 'function' ? a(args) : a; }; return { rpc, calls }; };
 const okRows = (rows) => ({ data: rows, error: null });
 const refused = (message) => ({ data: null, error: { message } });
@@ -55,32 +60,33 @@ const refused = (message) => ({ data: null, error: { message } });
   ok(calls.length === 1 && calls[0][0] === 'billing_usage' && JSON.stringify(calls[0][1]) === JSON.stringify({ p_user_id: UID }), '1c the read is ONE call to billing_usage with the user id and nothing else (never an email)');
   let f = 0;
   for (const bad of [[PAID, PAID], [{ ...PAID, brokerage_id: 'x' }], [{ ...PAID, role: 'admin' }], [{ ...PAID, state: 'rich' }], [{ ...PAID, credits_used: -1 }], [{ ...PAID, credits_remaining: 1.5 }],
-    [{ ...PAID, credit_limit: '100' }], [{ ...PAID, period_ends_at: 'soon' }], [null], ['x']]) {
+    [{ ...PAID, credit_limit: '100' }], [{ ...PAID, period_ends_at: 'soon' }], [{ ...PAID, access_ends_at: 'later' }], [null], ['x']]) {
     try { await reads(bad).usageOf(UID); } catch (e) { if (e instanceof Svc.DataUnavailable) f++; }
   }
-  ok(f === 10, '1d two rows, or a row of the wrong shape (id, role, state, a count, a time), is a fault and never a plan (ten shapes)', f);
+  ok(f === 11, '1d two rows, or a row of the wrong shape (id, role, state, a count, either time), is a fault and never a plan (eleven shapes)', f);
   let g = 'none';
   try { await B.makeBillingReads(rpcWith({ billing_usage: refused('boom') }).rpc).usageOf(UID); } catch (e) { g = e.constructor.name; }
   ok(g === 'DataUnavailable', '1e a database error is DataUnavailable, never "no plan"', g);
   let nonArray = 0;
   for (const bad of [null, {}, 'x', 5]) { try { await reads(bad).usageOf(UID); } catch (e) { if (e instanceof Svc.DataUnavailable) nonArray++; } }
   ok(nonArray === 4, '1f an answer that is not a list is a fault', nonArray);
-  ok(['none', 'trialing', 'paid', 'past_due', 'canceled', 'unknown', 'test_only', 'suspended'].join() === [...B.PLAN_STATES].join(), '1g the plan states are exactly the eight the database can answer');
+  ok(['none', 'trialing', 'paid', 'past_due', 'canceled', 'unknown', 'test_only', 'suspended', 'expired'].join() === [...B.PLAN_STATES].join(), '1g the plan states are exactly the nine the database can answer (expired is a one-time grant that ran out)');
   const sum = B.planSummary(PAID);
-  ok(JSON.stringify(Object.keys(sum).sort()) === JSON.stringify(['credit_limit', 'credits_remaining', 'credits_used', 'period_ends_at', 'role', 'state']) && !JSON.stringify(sum).includes(BK),
+  ok(JSON.stringify(Object.keys(sum).sort()) === JSON.stringify(['access_ends_at', 'credit_limit', 'credits_remaining', 'credits_used', 'period_ends_at', 'role', 'state']) && !JSON.stringify(sum).includes(BK),
     '1h what a browser is told is the state, the role and the month\'s figures, and NEVER the brokerage id');
-  ok(JSON.stringify(B.planSummary(null)) === JSON.stringify({ state: 'none', role: null, credit_limit: 0, credits_used: 0, credits_remaining: 0, period_ends_at: null }), '1i no plan is "none", with nothing to spend');
+  ok(JSON.stringify(B.planSummary(null)) === JSON.stringify({ state: 'none', role: null, credit_limit: 0, credits_used: 0, credits_remaining: 0, period_ends_at: null, access_ends_at: null }), '1i no plan is "none", with nothing to spend');
+  ok(B.planSummary(GRANT).access_ends_at === '2027-05-04T12:00:00+00:00' && (await reads([GRANT]).usageOf(UID)).access_ends_at === '2027-05-04T12:00:00+00:00', '1i2 a one-time grant tells the page when its access ends');
 }
 {
   // applyEvent: the webhook's one writer's caller
-  const EVENT = { processor: 'lemonsqueezy', idempotency_key: 'k', subscription_ref: '1', event_name: 'subscription_created', processor_status: 'active', occurred_at: '2026-10-04T12:00:00Z', variant_ref: VARIANT, livemode: true };
+  const EVENT = { processor: 'paddle', idempotency_key: 'evt_k', subscription_ref: 'sub_1', event_name: 'subscription.created', processor_status: 'active', occurred_at: '2026-10-04T12:00:00Z', variant_ref: VARIANT, livemode: true };
   const okRow = { outcome: 'RECORDED', event_id: 1, is_latest: true, bound: true, state: 'paid' };
-  const go = async (script, brokerage = BK) => { try { return await B.makeBillingReads(rpcWith(script).rpc).applyEvent(brokerage, EVENT); } catch (e) { return e.constructor.name; } };
+  const go = async (script, brokerage = BK, months = null) => { try { return await B.makeBillingReads(rpcWith(script).rpc).applyEvent(brokerage, EVENT, months); } catch (e) { return e.constructor.name; } };
   const r = await go({ billing_event_apply: okRows([okRow]) });
   ok(r.outcome === 'RECORDED' && r.bound === true && r.state === 'paid' && r.is_latest === true && !('event_id' in r), '1j a recorded event answers its outcome, whether it bound, the state and whether it is the latest, and no event id');
   const { rpc, calls } = rpcWith({ billing_event_apply: okRows([okRow]) });
   await B.makeBillingReads(rpc).applyEvent(BK, EVENT);
-  ok(calls.length === 1 && calls[0][0] === 'billing_event_apply' && calls[0][1].p_brokerage === BK && calls[0][1].p_event === EVENT && Object.keys(calls[0][1]).length === 2, '1k the write is ONE call to billing_event_apply with the brokerage and the event');
+  ok(calls.length === 1 && calls[0][0] === 'billing_event_apply' && calls[0][1].p_brokerage === BK && calls[0][1].p_event === EVENT && calls[0][1].p_access_months === null && Object.keys(calls[0][1]).length === 3, '1k the write is ONE call to billing_event_apply with the brokerage, the access length (none for a subscription) and the event');
   ok((await go({ billing_event_apply: okRows([{ ...okRow, outcome: 'DUPLICATE', bound: false }]) })).outcome === 'DUPLICATE', '1l a retried delivery is DUPLICATE');
   ok(await go({ billing_event_apply: refused('BINDING_CONFLICT') }) === 'BindingConflict', '1m BINDING_CONFLICT is BindingConflict');
   ok(await go({ billing_event_apply: refused('BROKERAGE_UNKNOWN') }) === 'BrokerageUnknown', '1n BROKERAGE_UNKNOWN is BrokerageUnknown');
@@ -91,10 +97,25 @@ const refused = (message) => ({ data: null, error: { message } });
   ok(await go({ billing_event_apply: okRows([{ ...okRow, outcome: 'MAYBE' }]) }) === 'DataUnavailable' && await go({ billing_event_apply: okRows([{ ...okRow, state: 'rich' }]) }) === 'DataUnavailable'
      && await go({ billing_event_apply: okRows([{ ...okRow, bound: 'yes' }]) }) === 'DataUnavailable', '1r a row of the wrong shape is a fault');
   ok(await go({}, 'not-a-uuid') === 'BrokerageUnknown', '1s a brokerage id that is not a UUID never reaches the database');
+  {
+    const g = rpcWith({ billing_event_apply: okRows([okRow]) });
+    await B.makeBillingReads(g.rpc).applyEvent(BK, EVENT, 6);
+    ok(g.calls.length === 1 && g.calls[0][1].p_access_months === 6, '1s2 a one-time grant is recorded with its length (6 months) in the same ONE call');
+    let rejected = 0;
+    for (const m of [0, 25, 1.5, -1, '6', NaN]) { if (await go({ billing_event_apply: okRows([okRow]) }, BK, m) === 'EventRefused') rejected++; }
+    ok(rejected === 6, '1s3 a grant length outside 1..24 or not a whole number never reaches the database (six values)', rejected);
+    ok(await go({ billing_event_apply: refused('OFFER_NOT_FOR_ACCOUNT') }, BK, 6) === 'OfferNotForAccount', '1s4 the database\'s refusal of a grant for a brokerage account is OfferNotForAccount');
+  }
+  {
+    const acct = async (rows, err) => { try { return await B.makeBillingReads(rpcWith({ brokerage_account_type_of: err ? refused('x') : okRows(rows) }).rpc).accountTypeOf(UID); } catch (e) { return e.constructor.name; } };
+    ok(await acct([{ account_type: 'individual', role: 'owner' }]) === 'individual' && await acct([{ account_type: 'brokerage', role: 'owner' }]) === 'brokerage' && await acct([]) === null, '1s5 the account type is read as the database says: individual, brokerage, or none');
+    ok(await acct([{ account_type: 'team' }]) === 'DataUnavailable' && await acct([{ account_type: 'individual' }, { account_type: 'individual' }]) === 'DataUnavailable' && await acct(null, true) === 'DataUnavailable' && await acct('x') === 'DataUnavailable',
+      '1s6 an unknown type, two rows, an error or a non-list is a fault, never "individual"');
+  }
 }
 {
   // the checkout slot (docs/da-owner-safeguards.sql part C)
-  const URL1 = 'https://homesignal.lemonsqueezy.com/checkout/custom/first';
+  const URL1 = ORIGIN + '/development-activity-reports.html?_ptxn=txn_first#billing';
   const claim = async (script, brokerage = BK) => { try { return await B.makeBillingReads(rpcWith(script).rpc).checkoutClaim(brokerage); } catch (e) { return e.constructor.name; } };
   ok(JSON.stringify(await claim({ billing_checkout_claim: okRows([{ outcome: 'CLAIMED' }]) })) === '{"outcome":"CLAIMED"}', '1t a free slot reads CLAIMED');
   ok(JSON.stringify(await claim({ billing_checkout_claim: okRows([{ outcome: 'BUSY' }]) })) === '{"outcome":"BUSY"}', '1u a slot a recent request holds reads BUSY');
@@ -122,9 +143,11 @@ function mdeps(over = {}) {
     authenticate: rec('authenticate', over.authenticate ?? (async () => ({ email: 'owner@example.test', id: UID }))),
     isAdmin: rec('isAdmin', over.isAdmin ?? (async () => false)),
     usageOf: rec('usageOf', over.usageOf ?? (async () => usage())),
+    accountTypeOf: rec('accountTypeOf', over.accountTypeOf ?? (async () => 'brokerage')),
+    clientConfig: () => ('clientConfig' in over ? over.clientConfig : { environment: 'sandbox', token: 'test_0123456789abcdef' }),
     configured: () => over.configured ?? true,
     checkoutEnabled: () => over.checkoutEnabled ?? true,
-    createCheckout: rec('createCheckout', over.createCheckout ?? (async () => 'https://homesignal.lemonsqueezy.com/checkout/custom/abc')),
+    createCheckout: rec('createCheckout', over.createCheckout ?? (async () => ORIGIN + '/development-activity-reports.html?_ptxn=txn_abc#billing')),
     checkoutClaim: rec('checkoutClaim', over.checkoutClaim ?? (async () => ({ outcome: 'CLAIMED' }))),
     checkoutRelease: rec('checkoutRelease', over.checkoutRelease ?? (async () => undefined)),
   };
@@ -159,11 +182,11 @@ const named = (name) => mcalls.filter((c) => c[0] === name);
   r = await ask(mdeps(), null, { raw: 'not json' });
   ok(r.status === 400 && named('usageOf').length === 0, '2h a body that is not JSON is 400');
   let bad400 = 0;
-  for (const body of [{}, { action: 'refund' }, { action: 5 }, { action: 'status', plan: 'x' }, { action: 'checkout', brokerage_id: BK }, { action: 'checkout', url: 'https://evil.example' }, [], 'x', { action: '__proto__' }, { action: 'constructor' }]) {
+  for (const body of [{}, { action: 'refund' }, { action: 5 }, { action: 'status', plan: 'x' }, { action: 'checkout', brokerage_id: BK }, { action: 'checkout', url: 'https://evil.example' }, { action: 'checkout', offer: 'gold' }, { action: 'checkout', offer: 5 }, { action: 'status', offer: 'partner' }, [], 'x', { action: '__proto__' }, { action: 'constructor' }]) {
     r = await ask(mdeps(), body);
     if (r.status === 400 && named('usageOf').length === 0 && named('createCheckout').length === 0) bad400++;
   }
-  ok(bad400 === 10, '2i an unknown action, an unknown field (the page cannot name a brokerage or a url) or a body that is not an object is 400 before anything is read (ten bodies)', bad400);
+  ok(bad400 === 13, '2i an unknown action, an unknown field (the page cannot name a brokerage or a url), an offer outside the closed list, or a body that is not an object is 400 before anything is read (thirteen bodies)', bad400);
 }
 {
   // status
@@ -171,6 +194,17 @@ const named = (name) => mcalls.filter((c) => c[0] === name);
   let r = await stat(usage({ role: 'owner', state: 'none' }));
   ok(r.status === 200 && r.json.status === 'OK' && r.json.checkout === 'available' && r.json.plan.state === 'none' && r.json.plan.role === 'owner', '2j an owner with no plan may start a checkout');
   ok(!r.text.includes(BK) && !r.text.includes(UID) && !r.text.includes(SECRET) && !r.text.includes(API_KEY), '2k the answer carries neither the brokerage id, the user id nor a secret');
+  ok(JSON.stringify(r.json.offers) === '["professional"]' && r.json.client && r.json.client.token === 'test_0123456789abcdef' && r.json.client.environment === 'sandbox',
+    '2k2 a brokerage owner is offered Professional only, and is given the PUBLIC client token for the checkout script');
+  r = await ask(mdeps({ usageOf: async () => usage({ role: 'owner', state: 'none' }), accountTypeOf: async () => 'individual' }), { action: 'status' });
+  ok(JSON.stringify(r.json.offers) === '["professional","partner"]', '2k3 an INDIVIDUAL agent\'s account is offered Professional and the Private Partner Offer');
+  r = await ask(mdeps({ usageOf: async () => usage({ role: 'owner', state: 'none' }), accountTypeOf: async () => 'individual', configured: false }), { action: 'status' });
+  ok(JSON.stringify(r.json.offers) === '[]' && r.json.client === null && r.json.checkout === 'not_set_up', '2k4 nothing is offered, and no client token is sent, while checkout is not available');
+  r = await ask(mdeps({ usageOf: async () => usage({ role: 'owner', state: 'none' }), clientConfig: null }), { action: 'status' });
+  ok(r.json.client === null, '2k5 no client token configured is null, not an empty token');
+  r = await ask(mdeps({ usageOf: async () => usage({ role: 'owner', state: 'expired', access_ends_at: '2026-06-01T00:00:00+00:00' }), accountTypeOf: async () => 'individual' }), { action: 'status' });
+  ok(r.json.checkout === 'available' && r.json.plan.state === 'expired' && r.json.plan.access_ends_at === '2026-06-01T00:00:00+00:00' && JSON.stringify(r.json.offers) === '["professional","partner"]',
+    '2k6 an individual whose six months ran out reads EXPIRED, may buy again, and is told when access ended');
   r = await stat(usage({ role: 'agent', state: 'none' }));
   ok(r.json.checkout === 'not_owner' && r.json.plan.role === 'agent', '2l an agent is told they are an agent and that checkout is the owner\'s');
   r = await stat(PAID);
@@ -197,8 +231,16 @@ const named = (name) => mcalls.filter((c) => c[0] === name);
   // checkout
   const co = async (over, body = { action: 'checkout' }) => ask(mdeps(over), body);
   let r = await co({});
-  ok(r.status === 200 && r.json.status === 'OK' && r.json.url === 'https://homesignal.lemonsqueezy.com/checkout/custom/abc' && JSON.stringify(Object.keys(r.json).sort()) === '["status","url"]'
-     && named('createCheckout').length === 1 && named('createCheckout')[0][1] === BK, '2u an owner gets the processor\'s checkout address, made for THEIR brokerage (read from the database, never from the request)');
+  ok(r.status === 200 && r.json.status === 'OK' && r.json.url === ORIGIN + '/development-activity-reports.html?_ptxn=txn_abc#billing' && JSON.stringify(Object.keys(r.json).sort()) === '["status","url"]'
+     && named('createCheckout').length === 1 && named('createCheckout')[0][1] === BK && named('createCheckout')[0][2] === 'professional', '2u an owner gets the processor\'s checkout address, made for THEIR brokerage (read from the database, never from the request); no offer named means Professional');
+  r = await co({ usageOf: async () => usage({ role: 'owner' }), accountTypeOf: async () => 'individual' }, { action: 'checkout', offer: 'partner' });
+  ok(r.status === 200 && named('createCheckout').length === 1 && named('createCheckout')[0][2] === 'partner', '2u2 an individual owner may start the one-time Private Partner checkout');
+  r = await co({ usageOf: async () => usage({ role: 'owner' }), accountTypeOf: async () => 'brokerage' }, { action: 'checkout', offer: 'partner' });
+  ok(r.status === 403 && r.json.detail === 'individual_only' && named('createCheckout').length === 0 && named('checkoutClaim').length === 0, '2u3 the Private Partner Offer is NOT for a brokerage account: 403 individual_only, the slot is never claimed and Paddle is never asked');
+  r = await co({ usageOf: async () => usage({ role: 'owner', state: 'expired', access_ends_at: '2026-06-01T00:00:00+00:00' }), accountTypeOf: async () => 'individual' }, { action: 'checkout', offer: 'partner' });
+  ok(r.status === 200 && named('createCheckout').length === 1, '2u4 an individual whose grant has run out may buy a new one (a new transaction, a new six months)');
+  r = await co({ usageOf: async () => usage({ role: 'owner', state: 'paid', access_ends_at: '2027-05-04T12:00:00+00:00' }), accountTypeOf: async () => 'individual' }, { action: 'checkout', offer: 'partner' });
+  ok(r.status === 409 && r.json.error === 'already_paid' && named('createCheckout').length === 0, '2u5 while a grant is still running a second one is refused (no stacking by accident)');
   r = await co({ usageOf: async () => usage({ role: 'agent' }) });
   ok(r.status === 403 && r.json.detail === 'owner_only' && named('createCheckout').length === 0, '2v an agent cannot start a checkout (403 owner_only) and the processor is never asked');
   r = await co({ usageOf: async () => PAID });
@@ -235,7 +277,7 @@ const named = (name) => mcalls.filter((c) => c[0] === name);
   r = await co({ createCheckout: async () => { throw new MH.CheckoutUnavailable('http 500'); }, checkoutRelease: async () => { throw new Svc.DataUnavailable('x'); } });
   ok(r.status === 502 && r.json.error === 'checkout_unavailable', '2ai and a failed release does not hide the real answer (the slot frees itself in ten minutes)');
   r = await co({});
-  ok(r.status === 200 && r.json.url === 'https://homesignal.lemonsqueezy.com/checkout/custom/abc' && JSON.stringify(Object.keys(r.json).sort()) === '["status","url"]', '2aj a made checkout is handed to the owner, as before');
+  ok(r.status === 200 && r.json.url === ORIGIN + '/development-activity-reports.html?_ptxn=txn_abc#billing' && JSON.stringify(Object.keys(r.json).sort()) === '["status","url"]', '2aj a made checkout is handed to the owner, as before');
   r = await co({ checkoutClaim: async () => ({ outcome: 'BUSY' }), usageOf: async () => PAID });
   ok(r.status === 409 && r.json.error === 'already_paid' && named('checkoutClaim').length === 0, '2ak a paid brokerage never reaches the slot at all (the plan check comes first)');
   for (const [who, over] of [['an agent', { usageOf: async () => usage({ role: 'agent' }) }], ['processor not set up', { configured: false }]]) {
@@ -244,8 +286,9 @@ const named = (name) => mcalls.filter((c) => c[0] === name);
   }
   ok(MH.checkoutAvailability(usage({ role: 'owner', state: 'paid' }), true, true) === 'already_paid' && MH.checkoutAvailability(usage({ role: 'agent', state: 'paid' }), true, true) === 'not_owner'
      && MH.checkoutAvailability(usage({ role: 'owner' }), false, true) === 'not_set_up' && MH.checkoutAvailability(usage({ role: 'owner' }), true, true) === 'available'
-     && MH.checkoutAvailability(usage({ role: 'owner', state: 'past_due' }), true, true) === 'subscription_exists' && MH.checkoutAvailability(usage({ role: 'owner', state: 'canceled' }), false, true) === 'not_set_up',
-    '2ac the ONE reading of who may start a checkout, answered directly for its five outcomes');
+     && MH.checkoutAvailability(usage({ role: 'owner', state: 'past_due' }), true, true) === 'subscription_exists' && MH.checkoutAvailability(usage({ role: 'owner', state: 'canceled' }), false, true) === 'not_set_up'
+     && MH.checkoutAvailability(usage({ role: 'owner', state: 'expired' }), true, true) === 'available',
+    '2ac the ONE reading of who may start a checkout, answered directly for its outcomes (an expired grant may buy again)');
 }
 
 // ---- 3. the webhook ---------------------------------------------------------------------------------------------------------------------------
@@ -254,15 +297,28 @@ const goodApplied = { outcome: 'RECORDED', bound: true, state: 'paid', is_latest
 function wdeps(over = {}) {
   return {
     secret: over.secret ?? SECRET,
-    variantId: over.variantId ?? VARIANT,
+    prices: over.prices ?? PRICES,
+    livemode: over.livemode ?? true,
+    now: () => over.now ?? NOW,
     applyEvent: async (...a) => { wcalls.push(a); if (over.applyEvent) return over.applyEvent(...a); return goodApplied; },
   };
 }
 async function body(over = {}) {
   const bind = await L.checkoutBinding(SECRET, BK);
   const p = {
-    meta: { event_name: 'subscription_created', test_mode: false, custom_data: { brokerage_id: BK, bind } },
-    data: { type: 'subscriptions', id: '987654', attributes: { product_id: 4242, variant_id: 123456, status: 'active', user_email: 'pat.payer@example.test', updated_at: '2026-10-04T12:00:05.000000Z', test_mode: false } },
+    event_id: 'evt_01hv8x8d6dxy3k7h2m0aaaaaaa', event_type: 'subscription.created', occurred_at: '2026-10-04T12:00:05.123456Z',
+    data: { id: 'sub_01hv8x8d6dxy3k7h2m0bbbbbbb', status: 'active', customer_email: 'pat.payer@example.test', custom_data: { brokerage_id: BK, bind },
+            items: [{ price: { id: PRO, product_id: 'pro_01m7d6ke8gd7beyc6p68kvhxy3' } }] },
+  };
+  if (over.mutate) over.mutate(p);
+  return JSON.stringify(p);
+}
+async function partnerBody(over = {}) {
+  const bind = await L.checkoutBinding(SECRET, BK);
+  const p = {
+    event_id: 'evt_01hv8x8d6dxy3k7h2m0ccccccc', event_type: 'transaction.completed', occurred_at: '2026-10-04T12:00:05Z',
+    data: { id: 'txn_01hv8x8d6dxy3k7h2m0ddddddd', status: 'completed', subscription_id: null, customer_email: 'pat.payer@example.test', custom_data: { brokerage_id: BK, bind },
+            items: [{ price_id: PARTNER, price: { id: PARTNER, product_id: 'pro_01m7d6q09cv0d8hmbbpjv1qraz' } }] },
   };
   if (over.mutate) over.mutate(p);
   return JSON.stringify(p);
@@ -270,7 +326,7 @@ async function body(over = {}) {
 async function hook(d, raw, { sig, method = 'POST', headers = {} } = {}) {
   wcalls.length = 0;
   const h = { 'content-type': 'application/json', ...headers };
-  if (sig !== null) h['x-signature'] = sig === undefined ? hmac(SECRET, raw ?? '') : sig;
+  if (sig !== null) h['paddle-signature'] = sig === undefined ? pSig(SECRET, raw ?? '') : sig;
   const init = { method, headers: h };
   if (method === 'POST') init.body = raw;
   const res = await WH.makeHandler(d)(new Request('https://x/functions/v1/development-activity-billing-webhook', init));
@@ -283,10 +339,10 @@ async function hook(d, raw, { sig, method = 'POST', headers = {} } = {}) {
   ok(r.status === 200 && r.json.configured === true && r.cache === 'no-store' && !r.text.includes(SECRET), '3a the capability says whether it is configured (a boolean) and never a value');
   r = await hook(wdeps({ secret: '' }), undefined, { method: 'GET' });
   ok(r.json.configured === false, '3b it says so when the secret is missing');
-  r = await hook(wdeps({ variantId: '' }), undefined, { method: 'GET' });
-  ok(r.json.configured === false, '3c and when the variant is missing');
-  r = await hook(wdeps({ variantId: 'abc' }), undefined, { method: 'GET' });
-  ok(r.json.configured === false, '3d and when the variant is not a number');
+  r = await hook(wdeps({ prices: { professional: '', partner: PARTNER } }), undefined, { method: 'GET' });
+  ok(r.json.configured === false, '3c and when the Professional price is missing');
+  r = await hook(wdeps({ prices: { professional: PRO, partner: 'abc' } }), undefined, { method: 'GET' });
+  ok(r.json.configured === false, '3d and when the Private Partner price is not a Paddle price id');
   r = await hook(wdeps(), undefined, { method: 'OPTIONS' });
   ok(r.status === 204 && r.acao === null, '3e a browser preflight is answered with nothing and no cross-origin grant: no page ever calls this');
   r = await hook(wdeps(), '{}', { method: 'PUT' });
@@ -295,8 +351,8 @@ async function hook(d, raw, { sig, method = 'POST', headers = {} } = {}) {
 {
   // not set up: every request refused, and the body is never trusted
   const raw = await body();
-  for (const [label, over] of [['no secret', { secret: '' }], ['no variant', { variantId: '' }], ['a non-numeric variant', { variantId: 'x' }]]) {
-    const r = await hook(wdeps(over), raw, { sig: hmac(over.secret === '' ? '' : SECRET, raw) });
+  for (const [label, over] of [['no secret', { secret: '' }], ['no Professional price', { prices: { professional: '', partner: PARTNER } }], ['a malformed Partner price', { prices: { professional: PRO, partner: 'x' } }]]) {
+    const r = await hook(wdeps(over), raw, { sig: pSig(over.secret === '' ? '' : SECRET, raw) });
     ok(r.status === 503 && r.json.error === 'not_set_up' && wcalls.length === 0, '3g with ' + label + ' EVERY request is refused 503, even one signed under the empty secret, and nothing is recorded');
   }
 }
@@ -304,47 +360,64 @@ async function hook(d, raw, { sig, method = 'POST', headers = {} } = {}) {
   const raw = await body();
   let r = await hook(wdeps(), raw, { sig: null });
   ok(r.status === 401 && r.json.error === 'unauthorized' && wcalls.length === 0, '3h no signature header: 401, nothing recorded');
-  r = await hook(wdeps(), raw, { sig: 'f'.repeat(64) });
+  r = await hook(wdeps(), raw, { sig: 'ts=' + NOW + ';h1=' + 'f'.repeat(64) });
   ok(r.status === 401 && wcalls.length === 0, '3i a wrong signature: 401');
-  r = await hook(wdeps(), raw, { sig: hmac('whsec_other', raw) });
+  r = await hook(wdeps(), raw, { sig: pSig('pdl_ntfset_other', raw) });
   ok(r.status === 401 && wcalls.length === 0, '3j a signature made under another secret: 401');
-  r = await hook(wdeps(), raw + ' ', { sig: hmac(SECRET, raw) });
+  r = await hook(wdeps(), raw + ' ', { sig: pSig(SECRET, raw) });
   ok(r.status === 401 && wcalls.length === 0, '3k a body changed after it was signed (one trailing space): 401');
-  r = await hook(wdeps(), JSON.stringify(JSON.parse(raw), null, 2), { sig: hmac(SECRET, raw) });
+  r = await hook(wdeps(), JSON.stringify(JSON.parse(raw), null, 2), { sig: pSig(SECRET, raw) });
   ok(r.status === 401 && wcalls.length === 0, '3l the RAW bytes are what is signed: the same JSON re-serialised is refused');
-  r = await hook(wdeps(), raw, { sig: hmac(SECRET, raw).toUpperCase() });
+  r = await hook(wdeps(), raw, { sig: 'ts=' + NOW + ';h1=' + hmac(SECRET, NOW + ':' + raw).toUpperCase() });
   ok(r.status === 200, '3m an upper-case hex signature verifies');
   r = await hook(wdeps(), 'x'.repeat(WH.MAX_BODY_BYTES + 1));
   ok(r.status === 413 && wcalls.length === 0, '3n a body larger than any real event is 413, before it is hashed');
   r = await hook(wdeps(), raw, { headers: { 'content-length': String(WH.MAX_BODY_BYTES + 1) } });
   ok(r.status === 413 && wcalls.length === 0, '3o a declared length over the cap is refused 413 before the body is read');
+  r = await hook(wdeps(), raw, { sig: pSig(SECRET, raw, NOW - 3600) });
+  ok(r.status === 401 && wcalls.length === 0, '3o2 a correctly signed webhook an hour old is refused 401 (a replay)');
+  r = await hook(wdeps(), raw, { sig: pSig(SECRET, raw, NOW + 3600) });
+  ok(r.status === 401 && wcalls.length === 0, '3o3 and one stamped an hour ahead (a wrong clock, or a forgery) is refused too');
+  r = await hook(wdeps(), raw, { sig: 'h1=' + hmac(SECRET, raw) });
+  ok(r.status === 401 && wcalls.length === 0, '3o4 a Lemon-style bare signature (no timestamp) is refused: the old header shape verifies nothing');
 }
 {
   // a verified body
   let r = await hook(wdeps(), await body());
   ok(r.status === 200 && r.json.status === 'OK' && r.json.outcome === 'RECORDED' && wcalls.length === 1 && wcalls[0][0] === BK
-     && wcalls[0][1].processor === 'lemonsqueezy' && wcalls[0][1].subscription_ref === '987654' && wcalls[0][1].livemode === true && wcalls[0][1].variant_ref === '123456',
-    '3p a verified subscription event is recorded for the brokerage the SIGNED checkout named, once');
-  ok(!r.text.includes(BK) && !r.text.includes('987654') && !r.text.includes('pat.payer') && JSON.stringify(Object.keys(r.json).sort()) === '["outcome","status"]',
+     && wcalls[0][1].processor === 'paddle' && wcalls[0][1].subscription_ref === 'sub_01hv8x8d6dxy3k7h2m0bbbbbbb' && wcalls[0][1].livemode === true && wcalls[0][1].variant_ref === PRO && wcalls[0][2] === null,
+    '3p a verified subscription event is recorded for the brokerage the SIGNED checkout named, once, with NO fixed access length');
+  ok(!r.text.includes(BK) && !r.text.includes('sub_01hv') && !r.text.includes('pat.payer') && JSON.stringify(Object.keys(r.json).sort()) === '["outcome","status"]',
     '3q the answer is a word: it carries no brokerage id, subscription id or payer detail');
-  ok(!JSON.stringify(wcalls).includes('pat.payer') && !JSON.stringify(wcalls).includes('user_email'), '3r nothing personal reaches the recorder, though the body held an email');
+  ok(!JSON.stringify(wcalls).includes('pat.payer') && !JSON.stringify(wcalls).includes('customer_email'), '3r nothing personal reaches the recorder, though the body held an email');
   r = await hook(wdeps({ applyEvent: async () => ({ ...goodApplied, outcome: 'DUPLICATE', bound: false }) }), await body());
-  ok(r.status === 200 && r.json.outcome === 'DUPLICATE', '3s a retried delivery is 200 DUPLICATE (the processor stops retrying)');
-  r = await hook(wdeps(), await body({ mutate: (p) => { p.meta.event_name = 'order_created'; } }));
-  ok(r.status === 200 && r.json.status === 'IGNORED' && r.json.reason === 'event_name' && wcalls.length === 0, '3t an order event is acknowledged 200 and recorded nowhere');
-  r = await hook(wdeps(), await body({ mutate: (p) => { delete p.meta.custom_data; } }));
+  ok(r.status === 200 && r.json.outcome === 'DUPLICATE', '3s a retried delivery is 200 DUPLICATE (Paddle stops retrying)');
+  r = await hook(wdeps(), await body({ mutate: (p) => { p.event_type = 'address.created'; } }));
+  ok(r.status === 200 && r.json.status === 'IGNORED' && r.json.reason === 'event_type' && wcalls.length === 0, '3t an event type this build does not use is acknowledged 200 and recorded nowhere');
+  r = await hook(wdeps(), await body({ mutate: (p) => { delete p.data.custom_data; } }));
   ok(r.status === 200 && r.json.status === 'IGNORED' && r.json.reason === 'no_binding' && wcalls.length === 0, '3u a subscription this server did not make a checkout for (no custom data) is acknowledged and recorded nowhere');
-  r = await hook(wdeps(), await body({ mutate: (p) => { p.meta.custom_data.bind = 'a'.repeat(64); } }));
+  r = await hook(wdeps(), await body({ mutate: (p) => { p.data.custom_data.bind = 'a'.repeat(64); } }));
   ok(r.status === 200 && r.json.reason === 'bad_binding' && wcalls.length === 0, '3v a checkout carrying a forged brokerage signature is acknowledged and recorded nowhere (a buyer cannot bind to an account)');
-  r = await hook(wdeps(), await body({ mutate: (p) => { p.data.attributes.variant_id = 7; } }));
-  ok(r.status === 200 && r.json.reason === 'variant' && wcalls.length === 0, '3w another product\'s subscription is acknowledged and recorded nowhere');
-  r = await hook(wdeps(), await body({ mutate: (p) => { delete p.data.attributes.status; } }));
+  r = await hook(wdeps(), await body({ mutate: (p) => { p.data.items = [{ price: { id: 'pri_01zzzzzzzzzzzzzzzzzzzzzzzz' } }]; } }));
+  ok(r.status === 200 && r.json.reason === 'price' && wcalls.length === 0, '3w another product\'s subscription is acknowledged and recorded nowhere');
+  r = await hook(wdeps(), await body({ mutate: (p) => { delete p.data.status; } }));
   ok(r.status === 422 && r.json.error === 'invalid' && r.json.reason === 'status' && wcalls.length === 0, '3x a subscription of ours that is not shaped as expected is 422 (loud, so a changed payload is noticed)');
   const junk = 'not json at all';
   r = await hook(wdeps(), junk);
   ok(r.status === 422 && r.json.reason === 'json' && wcalls.length === 0, '3y a correctly signed body that is not JSON is 422');
-  r = await hook(wdeps(), await body({ mutate: (p) => { p.meta.test_mode = true; p.data.attributes.test_mode = true; } }));
-  ok(r.status === 200 && wcalls.length === 1 && wcalls[0][1].livemode === false, '3z a TEST event is recorded as livemode false');
+  r = await hook(wdeps({ livemode: false }), await body());
+  ok(r.status === 200 && wcalls.length === 1 && wcalls[0][1].livemode === false, '3z a SANDBOX environment records livemode false (the environment is configuration, not payload)');
+  // the one-time Private Partner payment
+  r = await hook(wdeps(), await partnerBody());
+  ok(r.status === 200 && r.json.status === 'OK' && wcalls.length === 1 && wcalls[0][0] === BK && wcalls[0][1].subscription_ref === 'txn_01hv8x8d6dxy3k7h2m0ddddddd'
+     && wcalls[0][1].processor_status === 'completed' && wcalls[0][1].variant_ref === PARTNER && wcalls[0][2] === 6,
+    '3z2 a paid Private Partner transaction is recorded for the brokerage the SIGNED checkout named, bound for SIX months');
+  r = await hook(wdeps(), await partnerBody({ mutate: (p) => { p.data.custom_data.access_months = 120; } }));
+  ok(r.status === 200 && wcalls.length === 1 && wcalls[0][2] === 6 && !JSON.stringify(wcalls[0][1]).includes('120'), '3z3 a payload cannot choose the access length: the price decides it');
+  r = await hook(wdeps(), await partnerBody({ mutate: (p) => { p.data.subscription_id = 'sub_01hv8x8d6dxy3k7h2m0bbbbbbb'; } }));
+  ok(r.status === 200 && r.json.reason === 'subscription_transaction' && wcalls.length === 0, '3z4 a subscription\'s own renewal transaction is not a grant');
+  r = await hook(wdeps(), await partnerBody({ mutate: (p) => { p.data.status = 'billed'; } }));
+  ok(r.status === 422 && r.json.reason === 'status' && wcalls.length === 0, '3z5 a one-time payment that is not completed is 422, never a grant');
 }
 {
   const err = (e) => wdeps({ applyEvent: async () => { throw e; } });
@@ -355,9 +428,11 @@ async function hook(d, raw, { sig, method = 'POST', headers = {} } = {}) {
   r = await hook(err(new B.EventRefused('x')), await body());
   ok(r.status === 422 && r.json.reason === 'event_refused', '3ac an event the ledger refuses is 422');
   r = await hook(err(new Svc.DataUnavailable('db')), await body());
-  ok(r.status === 503 && r.json.error === 'data_unavailable', '3ad a database that cannot be reached is 503, so the processor retries');
+  ok(r.status === 503 && r.json.error === 'data_unavailable', '3ad a database that cannot be reached is 503, so Paddle retries');
   r = await hook(err(new Error('boom ' + BK + ' ' + SECRET)), await body());
   ok(r.status === 500 && r.json.error === 'internal' && !r.text.includes(BK) && !r.text.includes(SECRET) && !r.text.includes('boom'), '3ae any other failure is 500 and says nothing about why');
+  r = await hook(err(new B.OfferNotForAccount('x')), await partnerBody());
+  ok(r.status === 422 && r.json.reason === 'offer_not_for_account' && !r.text.includes(BK), '3af a Private Partner payment for a brokerage account is refused 422 (loud: money moved and no access was granted, so a person must look)');
 }
 
 // ---- 4. the real data layers ------------------------------------------------------------------------------------------------------------------
@@ -369,62 +444,86 @@ async function hook(d, raw, { sig, method = 'POST', headers = {} } = {}) {
     return new Response('{}', { status: 404 });
   };
   const json = (v, status = 200) => new Response(JSON.stringify(v), { status, headers: { 'content-type': 'application/json' } });
-  const BILL = { apiKey: API_KEY, storeId: '4321', variantId: VARIANT, secret: SECRET, testMode: false };
+  const BILL = { apiKey: API_KEY, secret: SECRET, prices: PRICES, environment: 'production', clientToken: 'live_0123456789abcdef' };
 
   // webhook data
   reqs.length = 0;
-  let d = WD.makeDeps({ url: BASE, serviceKey: SERVICE, secret: SECRET, variantId: VARIANT }, mkFetch([[/rpc\/billing_event_apply$/, () => json([{ outcome: 'RECORDED', event_id: 9, is_latest: true, bound: true, state: 'paid' }])]]));
-  const EVENT = { processor: 'lemonsqueezy', idempotency_key: 'k', subscription_ref: '1', event_name: 'subscription_created', processor_status: 'active', occurred_at: '2026-10-04T12:00:00Z', variant_ref: VARIANT, livemode: true };
-  const out = await d.applyEvent(BK, EVENT);
-  ok(out.outcome === 'RECORDED' && d.secret === SECRET && d.variantId === VARIANT, '4a the webhook\'s data layer carries the secret and the variant and records through applyEvent');
+  let d = WD.makeDeps({ url: BASE, serviceKey: SERVICE, secret: SECRET, prices: PRICES, livemode: true }, mkFetch([[/rpc\/billing_event_apply$/, () => json([{ outcome: 'RECORDED', event_id: 9, is_latest: true, bound: true, state: 'paid' }])]]));
+  const EVENT = { processor: 'paddle', idempotency_key: 'evt_k', subscription_ref: 'sub_1', event_name: 'subscription.created', processor_status: 'active', occurred_at: '2026-10-04T12:00:00Z', variant_ref: PRO, livemode: true };
+  const out = await d.applyEvent(BK, EVENT, null);
+  ok(out.outcome === 'RECORDED' && d.secret === SECRET && d.prices.partner === PARTNER && d.livemode === true && Math.abs(d.now() - Date.now() / 1000) < 5, '4a the webhook\'s data layer carries the secret, the prices, the environment and a real clock, and records through applyEvent');
   ok(reqs.length === 1 && reqs[0].url === BASE + '/rest/v1/rpc/billing_event_apply' && reqs[0].init.method === 'POST' && reqs[0].init.headers.apikey === SERVICE && reqs[0].init.headers.Authorization === 'Bearer ' + SERVICE
-     && JSON.parse(reqs[0].init.body).p_brokerage === BK && JSON.parse(reqs[0].init.body).p_event.subscription_ref === '1', '4b exactly ONE request: the project\'s own database function, as the service, with the brokerage and the event');
+     && JSON.parse(reqs[0].init.body).p_brokerage === BK && JSON.parse(reqs[0].init.body).p_event.subscription_ref === 'sub_1' && JSON.parse(reqs[0].init.body).p_access_months === null,
+    '4b exactly ONE request: the project\'s own database function, as the service, with the brokerage, the event and the access length');
   reqs.length = 0;
-  d = WD.makeDeps({ url: BASE, serviceKey: SERVICE, secret: SECRET, variantId: VARIANT }, mkFetch([[/rpc\/billing_event_apply$/, () => json({ message: 'BINDING_CONFLICT' }, 400)]]));
-  let e = 'none'; try { await d.applyEvent(BK, EVENT); } catch (x) { e = x.constructor.name; }
+  await d.applyEvent(BK, EVENT, 6);
+  ok(JSON.parse(reqs[0].init.body).p_access_months === 6, '4b2 a grant\'s six months travel in the same one request');
+  reqs.length = 0;
+  d = WD.makeDeps({ url: BASE, serviceKey: SERVICE, secret: SECRET, prices: PRICES, livemode: true }, mkFetch([[/rpc\/billing_event_apply$/, () => json({ message: 'BINDING_CONFLICT' }, 400)]]));
+  let e = 'none'; try { await d.applyEvent(BK, EVENT, null); } catch (x) { e = x.constructor.name; }
   ok(e === 'BindingConflict', '4c a database refusal travels through the real layer as its named error', e);
-  d = WD.makeDeps({ url: BASE, serviceKey: SERVICE, secret: SECRET, variantId: VARIANT }, mkFetch([[/rpc\/billing_event_apply$/, () => json({ message: 'x' }, 503)]]));
-  e = 'none'; try { await d.applyEvent(BK, EVENT); } catch (x) { e = x.constructor.name; }
-  ok(e === 'DataUnavailable', '4d a 5xx is DataUnavailable (the processor retries)', e);
+  d = WD.makeDeps({ url: BASE, serviceKey: SERVICE, secret: SECRET, prices: PRICES, livemode: true }, mkFetch([[/rpc\/billing_event_apply$/, () => json({ message: 'x' }, 503)]]));
+  e = 'none'; try { await d.applyEvent(BK, EVENT, null); } catch (x) { e = x.constructor.name; }
+  ok(e === 'DataUnavailable', '4d a 5xx is DataUnavailable (Paddle retries)', e);
 
   // manage-billing data
   reqs.length = 0;
-  const CHECKOUT_OK = { data: { type: 'checkouts', id: 'c', attributes: { url: 'https://homesignal.lemonsqueezy.com/checkout/custom/abc?signature=1' } } };
-  d = MD.makeDeps({ url: BASE, serviceKey: SERVICE, billing: BILL }, mkFetch([[/api\.lemonsqueezy\.com\/v1\/checkouts$/, () => json(CHECKOUT_OK, 201)], [/rpc\/billing_usage$/, () => json([PAID])]]));
+  const CHECKOUT_URL = ORIGIN + '/development-activity-reports.html?_ptxn=txn_01hv8x8d6dxy3k7h2m0ddddddd#billing';
+  const CHECKOUT_OK = { data: { id: 'txn_1', status: 'draft', checkout: { url: CHECKOUT_URL } } };
+  d = MD.makeDeps({ url: BASE, serviceKey: SERVICE, billing: BILL }, mkFetch([[/api\.paddle\.com\/transactions$/, () => json(CHECKOUT_OK, 201)], [/rpc\/billing_usage$/, () => json([PAID])]]));
   ok(d.configured() === true && MD.isConfigured(BILL) === true, '4e a complete configuration is configured');
-  const url = await d.createCheckout(BK);
-  ok(url === 'https://homesignal.lemonsqueezy.com/checkout/custom/abc?signature=1' && reqs.length === 1, '4f the checkout is ONE request to the processor and returns its address');
+  const url = await d.createCheckout(BK, 'professional');
+  ok(url === CHECKOUT_URL && reqs.length === 1, '4f the checkout is ONE request to Paddle and returns its address');
   const sent = reqs[0];
   const sbody = JSON.parse(sent.init.body);
-  ok(sent.url === 'https://api.lemonsqueezy.com/v1/checkouts' && sent.init.method === 'POST' && sent.init.headers.Authorization === 'Bearer ' + API_KEY
-     && sbody.data.attributes.checkout_data.custom.brokerage_id === BK && sbody.data.attributes.checkout_data.custom.bind === hmac(SECRET, 'hs-billing-checkout|' + BK)
-     && sbody.data.attributes.product_options.redirect_url === B.BILLING_PAGE,
-    '4g the request is the processor\'s endpoint, with the API key in the header, the brokerage and ITS signature in the custom data, and the billing page as the return address');
+  ok(sent.url === 'https://api.paddle.com/transactions' && sent.init.method === 'POST' && sent.init.headers.Authorization === 'Bearer ' + API_KEY
+     && sbody.custom_data.brokerage_id === BK && sbody.custom_data.bind === hmac(SECRET, 'hs-billing-checkout|' + BK)
+     && sbody.checkout.url === B.BILLING_PAGE && sbody.items.length === 1 && sbody.items[0].price_id === PRO && sbody.items[0].quantity === 1,
+    '4g the request is Paddle\'s endpoint, with the API key in the header, the brokerage and ITS signature in the custom data, the offer\'s price, and the billing page as the checkout page');
   ok(!sent.init.body.includes(API_KEY) && !sent.init.body.includes(SECRET) && !JSON.stringify(sent.init.headers).includes(SERVICE), '4h the API key is never in the body, the signing secret is never sent, and the project\'s service key never goes to the processor');
-  ok(B.BILLING_PAGE === ORIGIN + '/development-activity-reports.html#billing', '4i the return address is the billing section of the agent\'s page');
+  ok(B.BILLING_PAGE === ORIGIN + '/development-activity-reports.html#billing', '4i the checkout page is the billing section of the agent\'s page');
+  reqs.length = 0;
+  await d.createCheckout(BK, 'partner');
+  ok(JSON.parse(reqs[0].init.body).items[0].price_id === PARTNER, '4i2 the Private Partner offer asks Paddle for the one-time price');
+  const sandboxD = MD.makeDeps({ url: BASE, serviceKey: SERVICE, billing: { ...BILL, environment: 'sandbox' } }, mkFetch([[/transactions$/, () => json(CHECKOUT_OK, 201)]]));
+  reqs.length = 0; await sandboxD.createCheckout(BK, 'professional');
+  ok(reqs[0].url === 'https://sandbox-api.paddle.com/transactions', '4i3 a sandbox environment asks the sandbox host');
   let f = 0;
-  for (const routes of [[[/checkouts$/, () => json({ errors: [{ detail: 'x' }] }, 422)]], [[/checkouts$/, () => json({ data: { attributes: { url: 'https://evil.example/x' } } }, 201)]],
-    [[/checkouts$/, () => new Response('not json', { status: 201 })]], [[/checkouts$/, () => { throw new Error('network down ' + API_KEY); }]]]) {
+  for (const routes of [[[/transactions$/, () => json({ error: { detail: 'x' } }, 422)]], [[/transactions$/, () => json({ data: { checkout: { url: 'https://evil.example/x' } } }, 201)]],
+    [[/transactions$/, () => new Response('not json', { status: 201 })]], [[/transactions$/, () => { throw new Error('network down ' + API_KEY); }]]]) {
     const dd = MD.makeDeps({ url: BASE, serviceKey: SERVICE, billing: BILL }, mkFetch(routes));
-    try { await dd.createCheckout(BK); } catch (x) { if (x instanceof MH.CheckoutUnavailable && !String(x.message).includes(API_KEY)) f++; }
+    try { await dd.createCheckout(BK, 'professional'); } catch (x) { if (x instanceof MH.CheckoutUnavailable && !String(x.message).includes(API_KEY)) f++; }
   }
   ok(f === 4, '4j a refusal, a foreign address, an unreadable answer or a dead network is CheckoutUnavailable, and the API key is in none of the messages (four cases)', f);
   let readBody = false;
-  const dd = MD.makeDeps({ url: BASE, serviceKey: SERVICE, billing: BILL }, mkFetch([[/checkouts$/, () => ({ ok: false, status: 500, json: async () => { readBody = true; return {}; }, text: async () => { readBody = true; return ''; } })]]));
-  try { await dd.createCheckout(BK); } catch { /* expected */ }
-  ok(readBody === false, '4k when the processor refuses, its answer\'s body is never read (it can name the buyer)');
+  const dd = MD.makeDeps({ url: BASE, serviceKey: SERVICE, billing: BILL }, mkFetch([[/transactions$/, () => ({ ok: false, status: 500, json: async () => { readBody = true; return {}; }, text: async () => { readBody = true; return ''; } })]]));
+  try { await dd.createCheckout(BK, 'professional'); } catch { /* expected */ }
+  ok(readBody === false, '4k when Paddle refuses, its answer\'s body is never read (it can name the buyer)');
   let unconfigured = 0;
-  for (const b of [{ ...BILL, apiKey: '' }, { ...BILL, secret: '' }, { ...BILL, storeId: '' }, { ...BILL, variantId: 'abc' }, { ...BILL, storeId: 'x1' }]) {
+  for (const b of [{ ...BILL, apiKey: '' }, { ...BILL, secret: '' }, { ...BILL, environment: '' }, { ...BILL, environment: 'staging' }, { ...BILL, prices: { professional: 'abc', partner: PARTNER } }]) {
     const x = MD.makeDeps({ url: BASE, serviceKey: SERVICE, billing: b }, mkFetch([]));
     reqs.length = 0;
-    let threw = false; try { await x.createCheckout(BK); } catch (y) { threw = y instanceof MH.CheckoutUnavailable; }
+    let threw = false; try { await x.createCheckout(BK, 'professional'); } catch (y) { threw = y instanceof MH.CheckoutUnavailable; }
     if (x.configured() === false && MD.isConfigured(b) === false && threw && reqs.length === 0) unconfigured++;
   }
   ok(unconfigured === 5, '4l any missing or malformed setting is "not configured", and then NO request goes to the processor (five cases)', unconfigured);
+  {
+    const x = MD.makeDeps({ url: BASE, serviceKey: SERVICE, billing: { ...BILL, prices: { professional: PRO, partner: '' } } }, mkFetch([]));
+    reqs.length = 0;
+    let threw = false; try { await x.createCheckout(BK, 'partner'); } catch (y) { threw = y instanceof MH.CheckoutUnavailable; }
+    ok(x.configured() === true && threw && reqs.length === 0, '4l2 with the Private Partner price unset, Professional still works and the partner checkout is refused without a request');
+  }
+  ok(d.clientConfig() !== null && d.clientConfig().environment === 'production' && d.clientConfig().token === 'live_0123456789abcdef'
+     && MD.makeDeps({ url: BASE, serviceKey: SERVICE, billing: { ...BILL, clientToken: '' } }, mkFetch([])).clientConfig() === null
+     && MD.makeDeps({ url: BASE, serviceKey: SERVICE, billing: { ...BILL, clientToken: 'bad token!' } }, mkFetch([])).clientConfig() === null
+     && !JSON.stringify(d.clientConfig()).includes(API_KEY) && !JSON.stringify(d.clientConfig()).includes(SECRET),
+    '4l3 only the PUBLIC client token is ever handed on; a missing or malformed one is null, and the API key and secret are never in it');
   reqs.length = 0;
-  d = MD.makeDeps({ url: BASE, serviceKey: SERVICE, billing: BILL }, mkFetch([[/rpc\/billing_usage$/, () => json([PAID])]]));
+  d = MD.makeDeps({ url: BASE, serviceKey: SERVICE, billing: BILL }, mkFetch([[/rpc\/billing_usage$/, () => json([PAID])], [/rpc\/brokerage_account_type_of$/, () => json([{ account_type: 'individual', role: 'owner' }])]]));
   const got = await d.usageOf(UID);
   ok(got.state === 'paid' && reqs.length === 1 && reqs[0].url === BASE + '/rest/v1/rpc/billing_usage' && JSON.parse(reqs[0].init.body).p_user_id === UID, '4m the plan is read through the shared reader: one call to billing_usage, by user id');
+  reqs.length = 0;
+  ok(await d.accountTypeOf(UID) === 'individual' && reqs.length === 1 && reqs[0].url === BASE + '/rest/v1/rpc/brokerage_account_type_of' && JSON.parse(reqs[0].init.body).p_user_id === UID, '4n the account type is read through the shared reader by user id, in one call');
 }
 
 {

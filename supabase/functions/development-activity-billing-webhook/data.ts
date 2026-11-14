@@ -4,14 +4,15 @@
 // make. It decides nothing. Recording an event is ONE database function (public.billing_event_apply, through _shared/billing-reads.ts), which binds
 // the subscription to the brokerage and records the event in one transaction, through the payment ledger's one writer.
 import type { Deps } from './handler.ts';
+import type { OfferPrices } from '../_shared/paddle-billing.ts';
 import { makeServiceReads } from '../_shared/service-rest.ts';
 import type { FetchFn } from '../_shared/service-rest.ts';
 import { makeBillingReads } from '../_shared/billing-reads.ts';
 
-export type Config = { url: string; serviceKey: string; secret: string; variantId: string };
+export type Config = { url: string; serviceKey: string; secret: string; prices: OfferPrices; livemode: boolean };
 
 export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
   const { rpc } = makeServiceReads(cfg, fetchFn);
   const billing = makeBillingReads(rpc);
-  return { secret: cfg.secret, variantId: cfg.variantId, applyEvent: billing.applyEvent };
+  return { secret: cfg.secret, prices: cfg.prices, livemode: cfg.livemode, now: () => Math.floor(Date.now() / 1000), applyEvent: billing.applyEvent };
 }
