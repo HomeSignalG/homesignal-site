@@ -213,10 +213,10 @@ const linkingCust = [...content].filter(([f, body]) => f !== CUSTOMER_PAGE && f 
 // Founder, 2026-10-05: the header's Enterprise dropdown carries "My reports" so an agent can get back. That is the shell's link.
 // Founder, 2026-10-06 (superseded 2026-10-15, free-only): the landing page's Join link to the Billing card is removed with the price.
 ok(JSON.stringify(linkingCust) === JSON.stringify(['development-activity.html', 'partials/shell.html']),
-  'P6d the only staged files naming the customer page are the shell\'s "My reports" entry and the landing page\'s Join for $79/month link', linkingCust);
+  'P6d the only staged files naming the customer page are the shell\'s "My reports" entry and the landing page\'s Professional Get Started link', linkingCust);
 const landingLinks = (content.get('development-activity.html') || '').replace(/<!--[\s\S]*?-->/g, '').match(new RegExp(CUSTOMER_PAGE.replace('.', '\\.') + '[^"\'\\s<]*', 'g')) || [];
 // Founder, 2026-10-17: the Free column links the plain "My reports" page so a visitor knows where to start; the Join/Billing link stays gone.
-ok(landingLinks.length === 1 && landingLinks[0] === CUSTOMER_PAGE, 'P6e free-only (founder, 2026-10-15): the landing page names the customer page only through the plain "My reports" start link (2026-10-17); the Join/Billing link is gone', landingLinks);
+ok(landingLinks.length === 1 && landingLinks[0] === CUSTOMER_PAGE + '#billing', 'P6e founder, 2026-11-14: the landing page names the customer page only through Professional\'s Get Started link to the Billing card', landingLinks);
 ok(robots.includes(CUSTOMER_PAGE) && readRepo('scripts/stage_site.py').includes("'" + CUSTOMER_PAGE + "'"), 'P6e control: the same detector finds the page name where it really is');
 ok(!/service_role|SERVICE_ROLE/.test(cust) && /view: 'customer'/.test(cust) && !/'internal'/.test(cust),
   'P6f the customer page carries no service-role key and only ever asks for the customer view');
