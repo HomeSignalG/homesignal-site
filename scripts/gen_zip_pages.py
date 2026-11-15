@@ -1042,6 +1042,63 @@ APP_CSS_LINK = ('<link rel="stylesheet" href="/layout.css?v=c3f3f5d5">\n'
                 '<link rel="stylesheet" href="/app.css?v=aad7c2d4">\n')
 
 
+# The static pages (city, project, project list, guide and area hub) load no script, so they
+# carry the site's own header and footer as plain HTML, taken from partials/shell.html by
+# development_pages.site_chrome() (the dossier pages use the same copy). Share stays hidden
+# (no script to run it); Sign in is a plain link back to this page. Founder, 2026-11-15: the
+# guide page Google showed had no header, no footer and no page width.
+# Developer comments in partials/shell.html are left out: they carry dates and notes that are
+# not page content and would ship in ~26,000 pages.
+_NO_COMMENTS = re.compile(r"\s*<!--.*?-->", re.S)
+STATIC_HEADER = _NO_COMMENTS.sub("", dvp.SITE_HEADER)
+STATIC_FOOTER = _NO_COMMENTS.sub("", dvp.SITE_FOOTER.split('\n<div class="overlay"', 1)[0])
+STATIC_CSS_TEXT = (
+    dvp.CHROME_CSS
+    + 'body{margin:0;background:var(--bg,#f4f6f4)}\n'
+    '#hs-ssr{box-sizing:border-box;max-width:860px;margin:0 auto;padding:28px 20px 48px;'
+    'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;'
+    'font-size:16px;line-height:1.6;color:var(--ink,#16211c)}\n'
+    '#hs-ssr h1{font-size:30px;line-height:1.2;margin:4px 0 12px}\n'
+    '#hs-ssr h2{font-size:21px;line-height:1.3;margin:0 0 8px}\n'
+    '#hs-ssr h3{font-size:16px;margin:18px 0 6px}\n'
+    '#hs-ssr p{margin:0 0 10px}\n'
+    '#hs-ssr ul{margin:0 0 10px;padding-left:22px}\n'
+    '#hs-ssr li{margin:3px 0}\n'
+    '#hs-ssr a{color:var(--green-deep,#1f6b45)}\n'
+    '#hs-ssr .eyebrow{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;'
+    'color:var(--ink-3,#83918a);margin:0 0 6px}\n'
+    '#hs-ssr .zsec{margin:28px 0 0}\n'
+    '#hs-ssr .quiet{border:0;padding:0;margin:0;background:none;'
+    'font-size:13px;color:var(--ink-3,#83918a)}\n'
+    '#hs-ssr p.quiet{margin-top:28px}\n'
+    '#hs-ssr dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px;margin:0}\n'
+    '#hs-ssr dt{font-weight:600;color:var(--ink-2,#4a5a52)}#hs-ssr dd{margin:0}\n'
+    '#hs-ssr form label{font-weight:600;margin-right:6px}\n'
+    '#hs-ssr input{font:inherit;padding:8px 10px;border:1px solid var(--line,#e4e8e4);'
+    'width:9em;max-width:100%}\n'
+    '#hs-ssr button{font:inherit;font-weight:600;padding:8px 14px;border:0;'
+    'background:var(--green-deep,#1f6b45);color:#fff;cursor:pointer}\n'
+    '@media (max-width:620px){#hs-ssr{padding:20px 16px 40px}#hs-ssr h1{font-size:25px}}\n')
+# One shared, content-addressed file (not inlined): inlined, these rules added ~11 KB to each of
+# ~26,000 project pages and pushed the artifact past the Pages budget. guides/ is a generated tree.
+STATIC_CSS_PATH = f"guides/page.{hashlib.sha256(STATIC_CSS_TEXT.encode('utf-8')).hexdigest()[:8]}.css"
+STATIC_CSS = f'<link rel="stylesheet" href="/{STATIC_CSS_PATH}">\n'
+
+
+def write_static_css(out_dir):
+    path = os.path.join(out_dir, STATIC_CSS_PATH)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(STATIC_CSS_TEXT)
+
+
+def static_body(nav, path, body):
+    """<body> of a static page: the site header, the page, the site footer."""
+    header = STATIC_HEADER.replace(dvp.RETURN_TOKEN, urllib.parse.quote(path, safe=""), 1)
+    return (f'<body data-nav="{nav}">\n{header}\n{body}\n{STATIC_FOOTER}\n'
+            '</body>\n</html>\n')
+
+
 def coverage_panel(p):
     """The coverage panel for a ZIP with no Census-drawn area. Same words as shell.js
     HS.zipCoveragePanelHTML (both read lib/zip-coverage.json's copy); test/zip-coverage.test.mjs
@@ -1367,8 +1424,8 @@ def render_city(c, pages, built):
         '<meta http-equiv="Content-Security-Policy" content="default-src \'self\'; '
         "base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; "
         "style-src 'self' 'unsafe-inline'; script-src 'none'; form-action 'self'\">\n"
-        + APP_CSS_LINK + '</head>\n'
-        f'<body data-nav="city">\n{body}\n</body>\n</html>\n')
+        + APP_CSS_LINK + STATIC_CSS + '</head>\n'
+        + static_body("city", city_path(c), body))
 
 
 def build_cities(cities, pages, out_dir, built, state=None):
@@ -1411,7 +1468,7 @@ def _head(title, desc, canon, og_type="website", robots="index, follow", ld=None
         "base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; "
         "style-src 'self' 'unsafe-inline'; script-src 'none'; form-action 'self'\">\n"
         + (_ld_json(ld) if ld else "")
-        + APP_CSS_LINK + '</head>\n')
+        + APP_CSS_LINK + STATIC_CSS + '</head>\n')
 
 
 def _ld_json(obj):
@@ -1579,7 +1636,7 @@ def render_project(pr, pages, built, projects=None):
           f'<a href="{GUIDE_CHECK}">How to check proposed development near a house</a></nav>'
         + '</main>')
     return (_head(title, desc, canon, og_type="article", ld=ld)
-            + f'<body data-nav="project">\n{body}\n</body>\n</html>\n')
+            + static_body("project", pr["path"], body))
 
 
 def _history_section(pr):
@@ -1688,7 +1745,7 @@ def render_project_list(z, keys, projects, pages):
             + (f'<a href="{esc(map_path(z))}">Development map for {esc(z)}</a> · ' if p.get("map_summary") else "")
             + f'<a href="/">HomeSignal home</a></nav></main>')
     return (_head(title, desc, f"{BASE}{project_list_path(z)}", robots="index, follow")
-            + f'<body data-nav="project-list">\n{body}\n</body>\n</html>\n')
+            + static_body("project-list", project_list_path(z), body))
 
 
 def build_projects(projects, pages, out_dir, built, state=None):
@@ -1794,7 +1851,7 @@ def _page(title, desc, path, body_html, built):
             + '<nav class="zsec"><a href="/">HomeSignal home</a> · '
               '<a href="/how-it-works.html">How HomeSignal works</a></nav></main>')
     return (_head(title, desc, f"{BASE}{path}", og_type="article")
-            + f'<body data-nav="guide">\n{body}\n</body>\n</html>\n')
+            + static_body("guide", path, body))
 
 
 def render_guide_what(cities, built):
@@ -2709,6 +2766,7 @@ def main():
     fc_pages, fc_index = fcp.build(fc_claims, a.out, now_iso[:10], _head, state, base=BASE)
     fc_paths = fc_pages + [fc_index]
     n_land_links = dvp.write_land_index(dossiers, a.out)
+    write_static_css(a.out)
     guide_paths = build_guides(cities, projects, pages, a.out, now_iso[:10], state,
                                areas=load_focus_areas(), indexable=indexable)
     project_lastmod = {pr["path"]: pr["changed_on"] for pr in projects.values()}
