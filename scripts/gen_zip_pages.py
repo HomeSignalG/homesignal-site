@@ -1047,9 +1047,13 @@ APP_CSS_LINK = ('<link rel="stylesheet" href="/layout.css?v=c3f3f5d5">\n'
 # development_pages.site_chrome() (the dossier pages use the same copy). Share stays hidden
 # (no script to run it); Sign in is a plain link back to this page. Founder, 2026-11-15: the
 # guide page Google showed had no header, no footer and no page width.
-STATIC_FOOTER = dvp.SITE_FOOTER.split('\n<div class="overlay"', 1)[0]
-STATIC_CSS = (
-    '<style>\n' + dvp.CHROME_CSS
+# Developer comments in partials/shell.html are left out: they carry dates and notes that are
+# not page content and would ship in ~26,000 pages.
+_NO_COMMENTS = re.compile(r"\s*<!--.*?-->", re.S)
+STATIC_HEADER = _NO_COMMENTS.sub("", dvp.SITE_HEADER)
+STATIC_FOOTER = _NO_COMMENTS.sub("", dvp.SITE_FOOTER.split('\n<div class="overlay"', 1)[0])
+STATIC_CSS_TEXT = (
+    dvp.CHROME_CSS
     + 'body{margin:0;background:var(--bg,#f4f6f4)}\n'
     '#hs-ssr{box-sizing:border-box;max-width:860px;margin:0 auto;padding:28px 20px 48px;'
     'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;'
@@ -1074,13 +1078,23 @@ STATIC_CSS = (
     'width:9em;max-width:100%}\n'
     '#hs-ssr button{font:inherit;font-weight:600;padding:8px 14px;border:0;'
     'background:var(--green-deep,#1f6b45);color:#fff;cursor:pointer}\n'
-    '@media (max-width:620px){#hs-ssr{padding:20px 16px 40px}#hs-ssr h1{font-size:25px}}\n'
-    '</style>\n')
+    '@media (max-width:620px){#hs-ssr{padding:20px 16px 40px}#hs-ssr h1{font-size:25px}}\n')
+# One shared, content-addressed file (not inlined): inlined, these rules added ~11 KB to each of
+# ~26,000 project pages and pushed the artifact past the Pages budget. guides/ is a generated tree.
+STATIC_CSS_PATH = f"guides/page.{hashlib.sha256(STATIC_CSS_TEXT.encode('utf-8')).hexdigest()[:8]}.css"
+STATIC_CSS = f'<link rel="stylesheet" href="/{STATIC_CSS_PATH}">\n'
+
+
+def write_static_css(out_dir):
+    path = os.path.join(out_dir, STATIC_CSS_PATH)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(STATIC_CSS_TEXT)
 
 
 def static_body(nav, path, body):
     """<body> of a static page: the site header, the page, the site footer."""
-    header = dvp.SITE_HEADER.replace(dvp.RETURN_TOKEN, urllib.parse.quote(path, safe=""), 1)
+    header = STATIC_HEADER.replace(dvp.RETURN_TOKEN, urllib.parse.quote(path, safe=""), 1)
     return (f'<body data-nav="{nav}">\n{header}\n{body}\n{STATIC_FOOTER}\n'
             '</body>\n</html>\n')
 
@@ -2752,6 +2766,7 @@ def main():
     fc_pages, fc_index = fcp.build(fc_claims, a.out, now_iso[:10], _head, state, base=BASE)
     fc_paths = fc_pages + [fc_index]
     n_land_links = dvp.write_land_index(dossiers, a.out)
+    write_static_css(a.out)
     guide_paths = build_guides(cities, projects, pages, a.out, now_iso[:10], state,
                                areas=load_focus_areas(), indexable=indexable)
     project_lastmod = {pr["path"]: pr["changed_on"] for pr in projects.values()}
