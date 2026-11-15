@@ -188,7 +188,10 @@ ok(railEnv.dedupeByProject(corridor).length === 2,
   '25: one road project drawn as many markers becomes ONE rail card');
 ok(railEnv.dedupeByProject([{ label: 'a' }, { label: 'b' }, { label: 'c' }]).length === 3,
   '26: rows with NO project identity are never collapsed — two real permits at one address both keep a card');
-ok(/items = dedupeByProject\(items\);[\s\S]{0,200}items\.slice\(0, LIST_CAP\)/.test(pageSrc)
+// Since 2026-11-15 the columns follow the filters: listInto takes its rows from visibleSplit(),
+// which de-dups first and then keeps the visible rows, so the cap still sees de-duped rows.
+ok(/function visibleSplit\(items\)\{\s*var all = dedupeByProject\(items \|\| \[\]\);/.test(pageSrc)
+  && /var split = visibleSplit\(items\);\s*items = split\.shown;[\s\S]{0,1200}items\.slice\(0, LIST_CAP\)/.test(pageSrc)
   && /var LIST_CAP = 12;/.test(pageSrc),
   '27: the page de-dups BEFORE the 12-row cap, so the cap can never hide a duplicate');
 ok(/<div class='rec' data-ref='\"\+esc\(railKey\(s, i\)\)\+\"'/.test(pageSrc),

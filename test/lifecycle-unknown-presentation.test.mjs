@@ -78,7 +78,7 @@ const epaSite = (layer, extra) => Object.assign({ label: 'EPA SITE', layer, scop
     '6b "Operating now" is the points whose lifecycle is operating');
   ok(/var unknownRows = points\.concat\(dev\)\.filter\(function\(s\)\{ return bucketOf\(s\.type, s\)==="unknown"; \}\);/.test(PAGE),
     '6c "Lifecycle unknown" holds ANY record whose lifecycle is unknown — permits, facilities and notices alike');
-  ok(/listInto\("unknownList", unknownRows,/.test(PAGE) && /id="unknownList"/.test(read('homesignalmap.html'))
+  ok(/unknown: unknownRows/.test(PAGE) && /listInto\("unknownList", LIST_ROWS\.unknown,/.test(PAGE) && /id="unknownList"/.test(read('homesignalmap.html'))
      && /band-h t-unknown">Lifecycle unknown</.test(read('homesignalmap.html')),
     '6d the band is rendered, under the legend\'s own label');
   ok(!/operating now"/.test(PAGE), '6e no popup string asserts "operating now" for a facility');

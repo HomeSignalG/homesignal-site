@@ -372,6 +372,7 @@
     background:#fdecec;border:1px solid #f5c9c9;border-radius:6px;padding:2px 7px}
   .empty{color:var(--mute);font-size:13px;padding:12px 0}
   .listmore{color:var(--mute);font-size:12.5px;padding:8px 0 2px}
+  .listhidden{color:var(--mute);font-size:12.5px;padding:8px 0 2px;font-style:italic}
 
   .foot{color:var(--mute);font-size:12px;margin:8px 0 40px;line-height:1.6}
   /* About block: real, visible, crawlable copy for the landing page. It is the same text for people and
@@ -3142,37 +3143,20 @@ HS.onReady(function(){
     var bt = builtBandText(builtRows);
     if($("builtHead")) $("builtHead").textContent = bt.h;
     if($("builtSub")) $("builtSub").textContent = bt.s;
-    listInto("builtList", builtRows, "No completed agency records or source-listed operating data centers in Jody for this area. This does not mean nothing operates here.");
-    listInto("unknownList", unknownRows, "Nothing on record here without a stated lifecycle.");
-    listInto("apprList", appr, "Nothing approved on record right now.");
-    // STATE CLEANUP SITES — their own band, shown only when this view holds one.
-    var cuBand = $("cleanupBand"), cuList = $("cleanupList");
-    if(cuBand && cuList){
-      cuBand.hidden = !cleanupSites.length;
-      cuList.innerHTML = cleanupSites.length ? HS.stateCleanupListHTML(cleanupSites, esc, LIST_CAP) : "";
-    }
-    // WATER RIGHTS FILINGS — their own band, shown only when this view holds one.
-    var wrBand = $("waterBand"), wrList = $("waterList");
-    if(wrBand && wrList){
-      wrBand.hidden = !waterSites.length;
-      wrList.innerHTML = waterSites.length ? HS.waterRightsListHTML(waterSites, esc, LIST_CAP) : "";
-    }
-    // showCurrentStatus is scoped to the PROPOSED rail alone. It is the rail whose
-    // heading a reader takes as a statement about now, and the only one that can hold a
-    // decided application. Approved/Operating rails are byte-for-byte unchanged.
-    listInto("propList", prop, "No proposed item on record right now.", { showCurrentStatus: true });
+    // THE COLUMNS FOLLOW THE FILTERS (2026-11-15). The rows are kept here and drawn by
+    // renderLists(), which applyFilter() also calls, so a Status / Type / switch change
+    // redraws the lists from the SAME siteVisible() the three map views use.
+    LIST_ROWS = { built: builtRows, unknown: unknownRows, appr: appr, prop: prop,
+                  cleanup: cleanupSites, water: waterSites };
+    renderLists();
     // ── DISCLOSE A MIXED BROWSING CATEGORY ─────────────────────────────────────────
     // The rail's sub-line read "Hearings and notices you can still weigh in on" — an
     // active claim over every row in it. Once a decided application legitimately sits
     // here, that sentence is wrong for those rows, so the heading says what the category
     // actually means. Shown ONLY when the rail really holds one, so a page with none is
     // unchanged and the sentence never appears without something to explain.
-    var propNote = HS.proposedRailNote ? HS.proposedRailNote(prop) : "";
-    var propSub = $("propSub");
-    if(propSub){
-      propSub.innerHTML = "Hearings and notices in this area"
-        + (propNote ? "<span class='histnote'>" + esc(propNote) + "</span>" : "");
-    }
+    // (The Proposed sub-line, with its decided-application note, is drawn by renderLists()
+    // from the rows the filters leave visible.)
     // Non-headlined civic list (engine contract): real public hearings that aren't development.
     // Neutral dot + plain date (not a "closes in N days" comment countdown). Band hides when empty.
     // (The civic list band was removed 2026-09-26, founder decision: these notices live on the
@@ -3597,6 +3581,7 @@ HS.onReady(function(){
     });
     syncTypeEmptyNote();
     syncStageEmptyNote();
+    renderLists();
     if(V3.active){ build3DFacilities(); }   // legend toggles apply to the 3D views too
     if(GL.active){ buildGLMarkers(); }
     publishVerifyState();
@@ -4103,11 +4088,86 @@ HS.onReady(function(){
     });
     return out;
   }
+  // ── THE COLUMNS FOLLOW THE FILTERS ────────────────────────────────────────────
+  // render() stores each column's rows; this draws them through siteVisible(), the one
+  // predicate the 2D, 3D aerial and 3D satellite views use, so a row is listed exactly
+  // when its pin is drawn. A column whose rows are all filtered out says WHY, and how many,
+  // rather than claiming the area has nothing ("Nothing approved on record" would be false).
+  var LIST_ROWS = null;
+  function visibleSplit(items){
+    var all = dedupeByProject(items || []);
+    var shown = all.filter(function(s){ return siteVisible(s); });
+    return { all: all, shown: shown, hidden: all.length - shown.length };
+  }
+  function hiddenNoteText(n, stageKey){
+    var what = n === 1 ? "1 record here is" : n + " records here are";
+    if(stageKey && !FILTER[stageKey]){
+      return what + " hidden by your Status filter. Check “" + (STAGE_LABEL[stageKey] || stageKey)
+        + "” above to list " + (n === 1 ? "it" : "them") + ".";
+    }
+    return what + " hidden by your Project Type or Regulatory filters.";
+  }
+  function renderLists(){
+    if(!LIST_ROWS || !$("builtList")) return;
+    listInto("builtList", LIST_ROWS.built, "No completed agency records or source-listed operating data centers in Jody for this area. This does not mean nothing operates here.", { stage: "operating" });
+    listInto("unknownList", LIST_ROWS.unknown, "Nothing on record here without a stated lifecycle.", { stage: "unknown" });
+    listInto("apprList", LIST_ROWS.appr, "Nothing approved on record right now.", { stage: "approved" });
+    // STATE CLEANUP SITES — their own band, shown only when this view holds one; listed only
+    // while their own switch is on, as on the map.
+    var cuBand = $("cleanupBand"), cuList = $("cleanupList"), cu = LIST_ROWS.cleanup || [];
+    if(cuBand && cuList){
+      cuBand.hidden = !cu.length;
+      var cuOn = HS.stateCleanupVisible ? HS.stateCleanupVisible() : true;
+      cuList.innerHTML = !cu.length ? ""
+        : cuOn ? HS.stateCleanupListHTML(cu, esc, LIST_CAP)
+        : "<div class='empty listhidden'>Hidden: turn on “State cleanup sites” above to list them.</div>";
+    }
+    // WATER RIGHTS FILINGS — their own band, shown only when this view holds one.
+    var wrBand = $("waterBand"), wrList = $("waterList"), wr = LIST_ROWS.water || [];
+    if(wrBand && wrList){
+      wrBand.hidden = !wr.length;
+      var wrOn = HS.waterRightsVisible ? HS.waterRightsVisible() : true;
+      wrList.innerHTML = !wr.length ? ""
+        : wrOn ? HS.waterRightsListHTML(wr, esc, LIST_CAP)
+        : "<div class='empty listhidden'>Hidden: turn on “Water rights filings” above to list them.</div>";
+    }
+    // showCurrentStatus is scoped to the PROPOSED rail alone. It is the rail whose
+    // heading a reader takes as a statement about now, and the only one that can hold a
+    // decided application. Approved/Operating rails are byte-for-byte unchanged.
+    var propShown = listInto("propList", LIST_ROWS.prop, "No proposed item on record right now.", { showCurrentStatus: true, stage: "proposed" });
+    // ── DISCLOSE A MIXED BROWSING CATEGORY ─────────────────────────────────────────
+    // The rail's sub-line read "Hearings and notices you can still weigh in on" — an
+    // active claim over every row in it. Once a decided application legitimately sits
+    // here, that sentence is wrong for those rows, so the heading says what the category
+    // actually means. Shown ONLY when the LISTED rows really hold one.
+    var propNote = HS.proposedRailNote ? HS.proposedRailNote(propShown || []) : "";
+    var propSub = $("propSub");
+    if(propSub){
+      propSub.innerHTML = "Hearings and notices in this area"
+        + (propNote ? "<span class='histnote'>" + esc(propNote) + "</span>" : "");
+    }
+    publishListState();
+  }
+  // Test/probe hook: what each column lists right now (row identities), beside the map.
+  function publishListState(){
+    var out = {};
+    ["builtList","unknownList","apprList","propList"].forEach(function(id){
+      var el = $(id); if(!el) return;
+      out[id] = Array.prototype.map.call(el.querySelectorAll(".rec"), function(r){ return r.getAttribute("data-ref"); });
+    });
+    window.__HS_LISTS = out;
+  }
   function listInto(id, items, emptyMsg, opts){
     opts = opts || {};
     var el = $(id);
-    items = dedupeByProject(items);
-    if(!items.length){ el.innerHTML = "<div class='empty'>"+emptyMsg+"</div>"; return; }
+    var split = visibleSplit(items);
+    items = split.shown;
+    var hiddenNote = split.hidden ? "<div class='listhidden'>" + esc(hiddenNoteText(split.hidden, opts.stage)) + "</div>" : "";
+    if(!items.length){
+      el.innerHTML = split.hidden ? "<div class='empty listhidden'>" + esc(hiddenNoteText(split.hidden, opts.stage)) + "</div>"
+        : "<div class='empty'>"+emptyMsg+"</div>";
+      return items;
+    }
     el.innerHTML = items.slice(0, LIST_CAP).map(function(s, i){
       // The dot is the record's LIFECYCLE colour — the same bucketOf the pin and the band use —
       // never its raw `type` (an EPA point's legacy `type:"built"` is not lifecycle evidence).
@@ -4162,7 +4222,8 @@ HS.onReady(function(){
       return "<div class='rec' data-ref='"+esc(railKey(s, i))+"'><span class='dot' style='background:"+col+"'></span>"+
         "<div style='flex:1'><div class='t'>"+esc(s.label)+"</div>"+
         "<div class='s'>"+esc(tag)+dstr+when+decidedTag+srcPart(s)+a+"</div>"+decHtml+statusHtml+v+"</div></div>";
-    }).join("") + listMoreHTML(items.length);
+    }).join("") + listMoreHTML(items.length) + hiddenNote;
+    return items;
   }
   // A rail shows at most LIST_CAP rows. When it holds more, it says so, rather than reading as
   // the whole list: on a dense ZIP the Operating rail used to stop at 12 with nothing to say
