@@ -26,7 +26,7 @@ ok(pages.length > 5 && pages.filter((p) => read(p).includes('acq-weekly-topics')
 ok(/<button data-tab="weeklyreport">20 · Weekly Report<\/button><\/nav>/.test(page) && page.includes('<div class="tab" id="tab-weeklyreport"></div>')
   && /weeklyreport: function \(\) \{\s*var el = document\.getElementById\('tab-weeklyreport'\);\s*if \(el && window\.HS && window\.HS\.acqWeeklyTopics\) window\.HS\.acqWeeklyTopics\.load\(window\.hsClient, el\);/.test(page)
   && /if\(id==='weeklyreport'\) return;/.test(page) && !/acqWeeklySlice/.test(page), '1c Tab 20 mounts the queue through its own entry point and never names the workbench');
-for (const f of ['lib/acq-weekly-topics.js', 'lib/acq-weekly-slice.js']) {
+for (const f of ['lib/acq-weekly-topics.js', 'lib/acq-weekly-slice.js', 'lib/acq-weekly-video.js']) {
   const k = createHash('sha256').update(readFileSync(new URL('../' + f, import.meta.url))).digest('hex').slice(0, 8);
   ok(page.includes('<script src="' + f + '?v=' + k + '"></script>'), '1d ' + f + ' is loaded with its current content key');
 }
@@ -36,7 +36,7 @@ try { mainPage = execFileSync('git', ['show', 'origin/main:acquisition.html'], {
 if (mainPage == null) console.log('SKIP — 1e origin/main is not in this checkout');
 else {
   const strip = (h) => h.replace('<button data-tab="weeklyreport">20 · Weekly Report</button>', '').replace('    <div class="tab" id="tab-weeklyreport"></div>\n', '')
-    .replace(/<script src="lib\/acq-weekly-(slice|topics)\.js\?v=[0-9a-f]{8}"><\/script>\n/g, '').replace(/    \/\/ Live, gated \(hs_weekly_\*\)[\s\S]*?acqWeeklyTopics\.load\(window\.hsClient, el\);\n    \},\n/, '')
+    .replace(/<script src="lib\/acq-weekly-(slice|topics|video)\.js\?v=[0-9a-f]{8}"><\/script>\n/g, '').replace(/    \/\/ Live, gated \(hs_weekly_\*\)[\s\S]*?acqWeeklyTopics\.load\(window\.hsClient, el\);\n    \},\n/, '')
     .replace("      if(id==='weeklyreport') return;\n", '');
   // Since #2772 merged, main carries Tab 20 too: compare both pages with the Tab 20 lines removed.
   ok(strip(page) === strip(mainPage), '1e apart from the Tab 20 lines, acquisition.html is byte-for-byte origin/main’s (Tab 17 and every other tab unchanged)');
@@ -106,7 +106,8 @@ else {
   ok(!changed.some((f) => /impact|acq-weekly-report|^topics\.js$|youtube|^lib\/.*bluesky|^docs\/(?!weekly-bluesky-sources\.sql$).*bluesky/i.test(f)), '6 no Tab 17, Stage 1, Bluesky or YouTube file differs from origin/main (' + changed.length + ' files changed)');
   // the one other-tab file that changes: a test that counts the dashboard's tabs (19 -> 20)
   // Before #2772 merged these three were the expected set; once main carries them, a later branch may change none of them.
-  const allowed = ['acquisition.html', 'test/claim-check.test.mjs', 'test/video-bluesky-queue.test.mjs'];
+  // CLAUDE.md: the repo's own record of a Tab 20 change (2026-11-15, video production) is documentation, never another tab's code.
+  const allowed = ['acquisition.html', 'CLAUDE.md', 'test/claim-check.test.mjs', 'test/video-bluesky-queue.test.mjs'];
   ok(changed.filter((f) => !/weekly/i.test(f)).every((f) => allowed.indexOf(f) >= 0),
     '6b outside the weekly files, only acquisition.html and two tab-count tests changed');
 }

@@ -42,6 +42,18 @@ days whose edition is open. The worker is homesignal-ingest `scripts/weekly_perp
 answer is saved as an AI draft; checking its sources is still files 3+.
 Tests: `test/weekly_stage2_pg/run_perplexity.sh` (21 checks, eight mutations), `test/weekly-topics.browser.test.mjs` §15.
 
+## Video production: `docs/weekly-video.sql` (separate, unnumbered; needs 1, 2 and the `impact-media` bucket of `docs/impact-stories.sql`)
+
+Tab 20 makes the weekly report video itself (founder, 2026-11-14: "build the video production in tab 20"). The Video card
+under Report editions (`lib/acq-weekly-video.js`) calls `hs_weekly_video_request`, which queues one job per edition and
+dispatches homesignal-ingest `weekly-video-render.yml`. That renders the edition's committed video script
+(`impact/drafts/weekly-<edition_key>.json`, sources in `impact/sources/weekly-<edition_key>/`) with the Impact Stories
+renderer: narration, licensed real photos, and the source documents drawn as pages with the quoted words highlighted,
+each where the script calls for it. Files go to `impact-media/weekly/<edition_key>/<job>/`; the founder watches each one
+and approves it or asks for changes (`hs_weekly_video_decide`, append-only). Creates `weekly_video_jobs`,
+`weekly_video_assets`, `weekly_video_decisions`; **it replaces no function of files 1-7.** Nothing publishes.
+Tests: `test/weekly_stage2_pg/run_video.sh` (20 checks, seven mutations), `test/weekly-video.browser.test.mjs`.
+
 ## The queue-only release: files 1, 2 and 2a
 
 This is what Tab 20 (`acquisition.html`, `HS.acqWeeklyTopics.load`) uses. It installs six tables
