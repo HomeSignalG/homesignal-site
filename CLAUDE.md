@@ -7024,3 +7024,19 @@ project's documents for review. Nothing is posted; the founder copies the reply 
 - Tests: `test/impact-dc-verify.test.mjs`, `test/impact-dc-page-check.browser.test.mjs`, `test/impact-dc-check.browser.test.mjs`,
   `test/map1-project-panel.test.mjs`, `test/map1-project-link.browser.test.mjs`, `test/impact_dc_verification_pg`,
   `test/map1_project_link_pg` (both in `zip-membership-suite.yml`).
+
+## TAB 20 MAKES THE WEEKLY REPORT VIDEO ITSELF ⚖️ FOUNDER (2026-11-14) — BUILT, SQL NOT YET APPLIED
+
+"Build the video production in tab 20"; "it reviews documents and real images, so it mixes between these images when
+appropriate to the script". The Video card sits under Report editions (`lib/acq-weekly-video.js`, mounted by
+`HS.acqWeeklyTopics.load` into `#tq-video-slot`, kept across redraws so a playing video is never reset).
+- **Make video** → `hs_weekly_video_request` (`docs/weekly-video.sql`): one queued/running job per edition, refused for a
+  closed or published edition, dispatches homesignal-ingest `weekly-video-render.yml` (`impact/weekly/job.py`).
+- The engine is the Impact Stories renderer, unchanged except for `"format": "weekly"` (homesignal-ingest
+  `impact/render/plan.py`): a saved web page is drawn as a document page with the quote highlighted (Tab 16's
+  `render_html_quote`), photos come from the same licensed search, and only open / evidence / outro are required.
+- The script is a committed draft, `impact/drafts/weekly-<edition_key>.json`, checked by `impact/weekly/check.py`; its
+  sources are `impact/sources/weekly-<edition_key>/`. No draft: the job fails saying so.
+- Files: private `impact-media/weekly/<edition_key>/<job>/`; Watch plays a blob; Approve / Ask for changes are
+  append-only rows. Nothing is published. Tests: `test/weekly_stage2_pg/run_video.sh`, `test/weekly-video.browser.test.mjs`.
+- ⛔ Apply order: merge the ingest PR (the workflow must be on main before a dispatch), then apply `docs/weekly-video.sql`.
