@@ -7040,3 +7040,17 @@ appropriate to the script". The Video card sits under Report editions (`lib/acq-
 - Files: private `impact-media/weekly/<edition_key>/<job>/`; Watch plays a blob; Approve / Ask for changes are
   append-only rows. Nothing is published. Tests: `test/weekly_stage2_pg/run_video.sh`, `test/weekly-video.browser.test.mjs`.
 - ⛔ Apply order: merge the ingest PR (the workflow must be on main before a dispatch), then apply `docs/weekly-video.sql`.
+
+## THE BUILD-TIME PAGE BLOCK (#hs-ssr) IS STYLED (2026-11-15)
+
+Founder report (screenshot of `/guides/what-is-being-built-near-me/`): pages showed as plain unstyled text, "for a short time
+and long time". Cause: every generated ZIP, city, project-list, project and guide document carries `<main id="hs-ssr">`, and no
+stylesheet had a rule for it, so it rendered at browser defaults flush against the window edge. Inline `.quiet` counts used
+app.css's dashed panel style and overlapped the text.
+- **Short time:** every ZIP page (12,591 with `data_quality = 'pass'`, measured 2026-11-15) showed it until the app loaded.
+- **Long time:** the 155 `coverage_coming` ZIPs keep the block above the app (`keepSsrAbove`); guide, city, project-list and
+  project pages ship no script, so they never showed anything else.
+- **Fix:** `#hs-ssr` takes the site container in `layout.css`, plus scoped reading styles in `app.css`. Only the `?v=` keys
+  changed in the documents, which `page_semantics` excludes, so there is no IndexNow mass change.
+- Test: `test/ssr-block-styled.browser.test.mjs` (renders every generated document type with JS off at desktop and phone
+  width; fails 46 checks on the old CSS).
