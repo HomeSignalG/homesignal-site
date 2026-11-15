@@ -336,6 +336,17 @@ let yp = await page.locator('#is').innerText();
 ok(yp.includes('Your photos (2)') && yp.includes('In your photos') && await page.locator('#is [data-act=choose][data-id=oak-2]').count() === 0
    && await page.locator('#is [data-act=unchoose][data-id=oak-9]').count() === 1,
    'visuals: every added photo is listed under Your photos, and an added candidate reads In your photos');
+// House Speaker story, 2026-11-15: chosen photos the license policy holds were skipped in silence. The previews name
+// them (engine photos_not_used) in the status bar, and Your photos marks each one Not used.
+await page.evaluate(() => { window.db.visuals.manifest.photos_not_used = [{ id: 'oak-9', title: 'File:Oak9 <x>.jpg', subject_id: 'oak-trees', license: 'CC BY-SA 2.0', reason: 'held' }];
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(150);
+let hb = await page.locator('#is-visbar').innerText(), hy = await page.locator('#is').innerText();
+ok(hb.includes('1 photo you asked for cannot be used') && hb.includes('CC BY-SA 2.0') && hb.includes('Oak9 <x>.jpg')
+   && !(await page.innerHTML('#is-visbar')).includes('Oak9 <x>') && hy.includes('Not used: CC BY-SA 2.0 on hold')
+   && (hy.match(/Not used:/g) || []).length === 1,
+   'visuals: a chosen photo the license policy holds is named in the status bar and marked Not used under Your photos');
+await page.evaluate(() => { delete window.db.visuals.manifest.photos_not_used; });
 await page.locator('#is [data-act=unchoose][data-id=oak-9]').click(); await page.waitForTimeout(80);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_unchoose_asset' && c[1].p_subject === 'oak-trees' && c[1].p_candidate === 'oak-9')),
    'visuals: Remove takes the photo out of the subject\'s set');
@@ -1262,6 +1273,14 @@ let kbox = await page.locator('#is-next-box').innerText();
 ok(!/Review each video/i.test(kbox) && /did not pass the picture checks/.test(kbox) && /Rendering again would make the same videos/.test(kbox)
    && await page.locator('#is #is-next-box .is-btn.primary[data-act=fixblocked]', { hasText: 'Save fix requests for 3 blocked videos' }).count() === 1,
    'blocked videos: the step is to save fix requests for the 3 blocked videos, never "Review each video" again');
+// A render also names every photo asked for that its videos do not show (engine photos_not_used, 2026-11-15).
+await page.evaluate(() => { window.db.media.photos_not_used = [{ id: 'j1', title: 'File:Hakeem Jeffries (1).jpg', license: 'CC BY-SA 2.0', reason: 'held', chosen: true }];
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+ok(/1 photo you asked for cannot be used/.test(await page.locator('#is').innerText()) && /Hakeem Jeffries \(1\)\.jpg/.test(await page.locator('#is').innerText()),
+   'media: a rendered video that skipped a chosen photo says which and why');
+await page.evaluate(() => { delete window.db.media.photos_not_used; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
 await page.evaluate(() => { window.calls.length = 0; });
 await page.click('#is #is-next-box [data-act=fixblocked]'); await page.waitForTimeout(80);
 ok(await page.evaluate(() => { const c = window.calls.filter((x) => x[0] === 'hs_impact_story_media_decide');

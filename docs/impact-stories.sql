@@ -904,6 +904,8 @@ begin
     'renderer', j.input->>'renderer', 'current', cur, 'stale_reason', stale_reason, 'hum', hum,
     'complete', cur and n > 0 and nok = n, 'files', files,
     'quality', j.result->'quality', 'currency', j.result->'currency', 'blocked', blocked, 'choices', choices,
+    -- every photo asked for that the rendered videos do not show, with why (engine photos_not_used; 2026-11-15)
+    'photos_not_used', coalesce(j.result->'photos_not_used', '[]'::jsonb),
     'fix_requests', fixes, 'fix_batch', public._hs_is_fix_batch(p_story));
 end $$;
 

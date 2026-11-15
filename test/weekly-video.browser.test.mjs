@@ -121,6 +121,15 @@ await page.selectOption('#tq-edition', ED);
 await page.waitForSelector('#wv-card .wv-bad');
 ok(!(await page.evaluate(() => window.pwned)) && (await page.locator('#wv-card img').count()) === 0, '5 text from the database is escaped');
 
+// 5b a photo the script asks for that the video does not show is named, with why (2026-11-15: never skipped in silence)
+const held = JSON.parse(JSON.stringify(done));
+held.jobs[0].result.photos_not_used = [{ id: 'cap', title: 'File:Capitol <b>.jpg', license: 'CC BY-SA 3.0', reason: 'license CC BY-SA 3.0 is held for review' }];
+await boot('ok', held);
+await page.selectOption('#tq-edition', ED);
+await page.waitForSelector('#wv-card .wv-warn');
+const ht = await page.locator('#wv-card').innerText();
+ok(/1 photo the script asks for is not in the video/.test(ht) && ht.includes('Capitol <b>.jpg (CC BY-SA 3.0): license CC BY-SA 3.0 is held')
+  && !(await page.innerHTML('#wv-card')).includes('<b>.jpg'), '5b a held photo is named with its license and reason, escaped');
 ok(errors.length === 0, '6a no script errors or dialogs', errors);
 ok(outside.length === 0, '6b no request left the page', outside);
 await browser.close();

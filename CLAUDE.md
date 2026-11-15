@@ -6341,6 +6341,13 @@ one story went through 13 fix batches and 9 renders. The founder asked for the a
 - **Approved pictures survive a code-only change** (engine, homesignal-ingest CLAUDE.md, same date): a render no longer
   sends a story back to Prepare just because video code merged after the approval.
 
+## A PHOTO SOMEONE ASKED FOR IS NEVER SKIPPED IN SILENCE (2026-11-15, Tabs 17 and 20)
+
+The engine's `photos_not_used` (homesignal-ingest CLAUDE.md, same date) is shown on the Visuals status bar and Your photos
+("Not used: <license> on hold"), in Media review for a render, and on the Tab 20 video card. `_hs_is_media` passes it
+(`docs/impact-photos-not-used-apply-2026-11-15.sql`, applied 2026-11-15, md5 `17ae7cc9…` -> `bdc8470c…`). The page
+decides nothing. Why: 18 chosen CC BY-SA Jeffries photos were skipped after the 2026-11-11 license hold with no message.
+
 ## IMPACT STORIES, TAB 17: "NOT ABOUT THIS STORY — CONTINUE PREPARING" (2026-11-07)
 
 Founder: "the article does not matter but there is no button to disregard it and continue". When Prepare (or a render)
