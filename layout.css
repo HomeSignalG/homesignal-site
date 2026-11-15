@@ -36,3 +36,9 @@ body[data-layout="full"]{--hs-max:none}
   margin-inline:auto;
   padding-inline:var(--hs-gutter);
 }
+
+/* The build-time page block (#hs-ssr) on generated ZIP, city, project-list, project and guide pages.
+   It had no rules at all, so it sat flush against the window's left edge at browser defaults: on
+   every ZIP page until the app loaded, permanently on the 155 ZIPs that keep it, and on every page
+   that carries no script (founder report 2026-11-15). Same container as the rest of the site. */
+#hs-ssr{box-sizing:border-box;width:100%;max-width:var(--hs-max);margin-inline:auto;padding:24px var(--hs-gutter) 48px}

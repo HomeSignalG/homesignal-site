@@ -775,3 +775,25 @@ a.home-index__record-name:hover{color:var(--green)}
 @media (prefers-reduced-motion:reduce){
   .home-index *{scroll-behavior:auto !important}
 }
+
+/* Reading styles for the build-time page block (#hs-ssr), scoped so nothing else moves.
+   An inline .quiet (a count beside a link) is plain muted text here, never the dashed panel. */
+#hs-ssr{color:var(--ink);font-size:15px;line-height:1.55}
+#hs-ssr > header{margin-bottom:8px}
+#hs-ssr .eyebrow{margin:0 0 6px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--green)}
+#hs-ssr .eyebrow a{color:inherit;text-decoration:none}
+#hs-ssr h1{margin:0 0 10px;font-size:clamp(24px,3.2vw,30px);line-height:1.2;letter-spacing:-.01em;font-weight:700}
+#hs-ssr header p{max-width:720px;color:var(--ink-2);margin:0}
+#hs-ssr h2{margin:0 0 10px;font-size:17px;font-weight:700}
+#hs-ssr h3{margin:16px 0 6px;font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2)}
+#hs-ssr p{max-width:760px}
+#hs-ssr a{color:var(--green)}
+#hs-ssr .zsec,#hs-ssr .zsib,#hs-ssr .zcity,#hs-ssr .zproj,#hs-ssr .zdev,#hs-ssr .zdcl,#hs-ssr .zcov,#hs-ssr .zcrumb{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:16px 18px;margin:14px 0}
+#hs-ssr ul,#hs-ssr ol{margin:6px 0 0;padding-left:20px}
+#hs-ssr li{margin:4px 0}
+#hs-ssr time{color:var(--ink-3);font-size:13px;margin-left:6px}
+#hs-ssr .quiet{display:inline;border:0;padding:0;margin:0;background:none;color:var(--ink-3);font-size:13px}
+#hs-ssr p.quiet{display:block;margin:16px 0}
+#hs-ssr form.zsec{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+#hs-ssr input{border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 12px;font:inherit;font-size:14px}
+#hs-ssr button{height:36px;padding:0 14px;border-radius:9px;border:1px solid var(--green);background:var(--green);color:#fff;font:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
