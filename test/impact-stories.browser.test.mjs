@@ -734,6 +734,26 @@ await page.fill('#fx-note-3', 'Text too small on a phone.'); await page.fill('#f
 await page.click('#is [data-act=fixsend][data-id="3"]'); await page.waitForTimeout(50);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_media_decide' && c[1].p_asset_id === 3 && c[1].p_decision === 'rejected'
    && c[1].p_note === 'Text too small on a phone.' && c[1].p_timecode === '0:12')), 'media: a fix request is written in a form under the video and sends what to fix and the moment');
+// A fix can be about one act (founder, 2026-11-15): the form lists the acts, each with its own note and start moment.
+await page.evaluate(() => {
+  const mf = window.db.visuals.manifest; const sh = mf.assets.main.shots;
+  sh[0].act = 1; sh[0].act_name = 'Hook';
+  window.db.media.files[0].shots = [{ id: sh[0].id, layout: 'open', kind: 'MAP', start_s: 0 }];
+  if (sh.length > 1) { sh[1].act = 2; sh[1].act_name = 'Evidence'; window.db.media.files[0].shots.push({ id: sh[1].id, layout: 'scene', kind: 'PHOTO', start_s: 65 }); }
+  window.calls.length = 0;
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(80);
+await page.click('#is [data-act=fixform][data-id="1"]'); await page.waitForTimeout(50);
+ok(await page.locator('#fx-part-1-0').count() === 1 && (await page.locator('#is').innerText()).includes('Which part needs changing?')
+   && (await page.locator('#is').innerText()).includes('Act 1 \u00b7 Hook'), 'media: Request a fix lists every act with its own note box');
+await page.fill('#fx-part-1-0', 'Open on the lake, not the map.');
+if (await page.locator('#fx-part-1-1').count()) await page.fill('#fx-part-1-1', 'Show the permit page longer.');
+await page.click('#is [data-act=fixsend][data-id="1"]'); await page.waitForTimeout(80);
+ok(await page.evaluate(() => { const d = window.calls.filter((c) => c[0] === 'hs_impact_story_media_decide' && c[1].p_asset_id === 1 && c[1].p_decision === 'rejected');
+   return d.length >= 1 && d[0][1].p_note === 'Act 1 \u00b7 Hook: Open on the lake, not the map.' && d[0][1].p_timecode === '0:00'
+     && (d.length === 1 || (d[1][1].p_note.startsWith('Act 2') && d[1][1].p_timecode === '1:05')); }),
+   'media: a note written under an act is saved on that act, with the moment it starts');
 await page.evaluate(() => { window.prompt = () => 'Lead with the date.'; });
 // Fix (2026-10-28): every request stays listed with what happened to it; the button sends the open ones and starts the job
 await page.evaluate(() => {
