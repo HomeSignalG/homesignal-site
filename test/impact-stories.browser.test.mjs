@@ -336,6 +336,17 @@ let yp = await page.locator('#is').innerText();
 ok(yp.includes('Your photos (2)') && yp.includes('In your photos') && await page.locator('#is [data-act=choose][data-id=oak-2]').count() === 0
    && await page.locator('#is [data-act=unchoose][data-id=oak-9]').count() === 1,
    'visuals: every added photo is listed under Your photos, and an added candidate reads In your photos');
+// House Speaker story, 2026-11-15: chosen photos the license policy holds were skipped in silence. The previews name
+// them (engine choices_held) in the status bar, and Your photos marks each one Not used.
+await page.evaluate(() => { window.db.visuals.manifest.choices_held = [{ id: 'oak-9', title: 'File:Oak9 <x>.jpg', subject_id: 'oak-trees', license: 'CC BY-SA 2.0', reason: 'held' }];
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(150);
+let hb = await page.locator('#is-visbar').innerText(), hy = await page.locator('#is').innerText();
+ok(hb.includes('1 of your photos cannot be used') && hb.includes('CC BY-SA 2.0') && hb.includes('Oak9 <x>.jpg')
+   && !(await page.innerHTML('#is-visbar')).includes('Oak9 <x>') && hy.includes('Not used: CC BY-SA 2.0 on hold')
+   && (hy.match(/Not used:/g) || []).length === 1,
+   'visuals: a chosen photo the license policy holds is named in the status bar and marked Not used under Your photos');
+await page.evaluate(() => { delete window.db.visuals.manifest.choices_held; });
 await page.locator('#is [data-act=unchoose][data-id=oak-9]').click(); await page.waitForTimeout(80);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_unchoose_asset' && c[1].p_subject === 'oak-trees' && c[1].p_candidate === 'oak-9')),
    'visuals: Remove takes the photo out of the subject\'s set');
