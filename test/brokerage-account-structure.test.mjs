@@ -130,6 +130,14 @@ const watchCode = code(WATCH_SQL);
 // and its precondition. Never the member table; it writes neither this spine's tables nor any column of them.
 const BILLING_SQL = 'docs/brokerage-billing.sql';
 const billingCode = code(BILLING_SQL);
+// docs/paddle-billing.sql (2026-11-14) REPLACES three of those billing functions (plan, usage, writer) for Paddle and the six-month grant. It reads the resolver once (billing_usage, as
+// before), the account row for its STATUS and its account_type only (a grant is for an individual account), and never the member table; it writes no row of the spine.
+const PADDLE_SQL = 'docs/paddle-billing.sql';
+const paddleCode = code(PADDLE_SQL);
+// supabase/functions/_shared/billing-reads.ts names the account table family only through the RPC NAME `brokerage_account_type_of` (is this person an individual?), which is the one place the
+// Private Partner offer asks the database whose account it is. It touches no table: it calls a function.
+const BILLING_READS = 'supabase/functions/_shared/billing-reads.ts';
+const billingReadsCode = code(BILLING_READS);
 // docs/report-rate-limit.sql adds ONE more reader of the RESOLVER and nothing else: the claim asks which brokerage the caller is in (so a brokerage's own ceiling can be
 // shared by its people), once, plus the precondition that the resolver exists (its test and its message: three mentions in all). Never the account or member tables; it writes only its own counter table.
 const RATE_SQL = 'docs/report-rate-limit.sql';
@@ -148,7 +156,11 @@ const l2Code = code(L2_SQL);
 // It writes no row of the spine, calls neither the resolver nor any issue function, and the report page and the issuance functions are untouched.
 const ACQ_SQL = 'docs/acquisition-attribution.sql';
 const acqCode = code(ACQ_SQL);
-ok(sorted(naming) === sorted([SQL_FILE, L1_SQL, EVAL_READS, SAVED_SQL, HEADER_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, RATE_SQL, DA_SQL, L2_SQL, ACQ_SQL])
+// docs/paddle-billing.sql Part B (2026-11-14, new individuals have no free reports) adds ONE column to the evaluation and splices three existing functions; it creates no account, membership or account table.
+ok(sorted(naming) === sorted([SQL_FILE, L1_SQL, EVAL_READS, SAVED_SQL, HEADER_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, PADDLE_SQL, BILLING_READS, RATE_SQL, DA_SQL, L2_SQL, ACQ_SQL])
+   && !/\bpublic\.brokerage_(account|member)\b|\.from\(['"]brokerage_/.test(billingReadsCode)
+   && (paddleCode.match(/brokerage_membership_of\(p_user_id\)/g) || []).length === 1 && !/brokerage_member\b/.test(paddleCode)
+   && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(only\s+)?public\.brokerage_(account|member)\b/i.test(paddleCode)
    && !/\b(insert\s+into|update|delete\s+from|truncate|alter\s+table|drop\s+table|create\s+table)\s+(only\s+)?public\.(brokerage_|evaluation)/i.test(acqCode) && !/brokerage_membership_of|evaluation_report_issue|brokerage_report_issue/.test(acqCode)
    && (acqCode.match(/\bpublic\.brokerage_member\b/g) || []).length === 1 && /\bfrom b join public\.brokerage_member mm\b|\bjoin public\.brokerage_member mm\b/.test(acqCode)
    && (daCode.match(/from public\.brokerage_membership_of\(p_actor\) r/g) || []).length === 2 && !/\b(insert\s+into|delete\s+from|truncate|alter\s+table|drop\s+table|create\s+table)\s+(only\s+)?public\.brokerage_(account|member)/i.test(daCode)

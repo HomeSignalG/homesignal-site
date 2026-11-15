@@ -17,6 +17,8 @@ docsql() {
       sed "s/evaluation_report_limit() <> 100 then raise exception 'report_rate_limit: the free report limit is not 100/evaluation_report_limit() <> $LIMIT_UNDER_TEST then raise exception 'report_rate_limit: the free report limit is not $LIMIT_UNDER_TEST/" "$src" >"$out";;
     da-owner-safeguards)
       sed "s/evaluation_report_limit() <> 100 or/evaluation_report_limit() <> $LIMIT_UNDER_TEST or/" "$src" >"$out";;
+    paddle-billing-a)   # PART A of the one Paddle migration (billing); Part B (paid-only new individuals) is applied only where a suite tests it
+      src="$root/docs/paddle-billing.sql"; sed '/^-- PART B (below)/,$d' "$src" >"$out"; printf '%s' "$out"; return;;
     *) printf '%s' "$src"; return;;
   esac
   cmp -s "$src" "$out" && { echo "docsql: the limit-under-test substitution changed nothing in $name" >&2; return 1; }

@@ -530,7 +530,7 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
   ok(r.status === 502 && r.json.error === 'data_unavailable' && !f.calls.includes('geocode') && !f.calls.includes('issue'), '8l7 a plan that cannot be read is 502, with no address looked up and nothing charged (never "no plan", which would refuse or free a paid report)');
   f = trialFakes({ planOf: async () => null });
   r = await call(f.deps, { ...REQ, idempotency_key: KEY }, TAUTH);
-  ok(r.status === 200 && JSON.stringify(r.json.plan) === '{"state":"none","role":null,"credit_limit":0,"credits_used":0,"credits_remaining":0,"period_ends_at":null}', '8l8 a member the plan read does not know is "none" with no role, and the free trial works as before');
+  ok(r.status === 200 && JSON.stringify(r.json.plan) === '{"state":"none","role":null,"credit_limit":0,"credits_used":0,"credits_remaining":0,"period_ends_at":null,"access_ends_at":null}', '8l8 a member the plan read does not know is "none" with no role, and the free trial works as before');
   f = trialFakes();
   r = await call(f.deps, { ...REQ, idempotency_key: KEY }, TAUTH);
   ok(f.calls.filter((c) => c === 'planOf').length === 1, '8l9 the plan is read ONCE per request');
@@ -628,7 +628,7 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
   }
   ok(shape === 6, '9h an answer whose allotment is unknown, whose paid report names no month, or whose free report names one, is a failure and never a stored report (six shapes)', shape);
   reqs.length = 0;
-  d = mk([[/rpc\/billing_usage/, () => json([{ brokerage_id: 'b0b0b0b0-1111-4222-8333-444444444444', role: 'owner', state: 'paid', credit_limit: 100, credits_used: 1, credits_remaining: 99, period_ends_at: '2026-11-04T12:00:00+00:00' }])]]);
+  d = mk([[/rpc\/billing_usage/, () => json([{ brokerage_id: 'b0b0b0b0-1111-4222-8333-444444444444', role: 'owner', state: 'paid', credit_limit: 100, credits_used: 1, credits_remaining: 99, period_ends_at: '2026-11-04T12:00:00+00:00', access_ends_at: null }])]]);
   const pl = await d.planOf(USER);
   ok(pl.state === 'paid' && reqs.length === 1 && reqs[0].url === BASE + '/rest/v1/rpc/billing_usage' && JSON.parse(reqs[0].init.body).p_user_id === USER && Object.keys(JSON.parse(reqs[0].init.body)).length === 1,
     '9i the plan is ONE call to public.billing_usage by user id, through the shared reader (never an email, never a count made here)');

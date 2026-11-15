@@ -16,6 +16,7 @@ on:
       - 'docs/brokerage-account-spine.sql'
       - 'docs/evaluation-entitlement.sql'
       - 'docs/brokerage-billing.sql'
+      - 'docs/paddle-billing.sql'
       - 'test/individual_signup_pg/**'
       - 'supabase/functions/development-activity-trial/**'
       - 'supabase/functions/_shared/evaluation-reads.ts'
