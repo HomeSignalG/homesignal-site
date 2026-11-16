@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = 'supabase/functions/get-address-report/jurisdiction-registry.json';
 const OUT = 'supabase/functions/_shared/source-publishers.generated.json';
-const CONNECTORS = ['socrata', 'arcgis', 'ckan', 'csv', 'carto'];
+const CONNECTORS = ['socrata', 'arcgis', 'ckan', 'csv', 'carto', 'county_cases'];
 
 function host(u) { try { return new URL(u).host; } catch { return ''; } }
 

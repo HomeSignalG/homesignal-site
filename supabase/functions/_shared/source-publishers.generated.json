@@ -997,6 +997,11 @@
    "agency": "City of Tigard, Oregon",
    "dataset": "svr.tigardmaps.com, service Featured_Public/active_permits"
   },
+  "tillamook-county-land-use-cases": {
+   "agency": "Tillamook County Community Development",
+   "dataset": "www.tillamookcounty.gov",
+   "date_label": "Date of Notice on the county's case page"
+  },
   "topeka-building-permits": {
    "agency": "City of Topeka, Kansas",
    "dataset": "maps.topeka.gov, service CityworksViews/BuildingPermits"

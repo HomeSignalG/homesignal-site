@@ -38,11 +38,12 @@ const ok = (name, cond, detail) => {
 };
 
 const SRC = new URL('../supabase/functions/get-address-report/sources/', import.meta.url);
-const CONNECTORS = ['arcgis', 'socrata', 'carto', 'ckan', 'csv'];
+const CONNECTORS = ['arcgis', 'socrata', 'carto', 'ckan', 'csv', 'county_cases'];
+const FILE_OF = { county_cases: 'county-cases' };   // platform name -> sources/<file>.ts
 
 /** The option names a connector's own RegistryEntry interface declares. */
 function declaredOptions(name) {
-  const src = readFileSync(new URL(`${name}.ts`, SRC), 'utf8');
+  const src = readFileSync(new URL(`${FILE_OF[name] ?? name}.ts`, SRC), 'utf8');
   const m = src.match(/export interface \w*RegistryEntry[^{]*\{([\s\S]*?)\n\}/);
   if (!m) return null;
   const out = new Set();

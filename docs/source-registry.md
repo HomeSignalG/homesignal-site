@@ -13463,3 +13463,23 @@ inside it, since the old layer dated by filing and layer 8 dates by issue). The 
     from 204.29.185.113:443 (pg_net 30910, 30913). The server drops connections from Supabase's network whatever the
     protocol, while a GitHub runner is answered. Not worked around. Its stored records are carried forward while it fails.
     `http1_only` stays on the entry; it is harmless and the reason it fails is now the server's own reset.
+
+## TILLAMOOK COUNTY LAND-USE CASES (county_cases connector, 2026-11-16)
+
+`sources/county-cases.ts`, registry key `county_cases`, entry `tillamook-county-land-use-cases`. The county publishes planning cases only as an
+HTML index (`/1098/Land-Use-Applications`) and case pages; it has no case-level GIS layer. A case is pinned ONLY by joining the township / range /
+section / tax lots its own request text names to the county's public Taxlots FeatureServer (`MapTaxlot`, e.g. `5S1124AB01300`).
+- **Every named lot must resolve** (`min_found_share` 1) and the parcels must lie within 1.5 km of each other; otherwise the case is quarantined and
+  has no pin. A partial match is never a verified footprint. Real receipt 2026-11-16: the campground (851-26-000190-PLNG) resolves to one 65.4-acre
+  parcel `5S11130000202`; Sahhali South (851-25-000549/000548-PLNG) names 13 lots in 5S1124AB, of which 3 were confirmed by hand.
+- **The pin is a parcel centroid** (`location_basis: parcel_centroid`, `location_approx: true`), not a construction site.
+- **Status is the county's own word.** Only hearing-stage statuses map to `proposed`. "Appeal Period" and other post-decision words are excluded
+  because they do not say which decision was made. The case page's "Status Update" text is kept verbatim (`status_history`).
+- **Significance** is `significant_if` minus `routine_if` (partitions, resource zone exceptions, variances, lot-line, accessory, single dwellings).
+  Cases that share a tax lot are ONE project and one marker (`related_cases`).
+- **ZIP scope** is the canonical polygon (`zip_scope_members`), never the neighbourhood name.
+- **Terms checked 2026-11-16.** The Taxlots service is public, query-only, with no license or copyright text. The county's GIS Data Access page says
+  GIS information is available for free public access over the internet and is also SOLD for commercial purposes (tax lot shapefile $1,500, ORS 190.050);
+  its map disclaimer says the data is for context only and may not reflect the latest information. No written prohibition on commercial use of the
+  service was found. The connector reads only the lot key and centroid for the few lots a case names (no owner or mailing fields, no bulk copy).
+  robots.txt: the `*` group sets Crawl-delay 10 and does not disallow the case pages, so requests to the county host are spaced 10 s apart.
