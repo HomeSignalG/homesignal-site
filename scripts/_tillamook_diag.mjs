@@ -48,3 +48,16 @@ for (const c of cand) {
   const ks = taxlotKeys(c.request);
   console.log("CAND", JSON.stringify({ id: c.case_ids[0], type: c.type, keys: ks, centroids: ks.map((k) => cm.get(k) ? [cm.get(k).y, cm.get(k).x] : null), req: c.request.slice(0, 260) }));
 }
+// diag3
+{
+  await new Promise((r) => setTimeout(r, 10500));
+  const pg = txt(await (await fetch("https://www.tillamookcounty.gov/1139/851-25-000549-plng851-25-000548-plng", { headers: UA })).text());
+  const i = pg.indexOf("851-25-000549-PLNG:");
+  console.log("SAHHALI_PAGE_REQUEST", pg.slice(i, i + 1500));
+  const s2 = await (await fetch(`${e.parcel_url}/query?where=${encodeURIComponent("MapTaxlot LIKE '1S09%'")}&outFields=MapTaxlot&returnGeometry=false&resultRecordCount=3&f=json`)).json();
+  console.log("KEY_FORMAT_R9", JSON.stringify((s2.features || []).map((f) => f.attributes.MapTaxlot)));
+  const s3 = await (await fetch(`${e.parcel_url}/query?where=${encodeURIComponent("MapTaxlot LIKE '1S926%'")}&outFields=MapTaxlot&returnGeometry=false&resultRecordCount=3&f=json`)).json();
+  console.log("KEY_FORMAT_R9_UNPADDED_MATCHES", (s3.features || []).length);
+  const g = await (await fetch(`${e.parcel_url}/query?where=${encodeURIComponent("MapTaxlot IN ('5S11130000202','5S1113DC05700')")}&outFields=MapTaxlot&returnGeometry=true&outSR=4326&f=json`)).json();
+  for (const f of g.features || []) console.log("PARCEL_RINGS", f.attributes.MapTaxlot, JSON.stringify(f.geometry.rings.map((r) => r.map((p) => [Math.round(p[0]*1e5)/1e5, Math.round(p[1]*1e5)/1e5]))).slice(0, 2500));
+}
