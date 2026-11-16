@@ -108,5 +108,16 @@ ok(/revoke all on function public\.hs_bsky_subscriber_zips\(\) from public, anon
   && /grant execute on function public\.hs_bsky_subscriber_zips\(\) to authenticated;/.test(SQL), 'anon cannot call it');
 ok(!/\b(insert|update|delete)\b/i.test(SQL), 'it writes nothing');
 
+// ── 5 · QUALITY-OF-LIFE AREAS (read from evidence.qol_score.impacts, never decided here) ──
+{
+  const withI = { evidence: { qol_score: { score: 62, impacts: [
+    { key: 'air', label: 'Air quality', why: 'demolition: dust' }, { key: 'noise', label: 'Noise', why: 'machinery' }, { bad: 1 }, null] } } };
+  const im = HS.bskyQolImpacts(withI);
+  ok(im.length === 2 && im[0].label === 'Air quality' && im[0].why === 'demolition: dust', 'the draft\'s tagged areas are read with their reasons; malformed entries are dropped');
+  ok(HS.bskyQolImpacts({}).length === 0 && HS.bskyQolImpacts({ evidence: { qol_score: { score: 5 } } }).length === 0, 'a draft with no tags (made before them) shows none');
+}
+ok(/HS\.bskyQolImpacts\(p\)/.test(PAGE) && /QOL ISSUE/.test(PAGE) && /data-qol-impact=/.test(PAGE), 'the card draws a QOL ISSUE tag and one chip per area');
+ok(/if\(qiTags\) qiTags=/.test(PAGE), 'the QOL ISSUE tag appears only when an area was tagged');
+
 console.log('\n' + (n - bad) + '/' + n + ' passed');
 process.exit(bad ? 1 : 0);
