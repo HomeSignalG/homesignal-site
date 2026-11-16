@@ -1907,6 +1907,16 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       var stamp=document.getElementById('bsky-stamp'); if(stamp) stamp.textContent='updated '+new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
     }catch(e){ body.innerHTML='<div class="muted">Queue error.</div>'; }
   }
+  // ONE ACTION PER POST AT A TIME. Approve takes a second or two (claim check, then the RPC),
+  // and the button stayed live meanwhile, so a second click sent a second approve for a post
+  // the first had already approved. The database refused it ("only a draft can be approved")
+  // and the founder saw "Approve failed" over a post that was in fact approved.
+  var _bskyBusy={};
+  async function blueskyActionGuarded(id, act){
+    if(_bskyBusy[id]) return;
+    _bskyBusy[id]=true;
+    try{ await blueskyAction(id, act); } finally { delete _bskyBusy[id]; }
+  }
   async function blueskyAction(id, act){
     try{
       if(act==='approve'){
@@ -1944,6 +1954,8 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         // ("re-read it before approving") means the row moved; refreshBluesky() rebuilds
         // _bskyRows, so the NEXT click reviews the current revision. It does not call
         // hs_approve_social_post: the founder must look again and approve again.
+        // Already approved by an earlier click or another tab: not a failure, just refresh.
+        if(r.error && /only a draft can be approved/i.test(r.error.message||'')){ refreshBluesky(); return; }
         if(r.error){ alert('Approve failed: '+(r.error.message||'')); refreshBluesky(); return; }
       } else if(act==='skip'){
         var r2=await window.hsClient.from('social_posts').update({status:'skipped'}).eq('id',id);
@@ -2208,7 +2220,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         var zo=btn.getAttribute('data-zo');
         if(zo){ zipOrderAction(zo); return; }
         var wrap=btn.closest('[data-post]'); if(!wrap) return;
-        blueskyAction(wrap.getAttribute('data-post'), btn.getAttribute('data-act'));
+        blueskyActionGuarded(wrap.getAttribute('data-post'), btn.getAttribute('data-act'));
       });
     }
     refreshBluesky();
