@@ -28,7 +28,6 @@ jobs:
           print("county-case sites",len(cc))
           for s in cc:
               print(json.dumps({k:s.get(k) for k in ('title','label','case_number','status','bucket','type','use_type','lat','lng','scope','record_url','location_approx','file_date','status_note','description')},default=str))
-          for k,v in d.items():
-              if isinstance(v,dict) and ('county' in k.lower() or 'case' in k.lower()):
-                  print(k,json.dumps(v)[:4000])
+          print('REPORTS',json.dumps(d.get('county_cases_reports'),default=str)[:12000])
+          print('NOTE',str(d.get('note'))[:600])
           PY
