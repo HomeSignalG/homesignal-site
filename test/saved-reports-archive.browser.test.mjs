@@ -190,7 +190,7 @@ const archiveCalls = (d) => d.saved.filter((b) => b.action === 'archive' || b.ac
   await page.click('#saved-list .sv-row .sv-open');
   await page.waitForFunction(() => document.querySelectorAll('#report .da-rv-sec').length > 0);
   ok(d.saved.some((b) => b.action === 'open' && b.report_id === idOf(w, 'A', 8)) && /Saved report 8/.test(await status(page)), '1j clicking the row still opens that saved report, as before');
-  ok(/^8 of 10 free reports used$/.test(await trialCount(page)) && w.issued === 9, '1k opening used nothing: still 8 of 10 free reports used');
+  ok(/^8 of 10 reports used$/.test(await trialCount(page)) && w.issued === 9, '1k opening used nothing: still 8 of 10 reports used');
   ok(d.errors.length === 0 && d.foreign.length === 0, '1l no page error, nothing foreign fetched', { e: d.errors, f: d.foreign });
   await d.ctx.close();
 }
@@ -212,7 +212,7 @@ const archiveCalls = (d) => d.saved.filter((b) => b.action === 'archive' || b.ac
   ok(t.shown && t.text === 'Removed from Saved Reports.' && t.undo, '2b once the server confirms, the page says "Removed from Saved Reports." and offers Undo', t);
   ok((await numbers(page)).join() === '8,6,5,4,3,2', '2c the report left the list and the next one took its place (six shown, newest first)', await numbers(page));
   ok(archiveCalls(d).length === 1 && JSON.stringify(archiveCalls(d)[0]) === JSON.stringify({ action: 'archive', report_ids: [idOf(w, 'A', 7)] }), '2d exactly one request, naming exactly that report', archiveCalls(d));
-  ok(noReportRequests(d) && /^8 of 10 free reports used$/.test(await trialCount(page)), '2e no report request was made and the free-report figure still reads 8 of 10 used');
+  ok(noReportRequests(d) && /^8 of 10 reports used$/.test(await trialCount(page)), '2e no report request was made and the free-report figure still reads 8 of 10 used');
   // a second device
   const d2 = await device(w);
   ok((await numbers(d2.page)).join() === '8,6,5,4,3,2', '2f a second device (a fresh browser context, nothing shared but the account) shows the same list', await numbers(d2.page));
@@ -291,7 +291,7 @@ const archiveCalls = (d) => d.saved.filter((b) => b.action === 'archive' || b.ac
   await page.waitForFunction(() => /Restored 5 reports/.test(document.getElementById('saved-toast-text').textContent));
   await settle(page, 300);
   ok(w.archive.size === 0 && (await numbers(page)).join() === '8,7,6,5,4,3', '4p Undo puts all five back at once', await numbers(page));
-  ok(noReportRequests(d) && /^8 of 10 free reports used$/.test(await trialCount(page)), '4q still no report request, still 8 of 10 free reports used');
+  ok(noReportRequests(d) && /^8 of 10 reports used$/.test(await trialCount(page)), '4q still no report request, still 8 of 10 reports used');
   await d.ctx.close();
 }
 
