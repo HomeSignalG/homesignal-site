@@ -367,10 +367,10 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   ok((await page.evaluate(() => window.__sb.otp[0].options.shouldCreateUser)) === true, '1c the sign-in may create an account (an invited person usually has none)');
   await page.fill('#auth-code', '123456');
   await page.click('#auth-submit');
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   ok(trials.length === 1 && trials[0].body.action === 'redeem' && trials[0].body.token === TOKEN && trials[0].auth === 'Bearer user-token',
     '1d after sign-in the page redeems the invite once, with the person\'s own token', trials.map((t) => t.body));
-  ok(w.redeemed === 1 && /^0 of 10 free reports used$/.test(await text(page, '#trial-count')) && /joined/.test(await text(page, '#trial-sub')),
+  ok(w.redeemed === 1 && /^0 of 10 reports used$/.test(await text(page, '#trial-count')) && /joined/.test(await text(page, '#trial-sub')),
     '1e the panel says the person joined and has 10 free reports left', [await text(page, '#trial-count'), await text(page, '#trial-sub')]);
   ok((await page.evaluate(() => sessionStorage.getItem('hs-da-invite'))) === null, '1f the per-tab invite slot is emptied once the invite has been used');
   ok(!(await page.$eval('#go', (b) => b.disabled)), '1g "Make report" is offered');
@@ -382,8 +382,8 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
 {
   const w = world({ used: 3 });
   const { ctx, page, errors, reports, foreign } = await open({ w });
-  await waitCount(page, /^3 of 10 free reports used$/);
-  ok(/^3 of 10 free reports used$/.test(await text(page, '#trial-count')), '2a signed in, the panel reads the trial: 7 left');
+  await waitCount(page, /^3 of 10 reports used$/);
+  ok(/^3 of 10 reports used$/.test(await text(page, '#trial-count')), '2a signed in, the panel reads the trial: 7 left');
   await page.waitForTimeout(200);
   ok(trialsOf(page).length === 1, '2a2 the trial is read once, though the sign-in library reports the session twice on load (getSession and INITIAL_SESSION)', trialsOf(page).length);
   await make(page);
@@ -392,14 +392,14 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
     '2b one request, with the person\'s token, the customer view and a random v4 key, and nothing else', reports.map((r) => r.body));
   ok(w.used === 4 && (await page.$$('#report .da-rv-sec')).length > 0 && /used 1 of your brokerage/.test(await text(page, '#creditnote')),
     '2c a report that shows development is drawn and says it used one free report', await text(page, '#creditnote'));
-  ok(/^4 of 10 free reports used$/.test(await text(page, '#trial-count')), '2d the panel now says 6 left, from the report function\'s own count');
+  ok(/^4 of 10 reports used$/.test(await text(page, '#trial-count')), '2d the panel now says 6 left, from the report function\'s own count');
   // a fresh world with no traceable record: a "No data ingested" report
   await ctx.close();
   const w2 = world({ used: 4, untraceable: true });
   const o2 = await open({ w: w2 });
-  await waitCount(o2.page, /^4 of 10 free reports used$/);
+  await waitCount(o2.page, /^4 of 10 reports used$/);
   await make(o2.page);
-  ok(w2.used === 4 && /did not use a free report: No data ingested/.test(await text(o2.page, '#creditnote')) && /^4 of 10 free reports used$/.test(await text(o2.page, '#trial-count')),
+  ok(w2.used === 4 && /did not use a free report: No data ingested/.test(await text(o2.page, '#creditnote')) && /^4 of 10 reports used$/.test(await text(o2.page, '#trial-count')),
     '2e a "No data ingested" report says it used nothing, and the count stays', [await text(o2.page, '#creditnote'), await text(o2.page, '#trial-count')]);
   // the empty-source state on the launch test location (Brigham City, UT 84302), read off the page the way a person sees it: a plain answer, not a failure
   const hero = await o2.page.$eval('#report .da-rv-sec--outcome', (e) => ({ title: e.querySelector('.da-rv-h2').textContent.trim(), body: e.querySelector('.da-rv-outcome-p').textContent.trim() })).catch(() => null);
@@ -441,7 +441,7 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   const w = world({ used: 0 });
   let lost = 0;
   const { ctx, page, reports } = await open({ w, lose: () => lost++ === 0 }); // the server charges the first request, but its answer never arrives
-  await waitCount(page, /^0 of 10 free reports used$/);
+  await waitCount(page, /^0 of 10 reports used$/);
   await make(page);
   ok(/could not be reached/.test(await text(page, '#status')) && /will not use a second free report/.test(await text(page, '#status')),
     '3a a lost answer says so, and says pressing again will not use a second free report');
@@ -449,7 +449,7 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   await page.waitForFunction(() => document.querySelectorAll('#report .da-rv-sec').length > 0, null, { timeout: 8000 }).catch(() => {});
   ok(reports.length === 2 && reports[0].body.idempotency_key === reports[1].body.idempotency_key, '3b pressing again for the same address resends the SAME key', reports.map((r) => r.body.idempotency_key));
   ok(w.used === 1 && /the report you already made for this address/.test(await text(page, '#creditnote')) && /did not use another/.test(await text(page, '#creditnote'))
-     && /^1 of 10 free reports used$/.test(await text(page, '#trial-count')),
+     && /^1 of 10 reports used$/.test(await text(page, '#trial-count')),
     '3c the server had already charged the first request: the retry gets that same report, says it used no second one, and 9 are left', [w.used, await text(page, '#creditnote')]);
   await make(page, OTHER);
   ok(reports.length === 3 && reports[2].body.idempotency_key !== reports[1].body.idempotency_key && V4.test(reports[2].body.idempotency_key) && w.used === 2,
@@ -471,12 +471,12 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   for (const [rate, re, what] of cases) {
     const w = world({ used: 4 });
     const { ctx, page, reports, errors, foreign } = await open({ w });
-    await waitCount(page, /^4 of 10 free reports used$/);
+    await waitCount(page, /^4 of 10 reports used$/);
     w.rate = rate;
     await make(page);
     const st = await page.$eval('#status', (e) => ({ text: e.textContent.trim(), err: e.classList.contains('err') }));
     ok(re.test(st.text) && st.err, '3x ' + what + ': the page says so in plain words and shows it as a refusal', st);
-    ok(w.used === 4 && /^4 of 10 free reports used$/.test(await text(page, '#trial-count')), '3x ' + what + ': nothing was used: the brokerage still has 6 free reports left', [w.used, await text(page, '#trial-count')]);
+    ok(w.used === 4 && /^4 of 10 reports used$/.test(await text(page, '#trial-count')), '3x ' + what + ': nothing was used: the brokerage still has 6 free reports left', [w.used, await text(page, '#trial-count')]);
     ok(reports.length === 1 && (await page.$$('#report .da-rv-sec')).length === 0, '3x ' + what + ': one request was sent and no report is drawn', [reports.length, (await page.$$('#report .da-rv-sec')).length]);
     const shown = await text(page, 'main');
     ok(!/\b429\b|rate_limited|retry_after/.test(shown), '3x ' + what + ': no status code, error code or field name is shown to the person', shown.slice(0, 200));
@@ -487,19 +487,19 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   // when the window has passed, the very same page makes the report
   const w = world({ used: 4 });
   const { ctx, page } = await open({ w });
-  await waitCount(page, /^4 of 10 free reports used$/);
+  await waitCount(page, /^4 of 10 reports used$/);
   w.rate = { retryAfterSeconds: 5, limitedBy: 'user', windowSeconds: 60 };
   await make(page);
   w.rate = null;
   await page.click('#go');
   await page.waitForFunction(() => document.querySelectorAll('#report .da-rv-sec').length > 0, null, { timeout: 8000 }).catch(() => {});
-  ok(w.used === 5 && /^5 of 10 free reports used$/.test(await text(page, '#trial-count')), '3x and once the wait is over the same button makes the report: one free report used, 5 left', [w.used]);
+  ok(w.used === 5 && /^5 of 10 reports used$/.test(await text(page, '#trial-count')), '3x and once the wait is over the same button makes the report: one free report used, 5 left', [w.used]);
   await ctx.close();
 }
 
 // ---- 4. who may make reports, in plain words -----------------------------------------------------------------------------------------------
 for (const [label, w, count, disabled] of [
-  ['a used-up trial', world({ used: 10 }), /10 of 10 free reports used/, true],
+  ['a used-up trial', world({ used: 10 }), /10 of 10 reports used/, true],
   ['no trial', world({ trial: null }), /not part of a trial/, true],
   ['a revoked trial', world({ trial: 'revoked' }), /trial has ended/, true],
   ['an admin', world({ trial: null, admin: true }), /HomeSignal admin/, false],
@@ -536,9 +536,9 @@ for (const [label, w, count, disabled] of [
 {
   const w = world({ used: 9 });
   const { ctx, page } = await open({ w });
-  await waitCount(page, /^9 of 10 free reports used$/);
+  await waitCount(page, /^9 of 10 reports used$/);
   await make(page);
-  ok(w.used === 10 && /10 of 10 free reports used/.test(await text(page, '#trial-count')) && (await page.$eval('#go', (b) => b.disabled)) && (await page.$$('#report .da-rv-sec')).length > 0,
+  ok(w.used === 10 && /10 of 10 reports used/.test(await text(page, '#trial-count')) && (await page.$eval('#go', (b) => b.disabled)) && (await page.$$('#report .da-rv-sec')).length > 0,
     '4h the twentieth report is shown, and the panel then says the trial is complete and stops offering reports');
   await ctx.close();
 }
@@ -547,7 +547,7 @@ for (const [label, w, count, disabled] of [
 {
   const w = world({ used: 2 });
   const { ctx, page } = await open({ w, width: 390, height: 844 });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page);
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok((await page.$$('#report .da-rv-sec')).length > 0 && wide <= 0, '5a on a 390 px screen the report is drawn and the page does not scroll sideways', wide);
@@ -557,10 +557,10 @@ for (const [label, w, count, disabled] of [
 // ---- 6. an owner invites an agent (build step 5e) ---------------------------------------------------------------------------------------
 const teamShown = (page) => drawn(page, '#team'); // rendered, not the attribute (see `drawn`)
 for (const [label, w, count] of [
-  ['an agent', world({ role: 'agent' }), /free reports used/],
+  ['an agent', world({ role: 'agent' }), /reports used/],
   ['an admin', world({ trial: null, admin: true }), /HomeSignal admin/],
   ['a person with no trial', world({ trial: null, role: 'owner' }), /not part of a trial/],
-  ['an owner of a used-up trial', world({ role: 'owner', used: 10 }), /10 of 10 free reports used/],
+  ['an owner of a used-up trial', world({ role: 'owner', used: 10 }), /10 of 10 reports used/],
   ['an owner of a revoked trial', world({ role: 'owner', trial: 'revoked' }), /trial has ended/],
 ]) {
   const { ctx, page, errors } = await open({ w });
@@ -571,7 +571,7 @@ for (const [label, w, count] of [
 {
   const w = world({ role: 'owner', used: 2 });
   const { ctx, page, trials, errors, foreign } = await open({ w });
-  await waitCount(page, /^2 of 10 free reports used$/);
+  await waitCount(page, /^2 of 10 reports used$/);
   ok(await teamShown(page) && /Invite an agent/.test(await text(page, '#team-title')) && (await page.$eval('#minted', (e) => e.hidden)),
     '6b an owner of an active trial sees "Invite an agent", with no link yet');
   await page.click('#mint');
@@ -600,7 +600,7 @@ for (const [label, w, count] of [
   // signed in again as the owner, a link made, and then a DIFFERENT person signs in on the same tab: in the same moment (before the
   // page has asked anything about the new person) the card and the owner's link are gone
   await page.evaluate((s) => { window.__sb.session = s; window.__sb.listeners.forEach((cb) => cb('SIGNED_IN', s)); }, { access_token: 'user-token', user: { id: UID, email: 'agent@example.test' } });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await page.waitForFunction(() => !document.getElementById('team').hidden, null, { timeout: 8000 }).catch(() => {});
   await page.click('#mint');
   await page.waitForFunction(() => !document.getElementById('minted').hidden, null, { timeout: 8000 }).catch(() => {});
@@ -618,7 +618,7 @@ for (const [label, w, count] of [
   // the person is an owner when the page loads, but the database refuses at the moment of minting (they were made an agent meanwhile)
   const w = world({ role: 'owner' });
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   w.mint = 'refuse';
   await page.click('#mint');
   await page.waitForFunction(() => /owner/.test(document.getElementById('team-status').textContent), null, { timeout: 8000 }).catch(() => {});
@@ -633,7 +633,7 @@ for (const [label, w, count] of [
 {
   const w = world({ role: 'owner' });
   const { ctx, page } = await open({ w, loseInvite: () => true });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await page.click('#mint');
   await page.waitForFunction(() => /could not be made/.test(document.getElementById('team-status').textContent), null, { timeout: 8000 }).catch(() => {});
   ok(/could not be made just now\. Try again/.test(await text(page, '#team-status')) && (await page.$eval('#invite-link', (e) => e.value)) === '' && !(await page.$eval('#mint', (b) => b.disabled)),
@@ -643,7 +643,7 @@ for (const [label, w, count] of [
 {
   const w = world({ role: 'owner', used: 9 });
   const { ctx, page } = await open({ w });
-  await waitCount(page, /^9 of 10 free reports used$/);
+  await waitCount(page, /^9 of 10 reports used$/);
   ok(await teamShown(page), '6n an owner with one report left is offered the card');
   await make(page);
   ok(w.used === 10 && !(await teamShown(page)), '6o using the last free report takes the card away (no agent could make a report)');
@@ -652,7 +652,7 @@ for (const [label, w, count] of [
 {
   const w = world({ role: 'owner' });
   const { ctx, page } = await open({ w, width: 390, height: 844 });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await page.click('#mint');
   await page.waitForFunction(() => !document.getElementById('minted').hidden, null, { timeout: 8000 }).catch(() => {});
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -668,7 +668,7 @@ const waitRows = (page, k) => page.waitForFunction((c) => document.querySelector
 {
   const w = world();
   const { ctx, page, errors, reports, saved, foreign } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   ok(await savedShown(page) && (await rowsOf(page)).length === 0 && /No reports saved yet/.test(await text(page, '#saved-status')),
     '7a a trial member with no report yet sees the card and is told none is saved', await text(page, '#saved-status'));
   await make(page, ADDRESS); await make(page, ADDRESS_2);
@@ -703,7 +703,7 @@ const waitRows = (page, k) => page.waitForFunction((c) => document.querySelector
   // a different person on the same tab: the first person's list and report are gone in the same moment
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page);
   await waitRows(page, 1);
   const swap = await page.evaluate(() => {
@@ -728,9 +728,9 @@ const waitRows = (page, k) => page.waitForFunction((c) => document.querySelector
   // a trial whose 10 reports are used: the card stays, the stored reports reopen, and the page makes no new one
   const w = world({ used: 9 });
   const { ctx, page, reports } = await open({ w });
-  await waitCount(page, /^9 of 10 free reports used$/);
+  await waitCount(page, /^9 of 10 reports used$/);
   await make(page);
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await waitRows(page, 1);
   ok(w.used === 10 && await savedShown(page), '7n after the 10th report the card is still offered', w.used);
   await page.click('#saved-list .sv-open');
@@ -741,7 +741,7 @@ const waitRows = (page, k) => page.waitForFunction((c) => document.querySelector
 {
   const w = world(); w.listFails = true;
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await page.waitForFunction(() => /could not be read/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
   ok(/could not be read just now/.test(await text(page, '#saved-status')) && (await rowsOf(page)).length === 0, '7p a list that cannot be read says so in plain words and shows no rows', await text(page, '#saved-status'));
   w.listFails = false;
@@ -750,7 +750,7 @@ const waitRows = (page, k) => page.waitForFunction((c) => document.querySelector
 {
   const w = world();
   const { ctx, page } = await open({ w, width: 390, height: 844 });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page);
   await waitRows(page, 1);
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -767,7 +767,7 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
 {
   const w = world();
   const { ctx, page, errors, foreign, reports } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   ok(await profileShown(page) && (await page.$eval('#agent-name', (e) => e.value)) === '' && (await byName(page)) === 'Not set' && (await page.$eval('#by-edit', (e) => e.textContent)) === 'Add name' && await page.$eval('#profile', (e) => !!e.closest('.create') && !e.closest('#account')) && !(await page.$eval('#pf', (e) => e.checkVisibility())),
     '8a a trial member sees "Report by: Not set" with an Add name button inside Create a property report (not Account), the box empty and closed');
   await page.fill('#label', 'Smith buyers');
@@ -805,7 +805,7 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
   // the name already on the account is filled in once, and a report being made never overwrites what is being typed
   const w = world(); w.header = { brokerage: 'Acme Realty', agent: 'Jo Agent' };
   const { ctx, page } = await open({ w, name: 'Jo Agent' });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   ok((await page.$eval('#agent-name', (e) => e.value)) === 'Jo Agent' && (await byName(page)) === 'Jo Agent', '8h the line and the box start with the name already on the person\'s account');
   await editBy(page);
   await page.fill('#agent-name', 'Jo Q. Agent');
@@ -825,7 +825,7 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
   // a name that cannot be saved, and one that is too long
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await page.evaluate(() => { window.__sb.updateFails = true; });
   await editBy(page);
   await page.fill('#agent-name', 'Pat Agent');
@@ -843,7 +843,7 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
   // a header that cannot be read costs nothing and shows no report
   const w = world(); w.headerFails = true;
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page);
   ok(w.used === 0 && (await page.$$('#report .da-rv-sec')).length === 0 && /could not be read just now/.test(await text(page, '#status')),
     '8m a header that cannot be read: no report, no free report used, and the page says the records could not be read', [w.used, await text(page, '#status')]);
@@ -853,7 +853,7 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
   // text is shown as text
   const w = world(); w.header = { brokerage: '<b>Acme</b> Realty', agent: '<img src=x onerror="window.__pwned=1">' };
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page);
   const who = await page.evaluate(() => ({ text: (document.querySelector('#report .da-rv-who') || {}).textContent || '', imgs: document.querySelectorAll('#report .da-rv-who *').length, pwned: window.__pwned === 1 }));
   ok(who.text === '<b>Acme</b> Realty · <img src=x onerror="window.__pwned=1">' && who.imgs === 0 && !who.pwned, '8n a name and a brokerage with markup in them are printed as text, never run', who);
@@ -869,14 +869,14 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
     await ctx.close();
   }
   const { ctx, page } = await open({ w: world(), name: 'Pat Agent' });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   ok(await profileShown(page) && (await page.$eval('#agent-name', (e) => e.value)) === 'Pat Agent', '8p (control) a trial member with a name on file sees the card with it filled in');
   await page.evaluate(() => window.__sb.listeners.forEach((cb) => cb('SIGNED_OUT', null)));
   await page.waitForTimeout(200);
   ok(!(await profileShown(page)) && (await page.$eval('#agent-name', (e) => e.value)) === '', '8q signing out hides the card and empties the box');
   await ctx.close();
   const o2 = await open({ w: world(), name: 'Pat Agent' });
-  await waitCount(o2.page, /free reports used/);
+  await waitCount(o2.page, /reports used/);
   const swap = await o2.page.evaluate(() => {
     const other = { access_token: 'other-token', user: { id: 'b2222222-2222-4222-8222-222222222222', email: 'someone@example.test' } };
     window.__sb.session = other; window.__sb.listeners.forEach((cb) => cb('SIGNED_IN', other));
@@ -888,7 +888,7 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
 {
   // a save still on its way when ANOTHER person signs in must not write its answer onto that person's page
   const { ctx, page } = await open({ w: world(), name: 'Pat Agent' });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await page.evaluate(() => { window.__sb.updateHold = true; });
   await editBy(page);
   await page.fill('#agent-name', 'Pat Q. Agent');
@@ -910,7 +910,7 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
 {
   const w = world();
   const { ctx, page } = await open({ w, width: 390, height: 844 });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page);
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok(await profileShown(page) && wide <= 0, '8s on a 390 px screen the card is shown and the page does not scroll sideways', wide);
@@ -937,7 +937,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
 {
   const w = world();
   const { ctx, page, errors, shareCalls, foreign } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   ok(await shareHidden(page), '9a before any report, the share card is not shown');
   await make(page);
   await waitShare(page, /^$/);
@@ -1060,7 +1060,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   // a report that was NOT saved ("No data ingested" uses nothing and is stored nowhere) cannot be shared, but can still be printed
   const w = world({ untraceable: true });
   const { ctx, page, shareCalls } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page);
   ok(w.made.size === 0 && (await shareHidden(page)) && shareCalls.length === 0, '9r a report that was not saved gets no share card and makes no share request');
   const bar = await page.$$eval('.da-rv-act', (els) => els.map((e) => ({ live: e.classList.contains('da-rv-act--live'), act: e.getAttribute('data-da-action') })));
@@ -1071,7 +1071,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   // opening a saved report shows its card; another report, or another person, never inherits the link
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page);
   await makeLink(page);
   await page.waitForFunction(() => !document.getElementById('share-new').hidden, null, { timeout: 8000 }).catch(() => {});
@@ -1098,7 +1098,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   // the ways it can fail are said in plain words, and a failure never shows a link
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page);
   w.shareFails = true;
   await makeLink(page);
@@ -1121,7 +1121,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
 {
   const w = world();
   const { ctx, page } = await open({ w, width: 390, height: 844 });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page);
   await makeLink(page);
   await page.waitForFunction(() => !document.getElementById('share-new').hidden, null, { timeout: 8000 }).catch(() => {});
@@ -1156,7 +1156,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
 {
   const w = world();
   const { ctx, page, errors, watchCalls, foreign } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   ok(await watchHidden(page), '10a before any report, the Watch card is not shown');
   await make(page);
   ok(await watchHidden(page) && (await drawn(page, '#rail-actions [data-da-action="watch"]')), '10b a saved report with no watch shows only the Watch Property action: the panel is not drawn until it is pressed');
@@ -1223,7 +1223,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   // a report that was not saved cannot be watched
   const w = world({ untraceable: true });
   const { ctx, page, watchCalls } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page);
   ok(w.made.size === 0 && (await watchHidden(page)) && watchCalls.length === 0, '10q a report that was not saved gets no Watch card and makes no Watch request');
   const bar = await page.$$eval('.da-rv-act', (els) => els.map((e) => ({ live: e.classList.contains('da-rv-act--live'), act: e.getAttribute('data-da-action') })));
@@ -1234,7 +1234,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   // the ways it can fail are said in plain words; a refusal never leaves the card in a state the server did not give
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page);
   await waitWatch(page, /not watching/);
   w.watchFails = true;
@@ -1264,7 +1264,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   // a list that cannot be read: starting is still offered (it does nothing twice), and the failure is said
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   w.watchListFails = true;
   await make(page);
   await waitWatch(page, /could not be done/);
@@ -1276,7 +1276,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   // another report, and another person, never inherit a watch
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page);
   await wclick(page, '#watch-start');
   await waitWatch(page, /You are watching this property, since/);
@@ -1294,7 +1294,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   // a different person signing in on the same tab takes the card, its state and its message away at once
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page);
   await wclick(page, '#watch-start');
   await waitWatch(page, /You are watching this property, since/);
@@ -1311,7 +1311,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   // a late answer for the report the person has since left is ignored: it must not paint a watch onto the report now on screen
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   w.holdNextWatchList = true;
   await make(page);                                   // report 1; its list is held on the server's side
   w.watches.push({ watch_id: 'e0000000-0000-4000-8000-0000000000aa', report_id: 'c0000000-0000-4000-8000-000000000001', created_at: '2026-10-03T12:00:00+00:00', last_run_at: null, last_outcome: null, next_due_at: '2026-10-03T12:00:00+00:00' });
@@ -1326,7 +1326,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
 {
   const w = world();
   const { ctx, page } = await open({ w, width: 390, height: 844 });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page);
   await wclick(page, '#watch-start');
   await waitWatch(page, /You are watching this property, since/);
@@ -1355,7 +1355,7 @@ const WNONE_REPORT = (await wire(NO_FAMILY(RICH))).report;   // the engine's rep
   // before there are two reports there is nothing to compare, and the card says so
   const w = world();
   const { ctx, page, saved, foreign, errors } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await page.waitForFunction(() => /Comparing needs at least 2/.test(document.getElementById('compare-status').textContent), null, { timeout: 8000 }).catch(() => {});
   ok((await compareHidden(page)) && /Comparing needs at least 2 saved reports/.test(await text(page, '#compare-status')) && (await page.$eval('#compare-go', (b) => b.disabled)),
     '11a with no saved report the card says comparing needs at least two, and the button is off (the card itself waits for Compare reports)', await text(page, '#compare-status'));
@@ -1371,7 +1371,7 @@ const WNONE_REPORT = (await wire(NO_FAMILY(RICH))).report;   // the engine's rep
   // three saved reports: the card lists them, two to five can be chosen, and comparing opens exactly the chosen ones
   const w = world();
   const { ctx, page, saved, reports, foreign, errors } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page, A1); await make(page, A2); await make(page, A3);
   await waitBoxes(page, 3);
   const labels = await page.$$eval('#saved-list li .sv-open', (els) => els.map((e) => e.textContent.trim()));
@@ -1387,7 +1387,7 @@ const WNONE_REPORT = (await wire(NO_FAMILY(RICH))).report;   // the engine's rep
   await waitCompared(page);
   const opens = saved.slice(listsBefore).filter((c) => c.body && c.body.action === 'open');
   ok(opens.length === 3 && opens.every((c) => c.auth === 'Bearer user-token' && Object.keys(c.body).sort().join() === 'action,report_id' && /^[0-9a-f-]{36}$/.test(c.body.report_id)), '11h comparing opens exactly the three chosen saved reports, each with the person\'s own token and nothing in the request but the action and the report id', opens.map((c) => c.body));
-  ok(reports.length === madeBefore && w.used === usedBefore && /^3 of 10 free reports used$/.test(await text(page, '#trial-count')), '11i it made no report and used no free report: the count is still 7', [reports.length, w.used, await text(page, '#trial-count')]);
+  ok(reports.length === madeBefore && w.used === usedBefore && /^3 of 10 reports used$/.test(await text(page, '#trial-count')), '11i it made no report and used no free report: the count is still 7', [reports.length, w.used, await text(page, '#trial-count')]);
   ok(/Compared 3 saved reports\. Opening them did not use a free report\./.test(await text(page, '#compare-status')), '11j the card says it compared three and that opening them used no free report');
   const t = await tableOf(page);
   ok(t.heads.join() === 'Report 3,Report 2,Report 1', '11k the columns are in the saved list\'s order, newest first, not the order they were ticked', t.heads);
@@ -1409,7 +1409,7 @@ const WNONE_REPORT = (await wire(NO_FAMILY(RICH))).report;   // the engine's rep
   // comparison used to say "Oct 5" while the list said "October 4"
   const w = world(); w.generatedAt = '2026-10-05T02:00:00+00:00';
   const { ctx, page } = await open({ w, tz: 'America/Denver' });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
   const listed = await page.$$eval('#saved-list li .sv-open', (els) => els.map((e) => e.textContent.trim()));
@@ -1425,7 +1425,7 @@ const WNONE_REPORT = (await wire(NO_FAMILY(RICH))).report;   // the engine's rep
   // the limit: five may be chosen and no sixth; a changed choice clears the old comparison
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   for (const a of [A1, A2, A3, A4, A5, A6]) await make(page, a);
   await waitBoxes(page, 6);
   for (let i = 1; i <= 5; i++) await page.check('#saved-list li:nth-child(' + i + ') input');
@@ -1444,7 +1444,7 @@ const WNONE_REPORT = (await wire(NO_FAMILY(RICH))).report;   // the engine's rep
   // a column that cannot say what is nearby says so; it is never a zero
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page, A1); await make(page, A2);
   const keys = [...w.made.keys()];
   w.made.get(keys[0]).report = clone(WNONE_REPORT);                   // report 1 is stored as the engine saves a report with no data ingested
@@ -1464,7 +1464,7 @@ const WNONE_REPORT = (await wire(NO_FAMILY(RICH))).report;   // the engine's rep
   // refusals: a report that cannot be found, and reports made over different distances. Nothing partial is drawn.
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page, A1); await make(page, A2); await make(page, A3);
   await waitBoxes(page, 3);
   for (let i = 1; i <= 3; i++) await page.check('#saved-list li:nth-child(' + i + ') input');
@@ -1486,7 +1486,7 @@ const WNONE_REPORT = (await wire(NO_FAMILY(RICH))).report;   // the engine's rep
   // the report's own "Compare property" button adds the report on screen to the choice
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
   const btn = await page.$$eval('.da-rv-act', (els) => els.map((e) => ({ act: e.getAttribute('data-da-action'), live: e.classList.contains('da-rv-act--live'), label: e.textContent.trim() })));
@@ -1502,7 +1502,7 @@ const WNONE_REPORT = (await wire(NO_FAMILY(RICH))).report;   // the engine's rep
   // another person, signing out, and a late answer: nothing of one person's reports is left for the next
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
   await page.check('#saved-list li:nth-child(1) .sv-pick input'); await page.check('#saved-list li:nth-child(2) .sv-pick input');
@@ -1518,7 +1518,7 @@ const WNONE_REPORT = (await wire(NO_FAMILY(RICH))).report;   // the engine's rep
 {
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
   await page.check('#saved-list li:nth-child(1) .sv-pick input'); await page.check('#saved-list li:nth-child(2) .sv-pick input');
@@ -1536,7 +1536,7 @@ const WNONE_REPORT = (await wire(NO_FAMILY(RICH))).report;   // the engine's rep
   // a late answer for a person who has since signed out is dropped: it must not paint a comparison for nobody
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
   await page.check('#saved-list li:nth-child(1) .sv-pick input'); await page.check('#saved-list li:nth-child(2) .sv-pick input');
@@ -1556,7 +1556,7 @@ const WNONE_REPORT = (await wire(NO_FAMILY(RICH))).report;   // the engine's rep
   // a phone: five reports side by side never scroll the page sideways, and each cell says which report it is
   const w = world();
   const { ctx, page } = await open({ w, width: 390, height: 844 });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   for (const a of [A1, A2, A3, A4, A5]) await make(page, a);
   await waitBoxes(page, 5);
   for (let i = 1; i <= 5; i++) await page.check('#saved-list li:nth-child(' + i + ') input');
@@ -1570,7 +1570,7 @@ const WNONE_REPORT = (await wire(NO_FAMILY(RICH))).report;   // the engine's rep
   ok(m.wide <= 0 && m.tag !== 'none' && m.head === 'absolute' && m.tableDisplay === 'block', '11z4 on a 390 px screen the comparison stacks (each cell starts with its report number) and the page does not scroll sideways', m);
   await ctx.close();
   const d = await open({ w: world() });
-  await waitCount(d.page, /free reports used/);
+  await waitCount(d.page, /reports used/);
   await make(d.page, A1); await make(d.page, A2);
   await waitBoxes(d.page, 2);
   await d.page.check('#saved-list li:nth-child(1) .sv-pick input'); await d.page.check('#saved-list li:nth-child(2) .sv-pick input');
@@ -1585,7 +1585,7 @@ const WNONE_REPORT = (await wire(NO_FAMILY(RICH))).report;   // the engine's rep
   // the report's own Compare button is live on a REOPENED saved report too, and not only on a report just made
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
   await page.click('#saved-list .sv-open');
@@ -1598,7 +1598,7 @@ const WNONE_REPORT = (await wire(NO_FAMILY(RICH))).report;   // the engine's rep
   // a saved list that cannot be read empties the card's list and says so; it never leaves a stale list to compare
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
   await page.click('#compare-mode');
@@ -1615,7 +1615,7 @@ const WNONE_REPORT = (await wire(NO_FAMILY(RICH))).report;   // the engine's rep
   // a report that comes back but is not a report the page can show is never compared (the same answer as one that cannot be found)
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
   await page.check('#saved-list li:nth-child(1) .sv-pick input'); await page.check('#saved-list li:nth-child(2) .sv-pick input');
@@ -1745,7 +1745,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
     const { ctx, page, reports } = await open({ w });
     await waitBilling(page, card);
     ok(await page.$eval('#trial-cta', (e, [st, shown]) => (!e.parentElement.hidden) === shown && (!shown || e.textContent === (st === 'past_due' ? 'Manage plan' : 'Subscribe')), [state, state !== 'unknown' && state !== 'trialing']), '12p2 a ' + state + ' plan on a used-up trial: the tile carries "Manage plan" (past due), "Subscribe" where a new subscription is possible, and NOTHING while the status is unclear (free-only, founder 2026-10-15)');
-    ok(card.test(await billingText(page)) && await page.$eval('#go', (e) => e.disabled) && (await page.$eval('#subscribe', (e) => !e.hidden)) === buy && /10 of 10 free reports used/.test(await text(page, '#trial-count')) && reports.length === 0,
+    ok(card.test(await billingText(page)) && await page.$eval('#go', (e) => e.disabled) && (await page.$eval('#subscribe', (e) => !e.hidden)) === buy && /10 of 10 reports used/.test(await text(page, '#trial-count')) && reports.length === 0,
       '12p a ' + state + ' plan on a used-up trial: the card says so, "Make report" stays off, and the checkout is ' + (buy ? 'offered (a new subscription is what is needed)' : 'NOT offered (a second one would bill twice)'), [await billingText(page), buy]);
     await ctx.close();
   }
@@ -1876,7 +1876,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   await page.click('#signup-go');
   await page.waitForFunction(() => document.getElementById('signup').hidden, null, { timeout: 8000 }).catch(() => {});
   ok(w.signedUp.length === 1 && w.signedUp[0] === 'Ann Agent', '14d one signup call carrying the cleaned name', w.signedUp);
-  ok(/^0 of 10 free reports used$/.test(await text(page, '#trial-count')) && /Your account is ready\./.test(await text(page, '#trial-sub')) && !/brokerage/i.test(await text(page, '#trial-sub')),
+  ok(/^0 of 10 reports used$/.test(await text(page, '#trial-count')) && /Your account is ready\./.test(await text(page, '#trial-sub')) && !/brokerage/i.test(await text(page, '#trial-sub')),
     '14e the card goes away and the panel reads ten free reports, in words for one person (no brokerage)', await text(page, '#trial-sub'));
   ok(await page.$eval('#team', (e) => e.hidden), '14f an individual account is never offered the team / invite card');
   await ctx.close();
@@ -1892,7 +1892,7 @@ for (const [label, opts, expect] of [['refused', { trial: null, signup: 'refuse'
 }
 {
   const { ctx, page } = await open({ w: world({ trial: 'active', role: 'owner' }) });
-  await page.waitForFunction(() => /free reports used/.test(document.getElementById('trial-count').textContent), null, { timeout: 8000 }).catch(() => {});
+  await page.waitForFunction(() => /reports used/.test(document.getElementById('trial-count').textContent), null, { timeout: 8000 }).catch(() => {});
   ok(await page.$eval('#signup', (e) => e.hidden), '14h a person who already has an account never sees the signup card');
   await ctx.close();
 }
@@ -1914,7 +1914,7 @@ for (const [label, opts, expect] of [['refused', { trial: null, signup: 'refuse'
 {
   const w = world({ role: 'owner' });
   const { ctx, page, trials, errors, foreign } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await page.waitForFunction(() => document.querySelectorAll('#team-list li').length > 0, null, { timeout: 8000 }).catch(() => {});
   const rows = await page.$$eval('#team-list li', (ls) => ls.map((l) => ({ text: l.querySelector('.who').textContent, btn: l.querySelector('button').textContent })));
   ok(rows.length === 3 && /^Agent a\*\*\*@example\.test · joined October 3, 2026$/.test(rows[0].text) && rows[0].btn === 'Remove' && /^Agent j\*\*\*@brokerage\.test/.test(rows[1].text)
@@ -1951,7 +1951,7 @@ for (const [label, opts, expect] of [['refused', { trial: null, signup: 'refuse'
   // a new invite appears in the list; the list is empty-state honest; a refusal and an outage are plain words
   const w = world({ role: 'owner' }); w.team = { members: [], invites: [] };
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await page.waitForFunction(() => !document.getElementById('team-empty').hidden, null, { timeout: 8000 }).catch(() => {});
   ok(await page.$eval('#team-empty', (e) => !e.hidden && /No agents have joined yet/.test(e.textContent)) && (await page.$$eval('#team-list li', (ls) => ls.length)) === 0, '15j with nobody on the team the page says so, in plain words');
   w.team.invites.push({ ref: TEAM_I1, created_at: '2026-10-08T12:00:00+00:00', expires_at: '2026-10-22T12:00:00+00:00' });
@@ -1967,7 +1967,7 @@ for (const [label, opts, expect] of [['refused', { trial: null, signup: 'refuse'
 {
   const w = world({ role: 'owner' }); w.teamFails = true;
   const { ctx, page, errors } = await open({ w });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await page.waitForFunction(() => /could not be read/.test(document.getElementById('team-status').textContent), null, { timeout: 8000 }).catch(() => {});
   ok(/The team could not be read just now/.test(await text(page, '#team-status')) && (await page.$$eval('#team-list li', (ls) => ls.length)) === 0 && errors.filter((e) => !/502/.test(e)).length === 0,
     '15m a team that cannot be read says so and shows no list (never an empty team passed off as the real one)', [errors, await text(page, '#team-status'), await page.$$eval('#team-list li', (ls) => ls.length)]);
@@ -2132,7 +2132,7 @@ const noSideways = (page) => page.evaluate(() => document.documentElement.scroll
   // L2. a signed-in owner with saved reports: the order, the report as the dominant element, the actions under its heading, the closed account section
   const w = world({ role: 'owner' });
   const { ctx, page } = await open({ w, accountClosed: true });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   ok(await drawn(page, '#report-empty') && !(await drawn(page, '#share')) && !(await drawn(page, '#watch')), 'L2a before any report is open, the empty note is shown and the Share and Watch cards are not');
   await shot(page, 'L2-empty-member-desktop');
   await make(page, A1); await make(page, A2); await make(page, A3);
@@ -2166,7 +2166,7 @@ const noSideways = (page) => page.evaluate(() => document.documentElement.scroll
 for (const [width, height] of [[1280, 900], [768, 1024], [390, 844]]) {
   // L3. no sideways scroll at desktop, tablet and phone widths, with a report, the library and the account section open
   const { ctx, page } = await open({ w: world({ role: 'owner' }), width, height });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
   await page.check('#saved-list li:nth-child(1) .sv-pick input'); await page.check('#saved-list li:nth-child(2) .sv-pick input');
@@ -2189,7 +2189,7 @@ for (const [width, height] of [[1280, 900], [768, 1024], [390, 844]]) {
 for (const [width, height] of [[1440, 900], [1920, 1080]]) {
   // L5. THE TWO-COLUMN WORKSPACE: a narrow tools rail on the left, the report taking the rest, nothing left under the report
   const { ctx, page } = await open({ w: world({ role: 'owner' }), width, height, accountClosed: true });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   for (const a of [A1, A2, A3, A4, A5, A6]) await make(page, a);
   await waitBoxes(page, 6);
   const g = await page.evaluate(() => {
@@ -2215,7 +2215,7 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
   });
   ok(!h.inRail && Math.abs(h.create.l - h.ws.l) <= 2 && Math.abs(h.create.r - h.ws.r) <= 2 && h.create.b <= h.rail.t + 1 && h.create.b <= h.stage.t + 1, `L5q at ${width}px Create a property report spans the whole workspace width and sits above both columns`, [h.create, h.ws]);
   ok(h.create.h < 190 && Math.abs(h.addr.t - h.go.t) < 12 && h.label.l > h.addr.r - 1 && h.go.l > h.label.r - 1 && h.addr.w > h.go.w * 3, `L5r at ${width}px address, client label and Generate report share one row and the section stays compact`, [h.create.h, h.addr, h.label, h.go]);
-  ok(h.trialInHeader && h.trial.b <= h.headerB + 1 && h.trial.h < 90 && /^3 of 10 free reports used$|^\d+ of 10 free reports used$/.test(h.count) && h.cta.w > 0 && h.trial.t < h.create.t, `L5s at ${width}px the usage count and Subscribe sit in the site bar's account zone, small, above the form`, h);
+  ok(h.trialInHeader && h.trial.b <= h.headerB + 1 && h.trial.h < 90 && /^3 of 10 reports used$|^\d+ of 10 reports used$/.test(h.count) && h.cta.w > 0 && h.trial.t < h.create.t, `L5s at ${width}px the usage count and Subscribe sit in the site bar's account zone, small, above the form`, h);
 
   { const surface = g.report.r - g.rail.l;   // the working surface: from the rail's left edge to the report's right edge
     ok(g.report.w >= 950 && g.report.w / surface >= 0.70 && g.report.w / surface <= 0.80 && g.report.w / (g.wrap.r - g.wrap.l) >= 0.70, `L5b2 at ${width}px the report is at least 950px wide and 70-80% of the working surface (and 70%+ of the workspace container)`, { w: g.report.w, surface, wrap: g.wrap }); }
@@ -2264,21 +2264,21 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
 {
   // L6. a phone: the sections stack, in the order create, this report's tools, the report, saved reports, account
   const { ctx, page } = await open({ w: world({ role: 'owner' }), width: 390, height: 844, accountClosed: true });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
   const t = { create: await topOf(page, '#rf'), actions: await topOf(page, '#rail-actions'), report: await topOf(page, '#report .da-rv'), saved: await topOf(page, '#saved'), account: await topOf(page, '#account') };
   ok(t.create < t.actions && t.actions < t.report && t.report < t.saved && t.saved < t.account, 'L6a at 390px the order is Create, this report\'s tools, the report, Saved reports, Account', t);
   ok(await noSideways(page), 'L6b at 390px nothing scrolls sideways');
   { const u = await page.evaluate(() => ({ trialInHeader: document.querySelector('header.sitebar').contains(document.getElementById('trial')), tr: document.getElementById('trial').getBoundingClientRect().height, ctaVisible: document.getElementById('trial-cta').getClientRects().length > 0, count: document.getElementById('trial-count').textContent, cta: document.getElementById('trial-cta').textContent, addr: document.getElementById('addr').getBoundingClientRect(), label: document.getElementById('label').getBoundingClientRect(), go: document.getElementById('go').getBoundingClientRect() }));
-    ok(u.trialInHeader && u.ctaVisible && u.tr < 80 && /of 10 free reports used/.test(u.count) && u.cta === 'Subscribe', 'L6c at 390px usage and Subscribe stay visible and compact in the site bar', u);
+    ok(u.trialInHeader && u.ctaVisible && u.tr < 80 && /of 10 reports used/.test(u.count) && u.cta === 'Subscribe', 'L6c at 390px usage and Subscribe stay visible and compact in the site bar', u);
     ok(u.addr.bottom <= u.label.top + 1 && u.label.bottom <= u.go.top + 1 && Math.abs(u.addr.width - u.go.width) < 4, 'L6d at 390px the form stacks: address, client label, then a full-width Generate report', u); }
   await ctx.close();
 }
 {
   // L7. the buttons in the rail still do the report's work: Compare from the report's own button opens compare mode with that report chosen
   const { ctx, page } = await open({ w: world({ role: 'owner' }), accountClosed: true });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
   await page.click('#rail-actions [data-da-action="compare"]');
@@ -2316,7 +2316,7 @@ for (const [w, h] of [[1440, 900], [1920, 1080], [390, 844]]) {
   ok(g.create.w >= g.ws.w - 2, `${tag}: Create spans the full workspace width`, g.create);
   ok(!g.accountInRail && !g.accountInWs && !g.railHasAdmin && g.account && g.account.y >= g.ws.b - 1, `${tag}: Account and administration is out of the rail and below the workspace`, g);
   ok(g.railHeads.join('|') === 'This report|Saved reports', `${tag}: the rail holds only this report's tools and saved reports`, g.railHeads);
-  ok(g.trialInBar && g.trialCtaInBar && g.ctaShown && /free reports used/.test(g.count) && /Subscribe/.test(g.cta) && g.acctBtnInBar, `${tag}: usage, the plan action and the Account control are in the account zone of the bar`, g);
+  ok(g.trialInBar && g.trialCtaInBar && g.ctaShown && /reports used/.test(g.count) && /Subscribe/.test(g.cta) && g.acctBtnInBar, `${tag}: usage, the plan action and the Account control are in the account zone of the bar`, g);
   ok(!g.entnav && !g.brandLabel, `${tag}: no Enterprise row and no repeated HomeSignal label`, g);
   ok(g.overflow <= 0, `${tag}: nothing scrolls sideways`, g.overflow);
   ok(await page.evaluate(() => ![...document.querySelectorAll('[data-da-action="compare"], #compare-mode, #compare, .sv-pick')].some((e) => e.getClientRects().length) && ![...document.querySelectorAll('button')].some((b) => /compare/i.test(b.textContent) && b.getClientRects().length)), `${tag}: no Compare button, selection UI or report-level Compare action anywhere (launch scope)`);
@@ -2345,7 +2345,7 @@ for (const [w, h] of [[1440, 900], [1920, 1080], [390, 844]]) {
 {
   const w = world();
   const { ctx, page, errors, shareCalls, watchCalls } = await open({ w, compare: false });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   await make(page, A1); await make(page, A2);
   await page.waitForFunction(() => document.querySelectorAll('#saved-list li').length === 2, null, { timeout: 8000 }).catch(() => {});
   const used = await text(page, '#trial-count');
@@ -2408,7 +2408,7 @@ for (const [w, h] of [[1440, 900], [1920, 1080], [390, 844]]) {
   // THE LEFT RAIL ANSWERS TWO QUESTIONS ONLY (founder, 2026-10-11): what can I do with THIS report, and which OTHER report do I open.
   const w = world();
   const { ctx, page, errors } = await open({ w, compare: false });
-  await waitCount(page, /free reports used/);
+  await waitCount(page, /reports used/);
   ok(!(await drawn(page, '#rail-report')) && !/Open a report to share/.test(await page.evaluate(() => document.getElementById('rail').innerText)), 'O1 with no report open the rail has no empty "This report" section');
   await make(page);
   ok(await drawn(page, '#rail-report'), 'O2 with a report open, This report is drawn');
