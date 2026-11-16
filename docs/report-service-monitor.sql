@@ -12,8 +12,8 @@
 -- capability sheet and does nothing else (no sign-in, no database read, no write, no charge):
 --     get-development-activity-report            200 + its capability sheet
 --     manage-billing                             200 + its capability sheet
---     development-activity-billing-webhook       200 + {"configured": true|false}
--- The webhook's `configured` flag matters most: it is false when its signing secret or variant id is missing, and a
+--     paddle-webhook                             200 + {"configured": true|false}
+-- The webhook's `configured` flag matters most: it is false when its signing secrets or binding secret are missing, and a
 -- webhook in that state REFUSES every payment event (503), so a paying customer would never be marked paid.
 --
 -- THE CHECK `report_service` is ALERTABLE and FAILS when, for any one function:
@@ -56,10 +56,24 @@ $pre$;
 -- 1. the probe log: which request went to which function, and when. Counts and ids only; RLS on, no API grant.
 create table if not exists public.report_service_probe (
   id          bigserial primary key,
-  fn          text        not null check (fn in ('get-development-activity-report', 'manage-billing', 'development-activity-billing-webhook')),
+  fn          text        not null check (fn in ('get-development-activity-report', 'manage-billing', 'development-activity-billing-webhook', 'paddle-webhook')),
   request_id  bigint      not null,
   fired_at    timestamptz not null default now()
 );
+-- Paddle replaced Lemon Squeezy (2026-11-16): the webhook the probe asks is now paddle-webhook. A table made before that has the old check; widen it
+-- (the old name stays allowed so the probe rows already stored remain valid).
+do $widen$
+declare cn text;
+begin
+  select c.conname into cn from pg_constraint c
+   where c.conrelid = 'public.report_service_probe'::regclass and c.contype = 'c'
+     and pg_get_constraintdef(c.oid) like '%development-activity-billing-webhook%' and pg_get_constraintdef(c.oid) not like '%paddle-webhook%';
+  if cn is not null then
+    execute format('alter table public.report_service_probe drop constraint %I', cn);
+    alter table public.report_service_probe add constraint report_service_probe_fn_check
+      check (fn in ('get-development-activity-report', 'manage-billing', 'development-activity-billing-webhook', 'paddle-webhook'));
+  end if;
+end $widen$;
 create index if not exists report_service_probe_fn_fired_idx on public.report_service_probe (fn, fired_at desc);
 alter table public.report_service_probe enable row level security;
 revoke all on public.report_service_probe from public, anon, authenticated;
@@ -76,7 +90,7 @@ declare
   _id   bigint;
   _n    integer := 0;
 begin
-  foreach _fn in array array['get-development-activity-report', 'manage-billing', 'development-activity-billing-webhook'] loop
+  foreach _fn in array array['get-development-activity-report', 'manage-billing', 'paddle-webhook'] loop
     begin
       select net.http_get(url := _base || _fn,
                           headers := jsonb_build_object('apikey', _anon, 'Authorization', 'Bearer ' || _anon),
@@ -107,13 +121,13 @@ declare
   _last int;
   _conf text;
 begin
-  foreach _fn in array array['get-development-activity-report', 'manage-billing', 'development-activity-billing-webhook'] loop
+  foreach _fn in array array['get-development-activity-report', 'manage-billing', 'paddle-webhook'] loop
     fn := _fn;
     select max(p.fired_at) into _newest from public.report_service_probe p where p.fn = _fn;
     -- the two newest probes that have had time to answer (2 minutes) and whose answer is still on record
     with j as (
       select p.fired_at, r.status_code, r.timed_out,
-             case when _fn = 'development-activity-billing-webhook'
+             case when _fn = 'paddle-webhook'
                   then case when coalesce(r.content, '') ~ '"configured"[[:space:]]*:[[:space:]]*true' then 'true' else 'false' end
              end as configured
         from public.report_service_probe p
@@ -123,7 +137,7 @@ begin
        limit 2)
     select count(*),
            count(*) filter (where j.timed_out is true or j.status_code is distinct from 200
-                              or (_fn = 'development-activity-billing-webhook' and j.configured is distinct from 'true')),
+                              or (_fn = 'paddle-webhook' and j.configured is distinct from 'true')),
            (array_agg(j.status_code order by j.fired_at desc))[1],
            (array_agg(j.configured order by j.fired_at desc))[1]
       into _n, _bad, _last, _conf
@@ -135,7 +149,7 @@ begin
       state := 'stale'; detail := 'the probe job has not fired for over 40 minutes';
     elsif _n >= 2 and _bad = 2 then
       state := 'down';
-      detail := case when _fn = 'development-activity-billing-webhook' and _last = 200 and _conf is distinct from 'true'
+      detail := case when _fn = 'paddle-webhook' and _last = 200 and _conf is distinct from 'true'
                      then 'answers but is NOT set up (signing secret or variant id missing): every payment event would be refused'
                      else 'no good answer to the last two probes (newest status ' || coalesce(_last::text, 'none') || ')' end;
     else

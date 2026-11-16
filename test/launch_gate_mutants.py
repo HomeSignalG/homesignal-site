@@ -29,10 +29,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 FN = 'supabase/functions/'
-LB = FN + '_shared/lemon-billing.ts'
+LB = FN + '_shared/paddle-billing.ts'
 BR = FN + '_shared/billing-reads.ts'
 MH = FN + 'manage-billing/handler.ts'
-WH = FN + 'development-activity-billing-webhook/handler.ts'
+WH = FN + 'paddle-webhook/handler.ts'
 RH = FN + 'get-development-activity-report/handler.ts'
 RS = FN + '_shared/report-snapshot.ts'
 BILL = 'docs/brokerage-billing.sql'
@@ -55,20 +55,18 @@ def mm(name, pairs):
 # ---- the edge: who may start a checkout, and when -----------------------------------------------------------------------------------------------------
 m('agent_may_start_a_checkout', MH, "  if (u.role !== 'owner') return 'not_owner';\n", "")
 mm('a_paid_brokerage_is_offered_a_second_checkout', [(MH, "  if (u.state === 'paid') return 'already_paid';\n", ""),
-                                                      (MH, "u.state !== 'canceled' && u.state !== 'test_only')", "u.state !== 'canceled' && u.state !== 'test_only' && u.state !== 'paid')")])
-m('a_test_subscription_blocks_the_real_checkout', MH, "u.state !== 'canceled' && u.state !== 'test_only')", "u.state !== 'canceled')")
-m('a_canceled_brokerage_cannot_resubscribe', MH, "u.state !== 'none' && u.state !== 'canceled' && u.state !== 'test_only')", "u.state !== 'none' && u.state !== 'test_only')")
+                                                      (MH, "u.state !== 'canceled' && u.state !== 'expired' && u.state !== 'test_only') return 'subscription_exists';", "u.state !== 'canceled' && u.state !== 'expired' && u.state !== 'test_only' && u.state !== 'paid') return 'subscription_exists';")])
+m('a_test_subscription_blocks_the_real_checkout', MH, "u.state !== 'expired' && u.state !== 'test_only') return 'subscription_exists';", "u.state !== 'expired') return 'subscription_exists';")
+m('a_canceled_brokerage_cannot_resubscribe', MH, "u.state !== 'none' && u.state !== 'canceled' && u.state !== 'expired'", "u.state !== 'none' && u.state !== 'expired'")
 m('checkout_offered_without_the_processor_set_up', MH, "  if (!configured) return 'not_set_up';\n", "")
 m('plan_answer_names_the_brokerage', BR, "return { state: u.state, role: u.role,", "return { brokerage_id: u.brokerage_id, state: u.state, role: u.role,")
 # ---- the checkout and the webhook: which payment belongs to which brokerage ------------------------------------------------------------------------------
-m('checkout_without_its_signature', LB, "checkout_data: { custom: { brokerage_id: brokerageId, bind } },", "checkout_data: { custom: { brokerage_id: brokerageId } },")
-m('checkout_marked_test_when_live', LB, "        ...(cfg.testMode ? { test_mode: true } : {}),\n", "        test_mode: true,\n")
-m('webhook_signature_not_checked', WH, "    if (!(await verifySignature(deps.secret, raw, req.headers.get(SIGNATURE_HEADER)))) return reply({ error: 'unauthorized' }, 401);\n", "")
-m('binding_not_verified', LB, "  if (!(await verifyBinding(cfg.secret, custom.brokerage_id, custom.bind))) return { kind: 'ignore', reason: 'bad_binding' };\n", "")
-m('another_product_recorded', LB, "  if (!cfg.variantId || variant !== cfg.variantId) return { kind: 'ignore', reason: 'variant' };\n", "")
-m('test_payment_called_live', LB, "    livemode: !testMode,", "    livemode: true,")
-m('order_events_recorded', LB, "  if (!SUBSCRIPTION_EVENTS.includes(eventName)) return { kind: 'ignore', reason: 'event_name' };\n", "")
-m('a_malformed_event_is_guessed_at', LB, "  if (typeof updated !== 'string' || !ISO_WITH_OFFSET.test(updated) || !Number.isFinite(Date.parse(updated))) return { kind: 'invalid', reason: 'updated_at' };\n", "")
+m('checkout_without_its_signature', LB, "    customData: { brokerage_id: brokerageId, plan, ...(enrollmentId ? { enrollment_id: enrollmentId } : {}), bind },", "    customData: { brokerage_id: brokerageId, plan, ...(enrollmentId ? { enrollment_id: enrollmentId } : {}) },")
+m('webhook_signature_not_checked', WH, "    if (env === null) return reply({ error: 'unauthorized' }, 401);\n", "")
+m('binding_not_verified', LB, "  if (!(await verifyBinding(bindingSecret, custom.brokerage_id, custom.plan, custom.enrollment_id, custom.bind))) return { kind: 'unbound', reason: 'bad_binding', event };\n", "")
+m('sandbox_payment_called_live', LB, "  const livemode = env === 'live';", "  const livemode = true;")
+m('other_event_kinds_recorded', LB, "  if (!isSub && !isTxn && !isAdj) return { kind: 'ignore', reason: 'event_type' };\n", "")
+m('a_malformed_event_is_guessed_at', LB, "  if (occurred === null) return { kind: 'invalid', reason: 'occurred_at' };\n", "")
 # ---- the report function: the refusals come BEFORE any work ---------------------------------------------------------------------------------------------
 m('complete_trial_reaches_the_issue_function', RH, "if (trial && trial.complete && !paid) return reply(", "if (false && trial && trial.complete && !paid) return reply(")
 m('spent_month_reaches_the_issue_function', RH, "    if (trial && paid && plan!.credits_remaining <= 0) return reply(req, { error: 'allotment_complete', trial: trialSummary(trial.trial), ...planInfo }, 403);\n", "")

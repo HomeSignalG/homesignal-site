@@ -9,10 +9,10 @@
 // PURE of environment and network: the database call arrives as `rpc` (_shared/service-rest.ts).
 import { DataUnavailable } from './service-rest.ts';
 import type { ServiceRpc } from './service-rest.ts';
-import type { LedgerEvent } from './lemon-billing.ts';
+import type { LedgerEvent, Period, PlanKey } from './paddle-billing.ts';
 import { PUBLIC_ORIGIN } from './brand-origins.generated.ts';
 
-/** Where the processor brings a person back to after a checkout. It only brings them back: the page re-reads the plan, and a success URL grants nothing. */
+/** Where Paddle brings a person back to after a checkout. It only brings them back: the page re-reads the plan, and a success URL grants nothing. */
 export const BILLING_PAGE = PUBLIC_ORIGIN + '/development-activity-reports.html#billing';
 
 /** The ledger refused to bind the subscription: it already belongs to a different brokerage. */
@@ -23,7 +23,7 @@ export class BrokerageUnknown extends Error {}
 export class EventRefused extends Error {}
 
 /** The plan states billing_plan_of can answer, exactly. Anything else from the database is a shape failure. */
-export const PLAN_STATES = ['none', 'trialing', 'paid', 'past_due', 'canceled', 'unknown', 'test_only', 'suspended'] as const;
+export const PLAN_STATES = ['none', 'trialing', 'paid', 'past_due', 'canceled', 'unknown', 'test_only', 'suspended', 'expired'] as const;
 export type PlanState = typeof PLAN_STATES[number];
 
 export type BillingUsage = {
@@ -55,11 +55,49 @@ export function planSummary(u: BillingUsage | null): PlanSummary {
 /** The checkout slot (docs/da-owner-safeguards.sql, part C): CLAIMED = make one checkout; BUSY = one was claimed in the last ten minutes, make none. */
 export type CheckoutSlot = { outcome: 'CLAIMED' | 'BUSY' };
 
-export type AppliedEvent = { outcome: 'RECORDED' | 'DUPLICATE'; bound: boolean; state: PlanState; is_latest: boolean };
+export type ApplyOutcome = 'RECORDED' | 'DUPLICATE' | 'UNKNOWN_PRICE' | 'PLAN_MISMATCH' | 'UNSUPPORTED_EVENT' | 'PARTNER_NOT_ELIGIBLE' | 'NO_BINDING';
+export type AppliedEvent = { outcome: ApplyOutcome; bound: boolean; state: PlanState | null; is_latest: boolean | null };
+
+/** The dashboard's plan, exactly as public.billing_summary answers (docs/paddle-billing.sql). The brokerage id stays server-side. */
+export type BillingSummary = BillingUsage & {
+  plan_key: PlanKey | null; plan_label: string | null; kind: 'recurring' | 'one_time' | null; access_months: number | null;
+  next_reset_at: string | null; access_ends_at: string | null; renews_at: string | null; cancel_effective_at: string | null;
+};
+export type DashboardPlan = {
+  state: PlanState; role: 'owner' | 'agent' | null; plan_key: PlanKey | null; plan_label: string | null; kind: 'recurring' | 'one_time' | null;
+  credit_limit: number; credits_used: number; credits_remaining: number;
+  next_reset_at: string | null; access_ends_at: string | null; renews_at: string | null; cancel_effective_at: string | null;
+};
+export function dashboardPlan(u: BillingSummary | null): DashboardPlan {
+  if (!u) return { state: 'none', role: null, plan_key: null, plan_label: null, kind: null, credit_limit: 0, credits_used: 0, credits_remaining: 0, next_reset_at: null, access_ends_at: null, renews_at: null, cancel_effective_at: null };
+  return {
+    state: u.state, role: u.role, plan_key: u.plan_key, plan_label: u.plan_label, kind: u.kind, credit_limit: u.credit_limit, credits_used: u.credits_used,
+    credits_remaining: u.credits_remaining, next_reset_at: u.next_reset_at, access_ends_at: u.access_ends_at, renews_at: u.renews_at, cancel_effective_at: u.cancel_effective_at,
+  };
+}
+export type PartnerStart = { outcome: 'OK' | 'LINK_INVALID' | 'NOT_ENTITLED' | 'ALREADY_USED' | 'ALREADY_PAID'; enrollment_id: string | null; brokerage_id: string | null };
+
+const nullableTime = (v: unknown) => v === null || v === undefined || isTime(v);
+const APPLY_OUTCOMES: readonly string[] = ['RECORDED', 'DUPLICATE', 'UNKNOWN_PRICE', 'PLAN_MISMATCH', 'UNSUPPORTED_EVENT', 'PARTNER_NOT_ELIGIBLE', 'NO_BINDING'];
+
+function appliedFrom(data: unknown): AppliedEvent {
+  if (!Array.isArray(data) || data.length !== 1) throw new DataUnavailable('shape');
+  const r = data[0];
+  if (!r || !APPLY_OUTCOMES.includes(r.outcome) || typeof r.bound !== 'boolean' || !(r.is_latest === null || typeof r.is_latest === 'boolean')
+      || !(r.state === null || (PLAN_STATES as readonly string[]).includes(r.state))) throw new DataUnavailable('shape');
+  return { outcome: r.outcome, bound: r.bound, state: r.state, is_latest: r.is_latest };
+}
+function refusal(error: { message: string }, fn: string): never {
+  if (error.message === 'BINDING_CONFLICT') throw new BindingConflict('refused');
+  if (error.message === 'BROKERAGE_UNKNOWN') throw new BrokerageUnknown('refused');
+  // the ledger's own refusals are SQLSTATE 22023 with a message that names a field and never a value
+  if (/^payment_event:|^billing_event_apply:|^paddle_event_apply:|^paddle_adjustment_apply:/.test(error.message)) throw new EventRefused('refused');
+  throw new DataUnavailable(fn);
+}
 
 export function makeBillingReads(rpc: ServiceRpc) {
   return {
-    /** The signed-in person's billing, by their auth user id (never an email), or null when they belong to no brokerage. */
+    /** The signed-in person's billing (the report gate's reader), by auth user id, or null when they belong to no brokerage. */
     async usageOf(userId: string): Promise<BillingUsage | null> {
       const { data, error } = await rpc('billing_usage', { p_user_id: userId });
       if (error) throw new DataUnavailable('billing_usage');
@@ -78,11 +116,57 @@ export function makeBillingReads(rpc: ServiceRpc) {
       };
     },
 
-    /**
-     * Take the brokerage's single checkout slot (public.billing_checkout_claim, ONE transaction, serialised per brokerage): CLAIMED means make one
-     * checkout, BUSY means one was claimed in the last ten minutes and none is made. The address of a checkout is never kept anywhere. Any failure to
-     * claim is DataUnavailable: no checkout is made without the slot.
-     */
+    /** The customer dashboard's reader (public.billing_summary): plan, allowance, remaining, next reset, access end, renewal. */
+    async summaryOf(userId: string): Promise<BillingSummary | null> {
+      const { data, error } = await rpc('billing_summary', { p_user_id: userId });
+      if (error) throw new DataUnavailable('billing_summary');
+      if (!Array.isArray(data)) throw new DataUnavailable('shape');
+      if (data.length === 0) return null;
+      const u = data[0];
+      if (data.length !== 1 || !u || typeof u.brokerage_id !== 'string' || !UUID.test(u.brokerage_id) || (u.role !== 'owner' && u.role !== 'agent')
+          || !(PLAN_STATES as readonly string[]).includes(u.state) || !Number.isInteger(u.credit_limit) || !Number.isInteger(u.credits_used) || !Number.isInteger(u.credits_remaining)
+          || u.credits_used < 0 || u.credits_remaining < 0 || !(u.plan_key === null || u.plan_key === 'professional' || u.plan_key === 'private_partner')
+          || !(u.kind === null || u.kind === 'recurring' || u.kind === 'one_time') || !nullableTime(u.next_reset_at) || !nullableTime(u.access_ends_at)
+          || !nullableTime(u.renews_at) || !nullableTime(u.cancel_effective_at)) throw new DataUnavailable('shape');
+      return {
+        brokerage_id: u.brokerage_id.toLowerCase(), role: u.role, state: u.state, credit_limit: u.credit_limit, credits_used: u.credits_used, credits_remaining: u.credits_remaining,
+        period_ends_at: u.next_reset_at ?? null, plan_key: u.plan_key ?? null, plan_label: typeof u.plan_label === 'string' ? u.plan_label : null, kind: u.kind ?? null,
+        access_months: Number.isInteger(u.access_months) ? u.access_months : null, next_reset_at: u.next_reset_at ?? null, access_ends_at: u.access_ends_at ?? null,
+        renews_at: u.renews_at ?? null, cancel_effective_at: u.cancel_effective_at ?? null,
+      };
+    },
+
+    /** The Paddle price for a plan in the configured environment (public.billing_price_for), or null when none is registered. Never a price the page names. */
+    async priceFor(plan: PlanKey, livemode: boolean): Promise<string | null> {
+      const { data, error } = await rpc('billing_price_for', { p_plan_key: plan, p_livemode: livemode });
+      if (error) throw new DataUnavailable('billing_price_for');
+      return typeof data === 'string' && /^pri_[0-9a-z]{20,40}$/.test(data) ? data : null;
+    },
+
+    /** Whether this person's account may buy the private partner offer with this link (hash), and with write=true, the enrollment the signed checkout names. */
+    async partnerStart(userId: string, tokenHash: string, write: boolean): Promise<PartnerStart> {
+      const { data, error } = await rpc('partner_enrollment_start', { p_user_id: userId, p_token_hash: tokenHash, p_create: write });
+      if (error) throw new DataUnavailable('partner_enrollment_start');
+      if (!Array.isArray(data) || data.length !== 1) throw new DataUnavailable('shape');
+      const r = data[0];
+      if (!r || !['OK', 'LINK_INVALID', 'NOT_ENTITLED', 'ALREADY_USED', 'ALREADY_PAID'].includes(r.outcome)
+          || !(r.enrollment_id === null || (typeof r.enrollment_id === 'string' && UUID.test(r.enrollment_id)))
+          || !(r.brokerage_id === null || (typeof r.brokerage_id === 'string' && UUID.test(r.brokerage_id)))) throw new DataUnavailable('shape');
+      return { outcome: r.outcome, enrollment_id: r.enrollment_id, brokerage_id: r.brokerage_id };
+    },
+
+    /** The owner's recurring subscription id, for the billing-management addresses. Server-side only. */
+    async portalRef(userId: string): Promise<{ subscription_ref: string; livemode: boolean } | null> {
+      const { data, error } = await rpc('billing_portal_ref', { p_user_id: userId });
+      if (error) throw new DataUnavailable('billing_portal_ref');
+      if (!Array.isArray(data)) throw new DataUnavailable('shape');
+      if (data.length === 0) return null;
+      const r = data[0];
+      if (data.length !== 1 || !r || typeof r.subscription_ref !== 'string' || !/^sub_[0-9a-z]{20,40}$/.test(r.subscription_ref) || typeof r.livemode !== 'boolean') throw new DataUnavailable('shape');
+      return { subscription_ref: r.subscription_ref, livemode: r.livemode };
+    },
+
+    /** The brokerage's single checkout slot (public.billing_checkout_claim): CLAIMED = open one checkout, BUSY = one was opened in the last ten minutes. */
     async checkoutClaim(brokerageId: string): Promise<CheckoutSlot> {
       if (!UUID.test(brokerageId)) throw new DataUnavailable('checkout claim needs a brokerage id');
       const { data, error } = await rpc('billing_checkout_claim', { p_brokerage: brokerageId });
@@ -94,35 +178,32 @@ export function makeBillingReads(rpc: ServiceRpc) {
       throw new DataUnavailable('shape');
     },
 
-    /** The checkout could not be made: free the slot at once. Best effort: if this fails the slot frees itself in ten minutes. */
+    /** The checkout was closed without paying: free the slot at once. Best effort: it frees itself in ten minutes. */
     async checkoutRelease(brokerageId: string): Promise<void> {
       if (!UUID.test(brokerageId)) throw new DataUnavailable('checkout release needs a brokerage id');
       const { error } = await rpc('billing_checkout_release', { p_brokerage: brokerageId });
       if (error) throw new DataUnavailable('billing_checkout_release');
     },
 
-    /**
-     * Record one processor event for one brokerage, and bind its subscription to that brokerage if this is the first the database has seen of it
-     * (public.billing_event_apply: ONE transaction, through the payment ledger's one writer). A retried delivery is `DUPLICATE`. The refusals are
-     * named; any other failure is DataUnavailable so the webhook answers 5xx and the processor retries.
-     */
-    async applyEvent(brokerageId: string, event: LedgerEvent): Promise<AppliedEvent> {
+    /** Record one verified Paddle subscription / one-time transaction event for the account a SIGNED checkout named (public.paddle_event_apply). */
+    async applyEvent(brokerageId: string, plan: PlanKey, enrollmentId: string | null, event: LedgerEvent, period: Period | null): Promise<AppliedEvent> {
       if (!UUID.test(brokerageId)) throw new BrokerageUnknown('malformed');
-      const { data, error } = await rpc('billing_event_apply', { p_brokerage: brokerageId, p_event: event });
-      if (error) {
-        if (error.message === 'BINDING_CONFLICT') throw new BindingConflict('refused');
-        if (error.message === 'BROKERAGE_UNKNOWN') throw new BrokerageUnknown('refused');
-        // the ledger's own refusals are SQLSTATE 22023 with a message that names a field and never a value
-        if (/^payment_event:|^billing_event_apply:/.test(error.message)) throw new EventRefused('refused');
-        throw new DataUnavailable('billing_event_apply');
-      }
-      if (!Array.isArray(data) || data.length !== 1) throw new DataUnavailable('shape');
-      const r = data[0];
-      if (!r || (r.outcome !== 'RECORDED' && r.outcome !== 'DUPLICATE') || typeof r.bound !== 'boolean' || typeof r.is_latest !== 'boolean'
-          || !(PLAN_STATES as readonly string[]).includes(r.state)) {
-        throw new DataUnavailable('shape');
-      }
-      return { outcome: r.outcome, bound: r.bound, state: r.state, is_latest: r.is_latest };
+      const { data, error } = await rpc('paddle_event_apply', { p_brokerage: brokerageId, p_event: event, p_plan: plan, p_enrollment: enrollmentId, p_period: period });
+      if (error) refusal(error, 'paddle_event_apply');
+      return appliedFrom(data);
+    },
+
+    /** Record a FULL refund / chargeback against the binding it refers to (public.paddle_adjustment_apply). */
+    async applyRefund(event: LedgerEvent): Promise<AppliedEvent> {
+      const { data, error } = await rpc('paddle_adjustment_apply', { p_event: event });
+      if (error) refusal(error, 'paddle_adjustment_apply');
+      return appliedFrom(data);
+    },
+
+    /** A verified payment event whose checkout carried no valid signature: kept (opaque ids only) so the operator can refund it. Never granted. */
+    async recordUnbound(event: LedgerEvent): Promise<void> {
+      const { error } = await rpc('paddle_unmatched_record', { p_event: event, p_reason: 'NO_ACCOUNT' });
+      if (error) throw new DataUnavailable('paddle_unmatched_record');
     },
   };
 }

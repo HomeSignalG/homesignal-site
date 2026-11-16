@@ -1,74 +1,97 @@
-// manage-billing — a brokerage member reads their plan, and a brokerage OWNER starts the monthly checkout (Development Activity build step 11;
-// docs/development-activity-build-steps-100526.md: "$79/month checkout on the existing Lemon Squeezy connection: 100 reports a month, Billing tab").
+// manage-billing — a member reads their plan and its allowance, and an OWNER asks for a signed Paddle checkout (Paddle replaced Lemon Squeezy, 2026-11-16).
 //
-// TWO ACTIONS:
-//   status    { action: "status" }     the caller's plan: its state, this month's allotment, the caller's own role, and whether the caller may start a checkout.
-//   checkout  { action: "checkout" }   an OWNER asks for a checkout for their own brokerage. Returns the processor's checkout address; the page sends the
-//                                      browser there. Nothing is charged, and nothing about the plan changes, by calling it: the plan changes only when the
-//                                      processor's signed event arrives at development-activity-billing-webhook.
+// ACTIONS:
+//   status           { action: "status" }                                   the caller's plan: state, plan, this month's allowance, remaining, next reset,
+//                                                                          access end or renewal, and whether the caller may start a checkout.
+//   offer            { action: "offer", partner_code }                      read-only: may this account buy the private partner offer with this link?
+//   checkout         { action: "checkout", plan, partner_code? }            an OWNER asks for a checkout. Returns what Paddle.js needs to open its overlay:
+//                                                                          the PUBLIC client token, the price id, and custom data signed by this server.
+//                                                                          Nothing is charged, and nothing about the plan changes, by calling it: the plan changes
+//                                                                          only when Paddle's signed event reaches paddle-webhook.
+//   checkout_release { action: "checkout_release" }                         the overlay was closed without paying: free the single checkout slot at once.
+//   portal           { action: "portal" }                                   an OWNER of a recurring plan gets Paddle's own "update payment method" and
+//                                                                          "cancel" addresses (asked of Paddle, never stored).
 //
-// WHO MAY CALL. Any signed-in person is let in, and being signed in grants nothing: the database answers only for that person's own brokerage
-// (public.billing_usage, built on the one membership resolver). A person with no brokerage is refused. Only an OWNER may start a checkout (plan
-// Hard Rules 40-41: the brokerage owns the account and its billing); an agent sees the plan and is told to ask their owner.
+// WHO MAY CALL. Any signed-in person is let in, and being signed in grants nothing: the database answers only for that person's own account
+// (public.billing_summary). A person with no account is refused. Only an OWNER may start a checkout or open the portal; an agent sees the plan.
 //
-// WHAT IT NEVER RETURNS: the brokerage's id, a subscription id, an event, a price, a customer, an email, a key or any processor word. The checkout address
-// is the processor's own https address (_shared/lemon-billing.ts refuses any other). The processor's settings are reported only as a boolean.
+// THE PRICE IS NEVER THE PAGE'S: the price id comes from public.billing_price_for (docs/paddle-billing.sql) for the configured environment, and the
+// plan, the account and the partner enrollment are inside a signature only this server can make, so a payment cannot be attached to someone else's
+// account or to a plan it was not made for. The PRIVATE PARTNER offer is decided here from a link's hash (public.partner_enrollment_start); a price id
+// alone grants nothing.
 //
-// A CHECKOUT IS OFFERED ONLY FOR A NEW SUBSCRIPTION: to a brokerage that never subscribed, whose subscription has ended, or that has only a test one.
-// Over a subscription that exists and may recover (paid, past due, paused, trialing, unclear) it is refused (409), so a brokerage is never billed twice.
-//
-// AND ONLY ONE CHECKOUT IS OPENED AT A TIME (audit item D, docs/da-owner-safeguards.sql part C). Before the processor is asked, the brokerage's single
-// checkout slot is claimed in the database. For the next ten minutes a second press (or a second tab) is answered 409 `checkout_in_progress` and the processor
-// is not asked again. The address of a checkout is never stored (the launch gate pins that no table holds one), so it cannot be handed back.
-//
-// This file holds the LOGIC and reads no environment and calls no network: everything external arrives through `Deps`.
+// WHAT IT NEVER RETURNS: the account's id, a subscription id, an event, a Paddle customer, an email, the API key or any secret. The client token is
+// Paddle's public client-side token and is meant for the browser. This file holds the LOGIC and reads no environment and calls no network.
 import { authorizeSignedIn, corsFor, readBounded, reply, TOO_LARGE } from '../_shared/admin-gate.ts';
 import type { AdminGateDeps } from '../_shared/admin-gate.ts';
-import { planSummary } from '../_shared/billing-reads.ts';
-import type { BillingUsage, CheckoutSlot } from '../_shared/billing-reads.ts';
+import { dashboardPlan } from '../_shared/billing-reads.ts';
+import type { BillingSummary, CheckoutSlot, PartnerStart } from '../_shared/billing-reads.ts';
+import { PLANS } from '../_shared/paddle-billing.ts';
+import type { CheckoutSession, ManagementUrls, PlanKey } from '../_shared/paddle-billing.ts';
 import { DataUnavailable } from '../_shared/service-rest.ts';
 
 export { DataUnavailable };
 
-/** The processor could not give a checkout. The reason is for the log, never for the browser. */
+/** Paddle could not give what was asked. The reason is for the log, never for the browser. */
 export class CheckoutUnavailable extends Error {}
 
 export type Deps = AdminGateDeps & {
-  usageOf: (userId: string) => Promise<BillingUsage | null>;
-  /** Whether the processor's settings are all present. A boolean: the values never leave the server. */
+  summaryOf: (userId: string) => Promise<BillingSummary | null>;
+  /** The Paddle checkout settings are all present (a boolean: the values never leave the server). */
   configured: () => boolean;
+  /** The Paddle API key is present (the portal needs it; the checkout does not). */
+  apiConfigured: () => boolean;
   /** The committed kill switch (_shared/billing-switch.ts). False refuses every checkout. */
   checkoutEnabled: () => boolean;
-  createCheckout: (brokerageId: string) => Promise<string>;
-  /** The brokerage's single checkout slot (docs/da-owner-safeguards.sql, part C): one open checkout at a time. */
+  partnerStart: (userId: string, tokenHash: string, write: boolean) => Promise<PartnerStart>;
+  sha256: (text: string) => Promise<string>;
+  makeSession: (brokerageId: string, plan: PlanKey, enrollmentId: string | null) => Promise<CheckoutSession>;
   checkoutClaim: (brokerageId: string) => Promise<CheckoutSlot>;
   checkoutRelease: (brokerageId: string) => Promise<void>;
+  managementUrls: (userId: string) => Promise<ManagementUrls | null>;
 };
 
 export const CAPABILITY = {
-  product: 'HOMESIGNAL DEVELOPMENT ACTIVITY',
-  method: 'POST { action: "status" } | { action: "checkout" }',
-  access: 'signed-in brokerage member; status for any member, checkout for the brokerage owner only',
+  product: 'JODY TRACKS DEVELOPMENT ACTIVITY',
+  method: 'POST { action: "status" | "offer" | "checkout" | "checkout_release" | "portal" }',
+  access: 'signed-in account member; status for any member, offer / checkout / portal for the account owner only',
   writes: [],
 };
 
 /** The fields each action may carry. Anything else is a malformed request. */
-const FIELDS: Record<string, string[]> = { status: ['action'], checkout: ['action'] };
+const FIELDS: Record<string, string[]> = {
+  status: ['action'], offer: ['action', 'partner_code'], checkout: ['action', 'plan', 'partner_code'], checkout_release: ['action'], portal: ['action'],
+};
+/** A partner code is a long random token; its shape is checked before it is hashed, so a stray string never reaches the database. */
+const PARTNER_CODE = /^[A-Za-z0-9_-]{16,128}$/;
 
+export type Availability = 'available' | 'not_owner' | 'already_paid' | 'subscription_exists' | 'account_suspended' | 'disabled' | 'not_set_up';
 /**
- * Who may start a checkout and why not: the ONE reading of it, used by `status` to say so and by `checkout` to refuse. A checkout is offered only
- * where a NEW subscription is what the brokerage needs: never subscribed ('none'), a subscription that has ended ('canceled'), or a test subscription
- * only ('test_only', which never grants). Over a subscription that exists and may recover (paid, past due, paused, trialing, an unclear one) it is
- * refused, because a second checkout there would bill the brokerage twice.
+ * Who may start a checkout and why not: the ONE reading of it. A checkout is offered only where a NEW purchase is what the account needs: never bought
+ * ('none'), ended ('canceled', 'expired'), or a test purchase only ('test_only', which never grants). Over a purchase that exists and may recover (paid,
+ * past due, paused, trialing, unclear) it is refused, so an account is never billed twice.
  */
-export function checkoutAvailability(u: BillingUsage, configured: boolean, enabled: boolean): 'available' | 'not_owner' | 'already_paid' | 'subscription_exists' | 'disabled' | 'not_set_up' {
+export function checkoutAvailability(u: BillingSummary, configured: boolean, enabled: boolean): Availability {
   if (u.role !== 'owner') return 'not_owner';
   if (u.state === 'paid') return 'already_paid';
-  if (u.state !== 'none' && u.state !== 'canceled' && u.state !== 'test_only') return 'subscription_exists';
-  if (!enabled) return 'disabled';        // the kill switch (_shared/billing-switch.ts): checked before the processor's settings, so it holds whatever they are
+  if (u.state === 'suspended') return 'account_suspended';
+  if (u.state !== 'none' && u.state !== 'canceled' && u.state !== 'expired' && u.state !== 'test_only') return 'subscription_exists';
+  if (!enabled) return 'disabled';        // the kill switch: checked before Paddle's settings, so it holds whatever they are
   if (!configured) return 'not_set_up';
   return 'available';
 }
+
+const REFUSALS: Record<Exclude<Availability, 'available'>, [number, Record<string, string>]> = {
+  not_owner: [403, { error: 'forbidden', detail: 'owner_only' }],
+  already_paid: [409, { error: 'already_paid' }],
+  subscription_exists: [409, { error: 'subscription_exists' }],
+  account_suspended: [403, { error: 'account_suspended' }],
+  disabled: [503, { error: 'checkout_disabled' }],
+  not_set_up: [503, { error: 'billing_not_set_up' }],
+};
+const PARTNER_REFUSALS: Record<string, [number, string]> = {
+  LINK_INVALID: [404, 'offer_unavailable'], NOT_ENTITLED: [403, 'owner_only'], ALREADY_USED: [409, 'offer_used'], ALREADY_PAID: [409, 'already_paid'],
+};
 
 export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
   return async (req: Request): Promise<Response> => {
@@ -90,29 +113,63 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
     if (extra.length) return reply(req, { error: 'bad_request', detail: 'unknown field: ' + extra[0] }, 400);
 
     try {
-      const usage = await deps.usageOf(who.userId);
-      if (!usage) return reply(req, { error: 'forbidden' }, 403);     // no brokerage, no billing
-      const availability = checkoutAvailability(usage, deps.configured(), deps.checkoutEnabled());
-      if (action === 'status') return reply(req, { status: 'OK', plan: planSummary(usage), checkout: availability });
+      const summary = await deps.summaryOf(who.userId);
+      if (!summary) return reply(req, { error: 'forbidden' }, 403);     // no account, no billing
+      const availability = checkoutAvailability(summary, deps.configured(), deps.checkoutEnabled());
+      if (action === 'status') return reply(req, { status: 'OK', plan: dashboardPlan(summary), checkout: availability, portal: summary.role === 'owner' && summary.kind === 'recurring' && deps.apiConfigured() });
 
-      // checkout: an owner, not already paid, with the processor set up
-      if (availability === 'not_owner') return reply(req, { error: 'forbidden', detail: 'owner_only' }, 403);
-      if (availability === 'already_paid') return reply(req, { error: 'already_paid' }, 409);
-      if (availability === 'subscription_exists') return reply(req, { error: 'subscription_exists' }, 409);
-      if (availability === 'disabled') return reply(req, { error: 'checkout_disabled' }, 503);
-      if (availability === 'not_set_up') return reply(req, { error: 'billing_not_set_up' }, 503);
-      // ONE CHECKOUT AT A TIME. The slot is claimed in the database BEFORE the processor is asked, so two presses (or two tabs) cannot make two
-      // checkouts: the second is told one was just opened. No slot, no checkout: a failed claim is a 502.
-      const slot = await deps.checkoutClaim(usage.brokerage_id);
+      if (action === 'checkout_release') {
+        if (summary.role !== 'owner') return reply(req, { error: 'forbidden', detail: 'owner_only' }, 403);
+        await deps.checkoutRelease(summary.brokerage_id).catch(() => { /* the slot frees itself in ten minutes */ });
+        return reply(req, { status: 'OK' });
+      }
+
+      if (action === 'portal') {
+        if (summary.role !== 'owner') return reply(req, { error: 'forbidden', detail: 'owner_only' }, 403);
+        if (summary.kind !== 'recurring' || !deps.apiConfigured()) return reply(req, { error: 'portal_unavailable' }, 409);
+        const urls = await deps.managementUrls(who.userId);
+        if (!urls) return reply(req, { error: 'portal_unavailable' }, 409);
+        return reply(req, { status: 'OK', update_payment_method: urls.update_payment_method, cancel: urls.cancel });
+      }
+
+      // offer / checkout: a partner code, when one is sent, is shape-checked and hashed here; the token itself is never stored or logged
+      let tokenHash: string | null = null;
+      if (b.partner_code !== undefined) {
+        if (typeof b.partner_code !== 'string' || !PARTNER_CODE.test(b.partner_code)) return reply(req, { error: 'offer_unavailable' }, 404);
+        tokenHash = await deps.sha256(b.partner_code);
+      }
+
+      if (action === 'offer') {
+        if (tokenHash === null) return reply(req, { error: 'bad_request', detail: 'partner_code' }, 400);
+        const r = await deps.partnerStart(who.userId, tokenHash, false);
+        if (r.outcome !== 'OK') { const [st, e] = PARTNER_REFUSALS[r.outcome]; return reply(req, { error: e }, st); }
+        return reply(req, { status: 'OK', plan: 'private_partner', eligible: true });
+      }
+
+      // checkout: an owner, not already paid, with Paddle set up
+      const plan = typeof b.plan === 'string' && (PLANS as readonly string[]).includes(b.plan) ? (b.plan as PlanKey) : null;
+      if (plan === null) return reply(req, { error: 'bad_request', detail: 'plan' }, 400);
+      if (availability !== 'available') { const [st, e] = REFUSALS[availability]; return reply(req, e, st); }
+      if (plan === 'professional' && tokenHash !== null) return reply(req, { error: 'bad_request', detail: 'partner_code' }, 400);
+      let enrollmentId: string | null = null;
+      if (plan === 'private_partner') {
+        // eligibility is the DATABASE's, from the link's hash: a price id alone never reaches this point with an enrollment
+        if (tokenHash === null) return reply(req, { error: 'offer_unavailable' }, 404);
+        const r = await deps.partnerStart(who.userId, tokenHash, true);
+        if (r.outcome !== 'OK' || !r.enrollment_id) { const [st, e] = PARTNER_REFUSALS[r.outcome] ?? [404, 'offer_unavailable']; return reply(req, { error: e }, st); }
+        enrollmentId = r.enrollment_id;
+      }
+      // ONE CHECKOUT AT A TIME: the slot is claimed in the database BEFORE a session is made, so two presses (or two tabs) cannot open two checkouts.
+      const slot = await deps.checkoutClaim(summary.brokerage_id);
       if (slot.outcome === 'BUSY') return reply(req, { error: 'checkout_in_progress' }, 409);
-      let url: string;
+      let session: CheckoutSession;
       try {
-        url = await deps.createCheckout(usage.brokerage_id);
+        session = await deps.makeSession(summary.brokerage_id, plan, enrollmentId);
       } catch (e) {
-        await deps.checkoutRelease(usage.brokerage_id).catch(() => { /* the slot frees itself in two minutes */ });
+        await deps.checkoutRelease(summary.brokerage_id).catch(() => { /* the slot frees itself in two minutes */ });
         throw e;
       }
-      return reply(req, { status: 'OK', url });
+      return reply(req, { status: 'OK', session });
     } catch (e) {
       if (e instanceof CheckoutUnavailable) return reply(req, { error: 'checkout_unavailable' }, 502);
       if (e instanceof DataUnavailable) return reply(req, { error: 'data_unavailable' }, 502);

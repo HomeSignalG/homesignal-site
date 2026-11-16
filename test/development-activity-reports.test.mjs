@@ -86,12 +86,12 @@ ok(/shouldCreateUser:\s*true/.test(code) && !/shouldCreateUser:\s*false/.test(co
 
 // ---- 3. two functions, no decisions -----------------------------------------------------------------------------------------------------------
 const urls = [...new Set([...code.matchAll(/https:\/\/[^'"\s)]+/g)].map((m) => m[0]))];
-ok(JSON.stringify(urls) === JSON.stringify(['https://qwnnmljucajnexpxdgxr.supabase.co'])
+ok(JSON.stringify(urls) === JSON.stringify(['https://qwnnmljucajnexpxdgxr.supabase.co', 'https://cdn.paddle.com/paddle/v2/paddle.js'])
    && /var REPORT_FN = SB_URL \+ '\/functions\/v1\/get-development-activity-report';/.test(code) && /var TRIAL_FN = SB_URL \+ '\/functions\/v1\/development-activity-trial';/.test(code)
    && /var SHARE_FN = SB_URL \+ '\/functions\/v1\/manage-shared-report';/.test(code) && /var WATCH_FN = SB_URL \+ '\/functions\/v1\/manage-property-watch';/.test(code)
    && /var BILLING_FN = SB_URL \+ '\/functions\/v1\/manage-billing';/.test(code)
    && (code.match(/\/functions\/v1\//g) || []).length === 5,
-  '3a the only endpoints it names are the report function, the trial function, (build step 8) the agent\'s share-link function, (build step 9) the agent\'s Watch function and (build step 11) the Billing function, all on this project', urls);
+  '3a the only endpoints it names are the report function, the trial function, (build step 8) the agent\'s share-link function, (build step 9) the agent\'s Watch function and (build step 11) the Billing function, all on this project, plus Paddle\'s own checkout script (the one third-party address, 2026-11-16)', urls);
 ok(!/\.from\(|\.rpc\(|\.storage\b|\.functions\.invoke\(/.test(code), '3b no table, RPC, storage or other function read');
 ok(/var payload = \{ address: address, view: 'customer' \};/.test(code) && !/'internal'/.test(code) && !/radius/i.test(code),
   '3c a report asks for the customer view only, and never sets a radius (a report is always 0.5 mile, ruling 7)');
@@ -100,8 +100,9 @@ ok(!/canonicalLifecycle|classifyProjectType|STAGE_EVIDENCE|presentationStage|rep
 ok(/V\.mount\(\$\('report'\), body, \{ subject: address, label: field\('label'\), brokerage: hd\.brokerage, agent: hd\.agent, live: shareable \? \['share', 'watch', 'pdf', 'compare'\] : \['share', 'pdf'\], hide: COMPARE_AT_LAUNCH \? \[\] : \['compare'\] \}\)/.test(code) && /<script src="lib\/da-report-view\.js\?v=[0-9a-f]{8}"><\/script>/.test(page),
   '3e the report is drawn by the shared view (lib/da-report-view.js), loaded with its content key');
 const csp = /http-equiv="Content-Security-Policy" content="([^"]*)"/.exec(page)[1];
-ok(/connect-src 'self' https:\/\/qwnnmljucajnexpxdgxr\.supabase\.co wss:\/\/qwnnmljucajnexpxdgxr\.supabase\.co;/.test(csp) && /script-src 'self' 'unsafe-inline' https:\/\/cdn\.jsdelivr\.net;/.test(csp),
-  '3f the page may connect only to itself and this Supabase project', csp);
+ok(/connect-src 'self' https:\/\/qwnnmljucajnexpxdgxr\.supabase\.co wss:\/\/qwnnmljucajnexpxdgxr\.supabase\.co https:\/\/checkout-service\.paddle\.com https:\/\/sandbox-checkout-service\.paddle\.com;/.test(csp)
+   && /script-src 'self' 'unsafe-inline' https:\/\/cdn\.jsdelivr\.net https:\/\/cdn\.paddle\.com;/.test(csp) && /frame-src https:\/\/buy\.paddle\.com https:\/\/sandbox-buy\.paddle\.com;/.test(csp) && /object-src 'none'/.test(csp) && /form-action 'self'/.test(csp),
+  '3f the page may connect only to itself, this Supabase project and Paddle\'s own checkout service; its only extra script and frame hosts are Paddle\'s', csp);
 const showTrial = fn('showTrial');
 const canMake = fn('canMake');
 ok(/\$\('go'\)\.disabled = busy \|\| !canMake\(\);/.test(showTrial) && /!canMake\(\)/.test(fn('run'))
@@ -111,7 +112,7 @@ ok(/\$\('go'\)\.disabled = busy \|\| !canMake\(\);/.test(showTrial) && /!canMake
 
 // ---- 4. the invite, and what the browser keeps ------------------------------------------------------------------------------------------------
 const readInvite = fn('readInvite');
-ok(/location\.hash/.test(readInvite) && (code.match(/location\.search/g) || []).length === 1 && !/searchParams/.test(code),
+ok(/location\.hash/.test(readInvite) && (code.replace(/history\.replaceState\([^)]*\)/g, '').replace(/[^\n]*checkout=success[^\n]*/g, '').match(/location\.search/g) || []).length === 0 && !/searchParams/.test(code),
   '4a the invite is read from the URL fragment, which the browser never sends to a server; never from the query string');
 ok(/history\.replaceState\(null, '', location\.pathname \+ location\.search\)/.test(readInvite), '4b and removed from the address bar as soon as it is read');
 ok(/var INVITE = \/\^hse1_\[0-9a-f\]\{64\}\$\/;/.test(code) && /INVITE\.test\(fromHash\)/.test(readInvite) && /INVITE\.test\(kept\)/.test(readInvite),
@@ -120,7 +121,7 @@ const attrFn = code.slice(code.indexOf('function logReportCreated()'), code.inde
 const codeNoAttr = code.replace(attrFn, '');
 ok(attrFn.length > 200 && !/localStorage\.(set|remove)Item|indexedDB|document\.cookie|sessionStorage/.test(attrFn) && (attrFn.match(/localStorage\.getItem\('hs:referral'\)|localStorage\.getItem\('hs:referral_last'\)|localStorage\.getItem\('hs_sid'\)/g) || []).length === 3,
   '4d0 the campaign-attribution logger only READS the three keys shell.js wrote (hs:referral, hs:referral_last, hs_sid); it stores nothing');
-ok(!/localStorage|indexedDB|document\.cookie/.test(codeNoAttr) && (code.match(/sessionStorage\./g) || []).length === 3 && /var STASH = 'hs-da-invite';/.test(code),
+ok(!/localStorage|indexedDB|document\.cookie/.test(codeNoAttr) && (code.match(/sessionStorage\./g) || []).length === 5 && /var STASH = 'hs-da-invite';/.test(code) && /sessionStorage\.(set|get)Item\('hs-da-partner'/.test(code),
   '4d the only browser storage is the per-tab invite slot (set, cleared, read back once): no address, no report, nothing that outlives the tab');
 const loadTrial = fn('loadTrial');
 ok(/if \(r\.status === 0 \|\| r\.status >= 500\) \{ trialUnreadable\(\); return; \}/.test(loadTrial) && /invite = null; store\(null\);/.test(loadTrial)

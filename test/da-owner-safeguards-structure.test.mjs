@@ -67,7 +67,7 @@ const naming = (needle) => FUNCS.filter((p) => code[p].includes(needle));
 // ---- 4. the checkout: the slot is claimed before the processor is asked ------------------------------------------------------------------------------
 {
   const h = code['supabase/functions/manage-billing/handler.ts'];
-  ok(h.indexOf('deps.checkoutClaim(') > 0 && h.indexOf('deps.checkoutClaim(') < h.indexOf('deps.createCheckout('), '4a the slot is claimed BEFORE the processor is asked for a checkout');
+  ok(h.indexOf('deps.checkoutClaim(') > 0 && h.indexOf('deps.checkoutClaim(') < h.indexOf('deps.makeSession('), '4a the slot is claimed BEFORE the processor is asked for a checkout');
   ok(h.indexOf('checkoutAvailability(usage') < h.indexOf('deps.checkoutClaim('), '4b and only for a brokerage the plan check allows (an agent, a paid brokerage or an unset processor never claims)');
   ok(/catch \(e\) \{\s*await deps\.checkoutRelease\([^)]*\)\.catch\(\(\) => \{\s*\}\);\s*throw e;/.test(h), '4c a checkout that could not be made frees the slot and re-raises the real error');
   ok(/slot\.outcome === 'BUSY'\) return reply\(req, \{ error: 'checkout_in_progress' \}, 409\)/.test(h) && !/slot\.url|checkoutRecord|'OPEN'/.test(h), '4e a busy slot is 409 and no checkout address is ever kept or handed back');

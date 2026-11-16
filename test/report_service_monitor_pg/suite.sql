@@ -43,7 +43,7 @@ create function pg_temp._row() returns public.pipeline_health_check language sql
 
 \set R 'get-development-activity-report'
 \set B 'manage-billing'
-\set W 'development-activity-billing-webhook'
+\set W 'paddle-webhook'
 \set OKW '{"configured":true}'
 
 -- ---- F  the probe -----------------------------------------------------------------------------------------------------------------------------
@@ -53,7 +53,7 @@ select pg_temp._ck('F01 one fire sends exactly three GETs, one to each function,
   (select count(*) = 3
       and count(*) filter (where url = 'https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/get-development-activity-report') = 1
       and count(*) filter (where url = 'https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/manage-billing') = 1
-      and count(*) filter (where url = 'https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/development-activity-billing-webhook') = 1
+      and count(*) filter (where url = 'https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/paddle-webhook') = 1
      from net.sent), null);
 select pg_temp._ck('F02 each probe carries only the public key (apikey and Bearer, the same value) and a 15 second limit',
   (select bool_and(headers ? 'apikey' and headers ->> 'Authorization' = 'Bearer ' || (headers ->> 'apikey') and timeout_ms = 15000
@@ -144,7 +144,7 @@ select pg_temp._probe(:'B', interval '2 minutes 30 seconds', 502); select pg_tem
 select pg_temp._tick();
 select pg_temp._ck('M03 one function down: the check FAILS and is alertable', (select not ok and alertable from pg_temp._row()), (select detail from pg_temp._row()));
 select pg_temp._ck('M04 the failing detail names the function that is down and not the healthy ones',
-  (select detail like 'manage-billing: down%' and detail not like '%get-development-activity-report%' and detail not like '%development-activity-billing-webhook%' from pg_temp._row()),
+  (select detail like 'manage-billing: down%' and detail not like '%get-development-activity-report%' and detail not like '%paddle-webhook%' from pg_temp._row()),
   (select detail from pg_temp._row()));
 select pg_temp._ck('M05 the other check in the monitor still runs', (select count(*) = 1 from public.pipeline_health_check where check_name = 'other_check'), null);
 select pg_temp._ck('M06 the splice is in the monitor exactly once, beside exactly one anchor, and the other check is still there',

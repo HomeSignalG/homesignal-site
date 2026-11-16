@@ -46,7 +46,8 @@ const ok = (c, name, detail) => {
 const PAGE = '/development-activity-reports.html';
 const SB = 'https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/';
 const REPORT_FN = SB + 'get-development-activity-report', TRIAL_FN = SB + 'development-activity-trial', MANAGE_FN = SB + 'manage-shared-report', WATCH_FN = SB + 'manage-property-watch', BILLING_FN = SB + 'manage-billing';
-const CHECKOUT_URL = 'https://homesignal.lemonsqueezy.com/checkout/custom/test-checkout-1';
+const PADDLE_JS = 'https://cdn.paddle.com/paddle/v2/paddle.js';   // Paddle.js stand-in: records what the page asked it to open; nothing is charged
+const PRO_PRICE = 'pri_01m7d6kede6hqr2kh9b78mb25j';
 // the launch test location: Brigham City, UT 84302 (test/lib/launch-test-location.mjs; founder, 2026-10-04)
 const ADDRESS = LAUNCH_TEST_LOCATION.address, OTHER = OTHER_PROPERTY;
 const TOKEN = 'hse1_' + '0123456789abcdef'.repeat(4);
@@ -192,14 +193,19 @@ function world({ trial = 'active', used = 0, admin = false, untraceable = false,
   // the plan, as public.billing_usage answers it for this brokerage (null when the person belongs to none)
   const usage = () => (w.trial === null ? null : { brokerage_id: 'b0b0b0b0-1111-4222-8333-444444444444', role: w.role, state: w.plan, credit_limit: 100,
     credits_used: w.plan === 'paid' ? w.paidUsed : 0, credits_remaining: w.plan === 'paid' ? 100 - w.paidUsed : 0, period_ends_at: w.plan === 'paid' ? PAID_END : null });
+  const summary = () => { const u = usage(); return u === null ? null : { brokerage_id: u.brokerage_id, role: u.role, state: u.state, plan_key: u.state === 'paid' ? 'professional' : null, plan_label: null,
+    kind: u.state === 'paid' ? 'recurring' : null, credit_limit: u.credit_limit, credits_used: u.credits_used, credits_remaining: u.credits_remaining,
+    next_reset_at: u.period_ends_at, access_ends_at: null, renews_at: u.period_ends_at, cancel_effective_at: null, access_months: null }; };
   w.billingHandler = BH.makeHandler({
     ...gate,
-    usageOf: async () => { if (w.billingFails) throw new RH.DataUnavailable('x'); return usage(); },
-    configured: () => w.configured, checkoutEnabled: () => true,
-    createCheckout: async () => { if (w.checkoutFails) throw new BH.CheckoutUnavailable('x'); w.checkoutMade++; return CHECKOUT_URL; },
-    // the brokerage's single checkout slot (audit item D): held for ten minutes by whoever claimed it; the address of a checkout is kept nowhere
+    summaryOf: async () => { if (w.billingFails) throw new RH.DataUnavailable('x'); return summary(); },
+    configured: () => w.configured, apiConfigured: () => true, checkoutEnabled: () => true,
+    partnerStart: async () => ({ outcome: 'LINK_INVALID', enrollment_id: null, brokerage_id: null }), sha256: async (t) => 'h'.repeat(8) + t.length,
+    makeSession: async (brokerageId, plan2) => { if (w.checkoutFails) throw new BH.CheckoutUnavailable('x'); w.checkoutMade++; return { environment: 'production', clientToken: 'live_' + 'a'.repeat(30), priceId: PRO_PRICE, customData: { brokerage_id: brokerageId, plan: plan2, bind: '0'.repeat(64) } }; },
+    // the account's single checkout slot (audit item D): held for ten minutes by whoever claimed it; nothing of a checkout is kept
     checkoutClaim: async () => (w.checkoutBusy ? { outcome: 'BUSY' } : { outcome: 'CLAIMED' }),
     checkoutRelease: async () => undefined,
+    managementUrls: async () => ({ update_payment_method: 'https://customer-portal.paddle.com/update', cancel: 'https://customer-portal.paddle.com/cancel' }),
   });
   w.reportHandler = RH.makeHandler({
     ...gate, now: () => NOW, attribution: ATTRIBUTION_AB,
@@ -271,6 +277,7 @@ async function open({ compare = true, w = world(), signedIn = true, hash = '', w
   page.check = async (sel, o) => { if (/#saved-list/.test(sel) && !(await page.$eval('#saved', (e) => e.classList.contains('cmp-on')))) await page.click('#compare-mode'); return realCheck(sel, o); };
   await page.exposeFunction('__hsNameSaved', (v) => { w.header = { ...w.header, agent: E.cleanDisplayName(v, 80) }; }); // the server reads the saved name from the account
   const errors = [], reports = [], trials = [], foreign = [], saved = [], shareCalls = [], watchCalls = [], billingCalls = [], checkouts = [];
+  await page.exposeFunction('__hsPaddleOpen', (o) => { checkouts.push(o); });
   page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
   await page.route('**/*', async (route) => {
@@ -298,8 +305,8 @@ async function open({ compare = true, w = world(), signedIn = true, hash = '', w
       const res = await w.billingHandler(new Request(url, { method: 'POST', headers: { authorization: r.headers().authorization || '', 'content-type': 'application/json' }, body: r.postData() }));
       return route.fulfill({ status: res.status, contentType: 'application/json', body: await res.text() });
     }
-    // the provider's own checkout page: the browser is sent here and nothing is exchanged with it; this stands in for it
-    if (url.startsWith('https://homesignal.lemonsqueezy.com/')) { checkouts.push(url); return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>Checkout</title><p>Checkout</p>' }); }
+    // Paddle.js: the overlay is opened by this script. The stand-in keeps what the page asked it to open (window.__paddleOpens) and charges nobody.
+    if (url === PADDLE_JS) { if (w.paddleBlocked) return route.abort(); return route.fulfill({ status: 200, contentType: 'text/javascript', body: 'window.__paddleOpens=[];window.__paddleInit=null;window.Paddle={Environment:{set:function(){}},Initialize:function(o){window.__paddleInit=o;},Checkout:{open:function(o){window.__paddleOpens.push(o);if(window.__hsPaddleOpen)window.__hsPaddleOpen(JSON.parse(JSON.stringify(o)));}}};' }); }
     if (url === WATCH_FN) {
       const body = r.postData() ? JSON.parse(r.postData()) : null;
       watchCalls.push({ auth: r.headers().authorization || null, apikey: r.headers().apikey || null, body });
@@ -1639,28 +1646,28 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   // 12a-12d. an owner with no plan: the offer in the landing page's own words, one status call, and a checkout that goes to the provider only
   const w = world({ role: 'owner', used: 3 });
   const { ctx, page, errors, foreign, billingCalls, checkouts } = await open({ w });
-  await waitBilling(page, /Free trial/);
+  await waitBilling(page, /No active plan/);
   const t = await billingText(page);
-  ok(await billingShown(page) && /Billing/.test(t) && /Free trial/.test(t) && /Professional plan: \$78 a month, billed monthly and renewing automatically until you cancel/.test(t) && /10 free reports are separate from the plan/.test(t),
-    '12a an owner with no plan sees the Billing card: the free trial, and the $78/month Professional line with recurring billing disclosed (founder 2026-11-14)', t);
+  ok(await billingShown(page) && /Billing/.test(t) && /No active plan/.test(t) && /Professional plan: \$78 a month, billed monthly and renewing automatically until you cancel/.test(t) && !/free plan/i.test(t),
+    '12a an owner with no plan sees the Billing card: no active plan, and the $78/month Professional line with recurring billing disclosed (founder 2026-11-14); no free plan is advertised', t);
   ok(billingCalls.length === 1 && billingCalls[0].body.action === 'status' && billingCalls[0].auth === 'Bearer user-token' && JSON.stringify(billingCalls[0].body) === '{"action":"status"}',
     '12b the plan is read with ONE status call carrying the person\'s own token and nothing else', billingCalls.map((c) => c.body));
-  ok(await page.$eval('#subscribe', (e) => !e.hidden && /^Subscribe$/.test(e.textContent.trim())), '12c the owner is offered "Subscribe" (no price; free-only copy)');
+  ok(await page.$eval('#subscribe', (e) => !e.hidden && /^Subscribe: \$78\/month$/.test(e.textContent.trim())), '12c the owner is offered "Subscribe: $78/month" (the one public purchase)');
   ok(await page.$eval('#trial-cta', (e) => !e.closest('#trial').hidden && !e.parentElement.hidden && e.textContent === 'Subscribe'), '12c3 the status tile itself carries "Subscribe" while free reports remain and checkout is available');
   ok(!(await page.content()).includes(BKID) && !(await page.evaluate(() => document.body.innerText)).includes(BKID), '12c2 the brokerage\'s id is nowhere on the page');
   await page.click('#subscribe');
-  await page.waitForFunction(() => /checkout/i.test(document.title), null, { timeout: 8000 }).catch(() => {});
-  ok(w.checkoutMade === 1 && checkouts.length === 1 && checkouts[0] === CHECKOUT_URL && page.url().startsWith('https://homesignal.lemonsqueezy.com/'),
-    '12d pressing it asks for ONE checkout and sends the browser to the provider\'s own page (nothing is charged and no plan changes by pressing it)', [w.checkoutMade, checkouts, page.url()]);
-  ok(billingCalls.length === 2 && JSON.stringify(billingCalls[1].body) === '{"action":"checkout"}', '12d2 the checkout request carries no brokerage id, no price and no address: the server knows whose it is', billingCalls.map((c) => c.body));
-  ok(foreign.length === 0 && errors.length === 0, '12d3 nothing else was fetched and the page raised no error', [foreign, errors]);
+  await page.waitForFunction(() => (window.__paddleOpens || []).length > 0, null, { timeout: 8000 }).catch(() => {});
+  ok(w.checkoutMade === 1 && checkouts.length === 1 && checkouts[0].items?.[0]?.priceId === PRO_PRICE && checkouts[0].customData?.plan === 'professional' && page.url().startsWith(base + PAGE),
+    '12d pressing it asks for ONE checkout and opens Paddle\'s overlay on this page with the price and signed custom data the SERVER returned (nothing is charged and no plan changes by pressing it)', [w.checkoutMade, checkouts, page.url()]);
+  ok(billingCalls.length === 2 && JSON.stringify(billingCalls[1].body) === '{"action":"checkout","plan":"professional"}', '12d2 the checkout request carries the action and the plan only: no account id, no price and no address (the server knows whose it is, and the price comes from the database)', billingCalls.map((c) => c.body));
+  ok(foreign.length === 0 && errors.length === 0, '12d3 nothing else was fetched (Paddle.js itself is the stand-in) and the page raised no error', [foreign, errors]);
   await ctx.close();
 }
 {
   // 12e-12h. an agent, a processor that is not set up, a refusal, and a lost answer
   let o = await open({ w: world({ role: 'agent' }) });
-  await waitBilling(o.page, /Free trial/);
-  ok(await o.page.$eval('#subscribe', (e) => e.hidden) && /Only your brokerage's owner can subscribe\./.test(await billingText(o.page)), '12e an agent is told only the owner can subscribe and is offered no button');
+  await waitBilling(o.page, /No active plan/);
+  ok(await o.page.$eval('#subscribe', (e) => e.hidden) && /Only your account's owner can subscribe\./.test(await billingText(o.page)), '12e an agent is told only the owner can subscribe and is offered no button');
   ok(o.billingCalls.length === 1, '12e2 and makes no checkout call');
   await o.page.evaluate(() => document.getElementById('subscribe').click()); // the hidden button pressed anyway, by a script
   await settled(o.page);
@@ -1668,7 +1675,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   await o.ctx.close();
 
   o = await open({ w: world({ role: 'owner', configured: false }) });
-  await waitBilling(o.page, /Free trial/);
+  await waitBilling(o.page, /No active plan/);
   ok(await o.page.$eval('#subscribe', (e) => e.hidden) && await o.page.$eval('#trial-cta', (e) => e.parentElement.hidden) && /\$78 a month, billed monthly and renewing automatically/.test(await billingText(o.page)) && !/Subscribing is not open yet/.test(await billingText(o.page)) && (await text(o.page, '#trial-count')).length > 0,
     '12f with the processor not set up (free-only, founder 2026-10-15) there is NO Subscribe button anywhere, the card states the $78/month plan and its recurring billing, and the free trial still works');
   await o.page.evaluate(() => document.getElementById('subscribe').click()); // a script presses the hidden button anyway
@@ -1678,29 +1685,37 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
 
   const w = world({ role: 'owner' });
   o = await open({ w });
-  await waitBilling(o.page, /Free trial/);
+  await waitBilling(o.page, /No active plan/);
   w.checkoutFails = true;
   await o.page.click('#subscribe');
   await o.page.waitForFunction(() => /could not be opened/.test(document.getElementById('billing-status').textContent), null, { timeout: 8000 }).catch(() => {});
-  ok(/The payment page could not be opened just now/.test(await text(o.page, '#billing-status')) && await o.page.$eval('#billing-status', (e) => e.className === 'err') && o.checkouts.length === 0 && !o.page.url().includes('lemonsqueezy'),
-    '12g a provider that cannot give a checkout is said in plain words, and the browser is not sent anywhere');
+  ok(/The payment window could not be opened just now/.test(await text(o.page, '#billing-status')) && await o.page.$eval('#billing-status', (e) => e.className === 'err') && o.checkouts.length === 0,
+    '12g a provider that cannot give a checkout is said in plain words, and no overlay is opened');
   ok(await o.page.$eval('#subscribe', (e) => !e.disabled && !e.hidden), '12g2 the button is usable again, so a retry is one press');
   await o.ctx.close();
 
-  // the server's own answer is a foreign or unsafe address: the page refuses it as well (the server checks it too)
+  // the server's own answer is malformed (no price, no token, no signed data): the page refuses to open anything with it
   const w2 = world({ role: 'owner' });
   o = await open({ w: w2 });
-  await waitBilling(o.page, /Free trial/);
-  let forced = '';
-  await o.page.route(BILLING_FN, async (route) => { const r = route.request(); const b = r.postData() ? JSON.parse(r.postData()) : {}; if (b.action === 'checkout') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'OK', url: forced }) }); return route.fallback(); });
-  for (const bad of ['https://evil.example/pay', 'http://checkout.lemonsqueezy.com/pay', 'https://user:pw@checkout.lemonsqueezy.com/pay', 'https://lemonsqueezy.com.evil.example/pay']) {
+  await waitBilling(o.page, /No active plan/);
+  let forced = {};
+  await o.page.route(BILLING_FN, async (route) => { const r = route.request(); const b = r.postData() ? JSON.parse(r.postData()) : {}; if (b.action === 'checkout') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'OK', session: forced }) }); return route.fallback(); });
+  for (const bad of [{}, { priceId: 'pri_x' }, { clientToken: 'live_x', priceId: 7, customData: {} }, { clientToken: 'live_x', priceId: 'pri_x' }]) {
     forced = bad;
     await o.page.evaluate(() => { document.getElementById('billing-status').textContent = ''; });
     await o.page.click('#subscribe');
     await o.page.waitForFunction(() => /could not be opened/.test(document.getElementById('billing-status').textContent), null, { timeout: 8000 }).catch(() => {});
-    ok(o.page.url().startsWith(base) && !o.page.url().includes('evil') && !o.page.url().includes('lemonsqueezy') && /could not be opened/.test(await text(o.page, '#billing-status')),
-      '12h an address that is not the provider\'s own, or is not plain https, or carries credentials, is never opened: the page checks it too and says the payment page could not be opened (' + bad + ')');
+    ok(o.checkouts.length === 0 && o.page.url().startsWith(base) && /could not be opened/.test(await text(o.page, '#billing-status')),
+      '12h a checkout session that is not exactly what the server makes (token, price, signed custom data) is never opened: the page says the payment window could not be opened (' + JSON.stringify(bad) + ')');
   }
+  await o.ctx.close();
+  // Paddle.js itself cannot load (a blocker): said in plain words, nothing opens, and the single checkout slot is freed
+  const w3 = world({ role: 'owner' }); w3.paddleBlocked = true;
+  o = await open({ w: w3 });
+  await waitBilling(o.page, /No active plan/);
+  await o.page.click('#subscribe');
+  await o.page.waitForFunction(() => /could not be opened/.test(document.getElementById('billing-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(o.checkouts.length === 0 && /nothing is blocking/.test(await text(o.page, '#billing-status')) && o.billingCalls.some((c) => c.body.action === 'checkout_release'), '12h2 Paddle.js blocked: said in plain words, nothing opens and the checkout slot is released');
   await o.ctx.close();
 }
 {
@@ -1712,7 +1727,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
     '12i a brokerage whose free reports are used and whose plan is paid is told how many of the month\'s reports are left and when the month ends', [await text(page, '#trial-count'), await text(page, '#trial-sub')]);
   const t = await billingText(page);
   ok(await page.$eval('#trial-cta', (e) => !e.parentElement.hidden && e.textContent === 'Manage plan'), '12j2 once subscribed the tile CTA is "Manage plan"');
-  ok(/Paid plan: 3 of 100 reports used this month/.test(t) && /kept as they were/.test(t) && await page.$eval('#subscribe', (e) => e.hidden), '12j the Billing card shows the plan, the month\'s figures, and no second checkout');
+  ok(/Paid plan: 3 of 100 reports used this month/.test(t) && /renews automatically each month until you cancel/.test(t) && /Remaining this month\s*97/.test(t) && await page.$eval('#subscribe', (e) => e.hidden), '12j the Billing card shows the plan, the month\'s figures, the renewal and no second checkout', t);
   ok(await page.$eval('#go', (e) => !e.disabled), '12k "Make report" is open: the free trial is complete but the plan is paid');
   await make(page);
   ok(reports.length === 1 && V4.test(reports[0].body.idempotency_key), '12k2 a report made on the paid plan carries a random key, like every member report', reports.map((r) => r.body));
@@ -1740,7 +1755,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
 {
   // 12p-12s. a plan that is not paid never opens a used-up trial, and says what is wrong in plain words
   for (const [state, card, buy] of [['past_due', /Your subscription needs attention/, false], ['canceled', /Your subscription has ended/, true], ['unknown', /Your subscription status is not clear/, false],
-    ['trialing', /Your subscription status is not clear/, false], ['test_only', /Test subscription only/, true]]) {
+    ['trialing', /Your subscription status is not clear/, false], ['test_only', /Test purchase only/, true]]) {
     const w = world({ role: 'owner', used: 10, plan: state });
     const { ctx, page, reports } = await open({ w });
     await waitBilling(page, card);
@@ -1752,7 +1767,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   const w = world({ role: 'owner', used: 10, plan: 'canceled' });
   const { ctx, page } = await open({ w });
   await waitBilling(page, /ended/);
-  ok(await page.$eval('#subscribe', (e) => /^Subscribe again$/.test(e.textContent.trim())), '12q a brokerage whose subscription ended is offered "Subscribe again"');
+  ok(await page.$eval('#subscribe', (e) => /^Subscribe again: \$78\/month$/.test(e.textContent.trim())), '12q a brokerage whose subscription ended is offered "Subscribe again"');
   await ctx.close();
 }
 {
@@ -1764,8 +1779,8 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   ok(/Your plan could not be read just now/.test(await billingText(page)) && await page.$eval('#subscribe', (e) => e.hidden), '12t a plan that cannot be read says so and offers no checkout (never "paid", never "free")');
   w.billingFails = false;
   await page.click('#billing-refresh');
-  await waitBilling(page, /Free trial/);
-  ok(/Free trial/.test(await billingText(page)) && await page.$eval('#subscribe', (e) => !e.hidden), '12u "Check again" asks again and the card follows', billingCalls.map((c) => c.body));
+  await waitBilling(page, /No active plan/);
+  ok(/No active plan/.test(await billingText(page)) && await page.$eval('#subscribe', (e) => !e.hidden), '12u "Check again" asks again and the card follows', billingCalls.map((c) => c.body));
   // the provider has confirmed a payment: the page learns it only by asking
   w.plan = 'paid'; w.paidUsed = 0; w.used = 10;
   await page.click('#billing-refresh');
@@ -1812,7 +1827,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   }
   // a phone
   const { ctx, page } = await open({ w: world({ role: 'owner', used: 3 }), width: 390, height: 844 });
-  await waitBilling(page, /Free trial/);
+  await waitBilling(page, /No active plan/);
   ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), '12x at 390 px wide the page with the Billing card does not scroll sideways');
   await ctx.close();
 }
@@ -1832,7 +1847,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   await page.fill('#auth-email', 'agent@example.test'); await page.click('#auth-submit');
   await page.waitForSelector('#auth-code', { state: 'visible', timeout: 8000 });
   await page.fill('#auth-code', '123456'); await page.click('#auth-submit');
-  await waitBilling(page, /Free trial/);
+  await waitBilling(page, /No active plan/);
   await page.waitForTimeout(500); // long enough for a page that wrongly pressed Subscribe to have been sent to the provider
   const stayed = page.url().startsWith(base + PAGE);
   ok(stayed && checkouts.length === 0 && billingCalls.every((c) => c.body.action === 'status'),
@@ -1868,8 +1883,8 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   const { ctx, page } = await open({ w });
   await page.waitForFunction(() => !document.getElementById('signup').hidden, null, { timeout: 8000 }).catch(() => {});
   ok(await page.$eval('#signup', (e) => !e.hidden) && /not part of a trial/.test(await text(page, '#trial-count')), '14a signed in with no account: the signup card shows');
-  ok(/100 free Development Activity reports\. Paid plans are coming/.test(await text(page, '#signup')) && await page.$eval('#signup-quote', (a) => a.getAttribute('href') === 'contact.html'),
-    '14b it states the offer in the founder\'s words and links brokerages to the contact page');
+  ok(/Create your account to subscribe to Professional \(\$78\/month, 100 reports a month\)/.test(await text(page, '#signup')) && !/free Development Activity reports|Paid plans are coming/.test(await text(page, '#signup')) && await page.$eval('#signup-quote', (a) => a.getAttribute('href') === 'contact.html'),
+    '14b it states the paid offer (Professional, $78/month, 100 reports a month; no free plan is advertised) and links brokerages to the contact page');
   await page.click('#signup-go');
   ok(w.signedUp.length === 0 && /Type your name/.test(await text(page, '#signup-status')), '14c an empty name is stopped on the page: nothing is sent');
   await page.fill('#signup-name', '  Ann   Agent ');
@@ -1904,8 +1919,8 @@ for (const [label, opts, expect] of [['refused', { trial: null, signup: 'refuse'
 {
   // 13e. an AGENT (not the owner) arriving on #billing sees the card and is told only the owner can subscribe: no Subscribe button
   const { ctx, page, checkouts } = await open({ w: world({ role: 'agent', used: 3 }), hash: '#billing' });
-  await waitBilling(page, /Free trial/);
-  ok(await billingShown(page) && /Only your brokerage's owner can subscribe\./.test(await billingText(page)) && await page.$eval('#subscribe', (e) => e.hidden) && checkouts.length === 0,
+  await waitBilling(page, /No active plan/);
+  ok(await billingShown(page) && /Only your account's owner can subscribe\./.test(await billingText(page)) && await page.$eval('#subscribe', (e) => e.hidden) && checkouts.length === 0,
     '13e an agent on #billing sees the card, is told only the owner can subscribe, and has no Subscribe button');
   await ctx.close();
 }
@@ -1984,16 +1999,16 @@ for (const [label, w] of [['an agent', world({ role: 'agent' })], ['a person wit
   // audit item D, one open checkout at a time: a press while a payment page was opened in the last ten minutes is told so in plain words; no second checkout is made
   const w = world({ role: 'owner', used: 3 });
   const { ctx, page, checkouts, errors } = await open({ w });
-  await waitBilling(page, /Free trial/);
+  await waitBilling(page, /No active plan/);
   w.checkoutBusy = true;
   await page.click('#subscribe');
   await page.waitForFunction(() => /just opened/.test(document.getElementById('billing-status').textContent), null, { timeout: 8000 }).catch(() => {});
-  ok(/A payment page was just opened for your brokerage\. Use that tab, or wait a few minutes and press Subscribe again\./.test(await text(page, '#billing-status')) && checkouts.length === 0 && w.checkoutMade === 0 && page.url().startsWith(base + PAGE),
+  ok(/A payment window was just opened for your account\. Use that one, or wait a few minutes and try again\./.test(await text(page, '#billing-status')) && checkouts.length === 0 && w.checkoutMade === 0 && page.url().startsWith(base + PAGE),
     '15o a checkout opened a moment ago: the owner is told to use that tab or wait, the browser stays put, and no second checkout is made');
   w.checkoutBusy = false;
   await page.click('#subscribe');
-  await page.waitForFunction(() => /checkout/i.test(document.title), null, { timeout: 8000 }).catch(() => {});
-  ok(w.checkoutMade === 1 && checkouts.length === 1 && checkouts[0] === CHECKOUT_URL, '15p once the slot is free a press makes ONE checkout and sends the browser to it', [w.checkoutMade, checkouts]);
+  await page.waitForFunction(() => (window.__paddleOpens || []).length > 0, null, { timeout: 8000 }).catch(() => {});
+  ok(w.checkoutMade === 1 && checkouts.length === 1 && checkouts[0].items?.[0]?.priceId === PRO_PRICE, '15p once the slot is free a press makes ONE checkout and opens the overlay', [w.checkoutMade, checkouts]);
   ok(errors.filter((e) => !/409/.test(e)).length === 0, '15q no page error', errors);
   await ctx.close();
 }
@@ -2181,7 +2196,7 @@ for (const [width, height] of [[1280, 900], [768, 1024], [390, 844]]) {
 {
   // L4. the Billing deep link still lands on the plan, with the account section opened for it
   const { ctx, page } = await open({ w: world({ role: 'owner' }), hash: '#billing', accountClosed: true });
-  await waitBilling(page, /Free trial/);
+  await waitBilling(page, /No active plan/);
   ok(await page.$eval('#account', (e) => e.open) && (await drawn(page, '#billing')), 'L4 arriving on #billing opens the account section and shows the plan');
   await ctx.close();
 }
@@ -2293,7 +2308,7 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
 for (const [w, h] of [[1440, 900], [1920, 1080], [390, 844]]) {
   const { ctx, page, errors } = await open({ w: world({ role: 'owner' }), width: w, height: h, signedIn: true, compare: false });   // an owner: free-only copy shows the plan action only where checkout is available
   await waitCount(page, /free reports left/);
-  await waitBilling(page, /Free trial/);
+  await waitBilling(page, /No active plan/);
   await make(page, A1);
   await waitBoxes(page, 1);
   if (SHOTS) { await page.screenshot({ path: SHOTS + '/M-' + w + '-viewport.png' }); await shot(page, 'M-' + w + '-full'); }

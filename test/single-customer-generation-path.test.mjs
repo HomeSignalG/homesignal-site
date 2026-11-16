@@ -220,7 +220,7 @@ ok(landingLinks.length === 1 && landingLinks[0] === CUSTOMER_PAGE + '#billing', 
 ok(robots.includes(CUSTOMER_PAGE) && readRepo('scripts/stage_site.py').includes("'" + CUSTOMER_PAGE + "'"), 'P6e control: the same detector finds the page name where it really is');
 ok(!/service_role|SERVICE_ROLE/.test(cust) && /view: 'customer'/.test(cust) && !/'internal'/.test(cust),
   'P6f the customer page carries no service-role key and only ever asks for the customer view');
-ok(/location\.hash/.test(cust) && !/searchParams|URLSearchParams/.test(cust) && (cust.match(/location\.search/g) || []).length === 1
+ok(/location\.hash/.test(cust) && !/searchParams|URLSearchParams/.test(cust) && (cust.replace(/history\.replaceState\([^)]*\)/g, '').replace(/checkout=success[^\n]*location\.search[^\n]*|location\.search[^\n]*checkout=success/g, '').match(/location\.search/g) || []).length === 0
    && /history\.replaceState\(null, '', location\.pathname \+ location\.search\)/.test(cust),
   'P6g the invite token is read from the URL fragment only (never sent to a server) and removed from the address bar');
 const trialHandler = readRepo('supabase/functions/development-activity-trial/handler.ts');
