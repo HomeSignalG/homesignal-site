@@ -10,24 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Call get-address-report (ZIP mode, read-only for OR) and summarize county cases
-        run: |
-          curl -sS -m 600 -X POST "https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/get-address-report" \
-            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U" -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U" -H "Content-Type: application/json" \
-            -d '{"zip":"97149","lat":45.097,"lng":-123.9434}' -o r.json -w "HTTP %{http_code}\n"
-          ls -l r.json
-          python3 - <<'PY'
-          import json
-          d=json.load(open('r.json'))
-          print("keys",list(d.keys())[:30])
-          print("counts",json.dumps(d.get('counts')))
-          print("sources",json.dumps({k:v for k,v in d.items() if 'source' in k.lower() and k!='sites'})[:3000])
-          sites=d.get('sites') or []
-          print("total sites",len(sites))
-          cc=[s for s in sites if 'tillamook' in str(s.get('source_registry_id','')).lower() or 'county' in str(s.get('source_registry_id','')).lower() and 'case' in str(s.get('source_registry_id','')).lower()]
-          print("county-case sites",len(cc))
-          for s in cc:
-              print(json.dumps({k:s.get(k) for k in ('title','label','case_number','status','bucket','type','use_type','lat','lng','scope','record_url','location_approx','file_date','status_note','description')},default=str))
-          print('REPORTS',json.dumps(d.get('county_cases_reports'),default=str)[:12000])
-          print('NOTE',str(d.get('note'))[:600])
-          PY
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Diagnose Tillamook county cases (read-only, public county pages)
+        run: node scripts/_tillamook_diag.mjs
