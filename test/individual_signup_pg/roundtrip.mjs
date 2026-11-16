@@ -29,6 +29,7 @@ const J = "select coalesce(json_agg(row_to_json(t)), '[]') from ";
 // the database's own functions, called the way PostgREST would call them. An UNLISTED call stops the run: that is how a second way in would show.
 const RPC = {
   evaluation_usage: (a) => [J + "public.evaluation_usage(:'u'::uuid) t", { u: a.p_user_id }],
+  billing_summary: (a) => [J + "public.billing_summary(:'u'::uuid) t", { u: a.p_user_id }],
   billing_usage: (a) => [J + "public.billing_usage(:'u'::uuid) t", { u: a.p_user_id }],
   report_rate_claim: (a) => [J + "public.report_rate_claim(:'u'::uuid) t", { u: a.p_user }],
   brokerage_report_issue: (a) => [J + "public.brokerage_report_issue(:'u'::uuid, :'k'::uuid, :'b', :'h', :'v', :'i'::jsonb, nullif(:'p', '')::jsonb) t",
@@ -79,7 +80,7 @@ async function trialAsk(userId, body) {
   return { status: res.status, json: await res.json() };
 }
 async function billingAsk(userId, body) {
-  const real = BD.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc', billing: { apiKey: '', storeId: '', variantId: '', secret: '', testMode: true } }, fetchToSql);
+  const real = BD.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc', paddle: { environment: 'sandbox', clientToken: '', apiKey: '', bindingSecret: '' } }, fetchToSql);
   const h = BH.makeHandler({ ...real, checkoutEnabled: () => true, authenticate: async () => ({ email: 'x@example.test', id: userId }), isAdmin: async () => false });
   const res = await h(new Request('https://x/functions/v1/manage-billing', { method: 'POST', headers: { authorization: 'Bearer t', 'content-type': 'application/json' }, body: JSON.stringify(body) }));
   return { status: res.status, json: await res.json() };
@@ -145,7 +146,7 @@ ok(count('evaluation_credit') === 10 && Number(one("select count(*) from public.
 t = await billingAsk(ANN, { action: 'status' });
 ok(t.status === 200 && t.json.plan.state === 'none' && t.json.plan.role === 'owner' && t.json.checkout === 'not_set_up',
   '4a billing sees the individual as the OWNER of a plan-less account, and checkout reads not_set_up because no payment provider is configured here: nothing was activated', t.json);
-t = await billingAsk(ANN, { action: 'checkout' });
+t = await billingAsk(ANN, { action: 'checkout', plan: 'professional' });
 ok(t.status === 503 && t.json.error === 'billing_not_set_up' && !seen.some((s) => /billing_checkout_claim/.test(s)), '4b a checkout cannot be started without the provider configured: refused (503) before any slot or processor call', t.json);
 
 // ---- 5. a team cannot form in an individual account --------------------------------------------------------------------------------
