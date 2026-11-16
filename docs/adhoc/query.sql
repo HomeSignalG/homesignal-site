@@ -8,6 +8,5 @@ select jsonb_pretty(jsonb_build_object(
  'z64166_members', (select count(*) from geo.n5_serving_membership where zcta5='64166'),
  'z64166_projects', (select count(*) from public.app_projects where zip='64166' and record_kind='development'),
  'canon_trend', (select jsonb_agg(x order by x.day) from (select date_trunc('day',d.start_time)::date as day, count(*) n, round(percentile_cont(0.5) within group (order by extract(epoch from d.end_time-d.start_time))::numeric) p50, round(max(extract(epoch from d.end_time-d.start_time))::numeric) mx from cron.job_run_details d where d.command ~ 'serialized\(.canonical' and d.start_time>now()-interval '30 days' group by 1) x),
- 'counts', jsonb_build_object('entities',(select count(*) from public.dc_canonical_entity),'links',(select count(*) from public.dc_entity_observation)),
- 'last_maps_runs', (select jsonb_agg(to_jsonb(x)) from (select * from public.maps_generation_request order by 1 desc limit 3) x)
+ 'counts', jsonb_build_object('entities',(select count(*) from public.dc_canonical_entity),'links',(select count(*) from public.dc_entity_observation))
 ));
