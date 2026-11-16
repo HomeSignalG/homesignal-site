@@ -58,7 +58,7 @@ ok(out.length === 13, 'no record is dropped');
 const src = readFileSync(join(fn, 'sources/date-sanity.ts'), 'utf8').replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
 ok(!/massdot|champaign|2050|9999/i.test(src), 'the rule names no source and no sentinel value (code, comments stripped)');
 const idx = readFileSync(join(fn, 'index.ts'), 'utf8');
-ok(/refuseFutureFilingDates\(\[\.\.\.tabsSites, \.\.\.socrataSites, \.\.\.arcgisSites, \.\.\.ckanSites, \.\.\.csvSites, \.\.\.cartoSites\], today\)/.test(idx),
+ok(/refuseFutureFilingDates\(\[\.\.\.tabsSites, \.\.\.socrataSites, \.\.\.arcgisSites, \.\.\.ckanSites, \.\.\.csvSites, \.\.\.cartoSites, \.\.\.countyCaseSites\], today\)/.test(idx),
   'index.ts still applies it to every permit connector');
 
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
