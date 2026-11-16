@@ -8,7 +8,7 @@ records, so every onboarding also needed a hand-written classification migration
 ZIPs; tdlr-tabs 5 on 78617).
 
 THE TREATMENT IS A TECHNICAL FACT, NOT AN APPROVAL, and this module only decides it from facts:
-  * a non-ArcGIS connector (socrata, ckan, csv, carto, opendatasoft) stores the publisher's own
+  * a non-ArcGIS connector (socrata, ckan, csv, carto, opendatasoft, county_cases) stores the publisher's own
     lat/lng column or a geocode that passed the fence (sources/geo-fence.ts, CLAUDE.md 7.12b), and
     the build's geometry re-read (n5_shard.recover_shard) reads ArcGIS only            -> PROVEN
   * an ArcGIS layer whose metadata says it has NO geometry (a Table): the stored point is a fenced
@@ -35,7 +35,9 @@ BUILDING, because shards already frozen would disagree with shards frozen after 
 stdlib only.
 """
 
-NON_ARCGIS = ("socrata", "ckan", "csv", "carto", "opendatasoft")
+# county_cases: the connector joins a case to its named tax lots and stores the parcel centroid itself,
+# so the stored point is the connector's own (labelled approximate), never re-fetched by N5 recovery.
+NON_ARCGIS = ("socrata", "ckan", "csv", "carto", "opendatasoft", "county_cases")
 
 # Engine adapters whose records carry a source family but have no registry entry. Each value is
 # the treatment its stored point earns, with the reason. test/n5-classify-sources.test.mjs pins
