@@ -196,6 +196,10 @@ function mdeps(over = {}) {
     isAdmin: rec('isAdmin', async () => false),
     summaryOf: rec('summaryOf', over.summaryOf ?? (async () => summary())),
     configured: () => over.configured ?? true, apiConfigured: () => over.apiConfigured ?? true, checkoutEnabled: () => over.checkoutEnabled ?? true,
+    paddleEnvironment: () => over.paddleEnvironment ?? 'sandbox',
+    environmentMode: rec('environmentMode', over.environmentMode ?? (async () => 'staging')),
+    gateArmed: rec('gateArmed', over.gateArmed ?? (async () => true)),
+    termsAccept: rec('termsAccept', over.termsAccept ?? (async () => 'ACCEPTED')),
     partnerStart: rec('partnerStart', over.partnerStart ?? (async () => ({ outcome: 'OK', enrollment_id: EN, brokerage_id: BK }))),
     sha256: P.sha256Hex,
     makeSession: rec('makeSession', over.makeSession ?? (async (b, plan, enr) => ({ environment: 'sandbox', clientToken: 'test_x', priceId: plan === 'professional' ? PRO : PAR, customData: { brokerage_id: b, plan, ...(enr ? { enrollment_id: enr } : {}), bind: 'b'.repeat(64) } }))),
@@ -204,9 +208,11 @@ function mdeps(over = {}) {
     managementUrls: rec('managementUrls', over.managementUrls ?? (async () => ({ update_payment_method: 'https://customer-portal.paddle.com/u', cancel: 'https://customer-portal.paddle.com/c' }))),
   };
 }
-async function ask(d, body, { method = 'POST', auth = 'Bearer t', raw } = {}) {
+async function ask(d, body, { method = 'POST', auth = 'Bearer t', raw, noTerms = false } = {}) {
   mcalls.length = 0;
   const headers = { 'content-type': 'application/json' }; if (auth) headers.authorization = auth;
+  // a checkout carries the Terms version the page showed, unless a test is about its absence
+  if (body && body.action === 'checkout' && body.terms_version === undefined && !noTerms) body = { ...body, terms_version: '2026-11-16' };
   const init = { method, headers }; if (method === 'POST') init.body = raw !== undefined ? raw : JSON.stringify(body);
   const res = await MH.makeHandler(d)(new Request('https://x/functions/v1/manage-billing', init));
   const text = await res.text(); let json = null; try { json = JSON.parse(text); } catch { /* not json */ }
@@ -268,6 +274,33 @@ const CODE = 'partner-code-0123456789abcdef';
   ok(r.status === 400 && r.json.detail === 'plan', '5v Brokerage & Enterprise cannot be bought: an unknown plan is a malformed request');
   r = await ask(mdeps(), { action: 'checkout', plan: 'professional', price_id: PAR });
   ok(r.status === 400 && /unknown field/.test(r.json.detail) && !mcalls.some((c) => c[0] === 'makeSession'), '5w the page cannot name a price: an extra field is refused');
+  // ---- decisions 3 and 4: terms before purchase, and the environment / launch-gate safety checks ----
+  r = await ask(mdeps(), { action: 'checkout', plan: 'professional' }, { noTerms: true });
+  ok(r.status === 409 && r.json.error === 'terms_not_accepted' && !mcalls.some((c) => c[0] === 'makeSession' || c[0] === 'checkoutClaim' || c[0] === 'termsAccept'), '5aa a checkout with no Terms version is refused before anything is recorded or signed');
+  r = await ask(mdeps(), { action: 'checkout', plan: 'professional', terms_version: 'yesterday' });
+  ok(r.status === 409 && r.json.error === 'terms_not_accepted' && !mcalls.some((c) => c[0] === 'makeSession'), '5ab a malformed Terms version is refused');
+  r = await ask(mdeps({ termsAccept: async () => 'VERSION_STALE' }), { action: 'checkout', plan: 'professional' });
+  ok(r.status === 409 && r.json.error === 'terms_not_accepted' && r.json.detail === 'terms_changed' && !mcalls.some((c) => c[0] === 'makeSession' || c[0] === 'checkoutClaim'), '5ac a Terms version that is no longer current gets no session (the page must show the new Terms first)');
+  r = await ask(mdeps({ termsAccept: async () => 'NOT_OWNER' }), { action: 'checkout', plan: 'professional' });
+  ok(r.status === 403 && !mcalls.some((c) => c[0] === 'makeSession'), '5ad only the owner can agree for the account');
+  r = await ask(mdeps(), { action: 'checkout', plan: 'professional' });
+  const ta = mcalls.findIndex((c) => c[0] === 'termsAccept'), ms = mcalls.findIndex((c) => c[0] === 'makeSession');
+  ok(r.status === 200 && ta > 0 && ms > ta && mcalls[ta][2] === '2026-11-16' && mcalls[ta][3] === 'professional', '5ae the agreement is RECORDED (version and plan) BEFORE the session is signed');
+  r = await ask(mdeps(), { action: 'checkout', plan: 'private_partner', partner_code: CODE });
+  const tb = mcalls.findIndex((c) => c[0] === 'termsAccept');
+  ok(r.status === 200 && tb > 0 && mcalls[tb][3] === 'private_partner', '5af the partner offer requires the same agreement');
+  r = await ask(mdeps({ paddleEnvironment: 'production', environmentMode: async () => 'staging' }), { action: 'checkout', plan: 'professional' });
+  ok(r.status === 503 && r.json.error === 'billing_environment_mismatch' && !mcalls.some((c) => c[0] === 'makeSession' || c[0] === 'termsAccept'), '5ag a PRODUCTION Paddle function pointed at a STAGING database sells nothing');
+  r = await ask(mdeps({ paddleEnvironment: 'sandbox', environmentMode: async () => 'production' }), { action: 'checkout', plan: 'professional' });
+  ok(r.status === 503 && r.json.error === 'billing_environment_mismatch' && !mcalls.some((c) => c[0] === 'makeSession'), '5ah a SANDBOX checkout against the PRODUCTION database sells nothing (a sandbox payment can never be taken there)');
+  r = await ask(mdeps({ paddleEnvironment: 'production', environmentMode: async () => 'production' }), { action: 'checkout', plan: 'professional' });
+  ok(r.status === 200, '5ai production function + production database is the one allowed live pairing');
+  r = await ask(mdeps({ gateArmed: async () => false }), { action: 'checkout', plan: 'professional' });
+  ok(r.status === 503 && r.json.error === 'billing_gate_not_armed' && !mcalls.some((c) => c[0] === 'makeSession'), '5aj checkout cannot open while the unpaid-report gate is not armed: launching and gating are one act');
+  r = await ask(mdeps({ checkoutEnabled: false }), { action: 'status' });
+  ok(r.status === 200 && r.json.checkout === 'disabled' && !mcalls.some((c) => c[0] === 'environmentMode' || c[0] === 'gateArmed'), '5ak with the kill switch off, the database is not even asked about the environment or the gate');
+  r = await ask(mdeps({ environmentMode: async () => { throw new MH.DataUnavailable('x'); } }), { action: 'checkout', plan: 'professional' });
+  ok(r.status === 502 && !mcalls.some((c) => c[0] === 'makeSession'), '5al an unreadable environment fails closed (502), never a guess');
   r = await ask(mdeps(), { action: 'portal' });
   ok(r.status === 409, '5x the portal is refused for a plan with no recurring subscription');
   r = await ask(mdeps({ summaryOf: async () => summary({ state: 'paid', kind: 'recurring', plan_key: 'professional' }) }), { action: 'portal' });
@@ -282,6 +315,18 @@ const CODE = 'partner-code-0123456789abcdef';
   const json = (v, st = 200) => new Response(JSON.stringify(v), { status: st, headers: { 'content-type': 'application/json' } });
   const SBASE = 'https://proj.supabase.co';
   const cfg = (env = 'sandbox', over = {}) => ({ url: SBASE, serviceKey: 'service-key', paddle: { environment: env, clientToken: env === 'production' ? 'live_' + 'a'.repeat(30) : 'test_' + 'a'.repeat(30), apiKey: 'pdl_secret_key', bindingSecret: BIND, ...over } });
+  {
+    // the three new database reads: the environment, the launch gate and the Terms agreement
+    const c3 = [];
+    const { f: fe } = mkFetch([[/\/rest\/v1\/rpc\/(\w+)$/, (u, init) => { const fn = u.match(/rpc\/(\w+)$/)[1]; c3.push([fn, JSON.parse(init.body)]); return json(fn === 'billing_environment_mode' ? 'staging' : fn === 'billing_gate_state' ? [{ paid_required: true, honor_granted_free_reports: false }] : 'ACCEPTED'); }]]);
+    const dd = MD.makeDeps(cfg('sandbox'), fe);
+    ok(await dd.environmentMode() === 'staging' && await dd.gateArmed() === true && await dd.termsAccept(UID, '2026-11-16', 'professional') === 'ACCEPTED', '6aa the environment, the gate and the Terms agreement are each one database call and are read as the database answered');
+    ok(c3.find((c) => c[0] === 'billing_terms_accept')[1].p_user_id === UID && c3.find((c) => c[0] === 'billing_terms_accept')[1].p_version === '2026-11-16' && c3.find((c) => c[0] === 'billing_terms_accept')[1].p_plan === 'professional', '6ab the agreement names the signed-in person, the version and the plan');
+    const { f: fb } = mkFetch([[/\/rest\/v1\/rpc\/(\w+)$/, () => json('weird')]]);
+    let bad = 0; for (const fn of ['environmentMode', 'gateArmed']) { try { await MD.makeDeps(cfg('sandbox'), fb)[fn](); } catch (e) { bad++; } }
+    try { await MD.makeDeps(cfg('sandbox'), fb).termsAccept(UID, '2026-11-16', 'professional'); } catch (e) { bad++; }
+    ok(bad === 3, '6ac an answer of an unknown shape from any of the three is a failed read, never a pass');
+  }
   ok(MD.isConfigured(cfg('sandbox').paddle) && MD.isConfigured(cfg('production').paddle), '6a a token of the right kind for its environment is configured');
   ok(!MD.isConfigured({ ...cfg('production').paddle, clientToken: 'test_' + 'a'.repeat(30) }) && !MD.isConfigured({ ...cfg('sandbox').paddle, clientToken: 'live_' + 'a'.repeat(30) }) && !MD.isConfigured({ ...cfg('sandbox').paddle, bindingSecret: '' }) && !MD.isConfigured({ ...cfg('sandbox').paddle, clientToken: '' }),
     '6b a sandbox token in production (or the reverse), or a missing token or binding secret, is NOT configured');

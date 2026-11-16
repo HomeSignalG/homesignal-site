@@ -415,7 +415,7 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
 
   // the ledger refuses: nothing stored, nothing charged, and no report given
   for (const [what, err, status, code] of [['the 10th report used by another request first', new S.EvaluationComplete('x'), 403, 'evaluation_complete'],
-    ['membership ended while the report was made', new S.NotEntitled('x'), 403, 'forbidden'], ['the ledger unreachable', new H.DataUnavailable('x'), 502, 'data_unavailable'], ['anything else', new Error('boom'), 500, 'internal']]) {
+    ['the account has no paid plan and no promised free reports (no free plan)', new S.PaidPlanRequired('x'), 402, 'payment_required'], ['membership ended while the report was made', new S.NotEntitled('x'), 403, 'forbidden'], ['the ledger unreachable', new H.DataUnavailable('x'), 502, 'data_unavailable'], ['anything else', new Error('boom'), 500, 'internal']]) {
     f = trialFakes({ issue: async () => { throw err; } });
     r = await call(f.deps, { ...REQ, idempotency_key: KEY }, TAUTH);
     ok(r.status === status && r.json.error === code && r.json.report === undefined, '8g ' + what + ': ' + status + ' ' + code + ' and NO report (a report given anyway would be a free one)', [r.status, r.json]);
@@ -619,6 +619,8 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
   d = mk([[/rpc\/brokerage_report_issue/, () => json([{ ...ROW, credit_ordinal: 4, credits_used: 4, credits_remaining: 96, evaluation_status: 'paid', allotment: 'paid', period_ends_at: '2026-11-04T12:00:00+00:00' }])]]);
   const paid = await d.issue(USER, KEY, BODY, CTX, OPTS);
   ok(paid.credit.allotment === 'paid' && paid.credit.period_ends_at === '2026-11-04T12:00:00+00:00' && paid.credit.credits_remaining === 96, '9h a paid report\'s answer names its allotment and the month\'s end');
+  d = mk([[/rpc\/brokerage_report_issue/, () => json({ code: 'EV013', message: 'PAID_PLAN_REQUIRED' }, 400)]]);
+  ok(await d.issue(USER, KEY, BODY, CTX, OPTS).then(() => false, (e) => e instanceof S.PaidPlanRequired), '9h2 the database\'s PAID_PLAN_REQUIRED becomes its own named refusal (no free plan)');
   d = mk([[/rpc\/brokerage_report_issue/, () => json({ code: 'EV010', message: 'ALLOTMENT_COMPLETE' }, 400)]]);
   ok(await d.issue(USER, KEY, BODY, CTX, OPTS).then(() => false, (e) => e instanceof S.AllotmentComplete), '9h the database\'s ALLOTMENT_COMPLETE becomes its own named refusal');
   let shape = 0;

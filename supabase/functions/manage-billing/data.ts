@@ -41,6 +41,7 @@ export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
       if (!r.ok) throw new CheckoutUnavailable('http ' + r.status);      // the answer's body is never read or repeated: it can name the buyer
       return managementUrlsFrom(await r.json().catch(() => null));
     },
+    environmentMode: billing.environmentMode, gateArmed: billing.gateArmed, termsAccept: billing.termsAccept, paddleEnvironment: () => cfg.paddle.environment,
     checkoutEnabled: () => true,        // replaced by index.ts with the committed switch
   };
 }

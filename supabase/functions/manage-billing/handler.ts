@@ -43,6 +43,13 @@ export type Deps = AdminGateDeps & {
   apiConfigured: () => boolean;
   /** The committed kill switch (_shared/billing-switch.ts). False refuses every checkout. */
   checkoutEnabled: () => boolean;
+  /** The database's own environment ('production' | 'staging') and whether paid checkout has launched there (the report gate is armed). */
+  environmentMode: () => Promise<'production' | 'staging'>;
+  gateArmed: () => Promise<boolean>;
+  /** The Paddle environment this function is configured for ('production' | 'sandbox'). */
+  paddleEnvironment: () => 'production' | 'sandbox';
+  /** Records the owner's agreement to the CURRENT terms version for a plan; answers ACCEPTED, VERSION_STALE or NOT_OWNER. */
+  termsAccept: (userId: string, version: string, plan: PlanKey) => Promise<'ACCEPTED' | 'VERSION_STALE' | 'NOT_OWNER'>;
   partnerStart: (userId: string, tokenHash: string, write: boolean) => Promise<PartnerStart>;
   sha256: (text: string) => Promise<string>;
   makeSession: (brokerageId: string, plan: PlanKey, enrollmentId: string | null) => Promise<CheckoutSession>;
@@ -60,24 +67,29 @@ export const CAPABILITY = {
 
 /** The fields each action may carry. Anything else is a malformed request. */
 const FIELDS: Record<string, string[]> = {
-  status: ['action'], offer: ['action', 'partner_code'], checkout: ['action', 'plan', 'partner_code'], checkout_release: ['action'], portal: ['action'],
+  status: ['action'], offer: ['action', 'partner_code'], checkout: ['action', 'plan', 'partner_code', 'terms_version'], checkout_release: ['action'], portal: ['action'],
 };
 /** A partner code is a long random token; its shape is checked before it is hashed, so a stray string never reaches the database. */
 const PARTNER_CODE = /^[A-Za-z0-9_-]{16,128}$/;
 
-export type Availability = 'available' | 'not_owner' | 'already_paid' | 'subscription_exists' | 'account_suspended' | 'disabled' | 'not_set_up';
+export type Availability = 'available' | 'not_owner' | 'already_paid' | 'subscription_exists' | 'account_suspended' | 'disabled' | 'not_set_up' | 'environment_mismatch' | 'gate_not_armed';
 /**
  * Who may start a checkout and why not: the ONE reading of it. A checkout is offered only where a NEW purchase is what the account needs: never bought
  * ('none'), ended ('canceled', 'expired'), or a test purchase only ('test_only', which never grants). Over a purchase that exists and may recover (paid,
  * past due, paused, trialing, unclear) it is refused, so an account is never billed twice.
  */
-export function checkoutAvailability(u: BillingSummary, configured: boolean, enabled: boolean): Availability {
+export function checkoutAvailability(u: BillingSummary, configured: boolean, enabled: boolean, ready: { environmentOk: boolean; gateArmed: boolean } = { environmentOk: true, gateArmed: true }): Availability {
   if (u.role !== 'owner') return 'not_owner';
   if (u.state === 'paid') return 'already_paid';
   if (u.state === 'suspended') return 'account_suspended';
   if (u.state !== 'none' && u.state !== 'canceled' && u.state !== 'expired' && u.state !== 'test_only') return 'subscription_exists';
   if (!enabled) return 'disabled';        // the kill switch: checked before Paddle's settings, so it holds whatever they are
   if (!configured) return 'not_set_up';
+  // Two safety checks that make a launch impossible by accident: the function's Paddle environment must be the one the DATABASE grants for (a production
+  // function never sells against a staging database, and the reverse), and the report gate must already be armed, so the day checkout opens is the day
+  // an unpaid account stops being able to make reports.
+  if (!ready.environmentOk) return 'environment_mismatch';
+  if (!ready.gateArmed) return 'gate_not_armed';
   return 'available';
 }
 
@@ -88,6 +100,8 @@ const REFUSALS: Record<Exclude<Availability, 'available'>, [number, Record<strin
   account_suspended: [403, { error: 'account_suspended' }],
   disabled: [503, { error: 'checkout_disabled' }],
   not_set_up: [503, { error: 'billing_not_set_up' }],
+  environment_mismatch: [503, { error: 'billing_environment_mismatch' }],
+  gate_not_armed: [503, { error: 'billing_gate_not_armed' }],
 };
 const PARTNER_REFUSALS: Record<string, [number, string]> = {
   LINK_INVALID: [404, 'offer_unavailable'], NOT_ENTITLED: [403, 'owner_only'], ALREADY_USED: [409, 'offer_used'], ALREADY_PAID: [409, 'already_paid'],
@@ -115,7 +129,13 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
     try {
       const summary = await deps.summaryOf(who.userId);
       if (!summary) return reply(req, { error: 'forbidden' }, 403);     // no account, no billing
-      const availability = checkoutAvailability(summary, deps.configured(), deps.checkoutEnabled());
+      // the two database reads are made only when the switch is on and Paddle is set up: nothing about them is asked of a closed checkout
+      let ready = { environmentOk: true, gateArmed: true };
+      if (deps.checkoutEnabled() && deps.configured() && (action === 'status' || action === 'checkout')) {
+        const [mode, armed] = await Promise.all([deps.environmentMode(), deps.gateArmed()]);
+        ready = { environmentOk: (mode === 'production') === (deps.paddleEnvironment() === 'production'), gateArmed: armed };
+      }
+      const availability = checkoutAvailability(summary, deps.configured(), deps.checkoutEnabled(), ready);
       if (action === 'status') return reply(req, { status: 'OK', plan: dashboardPlan(summary), checkout: availability, portal: summary.role === 'owner' && summary.kind === 'recurring' && deps.apiConfigured() });
 
       if (action === 'checkout_release') {
@@ -150,6 +170,9 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
       const plan = typeof b.plan === 'string' && (PLANS as readonly string[]).includes(b.plan) ? (b.plan as PlanKey) : null;
       if (plan === null) return reply(req, { error: 'bad_request', detail: 'plan' }, 400);
       if (availability !== 'available') { const [st, e] = REFUSALS[availability]; return reply(req, e, st); }
+      // THE CUSTOMER AGREES TO THE CURRENT TERMS BEFORE ANYTHING IS SIGNED: the page names the version of the Terms and Refund Policy it showed; the database
+      // records the agreement only when that is the current version. No version, or a stale one, gets no checkout.
+      if (typeof b.terms_version !== 'string' || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(b.terms_version)) return reply(req, { error: 'terms_not_accepted' }, 409);
       if (plan === 'professional' && tokenHash !== null) return reply(req, { error: 'bad_request', detail: 'partner_code' }, 400);
       let enrollmentId: string | null = null;
       if (plan === 'private_partner') {
@@ -159,6 +182,8 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
         if (r.outcome !== 'OK' || !r.enrollment_id) { const [st, e] = PARTNER_REFUSALS[r.outcome] ?? [404, 'offer_unavailable']; return reply(req, { error: e }, st); }
         enrollmentId = r.enrollment_id;
       }
+      const agreed = await deps.termsAccept(who.userId, b.terms_version, plan);
+      if (agreed !== 'ACCEPTED') return reply(req, { error: 'terms_not_accepted', detail: agreed === 'VERSION_STALE' ? 'terms_changed' : 'owner_only' }, agreed === 'VERSION_STALE' ? 409 : 403);
       // ONE CHECKOUT AT A TIME: the slot is claimed in the database BEFORE a session is made, so two presses (or two tabs) cannot open two checkouts.
       const slot = await deps.checkoutClaim(summary.brokerage_id);
       if (slot.outcome === 'BUSY') return reply(req, { error: 'checkout_in_progress' }, 409);

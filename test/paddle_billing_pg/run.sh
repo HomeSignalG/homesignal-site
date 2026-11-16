@@ -26,5 +26,7 @@ echo "$out" | grep -q '^FAIL' && { echo "SUITE FAILED"; exit 1; }
 n=$(echo "$out" | grep -c '^PASS' || true); [ "$n" -ge 30 ] || { echo "FAIL fewer than 30 checks ran ($n)"; exit 1; }
 # rollback runs, and re-apply works
 sed -n '/^-- ROLLBACK-BEGIN$/,/^-- ROLLBACK-END$/p' "$SQL" | sed '1d;$d' | sed 's/^-- //' | P -f - >/dev/null || { echo "FAIL 3 rollback does not run"; exit 1; }
+g=$(P -tA -c "select pg_get_functiondef('public.brokerage_report_issue(uuid,uuid,text,text,text,jsonb,jsonb)'::regprocedure) like '%PAID_PLAN_REQUIRED%' or pg_get_functiondef('public.billing_check()'::regprocedure) like '%billing_grants_livemode%'")
+[ "$g" = "f" ] && echo "PASS 3b the rollback takes the gate splice and the environment test OUT of the two live functions" || { echo "FAIL 3b the rollback left a splice behind"; exit 1; }
 P -f "$SQL" >/dev/null && echo "PASS 3 rollback runs and the file re-applies"
 echo "ALL PASSED ($n suite checks)"

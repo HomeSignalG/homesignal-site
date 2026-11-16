@@ -297,9 +297,25 @@ select pg_temp._ck('C19 a link with ONE seat: once the first account has paid, a
 select pg_temp._run('vfy start', $$select pg_temp._start('v1', 14, 'ok')$$);
 select pg_temp._run('vfy pay', $$select pg_temp._apply('c11', pg_temp._bk('vfy'), 'private_partner', (select eid from _en where k='v1'), pg_temp._evt('txn_v1','transaction_completed','completed','2026-11-16T10:00:00Z', pg_temp._par(), true,'evt_c11'), null)$$);
 select pg_temp._ck('C20 periodic verification: nothing is due now; once its date passes the enrollment is listed for the operator', not exists (select 1 from public.partner_verification_due() where account_id = pg_temp._bk('vfy'))
-  and exists (select 1 from public.partner_verification_due(now() + interval '91 days') where account_id = pg_temp._bk('vfy')));
+  and exists (select 1 from public.partner_verification_due(now() + interval '31 days') where account_id = pg_temp._bk('vfy')));
 select pg_temp._run('vfy ok', $$select public.partner_enrollment_verify((select eid from _en where k='v1'), 'verified')$$);
-select pg_temp._ck('C21 a successful verification keeps access and schedules the next check', pg_temp._plan(pg_temp._bk('vfy')) = 'paid' and (select last_verified_at is not null and next_verification_at > now() + interval '80 days' from public.partner_enrollment where enrollment_id = (select eid from _en where k='v1')));
+select pg_temp._ck('C21 a successful verification keeps access and schedules the next check 30 days out (the default interval)', pg_temp._plan(pg_temp._bk('vfy')) = 'paid' and (select last_verified_at is not null and next_verification_at between now() + interval '29 days' and now() + interval '31 days' from public.partner_enrollment where enrollment_id = (select eid from _en where k='v1')));
+-- ---- V: re-verification: 30 days by default, configurable per partner brokerage, overdue = flagged for manual review, never an automatic suspension ----
+select pg_temp._ck('V01 the partner brokerage default is 30 days', (select verification_interval_days = 30 from public.partner_brokerage where partner_id = (select id from _pt where k='pb')));
+select pg_temp._run('v interval 45', $$select public.partner_brokerage_set_interval((select id from _pt where k='pb'), 45)$$);
+select pg_temp._run('v verify 45', $$select public.partner_enrollment_verify((select eid from _en where k='v1'), 'verified')$$);
+select pg_temp._ck('V02 the interval is the BROKERAGE''s: after setting 45 days the next check is scheduled 45 days out', (select next_verification_at between now() + interval '44 days' and now() + interval '46 days' from public.partner_enrollment where enrollment_id = (select eid from _en where k='v1')));
+select pg_temp._ck('V03 an interval outside 1..365 days is refused', pg_temp._why($$select public.partner_brokerage_set_interval((select id from _pt where k='pb'), 0)$$) like '23514%' and pg_temp._why($$select public.partner_brokerage_set_interval((select id from _pt where k='pb'), 366)$$) like '23514%');
+select pg_temp._run('v overdue', $$update public.partner_enrollment set next_verification_at = now() - interval '12 days' where enrollment_id = (select eid from _en where k='v1')$$);
+select pg_temp._run('v overdue report', $$select pg_temp._iss('v4', 14, 2090)$$);
+select pg_temp._ck('V04 an OVERDUE check is flagged for manual review (listed with its days overdue and counted by the audit) and access is NOT suspended: the plan stays paid and a paid report is still issued',
+  exists (select 1 from public.partner_verification_due() where account_id = pg_temp._bk('vfy') and days_overdue = 12)
+  and (select violations >= 1 from public.paddle_billing_check() where check_name = 'partner_verification_overdue_for_manual_review')
+  and pg_temp._plan(pg_temp._bk('vfy')) = 'paid' and pg_temp._allot('v4') = 'paid', pg_temp._allot('v4'));
+select pg_temp._run('v overdue long', $$update public.partner_enrollment set next_verification_at = now() - interval '400 days' where enrollment_id = (select eid from _en where k='v1')$$);
+select pg_temp._ck('V05 even 400 days overdue never suspends by itself', pg_temp._plan(pg_temp._bk('vfy')) = 'paid');
+select pg_temp._run('v back', $$select public.partner_enrollment_verify((select eid from _en where k='v1'), 'verified')$$);
+select pg_temp._ck('V06 verifying removes it from the review queue', not exists (select 1 from public.partner_verification_due() where account_id = pg_temp._bk('vfy')));
 select pg_temp._run('vfy fail', $$select public.partner_enrollment_verify((select eid from _en where k='v1'), 'failed')$$);
 select pg_temp._run('vfy report', $$select pg_temp._iss('c12', 14, 2003)$$);
 select pg_temp._ck('C22 a FAILED verification suspends the plan at once (no paid report), and a failed enrollment is never silently reversed', pg_temp._plan(pg_temp._bk('vfy')) = 'suspended' and pg_temp._allot('c12') is distinct from 'paid'
@@ -337,12 +353,98 @@ select pg_temp._run('lemon historical', $x$do $d$ begin
   perform public.billing_event_apply(pg_temp._bk('lem'), jsonb_build_object('processor','lemonsqueezy','idempotency_key','lem1','subscription_ref','9001','event_name','subscription_created','processor_status','active','occurred_at','2026-10-04T12:00:00Z','product_ref','1','variant_ref','2','livemode',true));
 end $d$$x$);
 select pg_temp._ck('D06 a historical Lemon Squeezy binding (no Paddle price row) behaves exactly as it did: active is paid; nothing it recorded is deleted or reinterpreted', pg_temp._plan(pg_temp._bk('lem')) = 'paid');
-select pg_temp._ck('D07 the new audit: every invariant 0 beside non-zero controls', (select count(*) = 2 and bool_and(violations > 0) from public.paddle_billing_check() where kind = 'control') and (select count(*) = 5 and bool_and(violations = 0) from public.paddle_billing_check() where kind = 'invariant'),
+select pg_temp._ck('D07 the new audit: every invariant 0 beside non-zero controls', (select count(*) = 2 and bool_and(violations > 0) from public.paddle_billing_check() where kind = 'control') and (select count(*) = 6 and bool_and(violations = 0) from public.paddle_billing_check() where kind = 'invariant'),
   (select string_agg(check_name || '=' || violations, ';') from public.paddle_billing_check()));
 select pg_temp._ck('D08 the existing brokerage audit still passes (no invariant violated by anything above)', (select bool_and(violations = 0) from public.billing_check() where kind = 'invariant'), (select string_agg(check_name || '=' || violations, ';') from public.billing_check() where violations <> 0 and kind = 'invariant'));
 select pg_temp._ck('D09 no unpaid or unauthorized brokerage holds a paid credit: every paid credit belongs to a LIVE binding whose price is known and whose plan is, or was, paid',
   not exists (select 1 from public.brokerage_paid_credit c join public.brokerage_subscription b using (binding_id) where not b.livemode)
   and not exists (select 1 from public.brokerage_paid_credit c where c.brokerage_id in (pg_temp._bk('hen'), pg_temp._bk('snd'), pg_temp._bk('blk'), pg_temp._bk('nop'), pg_temp._bk('k6'), pg_temp._bk('old'), pg_temp._bk('rfd'))));
+
+-- ---- E: the environment decides what grants (decision 4) ------------------------------------------------------------------------------
+select pg_temp._ck('E01 the default mode is production: live payments grant and the helper says so', public.billing_environment_mode() = 'production' and public.billing_grants_livemode());
+select pg_temp._ck('E02 no API role can read or write the environment, or call its helpers except service_role reading the mode',
+  pg_temp._as('anon', $$select * from public.billing_environment$$) like '42501%' and pg_temp._as('authenticated', $$update public.billing_environment set mode = 'staging'$$) like '42501%'
+  and pg_temp._as('service_role', $$update public.billing_environment set mode = 'staging'$$) like '42501%' and pg_temp._as('service_role', $$select public.billing_environment_mode()$$) = 'ok'
+  and pg_temp._as('anon', $$select public.billing_grants_livemode()$$) like '42501%');
+select pg_temp._ck('E03 a production database that holds a LIVE payment cannot be switched to staging (refused 55000), even by its owner', pg_temp._why($$update public.billing_environment set mode = 'staging'$$) like '55000%' and public.billing_environment_mode() = 'production');
+select pg_temp._ck('E04 the environment row cannot be deleted or truncated', pg_temp._why($$delete from public.billing_environment$$) like '55000%' and pg_temp._why($$truncate public.billing_environment$$) like '55000%');
+-- The sandbox end-to-end scenario, in an ISOLATED STAGING database: rolled back, so nothing it does remains here. (The refusal in E03 is switched off for this block ONLY, inside the rolled-back sub-transaction.)
+create function pg_temp._staging() returns text language plpgsql as $$
+declare out text; r record; bk uuid; bk2 uuid; ev uuid; tok text; st text; st2 text; alt text; ord int; mode_seen text;
+begin
+  begin
+    alter table public.billing_environment disable trigger billing_environment_guard;
+    update public.billing_environment set mode = 'staging';
+    mode_seen := public.billing_environment_mode();
+    select c.evaluation_id, c.brokerage_id, c.owner_token into ev, bk, tok from public.evaluation_create('Staging Realty') c;
+    insert into auth.users (id, email, raw_user_meta_data) values (pg_temp._u(41), 'stg41@example.test', '{}'::jsonb) on conflict do nothing;
+    perform 1 from public.evaluation_invite_redeem(tok, pg_temp._u(41));
+    select c.owner_token, c.brokerage_id into tok, bk2 from public.evaluation_create('Live Realty') c;
+    insert into auth.users (id, email, raw_user_meta_data) values (pg_temp._u(42), 'stg42@example.test', '{}'::jsonb) on conflict do nothing;
+    perform 1 from public.evaluation_invite_redeem(tok, pg_temp._u(42));
+    -- a SANDBOX payment grants here; a LIVE payment never does
+    perform 1 from public.paddle_event_apply(bk, pg_temp._evt('sub_stg1','subscription_created','active','2026-11-16T10:00:00Z', pg_temp._spro(), false,'evt_stg1'), 'professional', null, null);
+    perform 1 from public.paddle_event_apply(bk2, pg_temp._evt('sub_stg2','subscription_created','active','2026-11-16T10:00:00Z', pg_temp._pro(), true,'evt_stg2'), 'professional', null, null);
+    st := (select state from public.billing_plan_of(bk)); st2 := (select state from public.billing_plan_of(bk2));
+    select r2.allotment, r2.credit_ordinal into alt, ord from public.brokerage_report_issue(pg_temp._u(41), pg_temp._k(4101), '{"n":4101}', pg_temp._h('{"n":4101}'), 'engine-v1', '{"engine":"test"}'::jsonb, null) r2;
+    out := mode_seen || '|' || coalesce(st,'-') || '|' || coalesce(st2,'-') || '|' || coalesce(alt,'-') || '|' || coalesce(ord::text,'-')
+           || '|' || (select count(*) from public.brokerage_paid_credit c where c.brokerage_id = bk)::text
+           || '|' || (select count(*) from public.brokerage_paid_credit c where c.brokerage_id = bk2)::text;
+    raise exception using errcode = 'P0001', message = 'RESULT:' || out;
+  exception when sqlstate 'P0001' then return sqlerrm;
+  end;
+end $$;
+select pg_temp._ck('E05 in isolated STAGING a sandbox payment makes the plan PAID and its report is charged to the paid allotment, a LIVE payment is test_only and is charged nothing (sandbox end-to-end is possible without production)',
+  pg_temp._staging() = 'RESULT:staging|paid|test_only|paid|1|1|0', pg_temp._staging());
+select pg_temp._ck('E06 that scenario left nothing behind: the database is still production and holds no staging brokerage', public.billing_environment_mode() = 'production' and not exists (select 1 from public.brokerage_account where name in ('Staging Realty','Live Realty')));
+select pg_temp._ck('E07 production never grants for a sandbox payment even for a brand-new account (the earlier B13 rule, restated against the environment)', pg_temp._plan(pg_temp._bk('snd')) = 'test_only');
+
+-- ---- G: no free plan (decision 1) ---------------------------------------------------------------------------------------------------------
+select pg_temp._run('g make', $$select pg_temp._mk('gnew', 'Gate New'); select pg_temp._mk('ggra', 'Gate Granted')$$);
+select pg_temp._run('g owners', $$select pg_temp._own('gnew', 33); select pg_temp._own('ggra', 34)$$);
+select pg_temp._run('g grant', $$update public.evaluation set free_reports_granted = true where evaluation_id = pg_temp._ev('ggra')$$);
+select pg_temp._ck('G01 a NEW evaluation, made by any path, is created with NO free reports; only one an operator marks granted holds them (the review list shows exactly those)',
+  (select not free_reports_granted from public.evaluation where evaluation_id = pg_temp._ev('gnew')) and (select free_reports_granted from public.evaluation where evaluation_id = pg_temp._ev('ggra'))
+  and exists (select 1 from public.billing_free_reports_review() where brokerage_id = pg_temp._bk('ggra')) and not exists (select 1 from public.billing_free_reports_review() where brokerage_id = pg_temp._bk('gnew')));
+select pg_temp._run('g new report', $$select pg_temp._iss('g1', 33, 3301)$$);
+select pg_temp._ck('G02 an unpaid account that was never promised free reports is REFUSED (EV013 PAID_PLAN_REQUIRED) even before checkout launches; nothing stored, nothing charged',
+  pg_temp._allot('g1') like 'EV013%' and not exists (select 1 from public.evaluation_credit where evaluation_id = pg_temp._ev('gnew')), pg_temp._allot('g1'));
+select pg_temp._run('g granted report', $$select pg_temp._iss('g2', 34, 3401)$$);
+select pg_temp._ck('G03 before launch, an account that WAS promised free reports can still use them (historical promise honoured until the gate is armed)', pg_temp._allot('g2') = 'trial', pg_temp._allot('g2'));
+select pg_temp._run('g arm', $$select public.billing_gate_set(true, false)$$);
+select pg_temp._run('g granted after', $$select pg_temp._iss('g3', 34, 3402)$$);
+select pg_temp._run('g replay', $$select pg_temp._iss('g4', 34, 3401)$$);
+select pg_temp._ck('G04 ARMED: an unpaid report is refused for everyone, including a granted account; a retried key of a report already made still returns that report, free of charge',
+  pg_temp._allot('g3') like 'EV013%' and (select replayed from _i where label = 'g4') and pg_temp._allot('g4') = 'trial', pg_temp._allot('g3') || '/' || pg_temp._allot('g4'));
+select pg_temp._ck('G05 ARMED: a PAID account still makes reports (the gate refuses only unpaid ones)', (select pg_temp._iss('g5', 12, 3501) is not null) and pg_temp._allot('g5') = 'paid', pg_temp._allot('g5'));
+select pg_temp._ck('G06 ARMED: the workspace reads zero free reports for a granted account (the count already made is kept), and the invariant holds',
+  (select credit_limit = credits_used and credits_remaining = 0 from public.evaluation_usage(pg_temp._u(34))) and (select violations = 0 from public.paddle_billing_check() where check_name = 'free_reports_used_after_the_gate_armed'));
+select pg_temp._run('g honor', $$select public.billing_gate_set(true, true)$$);
+select pg_temp._run('g honored report', $$select pg_temp._iss('g6', 34, 3403)$$);
+select pg_temp._run('g unhonored report', $$select pg_temp._iss('g7', 33, 3302)$$);
+select pg_temp._ck('G07 the operator can choose to honour already-promised free reports (only those): the granted account works again, the never-promised one stays refused',
+  pg_temp._allot('g6') = 'trial' and pg_temp._allot('g7') like 'EV013%', pg_temp._allot('g6') || '/' || pg_temp._allot('g7'));
+select pg_temp._run('g disarm', $$select public.billing_gate_set(false, false)$$);
+select pg_temp._ck('G08 every change of the gate is logged (append-only) and no API role can read the gate, change it or write its log',
+  (select count(*) >= 3 from public.billing_gate_log) and pg_temp._why($$update public.billing_gate_log set paid_required = false$$) like '55000%'
+  and pg_temp._as('anon', $$select * from public.billing_gate$$) like '42501%' and pg_temp._as('service_role', $$select public.billing_gate_set(false, false)$$) like '42501%'
+  and pg_temp._as('authenticated', $$select public.billing_gate_state()$$) like '42501%' and pg_temp._as('service_role', $$select * from public.billing_gate_state()$$) = 'ok');
+select pg_temp._ck('G09 reports already made are never touched by any of this: the granted account''s first free report is still stored, and the credit ledger is unchanged', exists (select 1 from public.evaluation_credit where evaluation_id = pg_temp._ev('ggra') and ordinal = 1));
+select pg_temp._ck('G10 the arming rule is a flag in the database, not a code path: arming and disarming restore the same usable answer', public.billing_free_reports_usable(pg_temp._ev('ggra')) and not public.billing_free_reports_usable(pg_temp._ev('gnew')));
+
+-- ---- T: terms before purchase (decision 3) -----------------------------------------------------------------------------------------------------------
+select pg_temp._ck('T01 the current terms version is a row in the database', public.billing_terms_current() = '2026-11-16');
+select pg_temp._run('t accept', $$select public.billing_terms_accept(pg_temp._u(1), '2026-11-16', 'professional')$$);
+select pg_temp._ck('T02 an OWNER accepting the current version is recorded; an old or unknown version, an agent, a stranger and an unknown plan are all refused and record nothing',
+  public.billing_terms_accept(pg_temp._u(1), '2026-11-16', 'professional') = 'ACCEPTED' and public.billing_terms_accept(pg_temp._u(1), '2026-10-16', 'professional') = 'VERSION_STALE'
+  and public.billing_terms_accept(pg_temp._u(1), '2026-11-16', 'brokerage_enterprise') = 'VERSION_STALE' and public.billing_terms_accept(pg_temp._u(30), '2026-11-16', 'professional') = 'NOT_OWNER'
+  and public.billing_terms_accept(gen_random_uuid(), '2026-11-16', 'professional') = 'NOT_OWNER'
+  and (select count(*) = 1 from public.billing_terms_acceptance where brokerage_id = pg_temp._bk('pro')) is not null and (select count(*) = 1 from public.billing_terms_acceptance where brokerage_id = pg_temp._bk('pro')));
+select pg_temp._ck('T03 the acceptance record is append-only and holds no person, email or text', pg_temp._why($$update public.billing_terms_acceptance set plan_key = 'professional'$$) like '55000%' and pg_temp._why($$delete from public.billing_terms_acceptance$$) like '55000%'
+  and not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'billing_terms_acceptance' and column_name ~ '^(user|email|name|text|address|ip)'));
+select pg_temp._ck('T04 no API role reads the acceptances or accepts on someone''s behalf; service_role may only call the function',
+  pg_temp._as('anon', $$select * from public.billing_terms_acceptance$$) like '42501%' and pg_temp._as('authenticated', $$select public.billing_terms_accept(gen_random_uuid(), '2026-11-16', 'professional')$$) like '42501%'
+  and pg_temp._as('service_role', $$select * from public.billing_terms_acceptance$$) like '42501%' and pg_temp._as('service_role', $$select public.billing_terms_accept(gen_random_uuid(), '2026-11-16', 'professional')$$) = 'ok');
 
 select pg_temp._ck('S99 every setup step ran without raising', not exists (select 1 from _setup where result <> 'ok' and step <> 'lem bind'), (select string_agg(step || '=' || result, '; ') from _setup where result <> 'ok'));
 

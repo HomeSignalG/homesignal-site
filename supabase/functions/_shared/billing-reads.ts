@@ -136,6 +136,30 @@ export function makeBillingReads(rpc: ServiceRpc) {
       };
     },
 
+    /** The environment this DATABASE grants for (public.billing_environment_mode): 'production' or 'staging'. Anything else is a failed read. */
+    async environmentMode(): Promise<'production' | 'staging'> {
+      const { data, error } = await rpc('billing_environment_mode', {});
+      if (error) throw new DataUnavailable('billing_environment_mode');
+      if (data !== 'production' && data !== 'staging') throw new DataUnavailable('shape');
+      return data;
+    },
+
+    /** Whether paid checkout has launched in the database (public.billing_gate_state): unpaid reports are refused once it has. */
+    async gateArmed(): Promise<boolean> {
+      const { data, error } = await rpc('billing_gate_state', {});
+      if (error) throw new DataUnavailable('billing_gate_state');
+      if (!Array.isArray(data) || data.length !== 1 || typeof data[0]?.paid_required !== 'boolean') throw new DataUnavailable('shape');
+      return data[0].paid_required;
+    },
+
+    /** The owner agrees to the CURRENT terms for a plan (public.billing_terms_accept). Recorded append-only; nothing is signed before this answers ACCEPTED. */
+    async termsAccept(userId: string, version: string, plan: PlanKey): Promise<'ACCEPTED' | 'VERSION_STALE' | 'NOT_OWNER'> {
+      const { data, error } = await rpc('billing_terms_accept', { p_user_id: userId, p_version: version, p_plan: plan });
+      if (error) throw new DataUnavailable('billing_terms_accept');
+      if (data !== 'ACCEPTED' && data !== 'VERSION_STALE' && data !== 'NOT_OWNER') throw new DataUnavailable('shape');
+      return data;
+    },
+
     /** The Paddle price for a plan in the configured environment (public.billing_price_for), or null when none is registered. Never a price the page names. */
     async priceFor(plan: PlanKey, livemode: boolean): Promise<string | null> {
       const { data, error } = await rpc('billing_price_for', { p_plan_key: plan, p_livemode: livemode });

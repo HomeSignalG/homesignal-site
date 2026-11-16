@@ -162,8 +162,8 @@ ok([BR, LB, ...Object.values(MB), ...Object.values(WB)].every((t) => t.length > 
   const h = stripJs(MB.handler), d = stripJs(MB.data);
   ok(/authorizeSignedIn\(req, deps\)/.test(h) && h.indexOf('authorizeSignedIn(') < h.indexOf('readBounded(') && h.indexOf('readBounded(') < h.indexOf('deps.summaryOf('),
     '2j the gate refuses BEFORE the body is read, and the body is read before anything about billing is asked');
-  ok(/deps\.makeSession\(summary\.brokerage_id, plan, enrollmentId\)/.test(h) && !/\bb\.(brokerage|url|price|price_id|email)/.test(h) && /checkout: \['action', 'plan', 'partner_code'\]/.test(h) && /status: \['action'\]/.test(h),
-    '2k a checkout is made for the account the DATABASE names for the signed-in person, never one the request names; the request may name only the plan and a partner code, and the price is never sent by the browser');
+  ok(/deps\.makeSession\(summary\.brokerage_id, plan, enrollmentId\)/.test(h) && !/\bb\.(brokerage|url|price|price_id|email)/.test(h) && /checkout: \['action', 'plan', 'partner_code', 'terms_version'\]/.test(h) && /status: \['action'\]/.test(h),
+    '2k a checkout is made for the account the DATABASE names for the signed-in person, never one the request names; the request may name only the plan, a partner code and the Terms version the page showed, and the price is never sent by the browser');
   const iOwner = h.indexOf("availability !== 'available'"), iMake = h.indexOf('deps.makeSession('), iClaim = h.indexOf('deps.checkoutClaim(');
   ok(iOwner > 0 && iClaim > iOwner && iMake > iClaim && /const REFUSALS/.test(h) && /not_owner: \[403/.test(h) && /already_paid: \[409/.test(h) && /not_set_up: \[503/.test(h) && /disabled: \[503/.test(h),
     '2l the checkout is refused for a non-owner, over a paid account, when Paddle is not set up and while the kill switch is off, and only then is the single checkout slot claimed and a session made', [iOwner, iClaim, iMake].join());

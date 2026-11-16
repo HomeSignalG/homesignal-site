@@ -107,8 +107,8 @@ const showTrial = fn('showTrial');
 const canMake = fn('canMake');
 ok(/\$\('go'\)\.disabled = busy \|\| !canMake\(\);/.test(showTrial) && /!canMake\(\)/.test(fn('run'))
    && /if \(access === 'admin'\) return true;/.test(canMake) && /if \(access !== 'trial' && access !== 'complete'\) return false;/.test(canMake)
-   && /return isPaid\(\) \? plan\.credits_remaining > 0 : access === 'trial';/.test(canMake),
-  '3g it offers "Make report" only to the callers the report function serves: an admin, a member with free reports left, or (build step 11) a member whose plan is paid with reports left this month, as the trial and Billing functions named them');
+   && /return isPaid\(\) \? plan\.credits_remaining > 0 : \(access === 'trial' && freeLeft > 0\);/.test(canMake),
+  '3g it offers "Make report" only to the callers the report function serves: an admin, a member with reports left that were promised before the free plan ended, or (build step 11) a member whose plan is paid with reports left this month, as the trial and Billing functions named them');
 
 // ---- 4. the invite, and what the browser keeps ------------------------------------------------------------------------------------------------
 const readInvite = fn('readInvite');

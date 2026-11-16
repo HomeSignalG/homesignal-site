@@ -54,6 +54,10 @@ const RPC = {
   // the webhook's one writer; the event is the exact object the webhook sent
   billing_event_apply: (a) => [asJson("public.billing_event_apply(:'b'::uuid, :'e'::jsonb)"), { b: a.p_brokerage, e: JSON.stringify(a.p_event) }],
   // Paddle's own database calls (docs/paddle-billing.sql): the account reading, the price table, the webhook's writers
+  // decisions of 2026-11-16: the environment this database grants for, the launch gate, and the Terms agreement recorded before a checkout is signed
+  billing_environment_mode: () => ["select to_json(public.billing_environment_mode())", {}],
+  billing_gate_state: () => [asJson("public.billing_gate_state()"), {}],
+  billing_terms_accept: (a) => ["select to_json(public.billing_terms_accept(:'u'::uuid, :'v', :'p'))", { u: a.p_user_id, v: a.p_version, p: a.p_plan }],
   billing_summary: (a) => [asJson("public.billing_summary(:'u'::uuid)"), { u: a.p_user_id }],
   billing_price_for: (a) => ["select to_json(public.billing_price_for(:'k', :'l'::boolean))", { k: a.p_plan_key, l: String(a.p_livemode) }],
   billing_portal_ref: (a) => [asJson("public.billing_portal_ref(:'u'::uuid)"), { u: a.p_user_id }],
@@ -120,7 +124,9 @@ async function fetchToSql(url, init = {}) {
 // ---- the people ------------------------------------------------------------------------------------------------------------------------------------
 const ADMIN = 'd4444444-4444-4444-8444-444444444444', OWNER = 'a1111111-1111-4111-8111-111111111111', AGENT = 'c3333333-3333-4333-8333-333333333333';
 const OUTSIDER = 'b2222222-2222-4222-8222-222222222222', RIVAL = 'e5555555-5555-4555-8555-555555555555';
-one("insert into auth.users (id, email) values (:'a'::uuid, 'founder@example.test'), (:'o'::uuid, 'owner@example.test'), (:'g'::uuid, 'agent@example.test'), (:'s'::uuid, 'outsider@example.test'), (:'r'::uuid, 'rival@example.test'), ('f6666666-6666-4666-8666-666666666666', 'rateowner@example.test'), ('f7777777-7777-4777-8777-777777777777', 'rateagent@example.test')",
+const NOFREE = 'aa111111-1111-4111-8111-111111111111', GRANTED = 'aa222222-2222-4222-8222-222222222222'; // section 16: no free plan
+
+one("insert into auth.users (id, email) values ('aa111111-1111-4111-8111-111111111111', 'nofree@example.test'), ('aa222222-2222-4222-8222-222222222222', 'granted@example.test'), (:'a'::uuid, 'founder@example.test'), (:'o'::uuid, 'owner@example.test'), (:'g'::uuid, 'agent@example.test'), (:'s'::uuid, 'outsider@example.test'), (:'r'::uuid, 'rival@example.test'), ('f6666666-6666-4666-8666-666666666666', 'rateowner@example.test'), ('f7777777-7777-4777-8777-777777777777', 'rateagent@example.test')",
   { a: ADMIN, o: OWNER, g: AGENT, s: OUTSIDER, r: RIVAL });
 
 // ---- the four functions, each built from its real handler and real data layer -------------------------------------------------------------------
@@ -129,7 +135,7 @@ const BILLING = { clientToken: 'live_' + 'a'.repeat(30), apiKey: 'fixture-api-ke
 const VARIANT = 'pri_01m7d6kede6hqr2kh9b78mb25j';          // the seeded LIVE Professional price
 const SANDBOX_VARIANT = 'pri_01sandboxfixture000000001';   // registered below as a SANDBOX price
 const RATE_OWNER = 'f6666666-6666-4666-8666-666666666666', RATE_AGENT = 'f7777777-7777-4777-8777-777777777777'; // section 15's own brokerage
-const emailOf = (id) => ({ [ADMIN]: 'founder', [OWNER]: 'owner', [AGENT]: 'agent', [OUTSIDER]: 'outsider', [RIVAL]: 'rival', [RATE_OWNER]: 'rateowner', [RATE_AGENT]: 'rateagent' }[id]) + '@example.test';
+const emailOf = (id) => ({ [ADMIN]: 'founder', [OWNER]: 'owner', [AGENT]: 'agent', [OUTSIDER]: 'outsider', [RIVAL]: 'rival', [RATE_OWNER]: 'rateowner', [RATE_AGENT]: 'rateagent', [NOFREE]: 'nofree', [GRANTED]: 'granted' }[id]) + '@example.test';
 const post = (body, headers = {}) => new Request('https://x/functions/v1/f', { method: 'POST', headers: { authorization: 'Bearer t', 'content-type': 'application/json', ...headers }, body: typeof body === 'string' ? body : JSON.stringify(body) });
 
 async function trialAsk(userId, body, admin = false) {
@@ -139,7 +145,8 @@ async function trialAsk(userId, body, admin = false) {
   return { status: res.status, json: await res.json() };
 }
 async function billingAsk(userId, body, billing = BILLING) {
-  const real = BD.makeDeps({ ...SUPABASE, paddle: { environment: 'production', clientToken: billing.clientToken, apiKey: billing.apiKey, bindingSecret: billing.bindingSecret } }, fetchToSql);
+  if (body && body.action === 'checkout' && body.terms_version === undefined && !billing.noTerms) body = { ...body, terms_version: '2026-11-16' };
+  const real = BD.makeDeps({ ...SUPABASE, paddle: { environment: billing.environment ?? 'production', clientToken: billing.clientToken, apiKey: billing.apiKey, bindingSecret: billing.bindingSecret } }, fetchToSql);
   const h = BH.makeHandler({ ...real, checkoutEnabled: () => true, authenticate: async () => ({ email: emailOf(userId), id: userId }), isAdmin: async () => false });
   const res = await h(post(body));
   return { status: res.status, json: await res.json() };
@@ -205,6 +212,10 @@ one("insert into public.billing_plan_price (price_ref, livemode, plan_key, plan_
 let t = await trialAsk(ADMIN, { action: 'create', brokerage_name: 'Launch Gate Realty' }, true);
 ok(t.status === 200 && /#invite=hse1_[0-9a-f]{64}$/.test(t.json.invite_link), '1a an admin creates the test brokerage\'s trial and gets the owner invite link', t.json);
 const ownerToken = tokenOf(t.json.invite_link);
+// DECISION 1 (2026-11-16): a NEW account holds no free reports. This scenario is the OLD promise, so its account is marked as promised (what the review list
+// shows for the five existing ones), and the operator has armed the launch gate while choosing to honour those promises. Section 16 runs the new rule.
+one("update public.evaluation set free_reports_granted = true where brokerage_id = (select id from public.brokerage_account where name = 'Launch Gate Realty')");
+one("select public.billing_gate_set(true, true)");
 t = await trialAsk(OWNER, { action: 'redeem', token: ownerToken });
 ok(t.status === 200 && t.json.role === 'owner' && t.json.access === 'trial' && t.json.trial?.credits_remaining === 10, '1b the owner opens the link: owner, ten free reports left', t.json);
 t = await trialAsk(OWNER, { action: 'invite' });
@@ -493,6 +504,69 @@ ok(backUp.status === 200, '15l and with the limiter back the same person is serv
 ok(Number(one("select count(*) from public.report_rate_window where subject = :'u'::uuid or subject = :'b'::uuid", { u: RATE_OWNER, b: rateBrokerage })) === 6
    && Number(one("select count(*) from public.report_rate_check() where kind = 'invariant' and n <> 0")) === 0,
   '15m the counters are the person\'s three windows and the brokerage\'s three, and the limiter\'s own audit reads zero');
+
+
+// ---- 16. NO FREE PLAN, TERMS BEFORE PURCHASE, ENVIRONMENT AND GATE (founder decisions, 2026-11-16) ----------------------------------------------------
+// A NEW account holds no free reports, whatever else is true. The gate is armed with the operator's choice to honour promised reports (set in section 1).
+const fresh = async (who, name) => {
+  const c = await trialAsk(ADMIN, { action: 'create', brokerage_name: name }, true);
+  const red = await trialAsk(who, { action: 'redeem', token: tokenOf(c.json.invite_link) });
+  return { c, red };
+};
+const nf = await fresh(NOFREE, 'No Free Realty');
+ok(nf.red.status === 200 && nf.red.json.role === 'owner' && nf.red.json.trial?.credits_remaining === 0 && nf.red.json.trial?.credits_used === 0,
+  '16a a brand-new account holds NO free reports: its owner joins and the usage reads zero left', nf.red.json);
+const nfBrokerage = one("select id from public.brokerage_account where name = 'No Free Realty'");
+const creditsBefore16 = count('evaluation_credit'), snapsBefore16 = count('report_snapshot'), paidBefore16 = count('brokerage_paid_credit');
+r = await ask(NOFREE, { address: addr(401), idempotency_key: key(401) });
+ok(r.status === 402 && r.json.error === 'payment_required' && r.json.report === undefined && count('evaluation_credit') === creditsBefore16 && count('report_snapshot') === snapsBefore16 && count('brokerage_paid_credit') === paidBefore16,
+  '16b an unpaid account with no promised free reports cannot make a report (402 payment_required): nothing stored, nothing charged, no report returned', [r.status, r.json]);
+ok(Number(one("select count(*) from public.report_snapshot s join public.evaluation_credit_all c on c.report_id = s.report_id join public.evaluation e on e.evaluation_id = c.evaluation_id where e.brokerage_id = :'b'::uuid", { b: nfBrokerage })) === 0,
+  '16c the database holds no report for it');
+// the gate does not touch what already exists: the earlier brokerage still reads and lists its saved reports
+const listed16 = await ask(OWNER, { action: 'list' });
+ok(listed16.status === 200 && listed16.json.reports.length >= 10, '16d reports already made stay listed16 and open for their owners', [listed16.status, listed16.json.reports?.length]);
+
+// TERMS BEFORE PURCHASE
+const acceptedBefore = count('billing_terms_acceptance'), claims16 = claims();
+b = await billingAsk(NOFREE, { action: 'status' });
+ok(b.status === 200 && b.json.checkout === 'available', '16e with the gate armed, the environment matching and Paddle set up, the new owner may start a checkout', b.json);
+b = await billingAsk(NOFREE, { action: 'checkout', plan: 'professional' }, { ...BILLING, noTerms: true });
+ok(b.status === 409 && b.json.error === 'terms_not_accepted' && count('billing_terms_acceptance') === acceptedBefore && claims() === claims16 && processor.calls.length === 0,
+  '16f a checkout with no Terms version is refused: nothing recorded, no checkout slot claimed, no session signed', b.json);
+b = await billingAsk(NOFREE, { action: 'checkout', plan: 'professional', terms_version: '2026-10-16' });
+ok(b.status === 409 && b.json.detail === 'terms_changed' && count('billing_terms_acceptance') === acceptedBefore && claims() === claims16,
+  '16g a stale Terms version (the October ones that said the service was free) is refused: the customer must read the current ones first', b.json);
+b = await billingAsk(AGENT, { action: 'checkout', plan: 'professional' });
+ok(b.status === 403 && count('billing_terms_acceptance') === acceptedBefore, '16h an agent cannot agree to the Terms for the account', b.json);
+b = await billingAsk(NOFREE, { action: 'checkout', plan: 'professional' });
+ok(b.status === 200 && b.json.session?.priceId === VARIANT && count('billing_terms_acceptance') === acceptedBefore + 1
+   && one("select plan_key || '|' || terms_version from public.billing_terms_acceptance where brokerage_id = :'b'::uuid", { b: nfBrokerage }) === 'professional|2026-11-16',
+  '16i agreeing to the CURRENT Terms is recorded (account, plan, version) and only then is the session signed', b.json);
+await billingAsk(NOFREE, { action: 'checkout_release' });
+
+// THE LAUNCH GATE AND THE ENVIRONMENT: checkout opens only when both are right
+b = await billingAsk(NOFREE, { action: 'checkout', plan: 'professional' }, { ...BILLING, environment: 'sandbox', clientToken: 'test_' + 'a'.repeat(30) });
+ok(b.status === 503 && b.json.error === 'billing_environment_mismatch' && claims() === claims16 + 1, '16j a SANDBOX checkout against this PRODUCTION database is refused: a sandbox payment can never be taken here', b.json);
+one("select public.billing_gate_set(false, false)");
+b = await billingAsk(NOFREE, { action: 'checkout', plan: 'professional' });
+ok(b.status === 503 && b.json.error === 'billing_gate_not_armed', '16k with the unpaid-report gate off, checkout will not open: launching and gating are one act', b.json);
+one("select public.billing_gate_set(true, true)");
+
+// A PROMISED account, then the operator stops honouring promises: the promised reports can no longer be used, and what was made is untouched
+const gr = await fresh(GRANTED, 'Granted Realty');
+one("update public.evaluation set free_reports_granted = true where brokerage_id = (select id from public.brokerage_account where name = 'Granted Realty')");
+r = await ask(GRANTED, { address: addr(402), idempotency_key: key(402) });
+ok(r.status === 200 && r.json.allotment === 'trial' && r.json.charged === true, '16l an account that WAS promised free reports can use them while the operator honours the promise', [r.status, r.json.error, r.json.allotment]);
+one("select public.billing_gate_set(true, false)");
+const gSnap = count('report_snapshot');
+r = await ask(GRANTED, { address: addr(403), idempotency_key: key(403) });
+ok(r.status === 402 && r.json.error === 'payment_required' && count('report_snapshot') === gSnap, '16m once the operator stops honouring them, the same account is refused (402): no unpaid report is made after launch', [r.status, r.json]);
+r = await ask(GRANTED, { address: addr(402), idempotency_key: key(402) });
+ok(r.status === 200 && r.json.replayed === true && count('report_snapshot') === gSnap, '16n a retry of the report it already made still returns that report and charges nothing', [r.status, r.json.replayed]);
+one("select public.billing_gate_set(true, true)");
+ok(Number(one("select count(*) from public.billing_gate_log")) >= 4 && one("select paid_required || '|' || honor_granted_free_reports from public.billing_gate") === 'true|true',
+  '16o every gate change is in the append-only log, and the gate is left as the scenario began');
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);

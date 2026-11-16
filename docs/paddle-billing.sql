@@ -33,7 +33,19 @@
 --   7. Nothing personal is stored: no email, name, card, address, Paddle customer id, amount or free text. Opaque ids and times only.
 --   8. Events are idempotent (the ledger's unique key is Paddle's own event_id) and out-of-order safe (the ledger orders by Paddle's occurred_at).
 --
--- ADDITIVE ONLY. Creates 7 tables, 2 indexes, and the functions below; replaces payment_event_map_status and billing_plan_of with the same
+--   9. THE ENVIRONMENT DECIDES WHAT GRANTS (founder, 2026-11-16, decision 4). A database has ONE mode, public.billing_environment: 'production' grants only
+--      livemode=true (real) payments and treats every sandbox payment as 'test_only'; an ISOLATED STAGING database ('staging') grants only livemode=false
+--      (sandbox) payments, so the Paddle sandbox end-to-end test can show a paid plan without ever touching production. The mode cannot be changed through
+--      any API role, and a trigger refuses to change it once the database holds a payment of the other kind (a production database that has taken a real
+--      payment can never be switched to staging, and the reverse).
+--  10. NO FREE PLAN (founder, 2026-11-16, decision 1). New evaluations are created with NO free reports (evaluation.free_reports_granted defaults to false;
+--      the five that exist keep true and are listed for review). public.billing_gate says whether paid checkout has launched: once armed, every unpaid
+--      report is refused (PAID_PLAN_REQUIRED) unless the operator has chosen to honour the already-granted free reports. Reports already made are never touched.
+--  11. TERMS BEFORE PURCHASE (decision 3). A checkout is signed only after the owner's acceptance of the CURRENT terms version is recorded (append-only).
+--  12. PARTNER RE-VERIFICATION (decision 2): every 30 days by default, configurable per partner brokerage. An overdue check is FLAGGED for manual review and
+--      never suspends access; only a confirmed 'failed' check suspends.
+--
+-- ADDITIVE ONLY. Creates 12 tables, 2 indexes, and the functions below; replaces payment_event_map_status and billing_plan_of with the same
 -- signatures. Seeds the two LIVE price ids read from the Paddle API on 2026-11-16. Idempotent. ROLLBACK at the foot.
 -- ============================================================================
 
@@ -126,6 +138,211 @@ as $$
    order by x.occurred_at, x.event_id limit 1
 $$;
 
+-- ---- 2b. WHICH ENVIRONMENT THIS DATABASE GRANTS FOR (decision 4) ----------------------------------------------------------
+-- ONE row. 'production' (the default): only a LIVE (livemode = true) payment grants; a sandbox payment is recorded and is 'test_only'. 'staging': this is
+-- an ISOLATED database made for the Paddle sandbox end-to-end test; only a SANDBOX (livemode = false) payment grants, and a live one never does. No API
+-- role can read or write it. The trigger below refuses to change the mode once the database holds a payment of the other kind, so a production database
+-- that has taken a real payment can never be switched, and a staging one that holds sandbox payments cannot become production.
+create table if not exists public.billing_environment (
+  singleton boolean     primary key default true,
+  mode      text        not null default 'production',
+  set_at    timestamptz not null default now(),
+  constraint billing_environment_one  check (singleton),
+  constraint billing_environment_mode check (mode in ('production', 'staging'))
+);
+insert into public.billing_environment (singleton, mode) values (true, 'production') on conflict do nothing;
+
+create or replace function public.billing_environment_guard() returns trigger
+language plpgsql set search_path = public, pg_temp
+as $$
+begin
+  if tg_op <> 'UPDATE' then raise exception 'billing_environment: the row is never deleted or truncated' using errcode = '55000'; end if;
+  if new.singleton is distinct from old.singleton then raise exception 'billing_environment: identity cannot change' using errcode = '55000'; end if;
+  if new.mode <> old.mode then
+    -- 'production' holds LIVE payments (livemode = true); 'staging' holds SANDBOX payments (livemode = false)
+    if exists (select 1 from public.brokerage_subscription s where s.livemode = (old.mode = 'production'))
+       or exists (select 1 from public.payment_event e where e.livemode = (old.mode = 'production')) then
+      raise exception 'billing_environment: this database already holds % payments, so its mode cannot be changed', case when old.mode = 'production' then 'live' else 'sandbox' end
+        using errcode = '55000';
+    end if;
+    new.set_at := now();
+  end if;
+  return new;
+end $$;
+drop trigger if exists billing_environment_guard on public.billing_environment;
+create trigger billing_environment_guard before update on public.billing_environment for each row execute function public.billing_environment_guard();
+drop trigger if exists billing_environment_no_delete on public.billing_environment;
+create trigger billing_environment_no_delete before delete or truncate on public.billing_environment for each statement execute function public.billing_environment_guard();
+
+-- true: this database grants for LIVE payments (production). false: it grants for SANDBOX payments (isolated staging).
+create or replace function public.billing_grants_livemode() returns boolean
+language sql stable security definer set search_path = public, pg_temp
+as $$ select coalesce((select e.mode = 'production' from public.billing_environment e), true) $$;
+create or replace function public.billing_environment_mode() returns text
+language sql stable security definer set search_path = public, pg_temp
+as $$ select coalesce((select e.mode from public.billing_environment e), 'production') $$;
+
+-- A payment of the kind this database grants for must not be bound the other way round by the guard on a paid credit (replaced, same signature).
+create or replace function public.brokerage_paid_credit_guard() returns trigger
+language plpgsql set search_path = public, pg_temp
+as $$
+declare
+  b public.brokerage_subscription%rowtype;
+begin
+  select s.* into b from public.brokerage_subscription s where s.binding_id = new.binding_id;
+  if not found or b.livemode is distinct from public.billing_grants_livemode() or b.brokerage_id <> new.brokerage_id then
+    raise exception 'brokerage_paid_credit: a paid credit needs a subscription binding of the same brokerage, made in the environment this database grants for' using errcode = '55000';
+  end if;
+  new.period_index := public.billing_period_index(b.bound_at, now());
+  new.issued_at    := now();
+  return new;
+end $$;
+
+-- ---- 2c. NO FREE PLAN: the gate, and who still holds free reports (decision 1) -----------------------------------------------
+-- evaluation.free_reports_granted says whether this account was ever PROMISED free reports. Every existing evaluation keeps true (that is the review
+-- list: select * from public.billing_free_reports_review()); every NEW evaluation, by any path, defaults to false, so no new free credit is issued.
+alter table public.evaluation add column if not exists free_reports_granted boolean not null default true;
+alter table public.evaluation alter column free_reports_granted set default false;
+
+-- ONE row. paid_required: paid checkout has launched, so an unpaid report is refused. honor_granted_free_reports: the operator's reviewed choice to keep
+-- letting accounts that were promised free reports use what they have left (default false: the founder's instruction is no unpaid generation).
+-- Changing it is a SQL act by the owner (no API role can), and every change is logged (append-only).
+create table if not exists public.billing_gate (
+  singleton                 boolean     primary key default true,
+  paid_required             boolean     not null default false,
+  honor_granted_free_reports boolean    not null default false,
+  armed_at                  timestamptz,
+  constraint billing_gate_one check (singleton),
+  constraint billing_gate_armed check ((paid_required) = (armed_at is not null))
+);
+insert into public.billing_gate (singleton) values (true) on conflict do nothing;
+create table if not exists public.billing_gate_log (
+  id bigint generated always as identity primary key,
+  changed_at timestamptz not null default now(),
+  paid_required boolean not null,
+  honor_granted_free_reports boolean not null
+);
+create or replace function public.billing_gate_set(p_paid_required boolean, p_honor_granted_free_reports boolean default false) returns void
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+begin
+  update public.billing_gate g set paid_required = p_paid_required, honor_granted_free_reports = coalesce(p_honor_granted_free_reports, false),
+         armed_at = case when p_paid_required then coalesce(g.armed_at, now()) else null end;
+  insert into public.billing_gate_log (paid_required, honor_granted_free_reports) values (p_paid_required, coalesce(p_honor_granted_free_reports, false));
+end $$;
+create or replace function public.billing_gate_state() returns table (paid_required boolean, honor_granted_free_reports boolean)
+language sql stable security definer set search_path = public, pg_temp
+as $$ select g.paid_required, g.honor_granted_free_reports from public.billing_gate g $$;
+
+-- May this evaluation's FREE reports still be used? Only if the account was promised them and either checkout has not launched or the operator chose to honour them.
+create or replace function public.billing_free_reports_usable(p_evaluation uuid) returns boolean
+language sql stable security definer set search_path = public, pg_temp
+as $$
+  select coalesce((select e.free_reports_granted and (not g.paid_required or g.honor_granted_free_reports)
+                     from public.evaluation e cross join public.billing_gate g where e.evaluation_id = p_evaluation), false)
+$$;
+
+-- The review list (counts and opaque ids only): every account that was promised free reports, what it used and what is left.
+create or replace function public.billing_free_reports_review()
+returns table (brokerage_id uuid, evaluation_status text, credits_used integer, credits_left integer, granted_at timestamptz)
+language sql stable security definer set search_path = public, pg_temp
+as $$
+  select e.brokerage_id, e.status, u.n, greatest(public.evaluation_report_limit() - u.n, 0), e.created_at
+    from public.evaluation e
+    cross join lateral (select count(*)::integer n from public.evaluation_credit c where c.evaluation_id = e.evaluation_id) u
+   where e.free_reports_granted order by e.created_at
+$$;
+
+-- The member's usage as the workspace reads it: when the free reports may not be used, there are none to show. The count already made is unchanged.
+create or replace function public.evaluation_usage(p_user_id uuid)
+returns table (evaluation_id uuid, status text, credit_limit integer, credits_used integer, credits_remaining integer,
+               expires_at timestamptz, expired boolean)
+language sql stable security definer set search_path = public, pg_temp
+as $$
+  select e.evaluation_id, e.status,
+         case when public.billing_free_reports_usable(e.evaluation_id) then public.evaluation_report_limit() else u.n end,
+         u.n,
+         case when public.billing_free_reports_usable(e.evaluation_id) then greatest(public.evaluation_report_limit() - u.n, 0) else 0 end,
+         e.expires_at, (e.expires_at is not null and e.expires_at <= now())
+    from public.brokerage_membership_of(p_user_id) r
+    join public.evaluation e on e.brokerage_id = r.brokerage_id
+    cross join lateral (select count(*)::integer as n from public.evaluation_credit c where c.evaluation_id = e.evaluation_id) u
+$$;
+
+-- THE GATE ITSELF: spliced into brokerage_report_issue (the ONE way a member's report is stored) from its LIVE definition, never retyped. A report is refused
+-- (EV013 PAID_PLAN_REQUIRED, nothing stored, nothing charged) when the plan is not paid and the free reports may not be used. A retried key of a report already
+-- made returns that report, as before. Fail-closed: the anchor must appear exactly once, or the splice is already in.
+do $gate$
+declare
+  f      constant text := 'public.brokerage_report_issue(uuid, uuid, text, text, text, jsonb, jsonb)';
+  anchor constant text := E'  select p.* into pl from public.billing_plan_of(m.brokerage_id) p;\n';
+  def    text;
+  n      integer;
+begin
+  def := pg_get_functiondef(to_regprocedure(f)::oid);
+  if def like '%PAID_PLAN_REQUIRED%' then return; end if;
+  n := (length(def) - length(replace(def, anchor, ''))) / length(anchor);
+  if n <> 1 then raise exception 'paddle_billing: brokerage_report_issue holds the plan lookup % times (expected exactly 1); refusing to splice', n; end if;
+  execute replace(def, anchor, anchor ||
+    E'  if pl.state is distinct from ''paid''\n' ||
+    E'     and not exists (select 1 from public.evaluation_credit c where c.evaluation_id = ev.evaluation_id and c.idempotency_key = p_idempotency_key)\n' ||
+    E'     and not public.billing_free_reports_usable(ev.evaluation_id) then\n' ||
+    E'    raise exception using errcode = ''EV013'', message = ''PAID_PLAN_REQUIRED'';\n' ||
+    E'  end if;\n');
+  if pg_get_functiondef(to_regprocedure(f)::oid) not like '%PAID_PLAN_REQUIRED%' then raise exception 'paddle_billing: the gate splice did not take'; end if;
+end $gate$;
+
+-- billing_check()'s test-binding invariant must follow the environment (a sandbox credit in isolated staging is correct, a live one there is the violation).
+do $chk$
+declare
+  f      constant text := 'public.billing_check()';
+  anchor constant text := 'where not b.livemode';
+  def    text;
+  n      integer;
+begin
+  def := pg_get_functiondef(to_regprocedure(f)::oid);
+  if def like '%billing_grants_livemode%' then return; end if;
+  n := (length(def) - length(replace(def, anchor, ''))) / length(anchor);
+  if n <> 1 then raise exception 'paddle_billing: billing_check holds the test-binding test % times (expected exactly 1); refusing to splice', n; end if;
+  execute replace(def, anchor, 'where b.livemode is distinct from public.billing_grants_livemode()');
+end $chk$;
+
+-- ---- 2d. TERMS BEFORE PURCHASE (decision 3) ----------------------------------------------------------------------------------
+-- The terms version a purchaser must have accepted is a row, not a code constant, so Terms and the database cannot drift without a visible change.
+create table if not exists public.billing_terms_version (
+  version      text        primary key,
+  effective_at timestamptz not null default now(),
+  constraint billing_terms_version_shape check (version ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+);
+insert into public.billing_terms_version (version, effective_at) values ('2026-11-16', '2026-11-16 00:00:00+00') on conflict do nothing;
+create or replace function public.billing_terms_current() returns text
+language sql stable security definer set search_path = public, pg_temp
+as $$ select t.version from public.billing_terms_version t where t.effective_at <= now() order by t.effective_at desc, t.version desc limit 1 $$;
+
+-- APPEND-ONLY. The ACCOUNT that agreed, the plan, the version and the time: no person, email, address or text.
+create table if not exists public.billing_terms_acceptance (
+  id           bigint      generated always as identity primary key,
+  brokerage_id uuid        not null references public.brokerage_account (id),
+  plan_key     text        not null,
+  terms_version text       not null references public.billing_terms_version (version),
+  accepted_at  timestamptz not null default now(),
+  constraint billing_terms_acceptance_plan check (plan_key in ('professional', 'private_partner'))
+);
+create index if not exists billing_terms_acceptance_by_account on public.billing_terms_acceptance (brokerage_id, plan_key, accepted_at desc);
+
+-- The OWNER agrees to the CURRENT terms for a plan. ACCEPTED | VERSION_STALE (the page showed an older version) | NOT_OWNER. A checkout is signed only after ACCEPTED.
+create or replace function public.billing_terms_accept(p_user_id uuid, p_version text, p_plan text) returns text
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+declare m record;
+begin
+  select r.* into m from public.brokerage_membership_of(p_user_id) r;
+  if not found or m.role <> 'owner' then return 'NOT_OWNER'; end if;
+  if p_plan not in ('professional', 'private_partner') or p_version is distinct from public.billing_terms_current() then return 'VERSION_STALE'; end if;
+  insert into public.billing_terms_acceptance (brokerage_id, plan_key, terms_version) values (m.brokerage_id, p_plan, p_version);
+  return 'ACCEPTED';
+end $$;
+
 -- ---- 3. DATES THE DASHBOARD SHOWS, AND VERIFIED EVENTS THAT GRANTED NOTHING (both append-only) -------------
 create table if not exists public.billing_period_observation (
   obs_id            bigint      generated always as identity primary key,
@@ -163,7 +380,9 @@ create table if not exists public.partner_brokerage (
   partner_id  uuid        primary key default gen_random_uuid(),
   name        text        not null,
   status      text        not null default 'active',
+  verification_interval_days integer not null default 30,
   created_at  timestamptz not null default now(),
+  constraint partner_brokerage_interval check (verification_interval_days between 1 and 365),
   constraint partner_brokerage_name   check (btrim(name) <> ''),
   constraint partner_brokerage_status check (status in ('active', 'inactive'))
 );
@@ -206,12 +425,12 @@ as $$
     select s.binding_id, s.processor, s.subscription_ref, s.livemode, s.bound_at
       from public.brokerage_subscription s
      where s.brokerage_id = p_brokerage
-     order by s.livemode desc, s.bound_at desc, s.binding_id
+     order by (s.livemode = public.billing_grants_livemode()) desc, s.bound_at desc, s.binding_id
      limit 1)
   select b.binding_id, b.livemode, b.bound_at, e.processor_status, e.mapped_status, e.occurred_at,
          case
            when not exists (select 1 from public.brokerage_account a where a.id = p_brokerage and a.status = 'active') then 'suspended'
-           when not b.livemode then 'test_only'
+           when b.livemode is distinct from public.billing_grants_livemode() then 'test_only'
            when exists (select 1 from public.partner_enrollment pe where pe.binding_id = b.binding_id and pe.verification_status = 'failed') then 'suspended'
            when e.mapped_status = 'active' and pp.kind = 'one_time'
                 and now() >= ((b.bound_at at time zone 'UTC') + pp.access_months * interval '1 month') at time zone 'UTC' then 'expired'
@@ -295,14 +514,16 @@ begin
       perform public.paddle_unmatched_record(p_event, 'PARTNER_NOT_ELIGIBLE');
       return query select 'PARTNER_NOT_ELIGIBLE'::text, null::bigint, null::boolean, false, null::text; return;
     end if;
-    -- only a LIVE payment binds an enrollment: a sandbox payment is recorded (the founder's test) and never uses up a link
+    -- only a payment of the kind THIS database grants binds an enrollment (live in production, sandbox in isolated staging): the other kind is
+    -- recorded (the founder's test) and never uses up a link
   end if;
 
   select a.* into r from public.billing_event_apply(p_brokerage, p_event) a;
 
-  if pp.plan_key = 'private_partner' and en.binding_id is null and v_live then
+  if pp.plan_key = 'private_partner' and en.binding_id is null and v_live = public.billing_grants_livemode() then
     select s.binding_id into v_bind from public.brokerage_subscription s where s.processor = 'paddle' and s.livemode = v_live and s.subscription_ref = v_ref;
-    update public.partner_enrollment e set binding_id = v_bind, next_verification_at = now() + interval '90 days'
+    update public.partner_enrollment e set binding_id = v_bind,
+           next_verification_at = now() + make_interval(days => (select b.verification_interval_days from public.partner_brokerage b where b.partner_id = en.partner_id))
      where e.enrollment_id = en.enrollment_id and e.binding_id is null;
   end if;
 
@@ -340,9 +561,18 @@ begin
 end $$;
 
 -- ---- 7. PARTNER ENROLLMENT ---------------------------------------------------------------------------------
-create or replace function public.partner_brokerage_create(p_name text) returns uuid
+create or replace function public.partner_brokerage_create(p_name text, p_verification_interval_days integer default 30) returns uuid
 language sql security definer set search_path = public, pg_temp
-as $$ insert into public.partner_brokerage (name) values (p_name) returning partner_id $$;
+as $$ insert into public.partner_brokerage (name, verification_interval_days) values (p_name, coalesce(p_verification_interval_days, 30)) returning partner_id $$;
+
+-- The re-verification interval is the PARTNER BROKERAGE's (configurable per brokerage, 1 to 365 days, default 30). It applies from the next check scheduled.
+create or replace function public.partner_brokerage_set_interval(p_partner uuid, p_days integer) returns boolean
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+begin
+  update public.partner_brokerage b set verification_interval_days = p_days where b.partner_id = p_partner;
+  return found;
+end $$;
 
 -- The operator mints a token (a random string), gives it to the partner, and stores only its sha-256 here.
 create or replace function public.partner_link_create(p_partner uuid, p_token_hash text, p_expires_at timestamptz, p_max integer) returns uuid
@@ -388,25 +618,32 @@ begin
   return query select 'OK'::text, v_id, m.brokerage_id;
 end $$;
 
--- Periodic membership verification: enrollments whose partner brokerage membership an operator must re-confirm.
+-- Periodic membership verification (decision 2). Every partner enrollment that has paid is re-checked by an operator every
+-- partner_brokerage.verification_interval_days (30 by default, set per brokerage). THIS LIST IS THE MANUAL-REVIEW QUEUE: it is derived from the clock on
+-- every call (no job has to run for an overdue check to appear), oldest first, with how many days overdue each is. Being on it changes NOTHING about
+-- access: only a recorded 'failed' check suspends (billing_plan_of reads it), never a late one.
 create or replace function public.partner_verification_due(p_now timestamptz default now())
-returns table (enrollment_id uuid, partner_name text, account_id uuid, enrolled_at timestamptz, last_verified_at timestamptz, next_verification_at timestamptz)
+returns table (enrollment_id uuid, partner_name text, account_id uuid, enrolled_at timestamptz, last_verified_at timestamptz, next_verification_at timestamptz, days_overdue integer)
 language sql stable security definer set search_path = public, pg_temp
 as $$
-  select e.enrollment_id, b.name, e.account_id, e.created_at, e.last_verified_at, e.next_verification_at
+  select e.enrollment_id, b.name, e.account_id, e.created_at, e.last_verified_at, e.next_verification_at,
+         greatest(0, floor(extract(epoch from (p_now - e.next_verification_at)) / 86400))::integer
     from public.partner_enrollment e join public.partner_brokerage b on b.partner_id = e.partner_id
    where e.binding_id is not null and e.verification_status <> 'failed' and e.next_verification_at <= p_now
    order by e.next_verification_at
 $$;
 
--- 'verified' keeps access and schedules the next check; 'failed' suspends access immediately (billing_plan_of reads it) and is never silently reversed.
-create or replace function public.partner_enrollment_verify(p_enrollment uuid, p_result text, p_next interval default interval '90 days') returns boolean
+-- 'verified' keeps access and schedules the next check (the partner's own interval unless one is given); 'failed' is a CONFIRMED ineligibility and suspends
+-- access immediately (billing_plan_of reads it) and is never silently reversed.
+create or replace function public.partner_enrollment_verify(p_enrollment uuid, p_result text, p_next interval default null) returns boolean
 language plpgsql security definer set search_path = public, pg_temp
 as $$
 begin
   if p_result not in ('verified', 'failed') then raise exception 'partner_enrollment_verify: result must be verified or failed' using errcode = '22023'; end if;
   update public.partner_enrollment e set verification_status = p_result, last_verified_at = now(),
-         next_verification_at = case when p_result = 'verified' then now() + p_next else null end
+         next_verification_at = case when p_result = 'verified'
+              then now() + coalesce(p_next, make_interval(days => (select b.verification_interval_days from public.partner_brokerage b where b.partner_id = e.partner_id)))
+              else null end
    where e.enrollment_id = p_enrollment and e.verification_status <> 'failed';
   return found;
 end $$;
@@ -470,8 +707,12 @@ as $$
     join public.brokerage_subscription s on s.binding_id = c.binding_id
     join public.billing_plan_price p on p.livemode = s.livemode and p.price_ref = public.billing_binding_price(s.processor, s.livemode, s.subscription_ref)
    where p.kind = 'one_time' and c.period_index >= p.access_months
-  union all select 'paid_credit_on_a_test_paddle_binding', 'invariant', count(*) from public.brokerage_paid_credit c
-    join public.brokerage_subscription s on s.binding_id = c.binding_id where s.processor = 'paddle' and not s.livemode
+  union all select 'paid_credit_on_a_binding_of_the_other_environment', 'invariant', count(*) from public.brokerage_paid_credit c
+    join public.brokerage_subscription s on s.binding_id = c.binding_id where s.processor = 'paddle' and s.livemode is distinct from public.billing_grants_livemode()
+  union all select 'partner_verification_overdue_for_manual_review', 'review', count(*) from public.partner_verification_due()
+  union all select 'free_reports_used_after_the_gate_armed', 'invariant', count(*) from public.evaluation_credit c
+    join public.evaluation e on e.evaluation_id = c.evaluation_id, public.billing_gate g
+   where g.paid_required and not g.honor_granted_free_reports and c.issued_at > g.armed_at and g.armed_at is not null
   union all select 'partner_link_over_its_cap', 'invariant', count(*) from public.partner_link l
     where (select count(*) from public.partner_enrollment e where e.link_id = l.link_id and e.binding_id is not null) > l.max_redemptions
   union all select 'partner_binding_not_on_a_partner_price', 'invariant', count(*) from public.partner_enrollment e
@@ -485,21 +726,28 @@ declare
   t text;
   f record;
 begin
-  foreach t in array array['billing_plan_price', 'billing_period_observation', 'paddle_unmatched_event', 'partner_brokerage', 'partner_link', 'partner_enrollment'] loop
+  foreach t in array array['billing_plan_price', 'billing_period_observation', 'paddle_unmatched_event', 'partner_brokerage', 'partner_link', 'partner_enrollment',
+                           'billing_environment', 'billing_gate', 'billing_gate_log', 'billing_terms_version', 'billing_terms_acceptance'] loop
     execute format('alter table public.%I enable row level security', t);
     execute format('revoke all on public.%I from public, anon, authenticated, service_role', t);
   end loop;
-  foreach t in array array['billing_period_observation', 'paddle_unmatched_event'] loop
+  foreach t in array array['billing_period_observation', 'paddle_unmatched_event', 'billing_gate_log', 'billing_terms_acceptance'] loop
     execute format('drop trigger if exists %I on public.%I', t || '_append_only', t);
     execute format('create trigger %I before update or delete on public.%I for each row execute function public.billing_append_only()', t || '_append_only', t);
     execute format('drop trigger if exists %I on public.%I', t || '_no_truncate', t);
     execute format('create trigger %I before truncate on public.%I for each statement execute function public.billing_append_only()', t || '_no_truncate', t);
   end loop;
   for f in select p.oid::regprocedure::text as sig from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-            where n.nspname = 'public' and (p.proname like 'paddle\_%' or p.proname like 'partner\_%' or p.proname in ('billing_price_for', 'billing_binding_price', 'billing_summary', 'billing_portal_ref')) loop
+            where n.nspname = 'public' and (p.proname like 'paddle\_%' or p.proname like 'partner\_%' or p.proname in ('billing_price_for', 'billing_binding_price', 'billing_summary', 'billing_portal_ref', 'billing_grants_livemode', 'billing_environment_mode', 'billing_gate_set', 'billing_gate_state', 'billing_free_reports_usable', 'billing_free_reports_review', 'billing_terms_current', 'billing_terms_accept')) loop
     execute format('revoke all on function %s from public, anon, authenticated, service_role', f.sig);
     execute format('grant execute on function %s to service_role', f.sig);
   end loop;
+  -- the gate and the environment are changed by the database owner in SQL, never through the API: not even service_role may call the setter, and the trigger
+  -- function is not callable at all
+  revoke execute on function public.billing_gate_set(boolean, boolean) from service_role;
+  revoke all on function public.billing_environment_guard() from public, anon, authenticated, service_role;
+  revoke execute on function public.partner_brokerage_create(text, integer) from service_role;
+  revoke execute on function public.partner_brokerage_set_interval(uuid, integer) from service_role;
   revoke all on function public.billing_plan_of(uuid) from public, anon, authenticated, service_role;
   grant execute on function public.billing_plan_of(uuid) to service_role;
   revoke all on function public.payment_event_map_status(text, text) from public, anon, authenticated;
@@ -513,7 +761,7 @@ declare
   t   text;
 begin
   for f in select p.oid, p.oid::regprocedure::text as sig from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-            where n.nspname = 'public' and (p.proname like 'paddle\_%' or p.proname like 'partner\_%' or p.proname in ('billing_price_for', 'billing_binding_price', 'billing_summary', 'billing_portal_ref')) loop
+            where n.nspname = 'public' and (p.proname like 'paddle\_%' or p.proname like 'partner\_%' or p.proname in ('billing_price_for', 'billing_binding_price', 'billing_summary', 'billing_portal_ref', 'billing_grants_livemode', 'billing_environment_mode', 'billing_gate_set', 'billing_gate_state', 'billing_free_reports_usable', 'billing_free_reports_review', 'billing_terms_current', 'billing_terms_accept')) loop
     if exists (select 1 from pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
                 where p.oid = f.oid and a.grantee <> p.proowner
                   and (a.grantee <> (select oid from pg_roles where rolname = 'service_role') or a.privilege_type <> 'EXECUTE')) then
@@ -523,7 +771,8 @@ begin
       raise exception 'paddle_billing: % must be SECURITY DEFINER (its tables are closed to the caller)', f.sig;
     end if;
   end loop;
-  foreach t in array array['public.billing_plan_price', 'public.billing_period_observation', 'public.paddle_unmatched_event', 'public.partner_brokerage', 'public.partner_link', 'public.partner_enrollment'] loop
+  foreach t in array array['public.billing_plan_price', 'public.billing_period_observation', 'public.paddle_unmatched_event', 'public.partner_brokerage', 'public.partner_link', 'public.partner_enrollment',
+                           'public.billing_environment', 'public.billing_gate', 'public.billing_gate_log', 'public.billing_terms_version', 'public.billing_terms_acceptance'] loop
     if not (select c.relrowsecurity from pg_class c where c.oid = t::regclass)
        or exists (select 1 from pg_class c, aclexplode(coalesce(c.relacl, acldefault('r', c.relowner))) a where c.oid = t::regclass and a.grantee <> c.relowner) then
       raise exception 'paddle_billing: % must have row level security and no grant to any API role', t;
@@ -534,13 +783,35 @@ begin
   end if;
 end $post$;
 
--- ROLLBACK (this file only). Appropriate only before the first Paddle event: it drops the partner and period records. The Lemon Squeezy mapping is
--- NOT restored (that processor has been removed); billing_plan_of goes back to its brokerage-billing.sql body by re-applying that file's section 6.
+-- ROLLBACK (this file only). Appropriate only before the first Paddle event: it drops the partner, period, gate and terms records. The Lemon Squeezy mapping is
+-- NOT restored (that processor has been removed); billing_plan_of goes back to its brokerage-billing.sql body, evaluation_usage to its evaluation-entitlement.sql
+-- body and brokerage_paid_credit_guard to its brokerage-billing.sql body by re-applying those sections. The gate splice in brokerage_report_issue and the
+-- environment test in billing_check are taken OUT below (nothing may still call a function this rollback drops).
 -- ROLLBACK-BEGIN
+--   do $undo$
+--   declare d text; f text;
+--   begin
+--     f := 'public.brokerage_report_issue(uuid, uuid, text, text, text, jsonb, jsonb)'; d := pg_get_functiondef(to_regprocedure(f)::oid);
+--     if d like '%PAID_PLAN_REQUIRED%' then
+--       d := replace(d, '  if pl.state is distinct from ''paid''' || chr(10) ||
+--         '     and not exists (select 1 from public.evaluation_credit c where c.evaluation_id = ev.evaluation_id and c.idempotency_key = p_idempotency_key)' || chr(10) ||
+--         '     and not public.billing_free_reports_usable(ev.evaluation_id) then' || chr(10) ||
+--         '    raise exception using errcode = ''EV013'', message = ''PAID_PLAN_REQUIRED'';' || chr(10) ||
+--         '  end if;' || chr(10), '');
+--       execute d;
+--     end if;
+--     f := 'public.billing_check()'; d := pg_get_functiondef(to_regprocedure(f)::oid);
+--     if d like '%billing_grants_livemode%' then execute replace(d, 'where b.livemode is distinct from public.billing_grants_livemode()', 'where not b.livemode'); end if;
+--   end $undo$;
 --   drop function if exists public.paddle_billing_check(), public.billing_portal_ref(uuid), public.billing_summary(uuid), public.partner_enrollment_verify(uuid, text, interval),
 --     public.partner_verification_due(timestamptz), public.partner_enrollment_start(uuid, text, boolean), public.partner_link_create(uuid, text, timestamptz, integer),
---     public.partner_brokerage_create(text), public.paddle_adjustment_apply(jsonb), public.paddle_event_apply(uuid, jsonb, text, uuid, jsonb),
+--     public.partner_brokerage_create(text, integer), public.partner_brokerage_set_interval(uuid, integer), public.billing_terms_accept(uuid, text, text),
+--     public.billing_terms_current(), public.billing_free_reports_review(), public.billing_gate_state(), public.billing_gate_set(boolean, boolean),
+--     public.paddle_adjustment_apply(jsonb), public.paddle_event_apply(uuid, jsonb, text, uuid, jsonb),
 --     public.paddle_unmatched_record(jsonb, text), public.billing_binding_price(text, boolean, text), public.billing_price_for(text, boolean);
 --   drop table if exists public.partner_enrollment, public.partner_link, public.partner_brokerage, public.paddle_unmatched_event,
---     public.billing_period_observation, public.billing_plan_price;
+--     public.billing_period_observation, public.billing_plan_price, public.billing_gate_log, public.billing_gate, public.billing_terms_acceptance, public.billing_terms_version;
+--   drop table if exists public.billing_environment;
+--   drop function if exists public.billing_free_reports_usable(uuid), public.billing_environment_mode(), public.billing_grants_livemode(), public.billing_environment_guard();
+--   alter table public.evaluation drop column if exists free_reports_granted;
 -- ROLLBACK-END

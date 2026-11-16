@@ -153,7 +153,7 @@ const acqCode = code(ACQ_SQL);
 const PADDLE_SQL = 'docs/paddle-billing.sql';
 const paddleCode = code(PADDLE_SQL);
 ok(sorted(naming) === sorted([SQL_FILE, L1_SQL, EVAL_READS, SAVED_SQL, HEADER_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, RATE_SQL, DA_SQL, L2_SQL, ACQ_SQL, PADDLE_SQL])
-   && (paddleCode.match(/brokerage_membership_of\(/g) || []).length === 4 && !/\bpublic\.brokerage_member\b/.test(paddleCode)
+   && (paddleCode.match(/brokerage_membership_of\(/g) || []).length === 6 && !/\bpublic\.brokerage_member\b/.test(paddleCode)
    && !/\b(insert\s+into|update|delete\s+from|truncate|alter\s+table|drop\s+table|create\s+table)\s+(only\s+)?public\.brokerage_(account|member)/i.test(paddleCode)
    && !/\b(insert\s+into|update|delete\s+from|truncate|alter\s+table|drop\s+table|create\s+table)\s+(only\s+)?public\.(brokerage_|evaluation)/i.test(acqCode) && !/brokerage_membership_of|evaluation_report_issue|brokerage_report_issue/.test(acqCode)
    && (acqCode.match(/\bpublic\.brokerage_member\b/g) || []).length === 1 && /\bfrom b join public\.brokerage_member mm\b|\bjoin public\.brokerage_member mm\b/.test(acqCode)
