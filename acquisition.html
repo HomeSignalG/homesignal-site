@@ -297,7 +297,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
 <script src="lib/acq-bluesky-videos.js?v=574d20af"></script>
 <script src="lib/acq-bluesky-schedule.js?v=d543ca4c"></script>
 <!-- Tab 12 queue order: subscriber ZIPs first, then drafts to review, approved last. A view only. -->
-<script src="lib/acq-bluesky-queue-order.js?v=506d7e41"></script>
+<script src="lib/acq-bluesky-queue-order.js?v=544c17d9"></script>
 <script src="lib/acq-engagement.js?v=d81c8179"></script>
 <script src="lib/acq-youtube.js?v=44fa15cc"></script>
 <script src="lib/creator-script.js?v=4cae37b2"></script>
@@ -1403,9 +1403,12 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       fam += ' <span class="tile-tag" style="background:#f3ecfb;color:#5a3a8a;border:1px solid #d8c6ef">'+
         esc(String(HS.mapsSocialThemeLabel(thKey)||'').toUpperCase())+'</span>';
     }
+    // Quality-of-life score the engine stored on the draft (read only); a draft made before it shows none.
+    var qs=(window.HS&&HS.bskyQolScore)?HS.bskyQolScore(p):null;
+    var qolTag=(qs===null)?'':(' <span class="tile-tag" title="Quality-of-life impact score out of 100, from what the record states (homesignal-ingest qol-score)" style="background:#fff6e0;color:#7a5200;border:1px solid #ecd48f">QoL '+Math.round(qs)+'/100</span>');
     return '<div class="card" data-post="'+esc(p.id)+'" style="margin-bottom:12px">'+
       '<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">'+
-        '<div>'+fam+' '+statusTag+' <span class="muted" style="font-size:12px">'+esc(p.tile)+' · '+when+'</span></div>'+
+        '<div>'+fam+' '+statusTag+qolTag+' <span class="muted" style="font-size:12px">'+esc(p.tile)+' · '+when+'</span></div>'+
         '<div style="font-variant-numeric:tabular-nums;'+(over?'color:var(--persist);font-weight:700':'color:var(--muted)')+'">'+n+'/300</div>'+
       '</div>'+
       '<div style="white-space:pre-wrap;margin:10px 0;line-height:1.5">'+esc(p.post_text)+'</div>'+
@@ -1476,7 +1479,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         bskySubscriberStrip(sub, allRows)+g.subscriber.map(blueskyRow).join('');
     }
     var nd=g.review.length;
-    html+=bskyGroupHead('To review', nd+' draft'+(nd===1?'':'s')+', newest first', false)+
+    html+=bskyGroupHead('To review', nd+' draft'+(nd===1?'':'s')+', highest quality-of-life score first (unscored last)', false)+
       (nd?g.review.map(blueskyRow).join(''):'<div class="muted">'+esc(visible.length?'No other drafts in this view.':emptyMsg)+'</div>');
     var na=g.approved.length;
     if(na){

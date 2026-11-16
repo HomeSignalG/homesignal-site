@@ -34,6 +34,18 @@ ok(ids(g.review) === 'x1,d2,d1', 'every other draft, newest first');
 ok(ids(g.approved) === 'a2,a1', 'other approved posts by posting time, soonest first');
 ok(g.subscriber.length + g.review.length + g.approved.length === rows.length, 'every row is in exactly one group');
 ok(!g.subscriber.some((p) => p.content_family !== 'MAPS'), 'an ALERTS post on a subscriber ZIP is not a subscriber map post');
+// QoL ranking inside To review (2026-11-16): highest stored score first, unscored last, ties newest first.
+const qrows = [
+  { id: 'u1', content_family: 'MAPS', zip: '10001', status: 'draft', created_at: '2026-11-11T12:00:00Z' },
+  { id: 'q40', content_family: 'MAPS', zip: '10002', status: 'draft', created_at: '2026-11-01T00:00:00Z', evidence: { qol_score: { score: 40 } } },
+  { id: 'q80', content_family: 'MAPS', zip: '10003', status: 'draft', created_at: '2026-11-02T00:00:00Z', evidence: { qol_score: { score: 80 } } },
+  { id: 'q80n', content_family: 'MAPS', zip: '10004', status: 'draft', created_at: '2026-11-05T00:00:00Z', evidence: { qol_score: { score: 80 } } },
+  { id: 'sub', content_family: 'MAPS', zip: '64166', status: 'draft', created_at: '2026-11-01T00:00:00Z', evidence: { qol_score: { score: 5 } } },
+];
+const gq = HS.bskyQueueGroups(qrows, ['64166']);
+ok(ids(gq.review) === 'q80n,q80,q40,u1', 'To review: highest QoL score first, ties newest first, unscored last');
+ok(ids(gq.subscriber) === 'sub', 'a low-scoring subscriber-ZIP post is still on top');
+ok(HS.bskyQolScore({ evidence: { qol_score: { score: 'x' } } }) === null && HS.bskyQolScore({}) === null, 'a missing or malformed score reads as unscored');
 const g0 = HS.bskyQueueGroups(rows, []);
 ok(g0.subscriber.length === 0 && ids(g0.approved) === 'a2,a1,s3', 'no subscriber ZIPs: nothing is promoted');
 
