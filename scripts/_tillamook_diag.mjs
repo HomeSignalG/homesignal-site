@@ -28,16 +28,23 @@ for (const t of targets) {
 }
 console.log("SIGNIFICANT_ROWS");
 for (const c of sigRows) console.log(JSON.stringify({ id: c.case_ids[0], type: c.type, status: c.status, keys: (taxlotKeys(c.request) || []).length, req: c.request.slice(0, 220) }));
-// case pages for targets (crawl delay 10 s)
-for (const t of targets) {
-  const c = rows.find((x) => x.case_ids.includes(t)); if (!c) continue;
-  await new Promise((r) => setTimeout(r, 10500));
-  const p = txt(await (await fetch(c.url, { headers: UA })).text());
-  console.log("PAGE", t, p.slice(0, 3000));
+
+const lotSentence = (r) => { const m = r.match(/.{0,60}Tax\s*Lots?.{0,260}/i); return m ? m[0] : r.slice(-200); };
+const sah = rows.find((x) => x.case_ids.includes("851-25-000549-PLNG"));
+console.log("SAHHALI_FULL_REQUEST_TAIL", JSON.stringify(sah.request.slice(200)));
+console.log("QUARANTINE_CANDIDATES");
+for (const c of sigRows) {
+  if (!/Planning Commission Hearing|Board of Commissioners Hearing|Notice of Application|Public Notice|Pending|Under Review/i.test(c.status)) continue;
+  if (taxlotKeys(c.request)) continue;
+  console.log(JSON.stringify({ id: c.case_ids[0], type: c.type, status: c.status, lots: lotSentence(c.request) }));
 }
-// parcel lookup for the Sahhali lots as the county text states them
-const keys = ["5S1124AB01300","5S1124AB01301","5S1124AB01400","5S1124AB01500","5S1124AB01600","5S1124AB01700","5S1124AB01800","5S1124AB01900","5S1124AB04600","5S1124AB04700","5S1124AB04800","5S1124AB04801","5S1124AB05900"];
-const where = `${e.parcel_key_field} IN (${keys.map((k) => `'${k}'`).join(",")})`;
-const q = `${e.parcel_url}/query?where=${encodeURIComponent(where)}&outFields=${e.parcel_key_field}&returnGeometry=false&f=json`;
-const j = await (await fetch(q)).json();
-console.log("SAHHALI_LOTS_RESOLVED", (j.features || []).map((f) => f.attributes[e.parcel_key_field]).sort().join(","));
+// parcel centroids for every keyed candidate in a mapped status
+const cand = sigRows.filter((c) => /Planning Commission Hearing|Board of Commissioners Hearing|Notice of Application|Public Notice|Pending|Under Review/i.test(c.status) && taxlotKeys(c.request));
+const ak = [...new Set(cand.flatMap((c) => taxlotKeys(c.request)))];
+const wh = `${e.parcel_key_field} IN (${ak.map((k) => `'${k}'`).join(",")})`;
+const jj = await (await fetch(`${e.parcel_url}/query?where=${encodeURIComponent(wh)}&outFields=${e.parcel_key_field}&returnGeometry=true&returnCentroid=true&outSR=4326&f=json`)).json();
+const cm = new Map((jj.features || []).map((f) => [f.attributes[e.parcel_key_field], f.centroid]));
+for (const c of cand) {
+  const ks = taxlotKeys(c.request);
+  console.log("CAND", JSON.stringify({ id: c.case_ids[0], type: c.type, keys: ks, centroids: ks.map((k) => cm.get(k) ? [cm.get(k).y, cm.get(k).x] : null), req: c.request.slice(0, 260) }));
+}
