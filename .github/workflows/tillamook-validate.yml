@@ -1,5 +1,8 @@
 name: tillamook-validate
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/tillamook-validate]
 permissions:
   contents: read
 jobs:
