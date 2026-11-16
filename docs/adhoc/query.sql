@@ -1,5 +1,6 @@
 select jsonb_pretty(jsonb_build_object(
- 'changes', (select jsonb_agg(x) from (select category, count(*) n, max(created_at) newest, (array_agg(left(title,60) order by created_at desc))[1:3] sample from public.app_changes where zip='97149' group by category) x),
- 'dev', (select jsonb_build_object('refreshed_at',refreshed_at,'area',(select count(*) from jsonb_array_elements(sites) s where s->>'scope'='area'),'plng',(select count(*) from jsonb_array_elements(sites) s where s::text like '%PLNG%')) from public.development_reports where zip='97149'),
- 'proj',(select jsonb_agg(x) from (select record_kind, count(*) n from public.app_projects where zip='97149' group by 1) x)
+ 'by_kind',(select jsonb_agg(x) from (select left(title,28) t, count(*) n from public.app_changes where zip='97149' group by 1 order by 2 desc limit 12) x),
+ 'plng',(select count(*) from public.app_changes where zip='97149' and (title ilike '%PLNG%' or title ilike '%land use%')),
+ 'alerts_planning_shape',(select jsonb_agg(x) from (select left(title,70) t, left(source_url,80) u, published_at::date d from public.alerts where community_id='5ec7e696-93fa-4a7c-81b0-50f8d2828353' and category='Planning, zoning & development' order by published_at desc limit 4) x),
+ 'rule',(select regexp_replace(substring(pg_get_functiondef('public.app_refresh_zip(text)'::regprocedure) from 'government_notice[\s\S]{0,700}'),'\s+',' ','g'))
 )) r
