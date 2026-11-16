@@ -121,7 +121,8 @@ ok(!existsSync(join(ROOT, 'supabase/functions/lemonsqueezy-webhook')), '5f the m
 // of the section-15 marker, with a positive control that the marker was found and that section 15 has checks of its own.
 const S15 = RTRAW.indexOf('// ---- 15. THE REPORT RATE LIMIT');
 const checksIn = (t) => (stripJs(t).match(/(^|[^\w.])ok\(/g) || []).length;
-ok(S15 > 0 && checksIn(RTRAW.slice(S15)) === 14, '6a (control) section 15 is found and carries 14 checks of its own', [S15, S15 > 0 && checksIn(RTRAW.slice(S15))]);
+const S16 = RTRAW.indexOf('// ---- 16.');
+ok(S15 > 0 && S16 > S15 && checksIn(RTRAW.slice(S15, S16)) === 14, '6a (control) section 15 is found and carries 14 checks of its own', [S15, S16, S15 > 0 && S16 > S15 && checksIn(RTRAW.slice(S15, S16))]);
 ok(S15 > 0 && checksIn(RTRAW.slice(0, S15)) === 73, '6b the original scenario, sections 1-14, is still exactly 73 checks: none was removed, merged or weakened to make room', S15 > 0 && checksIn(RTRAW.slice(0, S15)));
 ok(/report_rate_claim: \(a\) => \[asJson\("public\.report_rate_claim\(:'u'::uuid\)"\)/.test(RT) && !/report_rate_claim_at/.test(RT), '6c the round trip lets the handler reach the claim WRAPPER only: the clocked variant is not on the allowlist');
 ok(/async function ask\(userId, body, \{ limited = false \} = \{\}\) \{\s*if \(!limited\) one\('truncate public\.report_rate_window'\);/.test(RT), '6d sections 1-14 clear the limiter\'s counters before each request (they test the entitlement, far above the ceiling by design), and the clearing is opt-out');
