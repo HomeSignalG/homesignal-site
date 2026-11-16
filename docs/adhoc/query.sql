@@ -8,6 +8,5 @@ select jsonb_pretty(jsonb_build_object(
  'app_projects_97149', (select jsonb_agg(jsonb_build_object('kind',record_kind,'n',n)) from (select record_kind,count(*) n from public.app_projects where zip='97149' group by 1) s),
  'meta', (select to_jsonb(m) - 'component_scores' from public.app_community_meta m where zip='97149'),
  'refresh_failures', (select count(*) from public.app_refresh_failures where zip='97149'),
- 'zip_gov_bodies', (select jsonb_agg(to_jsonb(b)) from public.zip_government_bodies('97149') b),
  'now', now()
 ));
