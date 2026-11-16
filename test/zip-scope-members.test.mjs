@@ -348,7 +348,7 @@ console.log('\n8) wiring');
 {
   const idx = readFileSync(join(root, 'supabase/functions/get-address-report/index.ts'), 'utf8');
   const zm = idx.slice(idx.indexOf('── ZIP MODE ──'), idx.indexOf('── ZIP MODE ──') + 40000);
-  ok((zm.match(/zipMembers: scope\.bounds \? zipMembers : null/g) || []).length === 3, 'the three radius-capable connectors receive the membership function, and only with bounds');
+  ok((zm.match(/zipMembers: scope\.bounds \? zipMembers : null/g) || []).length === 4, 'the four radius-capable connectors (socrata, arcgis, csv, county_cases) receive the membership function, and only with bounds');
   ok(/zipMembershipRpc\(supabase, zip\)/.test(zm), 'membership goes through the one RPC adapter');
   ok(!/zipMembers/.test(idx.slice(idx.indexOf('── ZIP MODE ──') + 40000)), 'ADDRESS mode never receives a membership function');
   const code = ['scope-members.ts', 'arcgis.ts', 'socrata.ts', 'csv.ts'].map((f) => readFileSync(join(SRC, f), 'utf8').replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')).join('\n');

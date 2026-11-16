@@ -98,10 +98,12 @@ import { arcgisForZip, type ArcgisRegistryEntry } from "./sources/arcgis.ts";
 import { IDENTITY_ALIAS_FILES } from "./identity-aliases/index.ts";
 import { ckanForZip, type CkanCommunityRow, type CkanRegistryEntry } from "./sources/ckan.ts";
 import { csvForZip, type CsvCommunityRow, type CsvRegistryEntry } from "./sources/csv.ts";
+import { countyCasesForZip, type CountyCommunityRow, type CountyCasesRegistryEntry } from "./sources/county-cases.ts";
 import { cartoForZip, type CartoCommunityRow, type CartoRegistryEntry } from "./sources/carto.ts";
 const ARCGIS_ENTRIES = (jurisdictionRegistry as unknown as { arcgis?: ArcgisRegistryEntry[] }).arcgis ?? [];
 const CKAN_ENTRIES = (jurisdictionRegistry as unknown as { ckan?: CkanRegistryEntry[] }).ckan ?? [];
 const CSV_ENTRIES = (jurisdictionRegistry as unknown as { csv?: CsvRegistryEntry[] }).csv ?? [];
+const COUNTY_CASES_ENTRIES = (jurisdictionRegistry as unknown as { county_cases?: CountyCasesRegistryEntry[] }).county_cases ?? [];
 const CARTO_ENTRIES = (jurisdictionRegistry as unknown as { carto?: CartoRegistryEntry[] }).carto ?? [];
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -876,6 +878,13 @@ async function handleRequest(req: Request): Promise<Response> {
       zipCentroid: { lat: clat, lng: clng },
       noteFence,
     });
+    // County land-use CASES (HTML index + the county's own parcel layer). A case is pinned only when every
+    // tax lot it names resolves in the parcel layer; the pin must be a member of this ZIP's polygon.
+    const countyCases = await countyCasesForZip(zip, (commRows ?? []) as CountyCommunityRow[], COUNTY_CASES_ENTRIES, {
+      fetch,
+      zipCentroid: { lat: clat, lng: clng },
+      zipMembers: scope.bounds ? zipMembers : null,
+    });
     // Anti-fabrication: a marker with no official record URL is not rendered, not counted.
     const dev = devRaw.filter((s) => (s.url as string) && (s.url as string).trim() !== "");
     // TABS filings are development records by construction (state permit registry) — stamp
@@ -925,6 +934,15 @@ async function handleRequest(req: Request): Promise<Response> {
       });
     // Carto records → engine site shape (identical mapping to socrataSites above).
     const cartoSites: Record<string, unknown>[] = (carto.sites as unknown as Record<string, unknown>[])
+      .filter((s) => String(s.record_url || "").trim() !== "")
+      .map((s) => {
+        const lat = s.lat as number | null, lng = s.lng as number | null;
+        const pt = lat != null && lng != null;
+        const [e, n] = pt ? toEN(clat, clng, lat as number, lng as number) : [0, 0];
+        return { ...s, url: s.record_url, e, n, lat: pt ? lat : clat, lng: pt ? lng : clng };
+      });
+    // County-case records → engine site shape (identical mapping to socrataSites above).
+    const countyCaseSites: Record<string, unknown>[] = (countyCases.sites as unknown as Record<string, unknown>[])
       .filter((s) => String(s.record_url || "").trim() !== "")
       .map((s) => {
         const lat = s.lat as number | null, lng = s.lng as number | null;
@@ -986,7 +1004,7 @@ async function handleRequest(req: Request): Promise<Response> {
     // never silent point-job loss. No stored id lists; recomputed per report.
     // A filing/issue date after today is refused (the record stays undated); sources/date-sanity.ts.
     const permitSites = dedupeExactPermits(applyYields(
-      refuseFutureFilingDates([...tabsSites, ...socrataSites, ...arcgisSites, ...ckanSites, ...csvSites, ...cartoSites], today),
+      refuseFutureFilingDates([...tabsSites, ...socrataSites, ...arcgisSites, ...ckanSites, ...csvSites, ...cartoSites, ...countyCaseSites], today),
       YIELDS_MAP,
     ));
     const devRecords = [...devReal, ...permitSites];
@@ -1016,7 +1034,7 @@ async function handleRequest(req: Request): Promise<Response> {
     const envTceq = fac.filter((s) => (s.env as { tceq?: unknown } | undefined)?.tceq).length;
     // TABS records are development filings → counts.development, never counts.facilities.
     const facCoverage = facilityCoverage(facResult.epa);
-    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, epa: facResult.epa, echo, cwa, counts: { facilities: fac.length, ...(facCoverage ? { facilities_coverage: facCoverage } : {}), proposed: proposedRecords.length, proposed_active: proposedActiveRecords.length, proposed_decided: decidedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, tabs_quarantined: tabs.quarantined, socrata_reports: socrata.reports, arcgis_reports: arcgis.reports, ckan_reports: ckan.reports, csv_reports: csv.reports, carto_reports: carto.reports, env_records: { epa_matched: envEpa, tceq_matched: tceqStats.matched, tceq_dataset: tceq.dataset ?? null, tceq_entities: tceq.entities.length, tceq_quarantined: tceq.quarantined }, note: "ZIP-wide view (not a home). Development items are jurisdiction-level (scope=area); facilities (scope=point) are the EPA-registered facilities inside the ZIP boundary. Environmental records (EPA ECHO federal + TCEQ Central Registry state) are geo-matched to each facility. Not for resale.", sites }, 200, cors);
+    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, epa: facResult.epa, echo, cwa, counts: { facilities: fac.length, ...(facCoverage ? { facilities_coverage: facCoverage } : {}), proposed: proposedRecords.length, proposed_active: proposedActiveRecords.length, proposed_decided: decidedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, tabs_quarantined: tabs.quarantined, socrata_reports: socrata.reports, arcgis_reports: arcgis.reports, ckan_reports: ckan.reports, csv_reports: csv.reports, carto_reports: carto.reports, county_cases_reports: countyCases.reports, env_records: { epa_matched: envEpa, tceq_matched: tceqStats.matched, tceq_dataset: tceq.dataset ?? null, tceq_entities: tceq.entities.length, tceq_quarantined: tceq.quarantined }, note: "ZIP-wide view (not a home). Development items are jurisdiction-level (scope=area); facilities (scope=point) are the EPA-registered facilities inside the ZIP boundary. Environmental records (EPA ECHO federal + TCEQ Central Registry state) are geo-matched to each facility. Not for resale.", sites }, 200, cors);
   }
 
   const address = (body.address || "").trim();

@@ -17826,5 +17826,97 @@
       "record_url_precision": "dataset",
       "_receipts": "2026-07-28 PHASE 3 (docs/implementation-packets/claude_code_phase3_prompt.md). STAGED CONFIG \u2014 the Opendatasoft connector does not exist yet, so this entry is inert until sources/opendatasoft.ts and an index.ts call land; see _opendatasoft_readme. Vocabularies are VERBATIM live facet output \u2014 recon-fetch runs 30381742794 (r1), 30381831357 (r2), 30381943709 (r3); targets scripts/recon/p3-round*.json. Dataset: 8,751 records, update_frequency MONTHLY, data_processed 2026-07-01, publisher Innovate Memphis. BOTH VOCABULARIES ARE COMPLETE \u2014 each sums to EXACTLY 8,751. status (3): Issued 4,707 / Closed - Complete 4,036 / Inspection Phase 8 \u2014 a real status column, so status_to_bucket applies and status_const is NOT used (the packet offered it as a fallback for status-less layers). TYPE DEVIATION FROM THE PACKET: the packet names permit_type, whose 5 values are WORK CLASSES (Alteration 3,889 / New Construction 1,900 / Accessory Structure 1,478 / Demolition 757 / Addition 727) and cannot reach the required 3 use-types. record_type is used instead \u2014 9 values, also summing exactly to 8,751, encoding use AND work class: Residential Alteration 2,373 / Residential New Construction 1,664 / Commercial Alteration 1,516 / Residential Accessory Structure 1,237 / Demolition 757 / Residential Addition 655 / Commercial Accessory Structure 241 / Commercial New Construction 236 / Commercial Addition 72 -> Residential + Commercial + Development = 3 use-types, 0 unmapped. ZIP SCOPING PROVEN THREE INDEPENDENT WAYS THAT AGREE: refine.zip_code=38002 -> nhits 750, q=zip_code:38002 -> nhits 750, and Explore v2.1 where=zip_code=\"38002\" -> total_count 750; control 38117 -> 351. GEOGRAPHY: per-record lat/lon doubles plus a centroid GeoJSON Point, geo_point_2d and a record-level geometry Point \u2014 no geocoding needed. date_status is a real ODS date field (e.g. 2025-10-24). record_url_precision is 'dataset': there is no per-record URL column and the metadata's Accela reference (aca-prod.accela.com/SHELBYCO/Default.aspx) is a portal ROOT, not a deep link \u2014 templating one would be guessing (Boulder/Philadelphia precedent). All 41 packet ZIPs are modeled and resolve to TN/Shelby (verified against public.communities)."
     }
+  ],
+  "county_cases": [
+    {
+      "registry_id": "tillamook-county-land-use-cases",
+      "platform": "county_cases",
+      "index_url": "https://www.tillamookcounty.gov/1098/Land-Use-Applications",
+      "parcel_url": "https://services3.arcgis.com/JnnlTIrcZLzs7d68/arcgis/rest/services/Taxlots/FeatureServer/0",
+      "parcel_key_field": "MapTaxlot",
+      "dataset_url": "https://www.tillamookcounty.gov/1098/Land-Use-Applications",
+      "jurisdiction": "Tillamook County Community Development",
+      "coverage": [
+        {
+          "state": "OR",
+          "county": "Tillamook"
+        }
+      ],
+      "bbox": {
+        "min_lat": 45.0,
+        "max_lat": 46.0,
+        "min_lng": -124.2,
+        "max_lng": -123.2
+      },
+      "date_label": "Date of Notice",
+      "file_date_kind": "filed",
+      "file_date_label": "Date of Notice on the county's case page",
+      "recency_days": 540,
+      "max_cases": 25,
+      "min_found_share": 1,
+      "max_spread_m": 1500,
+      "crawl_delay_ms": 10000,
+      "max_page_reads": 4,
+      "record_url_precision": "record",
+      "spatial_zip_radius_mi": 3,
+      "significant_if": [
+        "subdivision",
+        "\\bplat\\b",
+        "campground",
+        "master plan",
+        "planned development",
+        "\\bPUD\\b",
+        "dwelling units",
+        "\\bRV (park|spots|sites)\\b",
+        "hotel|motel|resort",
+        "commercial|industrial|warehouse",
+        "ordinance amendment|map amendment|zone change",
+        "wireless|communication tower|pipeline|water system|sewer|utility"
+      ],
+      "routine_if": [
+        "\\bpartition\\b",
+        "resource zone exception",
+        "lot line",
+        "\\bvariance\\b",
+        "property line adjustment",
+        "non-?conforming (use )?minor",
+        "accessory",
+        "single[- ]family dwelling",
+        "replat of a portion",
+        "\\bhome occupation\\b",
+        "\\bfence\\b"
+      ],
+      "residential_if": [
+        "subdivision",
+        "\\bplat\\b",
+        "dwelling"
+      ],
+      "status_to_bucket": {
+        "proposed": [
+          "Planning Commission Hearing",
+          "Board of Commissioners Hearing",
+          "Notice of Application",
+          "Public Notice",
+          "Pending",
+          "Under Review"
+        ],
+        "exclude": [
+          "Appeal Period",
+          "Conditional Use Appeal Period",
+          "Nonconforming Review Appeal Period",
+          "Decision",
+          "Approved",
+          "Denied",
+          "Withdrawn",
+          "Complete",
+          "Closed"
+        ]
+      },
+      "_receipts": [
+        "Index, case pages, hearing statuses and the Taxlots parcel layer read live 2026-11-16 (runner probes). Cases are pinned ONLY by joining the tax lots the case's own text names (township, range, section, lot) to the county's Taxlots layer MapTaxlot key; every named lot must resolve. Pin = parcel centroid, labelled approximate. 'Appeal Period' and other post-decision statuses are excluded because the county's status words do not state which decision was made.",
+        "robots.txt (checked 2026-11-16): '*' group disallows search/calendar/RSS endpoints, not /1098 or case pages, and sets Crawl-delay 10; named AI-crawler groups repeat the disallows. This connector sends an honest HomeSignal user agent (matches the '*' group) and spaces requests to the county host 10 s apart.",
+        "The Taxlots FeatureServer is public (access=public, Query capability only) and states no license or copyright text. The county site publishes a GIS Data Access page and a GIS Price List for bulk data; this connector issues point lookups for the few tax lots a case names, not a bulk copy."
+      ]
+    }
   ]
 }

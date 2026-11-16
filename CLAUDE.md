@@ -6938,3 +6938,13 @@ target / file wins; null = the generated line).
   `video_endings_current` (service role only) and the visuals must be prepared again. **Tab 20:** mount with
   `{tab:'weekly', targets}` once the weekly report (PR #2772) renders videos; until then nothing is mounted.
 - Tests: `test/video_endings_pg` (`video-endings-suite.yml`, 24 checks), `test/video-endings.browser.test.mjs`.
+
+## COUNTY LAND-USE CASES: `county_cases` CONNECTOR, FIRST CONSUMER TILLAMOOK COUNTY OR (2026-11-16)
+
+`sources/county-cases.ts` (registry key `county_cases`). For a county that publishes planning cases only as an HTML index plus a public parcel
+layer. A case is pinned ONLY from the tax lots its own text names, joined to the county's Taxlots layer; EVERY named lot must resolve (a partial
+match is never a verified footprint), the parcels must lie together, and the pin must be a member of the ZIP polygon (`zip_scope_members`).
+The pin is a parcel centroid, labelled approximate (`location_approx`). Status is the county's own word (hearing stages only; post-decision
+words such as "Appeal Period" are excluded because they do not say which decision), and the case page's status-update text is kept verbatim.
+Cases that share a lot are one marker. Full record, terms check and robots crawl delay: `docs/source-registry.md` "TILLAMOOK COUNTY LAND-USE CASES".
+Tests: `test/county-cases-fixture.test.ts`. County-wide notices stay separate (homesignal-ingest feeds); this connector adds only verified pins.
