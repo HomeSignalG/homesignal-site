@@ -274,6 +274,21 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   </div>
 </div>
 
+<!-- SKIP REASON MODAL: why a post is being skipped, kept (hs_social_post_skip) so selection can learn. -->
+<div id="bsky-skip-overlay" class="bsky-edit-overlay">
+  <div class="bsky-edit-modal" style="max-width:520px">
+    <button class="bsky-edit-close" id="bsky-skip-close">&times;</button>
+    <h3>Skip this post</h3>
+    <p class="bsky-edit-sub" id="bsky-skip-sub">Tell the selector why, so it can pick better posts. Optional, but it is how it learns.</p>
+    <div id="bsky-skip-chips" style="display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px"></div>
+    <textarea id="bsky-skip-note" class="bsky-edit-textarea" style="min-height:90px" maxlength="2000" placeholder="Anything else? e.g. 'a bridge repaint is not a neighborhood change'"></textarea>
+    <div class="bsky-edit-actions">
+      <button class="bsky-btn" id="bsky-skip-cancel" style="background:#e4e8e4;color:#16211c">Cancel</button>
+      <button class="bsky-btn" id="bsky-skip-confirm" style="background:#c23b34;color:#fff">Skip post</button>
+    </div>
+  </div>
+</div>
+
 <!-- The SHIPPED Map 1 classifier. The Bluesky MAPS theme filter derives membership from
      HS.resolveMarker so the dashboard and the map can never disagree about what a Data
      center is (lib/maps-social-theme.js). Both are self-contained helper IIFEs — they
@@ -1907,6 +1922,16 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       var stamp=document.getElementById('bsky-stamp'); if(stamp) stamp.textContent='updated '+new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
     }catch(e){ body.innerHTML='<div class="muted">Queue error.</div>'; }
   }
+  // ONE ACTION PER POST AT A TIME. Approve takes a second or two (claim check, then the RPC),
+  // and the button stayed live meanwhile, so a second click sent a second approve for a post
+  // the first had already approved. The database refused it ("only a draft can be approved")
+  // and the founder saw "Approve failed" over a post that was in fact approved.
+  var _bskyBusy={};
+  async function blueskyActionGuarded(id, act){
+    if(_bskyBusy[id]) return;
+    _bskyBusy[id]=true;
+    try{ await blueskyAction(id, act); } finally { delete _bskyBusy[id]; }
+  }
   async function blueskyAction(id, act){
     try{
       if(act==='approve'){
@@ -1944,10 +1969,12 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         // ("re-read it before approving") means the row moved; refreshBluesky() rebuilds
         // _bskyRows, so the NEXT click reviews the current revision. It does not call
         // hs_approve_social_post: the founder must look again and approve again.
+        // Already approved by an earlier click or another tab: not a failure, just refresh.
+        if(r.error && /only a draft can be approved/i.test(r.error.message||'')){ refreshBluesky(); return; }
         if(r.error){ alert('Approve failed: '+(r.error.message||'')); refreshBluesky(); return; }
       } else if(act==='skip'){
-        var r2=await window.hsClient.from('social_posts').update({status:'skipped'}).eq('id',id);
-        if(r2.error){ alert('Skip failed: '+(r2.error.message||'')); return; }
+        openBskySkip(id);
+        return; // modal records the reason and skips; it refreshes the queue itself
       } else if(act==='edit'){
         openBskyEdit(id);
         return; // modal handles its own save/refresh — no DB write yet
@@ -2087,6 +2114,50 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     $('bsky-edit-overlay').style.display='flex';
     ta.focus();
   }
+  // ---- Skip with a reason. hs_social_post_skip skips the post AND saves the reason, with a
+  // snapshot of the post (ZIP, theme, quality-of-life score, project type, text), in one
+  // transaction. The codes below must match social_post_skip_reasons_codes (docs/social-skip-reasons.sql).
+  var BSKY_SKIP_REASONS=[
+    ['not_neighborhood_change','Not a change residents would notice'],
+    ['too_minor','Too minor'],
+    ['wrong_project_type','Wrong project type'],
+    ['duplicate','Duplicate'],
+    ['already_covered','Already covered'],
+    ['bad_name_or_address','Bad name or address'],
+    ['poor_map','Poor map'],
+    ['wrong_place','Wrong place'],
+    ['other','Other']
+  ];
+  var bskySkipId=null, bskySkipBusy=false;
+  function openBskySkip(id){
+    bskySkipId=id;
+    var p=_bskyRows[id]||null;
+    $('bsky-skip-sub').textContent='ZIP '+((p&&p.zip)||'')+' \u2014 tell the selector why, so it can pick better posts. Optional, but it is how it learns.';
+    $('bsky-skip-chips').innerHTML=BSKY_SKIP_REASONS.map(function(r){
+      return '<label style="display:inline-flex;align-items:center;gap:5px;border:1px solid #cfd8d3;border-radius:14px;padding:4px 10px;font-size:12.5px;cursor:pointer">'+
+        '<input type="checkbox" data-skip-code="'+r[0]+'"> '+esc(r[1])+'</label>';
+    }).join('');
+    $('bsky-skip-note').value='';
+    $('bsky-skip-confirm').disabled=false;
+    $('bsky-skip-overlay').style.display='flex';
+    $('bsky-skip-note').focus();
+  }
+  function closeBskySkip(){ $('bsky-skip-overlay').style.display='none'; bskySkipId=null; }
+  async function confirmBskySkip(){
+    if(!bskySkipId||bskySkipBusy) return;
+    bskySkipBusy=true; $('bsky-skip-confirm').disabled=true;
+    var id=bskySkipId;
+    var codes=[].map.call(document.querySelectorAll('#bsky-skip-chips input:checked'),function(i){return i.getAttribute('data-skip-code');});
+    try{
+      var r=await window.hsClient.rpc('hs_social_post_skip',{p_id:id,p_reasons:codes,p_note:$('bsky-skip-note').value});
+      // Already skipped (another tab or click): nothing to report, just re-read the queue.
+      if(r.error && !/only a draft or an approved post can be skipped/i.test(r.error.message||'')){
+        alert('Skip failed: '+(r.error.message||'')); $('bsky-skip-confirm').disabled=false; return;
+      }
+      closeBskySkip(); refreshBluesky();
+    }catch(e){ alert('Skip error.'); $('bsky-skip-confirm').disabled=false; }
+    finally{ bskySkipBusy=false; }
+  }
   function closeBskyEdit(){ $('bsky-edit-overlay').style.display='none'; bskyEditId=null; }
   // \u26a0\ufe0f FREE TEXT DOES NOT INHERIT A VALIDATION. This modal writes post_text
   // straight to PostgREST under the owner's RLS policy, so it never touches the composer
@@ -2164,6 +2235,10 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     document.body.appendChild(marker);
     $('bsky-edit-textarea').addEventListener('input', bskyEditCountUpdate);
     $('bsky-edit-cancel').addEventListener('click', closeBskyEdit);
+    $('bsky-skip-cancel').addEventListener('click', closeBskySkip);
+    $('bsky-skip-close').addEventListener('click', closeBskySkip);
+    $('bsky-skip-confirm').addEventListener('click', confirmBskySkip);
+    $('bsky-skip-overlay').addEventListener('click', function(e){ if(e.target===$('bsky-skip-overlay')) closeBskySkip(); });
     $('bsky-edit-close').addEventListener('click', closeBskyEdit);
     $('bsky-edit-save').addEventListener('click', saveBskyEdit);
     $('bsky-edit-overlay').addEventListener('click', function(e){ if(e.target===$('bsky-edit-overlay')) closeBskyEdit(); });
@@ -2208,7 +2283,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         var zo=btn.getAttribute('data-zo');
         if(zo){ zipOrderAction(zo); return; }
         var wrap=btn.closest('[data-post]'); if(!wrap) return;
-        blueskyAction(wrap.getAttribute('data-post'), btn.getAttribute('data-act'));
+        blueskyActionGuarded(wrap.getAttribute('data-post'), btn.getAttribute('data-act'));
       });
     }
     refreshBluesky();
