@@ -218,7 +218,7 @@ ok(/if\(u\.searchParams\.get\("embed"\) === "1"\)\{/.test(m1),
 // ── §10 non-embed Map 1 is unchanged ────────────────────────────────────────────────────
 ok(/var a = u\.searchParams\.get\("addr"\);/.test(m1) && /loadProperty\(a\.trim\(\)\); return;/.test(m1),
   '10a ?addr= still routes to the dossier on the full page');
-ok(/loadZip\(z\); loadDevTracker\(z\);/.test(m1),
+ok(/loadZip\(zz\); loadDevTracker\(zz\);/.test(m1),
   '10b ...and ?zip= still boots the ZIP report WITH the Development tracker (the embed skips the tracker)');
 ok(/ZIP_FRAME = ZIP_MODE && window\.HS && HS\.zipFrameFromSites/.test(m1),
   '10c ZIP_FRAME still comes from the records\' own extent — non-embed ZIP framing is untouched');

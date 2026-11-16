@@ -258,7 +258,9 @@ Record of the decision, in the founder's words: `docs/national-source-policy-202
   **Do not add a noindex rule or an exclusion criterion without explicit founder approval.**
 - Gate: `scripts/audit_index_all.py` runs in `pages.yml` against `_site` (public noindex, robots block, non-self canonical, missing from sitemap).
 
-### DEVELOPMENT MAP INDEXING PILOT (2026-11-11) — BUILT LOCALLY, NOT DEPLOYED
+### DEVELOPMENT MAP INDEXING PILOT (2026-11-11) — DEPLOYED 2026-11-11 19:29:35 UTC (f65a0f7, #2808)
+Baseline (deploy, IndexNow receipt, the 200 URLs with their lastmods, what a Bing result can and cannot show):
+`docs/seo/map-indexing-pilot/baseline-2026-11-11.md`. The controls were not submitted; IndexNow HTTP 200 is receipt, not indexing.
 Every `/map/<zip>/` document kept its whole page inside an inert `<template>` (6 visible words in the first HTML), and
 `page_semantics.projection` drops `<template>`, so a map's records never moved its fingerprint, `lastmod` or IndexNow.
 `scripts/map_zip_summary.py` writes `#hs-map-zip-summary` OUTSIDE the template from the Rule D plane count and the ZIP's
@@ -6339,6 +6341,13 @@ one story went through 13 fix batches and 9 renders. The founder asked for the a
 - **Approved pictures survive a code-only change** (engine, homesignal-ingest CLAUDE.md, same date): a render no longer
   sends a story back to Prepare just because video code merged after the approval.
 
+## A PHOTO SOMEONE ASKED FOR IS NEVER SKIPPED IN SILENCE (2026-11-15, Tabs 17 and 20)
+
+The engine's `photos_not_used` (homesignal-ingest CLAUDE.md, same date) is shown on the Visuals status bar and Your photos
+("Not used: <license> on hold"), in Media review for a render, and on the Tab 20 video card. `_hs_is_media` passes it
+(`docs/impact-photos-not-used-apply-2026-11-15.sql`, applied 2026-11-15, md5 `17ae7cc9…` -> `bdc8470c…`). The page
+decides nothing. Why: 18 chosen CC BY-SA Jeffries photos were skipped after the 2026-11-11 license hold with no message.
+
 ## IMPACT STORIES, TAB 17: "NOT ABOUT THIS STORY — CONTINUE PREPARING" (2026-11-07)
 
 Founder: "the article does not matter but there is no button to disregard it and continue". When Prepare (or a render)
@@ -6938,6 +6947,122 @@ target / file wins; null = the generated line).
   `video_endings_current` (service role only) and the visuals must be prepared again. **Tab 20:** mount with
   `{tab:'weekly', targets}` once the weekly report (PR #2772) renders videos; until then nothing is mounted.
 - Tests: `test/video_endings_pg` (`video-endings-suite.yml`, 24 checks), `test/video-endings.browser.test.mjs`.
+
+- **Two upload buttons (founder, 2026-11-12: "make the 2 buttons"):** "Upload ending for Shorts (vertical)" and "Upload ending
+  for main videos (horizontal)". `video_endings.shape` records which; a Short's picker lists only vertical recordings, a main
+  video's only horizontal ones, and `hs_video_ending_choose` refuses the other kind. The browser reads the file's width and
+  height and refuses a clip on the wrong button before uploading. A recording with no shape (none exist) fits either.
+- Tests: `test/video_endings_pg` (`video-endings-suite.yml`, 31 checks), `test/video-endings.browser.test.mjs`.
+
+## THE ZIP DEVELOPMENT LISTS HOLD WHAT MAP 1 DRAWS; OFFICIAL PORTALS ARE RECORDED (2026-11-12)
+
+Map 1 in ZIP mode draws app_projects members AND the national data-centre plane (`map1_dc_zip_members`). The ZIP
+page (`lib/community-page.js`) and `development.html` listed only app_projects, so a data centre drawn as Proposed
+was missing from both lists and from the Development tile (Behring 415 20th Street, 94612, canonical entity
+`e59b8d43…`, Compute Atlas). `lib/data.js` `nationalDataCenters()` had been written for this and had no caller.
+- **One combiner, `HS.data.zipDevelopment(zip, home)`**, read by both list pages: authoritative rows + the server's
+  `member` rows, nothing merged across planes (0 app_projects rows carry a `dc:` key, measured 2026-11-12). The
+  geography verdict (`complete`/`outcome`) stays the authoritative read's, so no absence sentence is unlocked by
+  national rows; a failed national read is `national.complete === false`, never "none". Dashboard, property and
+  index pages still read `projects()` only (not changed here).
+- **A national row is a third-party listing, stamped on the row** (`provenance_kind`, `provenance_source`). Cards say
+  "<Status> · third-party listing", credit the source and licence, say it is not an official application, approval
+  or permit, and open the source's own page (`HS.tpl.isThirdPartyListing`, `thirdPartyListingNote`, `devCard`).
+  A listing has no dossier on development.html.
+- **`data/official-record-portals.json`**: official planning/permit systems per jurisdiction, with discovery,
+  record and document coverage kept separate and every check dated. A missing open-data dataset is not a missing
+  record system. First entry: Oakland's Accela portal (anonymous search verified; record detail is a postback, so
+  no stable record links; no record matched to the Behring project). Nothing reads it at runtime yet.
+- Audit: `scripts/audits/map-list-parity.sql`. Tests: `test/zip-development-map-parity.test.mjs`,
+  `test/zip-development-list.browser.test.mjs`.
+- **Follow-ups (2026-11-14, from an adversarial review):**
+  - The ZIP page shows three cards; `HS.tpl.pickTopCards` gives the first listing a slot (a plain slice showed
+    only official rows: Behring sat behind 205) and a line names the listings not shown, linking the full list.
+  - A listing's link is the page its source CITES (`map1_dc_zip_members.source_url` = the observation's `cite`;
+    Behring's Compute Atlas listing cites KQED), so the card says "Opens kqed.org, the page Compute Atlas cites".
+  - The status keeps the map column and adds the source's own word when it differs
+    ("Approved · listed as under construction").
+  - Both reads start together. The property page, the homepage list and My Places read `zipDevelopment` too; the
+    dashboard reads no per-ZIP project list.
+  - Same building in both planes, measured: 20 of 2,049 listings sit within 150 m of an official record that names a
+    data center. Both still list; linking them is a founder decision.
+  - `supabase_read_only_user` may execute `map1_dc_zip_members` (`docs/map1-dc-zip-members-read-only-grant.sql`), so
+    the audit runs through db-read.
+  - ~~**Not done:** the pre-built `/community/<zip>/` text still omits listings.~~ **Done 2026-11-14:** the build
+    prints a "Data-center listings" section from `public.zip_dc_listing` (`docs/zip-dc-listing.sql`,
+    applied 2026-11-14): `map1_dc_zip_members`' own 'member' rows per registry ZIP, stored by
+    `zip_dc_listing_refresh` (pg_cron `zip-dc-listing`, every 10 min, 1,500 ZIPs, oldest checked first;
+    a failed read keeps the previous row and records `last_error`). The build (`gen_zip_pages.py`
+    `fetch_dc_listings` / `attach_dc_listings` / `_dc_listing_items`) prints a ZIP's listings only when its row
+    was checked within 48 h and not truncated; a missing table, stale or truncated row prints nothing, never an
+    absence sentence. Up to 12 per ZIP (Proposed, Approved, Operating), the rest named with a map link. The
+    section is `class="zsec zdcl"` with a lead paragraph, so the live proof never counts it as Alerts. Its words are
+    lib/templates.js's, ported to Python and checked on the same rows by `test/zip-page-dc-listings.test.mjs`.
+    SQL suite: `test/zip_dc_listing_pg` (`zip-dc-listing-suite.yml`).
+  - **Alarm (2026-11-14):** `zip_dc_listings` in the hourly `pipeline_health_tick()`
+    (`docs/zip-dc-listing-monitor.sql`, a splice) pages when a registry ZIP has no row, any row is over
+    6 h old (the job runs every 10 min, a full cycle ~90 min, the build drops rows at 48 h), any row has
+    `last_error`, or any row is truncated. Suite: `test/zip_dc_listing_monitor_pg` (in `zip-membership-suite.yml`).
+  - ⚠️ After renaming a table in production, PostgREST may answer 404 until `notify pgrst, 'reload schema'`
+    (seen 2026-11-14: the 14:46 build got 404 on the renamed table five minutes after the rename).
+
+## TAB 17 DATA-CENTER PROJECT CHECK (2026-11-13): A MAP 1 PROJECT LINK AND A REPLY IN EACH HOT TOPICS TILE
+
+Every Hot Topics topic in category `data_centers` is checked automatically: which Map 1 project it is about, where, its status,
+its documents, and whether its project link opens that project. The tile shows the result with Open project on JODY / Copy
+project link / Open original post, an editable reply (Copy reply, Save my wording, Use the suggested reply), Recheck, and the
+project's documents for review. Nothing is posted; the founder copies the reply and posts it by hand.
+- **Link:** `/map/<zip>/?project=<key>` (`lib/map1-project-panel.js`, `homesignalmap.html` PP module). Keys are stable project
+  keys (`dcrec:<record key>`, `nat:<national key>`, `n5:<source key>`), never `dc:<entity uuid>`, so a merge or a status change
+  keeps the link. The panel shows the latest published information and says it is not live.
+- **SQL of record:** `docs/map1-project-link.sql` (locate, stable keys, documents: pending → approved/rejected → revoked,
+  append-only, decided only by a dashboard admin; approval means the document belongs to the project and may be shown, never a
+  status change) and `docs/impact-dc-verification.sql` (queue, results, triggers, stale rules, Recheck, saved reply edits,
+  document review list, the dispatcher `impact_dc_verification_tick`).
+- **Worker:** `scripts/impact-dc-verify.mjs` (rules in `scripts/lib/impact-dc-verify-core.mjs`, browser check in
+  `scripts/lib/impact-dc-page-check.mjs`, production wiring `scripts/impact-dc-verify-run.mjs`), run by
+  `.github/workflows/impact-dc-verify.yml`, which refuses unless `.github/impact-dc-verify` reads `enabled`.
+- **Link available vs reply ready:** available = project identified, drawn by Map 1, and the link opened it at desktop and phone
+  width. Ready = also documents that support it (a directory listing never supports an Approved or Operating status) and 300
+  graphemes or fewer. A stale result (topic or document change after the run started, a detected project change, older than 48 h,
+  or a later failed attempt) is shown, labelled, and never counts as available or ready.
+- **Retries:** 5 min, 30 min, stop after 3. One job per topic, one run at a time (15 min lease); a change during a run reruns it.
+- **Saved reply edits** are append-only; a new check never replaces them; the tile flags a changed link or changed project facts.
+- Matching searches the data-center map layer only (`map1_dc_zip_members`). Project changes are found by a polling detector
+  inside the tick, not by an event.
+- Tests: `test/impact-dc-verify.test.mjs`, `test/impact-dc-page-check.browser.test.mjs`, `test/impact-dc-check.browser.test.mjs`,
+  `test/map1-project-panel.test.mjs`, `test/map1-project-link.browser.test.mjs`, `test/impact_dc_verification_pg`,
+  `test/map1_project_link_pg` (both in `zip-membership-suite.yml`).
+
+## TAB 20 MAKES THE WEEKLY REPORT VIDEO ITSELF ⚖️ FOUNDER (2026-11-14) — BUILT, SQL NOT YET APPLIED
+
+"Build the video production in tab 20"; "it reviews documents and real images, so it mixes between these images when
+appropriate to the script". The Video card sits under Report editions (`lib/acq-weekly-video.js`, mounted by
+`HS.acqWeeklyTopics.load` into `#tq-video-slot`, kept across redraws so a playing video is never reset).
+- **Make video** → `hs_weekly_video_request` (`docs/weekly-video.sql`): one queued/running job per edition, refused for a
+  closed or published edition, dispatches homesignal-ingest `weekly-video-render.yml` (`impact/weekly/job.py`).
+- The engine is the Impact Stories renderer, unchanged except for `"format": "weekly"` (homesignal-ingest
+  `impact/render/plan.py`): a saved web page is drawn as a document page with the quote highlighted (Tab 16's
+  `render_html_quote`), photos come from the same licensed search, and only open / evidence / outro are required.
+- The script is a committed draft, `impact/drafts/weekly-<edition_key>.json`, checked by `impact/weekly/check.py`; its
+  sources are `impact/sources/weekly-<edition_key>/`. No draft: the job fails saying so.
+- Files: private `impact-media/weekly/<edition_key>/<job>/`; Watch plays a blob; Approve / Ask for changes are
+  append-only rows. Nothing is published. Tests: `test/weekly_stage2_pg/run_video.sh`, `test/weekly-video.browser.test.mjs`.
+- ⛔ Apply order: merge the ingest PR (the workflow must be on main before a dispatch), then apply `docs/weekly-video.sql`.
+
+## THE BUILD-TIME PAGE BLOCK (#hs-ssr) IS STYLED (2026-11-15)
+
+Founder report (screenshot of `/guides/what-is-being-built-near-me/`): pages showed as plain unstyled text, "for a short time
+and long time". Cause: every generated ZIP, city, project-list, project and guide document carries `<main id="hs-ssr">`, and no
+stylesheet had a rule for it, so it rendered at browser defaults flush against the window edge. Inline `.quiet` counts used
+app.css's dashed panel style and overlapped the text.
+- **Short time:** every ZIP page (12,591 with `data_quality = 'pass'`, measured 2026-11-15) showed it until the app loaded.
+- **Long time:** the 155 `coverage_coming` ZIPs keep the block above the app (`keepSsrAbove`); guide, city, project-list and
+  project pages ship no script, so they never showed anything else.
+- **Fix:** `#hs-ssr` takes the site container in `layout.css`, plus scoped reading styles in `app.css`. Only the `?v=` keys
+  changed in the documents, which `page_semantics` excludes, so there is no IndexNow mass change.
+- Test: `test/ssr-block-styled.browser.test.mjs` (renders every generated document type with JS off at desktop and phone
+  width; fails 46 checks on the old CSS).
 
 ## COUNTY LAND-USE CASES: `county_cases` CONNECTOR, FIRST CONSUMER TILLAMOOK COUNTY OR (2026-11-16)
 

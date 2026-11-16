@@ -1,0 +1,76 @@
+name: impact-dc-verify
+
+# Tab 17 data-center project check (stage 2): the worker. Claims due jobs from
+# public.impact_dc_verification_claim, checks each topic's project on Map 1 and records the result
+# (scripts/impact-dc-verify.mjs, run by scripts/impact-dc-verify-run.mjs). SQL of record: docs/impact-dc-verification.sql (NOT APPLIED).
+#
+# Started ONLY by a dispatch: public.impact_dc_verification_tick() dispatches it when a job is due, at
+# most once in 10 minutes, and the cron schedule that calls the tick is NOT created. No `schedule:`
+# here on purpose.
+#
+# OFF until switched on: the first step after the boundary refuses unless .github/impact-dc-verify
+# reads exactly "enabled". It ships "disabled". Turning it on is a separate, approved one-line change.
+#
+# What it writes: impact_dc_verification* rows through the three service-role functions, and pending
+# document proposals (map1_project_document_propose). It approves nothing, changes no project and posts
+# nothing.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: impact-dc-verify
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    environment: { name: production, deployment: false }
+    runs-on: ubuntu-24.04   # ubuntu-latest became 26.04 (2026-10-27); Playwright 1.56 cannot install chromium there
+    timeout-minutes: 20
+    steps:
+      - name: 'Production boundary: refuse a dispatch the operator did not start'
+        id: boundary
+        # FIRST step, before any step that holds a secret. The production environment admits only
+        # ref main, but a workflow_dispatch's INPUTS are chosen by whoever dispatched it; another
+        # run's GITHUB_TOKEN (github-actions[bot]) or an installed app (<app>[bot]) would let branch
+        # code choose them. github.actor is the original dispatcher and github.triggering_actor the
+        # re-runner (a re-run replays the original inputs), so both must be the operator.
+        # Canonical text: test/lib/production-boundary.mjs (BOUNDARY_STEP); the tests compare this
+        # step to it byte for byte, comment lines excluded.
+        if: github.event_name == 'workflow_dispatch' && (github.actor != 'HomeSignalG' || github.triggering_actor != 'HomeSignalG')
+        env:
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        run: |
+          echo "::error::Production credentials are not issued to this dispatch (actor=$ACTOR, triggering_actor=$TRIGGERING_ACTOR). Only HomeSignalG may start or re-run a production dispatch, from main."
+          exit 1
+      - uses: actions/checkout@v4
+
+      - name: ENABLE GATE - refuse unless the check is switched on
+        run: |
+          set -euo pipefail
+          if [ ! -r .github/impact-dc-verify ]; then echo "NO SWITCH FILE at .github/impact-dc-verify. Nothing runs."; exit 1; fi
+          SW="$(tr -d '[:space:]' < .github/impact-dc-verify)"
+          if [ "$SW" != "enabled" ]; then echo "PROJECT CHECK DISABLED ($SW). Nothing runs."; exit 1; fi
+          echo "PROJECT CHECK ENABLED"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Installed in the PARENT of the checkout so the site's no-package.json rule holds.
+      - name: Install playwright
+        working-directory: ${{ github.workspace }}/..
+        run: |
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund playwright@1.56.0
+          npx playwright install --with-deps chromium
+
+      - name: Check due topics
+        env:
+          SUPABASE_URL: https://qwnnmljucajnexpxdgxr.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PROD_SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/impact-dc-verify-run.mjs

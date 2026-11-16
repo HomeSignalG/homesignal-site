@@ -1,0 +1,338 @@
+{
+ "after_body": {
+  "segments": [
+   {
+    "beat": "collision",
+    "claim_ids": [
+     "air-third-party-reports@1",
+     "air-program-background@1",
+     "air-warning-effect@1",
+     "air-proposal-status@1"
+    ],
+    "story": "air",
+    "text": "Under an EPA proposal, reports of company emissions detected by third parties would stop reaching the agency, and residents near oil and gas sites could lose an early warning about large methane releases, an estimated effect. The change is proposed, not final. The Super Emitter Program behind those reports started in 2024. It is one of several monitoring tools the agency uses, and officials say it can find problems that routine monitoring misses."
+   },
+   {
+    "beat": "landing",
+    "claim_ids": [
+     "air-proposal-status@1"
+    ],
+    "story": "air",
+    "text": "TEST DATA: For now this is a proposal, not a final rule, and residents can still comment on it."
+   }
+  ]
+ },
+ "after_checks": {
+  "ceiling_words": 750,
+  "certifies_accuracy": false,
+  "disclaimer": "Automated checks; not a certification of factual accuracy.",
+  "estimated_seconds_from_words": 37,
+  "high_risk": [],
+  "label": "mechanical checks passed",
+  "material_issues": [],
+  "ok": true,
+  "opening": {
+   "conflict_at_word": 0,
+   "limit": 45,
+   "stake_at_word": 18
+  },
+  "problems": [],
+  "quotes": [],
+  "rewrite": {
+   "action": "conflict_first",
+   "segment_index": 0
+  },
+  "runtime_note": "An estimate from word count, not a measured narration time.",
+  "target_words": 450,
+  "warnings": [],
+  "word_counts": {
+   "notes_and_source_words": 0,
+   "spoken_words": 92
+  },
+  "words": 92
+ },
+ "before_body": {
+  "segments": [
+   {
+    "beat": "collision",
+    "claim_ids": [
+     "air-third-party-reports@1",
+     "air-program-background@1",
+     "air-warning-effect@1",
+     "air-proposal-status@1"
+    ],
+    "story": "air",
+    "text": "For several years the Environmental Protection Agency has run a program that collects reports about large methane releases at oil and gas sites across the country. The Super Emitter Program started in 2024. It is one of several monitoring tools the agency uses, and officials say it can find problems that routine monitoring misses. Under the proposal, reports of company emissions detected by third parties would stop reaching EPA. Residents near these sites could lose an early warning, an estimated effect. The change is proposed, not final."
+   },
+   {
+    "beat": "landing",
+    "claim_ids": [
+     "air-proposal-status@1"
+    ],
+    "story": "air",
+    "text": "TEST DATA: For now this is a proposal, not a final rule, and residents can still comment on it."
+   }
+  ]
+ },
+ "before_checks": {
+  "ceiling_words": 750,
+  "certifies_accuracy": false,
+  "disclaimer": "Automated checks; not a certification of factual accuracy.",
+  "estimated_seconds_from_words": 42,
+  "high_risk": [],
+  "label": "mechanical checks passed",
+  "lesson_assessments": [],
+  "material_issues": [],
+  "ok": true,
+  "opening": {
+   "conflict_at_word": 54,
+   "limit": 45,
+   "stake_at_word": 69
+  },
+  "problems": [],
+  "quotes": [],
+  "runtime_note": "An estimate from word count, not a measured narration time.",
+  "target_words": 450,
+  "warnings": [
+   {
+    "detail": "the conflict starts at word 54 (aim: within 45)",
+    "kind": "automated assessment, not a factual finding",
+    "type": "delayed_conflict"
+   },
+   {
+    "detail": "no public stake named in the first 45 words",
+    "kind": "automated assessment, not a factual finding",
+    "type": "late_public_stake"
+   }
+  ],
+  "word_counts": {
+   "notes_and_source_words": 0,
+   "spoken_words": 106
+  },
+  "words": 106
+ },
+ "doc_cue": {
+  "checks": {
+   "certifies_accuracy": false,
+   "cued": 1,
+   "disclaimer": "Mechanical document checks: the highlighted words are in the stored document. Not a check that the finding is true.",
+   "download_errors": [],
+   "label": "document cue checks",
+   "ok": true,
+   "segments": [
+    {
+     "cue": {
+      "claim_id": "air-proposal-status@1",
+      "highlight": "yellow",
+      "page": 1,
+      "quote": "First, the EPA proposes to rescind the Super Emitter Program.",
+      "source_id": "SOURCE_ID",
+      "type": "doc"
+     },
+     "match": "first the epa proposes to rescind the super emitter program",
+     "page": 1,
+     "preview_path": "weekly-visuals/VERSION_ID/pages/SOURCE_ID_pdf_dfc3cf9a_p1.png",
+     "problems": [],
+     "scene": {
+      "doc": {
+       "focusSentence": 0,
+       "highlights": [
+        {
+         "h": 0.011329545454545453,
+         "w": 0.17538823529411765,
+         "x": 0.15188954248366013,
+         "y": 0.5306539141414142
+        },
+        {
+         "h": 0.011329545454545453,
+         "w": 0.2374764705882353,
+         "x": 0.07354248366013072,
+         "y": 0.5432789141414142
+        }
+       ],
+       "image": "pages/SOURCE_ID_pdf_dfc3cf9a_p1.png",
+       "note": null,
+       "page": 1,
+       "pageHeightPx": 1650,
+       "pageWidthPx": 1275,
+       "quote": "First, the EPA proposes to rescind the Super Emitter Program.",
+       "source": "EPA, Proposed Rule, 91 FR 68234 (October 29, 2026)",
+       "status": "confirmed",
+       "title": "EPA, Proposed Rule, 91 FR 68234 (October 29, 2026)"
+      },
+      "type": "doc"
+     },
+     "segment": 0,
+     "status": "resolved"
+    },
+    {
+     "segment": 1,
+     "status": "none"
+    }
+   ],
+   "unresolved": 0
+  },
+  "cue": {
+   "claim_id": "air-proposal-status@1",
+   "highlight": "yellow",
+   "page": 1,
+   "quote": "First, the EPA proposes to rescind the Super Emitter Program.",
+   "source_id": "SOURCE_ID",
+   "type": "doc"
+  },
+  "document": {
+   "kind": "pdf",
+   "label": "EPA, Proposed Rule, 91 FR 68234 (October 29, 2026)",
+   "repo_path": "video/projects/epa-oil-gas-methane-reconsideration-national/sources/docs/fr_2026-22082.pdf",
+   "sha256": "faa7045eb0c311e8795dafcf7744b2d5db6f6f297fe29ef76f2d64d1923c5758",
+   "size": 3321258,
+   "url": "https://www.govinfo.gov/content/pkg/FR-2026-10-29/pdf/2026-22082.pdf"
+  },
+  "segment_index": 0
+ },
+ "findings": [
+  {
+   "claim_id": "air-proposal-status@1",
+   "qualifiers": [
+    "proposed"
+   ],
+   "quotes": [
+    "TEST DATA: this action proposes to amend the rule"
+   ],
+   "scope": "federal",
+   "statement": "TEST DATA: The EPA change is proposed, not final.",
+   "uncertainty": null
+  },
+  {
+   "claim_id": "air-third-party-reports@1",
+   "qualifiers": [
+    "proposed"
+   ],
+   "quotes": [
+    "TEST DATA: notifications from third parties would no longer be submitted to the agency"
+   ],
+   "scope": "federal",
+   "statement": "TEST DATA: Under the proposal, reports of company emissions detected by third parties would stop reaching EPA.",
+   "uncertainty": null
+  },
+  {
+   "claim_id": "air-program-background@1",
+   "qualifiers": [],
+   "quotes": [],
+   "scope": "federal",
+   "statement": "TEST DATA: The Super Emitter Program started in 2024 and is one of several EPA monitoring tools that officials say can find problems routine monitoring misses.",
+   "uncertainty": null
+  },
+  {
+   "claim_id": "air-warning-effect@1",
+   "qualifiers": [
+    "estimated"
+   ],
+   "quotes": [],
+   "scope": "local",
+   "statement": "TEST DATA: Residents near oil and gas sites could lose an early warning about large methane releases.",
+   "uncertainty": "TEST DATA: depends on how often reports led to action"
+  },
+  {
+   "claim_id": "air-cost-estimate@1",
+   "qualifiers": [
+    "estimated"
+   ],
+   "quotes": [],
+   "scope": "federal",
+   "statement": "TEST DATA: EPA estimates the proposal would reduce oil and gas industry compliance costs by about $45 billion over its analysis period.",
+   "uncertainty": "TEST DATA: an agency estimate over many years, not a payment"
+  }
+ ],
+ "note": "TEST DATA from homesignal-ingest tests/weekly_workbench_demo.py --json",
+ "review": {
+  "action": "conflict_first",
+  "finding_ids": [
+   "air-third-party-reports@1",
+   "air-warning-effect@1"
+  ],
+  "lesson_scope": "reusable",
+  "reason": "The conflict arrives after more than 50 words of background, so a listener does not yet know why it matters.",
+  "segment_index": 0
+ },
+ "title": {
+  "candidates": [
+   {
+    "input": {
+     "amount_meaning": "EPA's estimate of reduced industry compliance costs over its analysis period, not a cash payment",
+     "beneficiary_label": "oil and gas industry",
+     "benefit_frame": "lower compliance costs for the industry",
+     "headline_amount": "$45B",
+     "policy_status": "proposed",
+     "profile_version": 1,
+     "public_cost_basis": "air-warning-effect@1",
+     "public_cost_frame": "residents near sites could lose an early warning",
+     "selected_angle_id": "angle-0",
+     "supporting_claim_ids": [
+      "air-cost-estimate@1",
+      "air-warning-effect@1",
+      "air-proposal-status@1"
+     ]
+    },
+    "rationale": "FIXTURE: wording approved by the founder in a conversation; not a dashboard approval, not evidence clearance.",
+    "title": "$45B Gift to Oil—At Your Expense"
+   }
+  ],
+  "checks": {
+   "candidates": [
+    {
+     "characterizations": [
+      {
+       "basis": "supported",
+       "kind": "editorial characterization, not an allegation of a crime",
+       "term": "gift"
+      }
+     ],
+     "characters": 32,
+     "flags": [],
+     "needs_research": false,
+     "problems": [],
+     "title": "$45B Gift to Oil—At Your Expense",
+     "warnings": [],
+     "words": 7
+    }
+   ],
+   "certifies_accuracy": false,
+   "disclaimer": "Mechanical title checks; not evidence clearance. A person's evidence review decides.",
+   "label": "title checks passed",
+   "needs_research": false,
+   "ok": true,
+   "problems": []
+  },
+  "profile": [
+   {
+    "origin": "inferred",
+    "text": "Concrete benefit first when the story supports one."
+   },
+   {
+    "origin": "inferred",
+    "text": "Name the beneficiary."
+   },
+   {
+    "origin": "inferred",
+    "text": "Plain language."
+   },
+   {
+    "origin": "inferred",
+    "text": "Short two-part contrast."
+   },
+   {
+    "origin": "inferred",
+    "text": "Direct public stake."
+   },
+   {
+    "origin": "inferred",
+    "text": "Forceful editorial characterization."
+   },
+   {
+    "origin": "inferred",
+    "text": "Declarative wording by default."
+   }
+  ]
+ }
+}

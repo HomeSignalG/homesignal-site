@@ -473,6 +473,62 @@ print("LOADED")`;
      'robots.txt lists sitemap.xml and every family sitemap');
 }
 
+// ---- 9. status history, agency status, and the Map 1 index ------------------------------
+{
+  const K1 = keyFor('https://permits.example.gov/r/1');
+  const K2 = keyFor('https://permits.example.gov/r/2');
+  const K3 = keyFor('https://permits.example.gov/r/3');
+  const h = makeInputs({ mutate: (d) => {
+    const pr = d.projectsDoc.projects;
+    Object.assign(pr[K1], {
+      history_read: true, agency_status: 'Completed', watched_since: '2026-09-30',
+      history: [
+        { day: '2026-11-12', kind: 'status_changed', from_status: 'Approved', to_status: 'Operating',
+          from_stage: 'Issued', to_stage: 'Completed' },
+        { day: '2026-10-02', kind: 'first_detected', to_status: 'Approved', to_stage: 'Issued <b>' },
+      ],
+      history_total: 3,
+    });
+    Object.assign(pr[K2], { history_read: true, watched_since: '2026-10-01', status: 'Decided', agency_status: 'Denied' });
+    // K3: no history_read at all (ledger not read) -> no section, never "no changes".
+  } });
+  const hb = build(h);
+  ok(hb.r.status === 0, `a projects document carrying history builds (${(hb.r.stderr || '').trim().slice(-200)})`);
+  const a = read(hb.out, pathOf('https://permits.example.gov/r/1'));
+  ok(a.includes('<h2>Status history</h2>'), 'a page with ledger history has a Status history section');
+  ok(a.includes('<dt>Agency\'s own status</dt><dd>Completed</dd>'), 'the agency\'s own status word is shown as published');
+  ok(a.includes('<time datetime="2026-11-12">Nov 12, 2026</time>: Agency status changed from <strong>Issued</strong> to <strong>Completed</strong>; HomeSignal status Approved → Operating / built'),
+     'a status change names both words and the day it was seen, labelled by the one lifecycle authority');
+  ok(a.indexOf('2026-11-12') < a.indexOf('2026-10-02'), 'newest first');
+  ok(a.includes('First seen by HomeSignal; agency status: <strong>Issued &lt;b&gt;</strong>'), 'source words are escaped');
+  ok(a.includes('Showing the 2 newest of 3 recorded changes.'), 'a capped history says so');
+  ok(a.includes('not necessarily the day the agency acted') && a.includes('withdrawn, denied, revised or paused'),
+     'the page says the dates are observation dates and that projects need not follow every stage');
+  const b = read(hb.out, pathOf('https://permits.example.gov/r/2'));
+  ok(b.includes('No status change recorded since then.') && b.includes('watched this record since <time datetime="2026-10-01">'),
+     'a read ledger with no change says only what was seen, from when');
+  ok(b.includes('(a decision is on record; see the agency\'s own status)') && b.includes('<dd>Denied</dd>'),
+     'a decided record says a decision is on record and shows the agency\'s word');
+  const c = read(hb.out, pathOf('https://permits.example.gov/r/3'));
+  ok(!c.includes('Status history') && !c.includes('No status change'), 'an unread ledger gets no history section');
+  const idx = JSON.parse(readFileSync(join(hb.out, 'community', '01002', 'projects', 'pages.json'), 'utf8'));
+  ok(idx.v === 1 && idx.zip === '01002' && idx.pages[K1.replace(/\|\d+$/, '')] === pathOf('https://permits.example.gov/r/1'),
+     'the ZIP project index maps each source_key to its page');
+  ok(Object.values(idx.pages).every((p) => /^\/project\//.test(p)), 'the index holds project paths only');
+  const zl = JSON.parse(readFileSync(join(hb.out, 'lib', 'generated', 'project-page-zips.json'), 'utf8'));
+  ok(zl.v === 1 && zl.zips.includes('01002') && zl.zips.every((z) => existsSync(join(hb.out, 'community', z, 'projects', 'pages.json'))),
+     'the ZIP list names exactly ZIPs that have an index');
+  ok(JSON.parse(readFileSync(join(root, 'lib', 'generated', 'project-page-zips.json'), 'utf8')).zips.length === 0,
+     'the committed placeholder lists no ZIP (it links nothing until the build replaces it)');
+  for (const [m, label] of [
+    [(d) => { d.projectsDoc.projects[K1].history = [{ day: 'bad', kind: 'status_changed' }]; }, 'a malformed history day'],
+    [(d) => { d.projectsDoc.projects[K1].history = [{ day: '2026-01-01', kind: 'invented' }]; }, 'an unknown history kind'],
+    [(d) => { d.projectsDoc.projects[K1].watched_since = 'yesterday'; }, 'a malformed watched_since'],
+  ]) {
+    ok(build(makeInputs({ mutate: m })).r.status !== 0, `${label} fails the build`);
+  }
+}
+
 // ---- 8. determinism --------------------------------------------------------------------
 ok(read(build(makeInputs()).out, p1) === pg1, 'two builds of the same input write byte-identical project pages');
 

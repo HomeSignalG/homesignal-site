@@ -1,0 +1,1172 @@
+{
+ "_note": "The real answers of hs_weekly_topic_queue and hs_weekly_bsky_sources on a DISPOSABLE database after test/weekly_bsky_sources_pg/suite.sql. TEST DATA.",
+ "queue": {
+  "note": "Statuses are derived from what was recorded. A lead, a source story or a social post is not evidence, and none of them shows that our video was published.",
+  "leads": [
+   {
+    "id": "1526d59f-8b55-4709-b8c8-7a64c2df08db",
+    "notes": null,
+    "state": {
+     "status": "published",
+     "current": {
+      "edition": {
+       "id": "1eded072-8ae8-4dda-8e4f-a1f7d954131c",
+       "topic": "Data Centers",
+       "closed": false,
+       "series": "QUALITY-of-LIFE Weekly Report",
+       "closed_at": null,
+       "published": true,
+       "video_url": "https://www.youtube.com/watch?v=ourvideo",
+       "period_end": "2026-11-15",
+       "edition_key": "data-centers-2026-11-09",
+       "close_reason": null,
+       "period_start": "2026-11-09",
+       "published_on": "2026-11-13"
+      },
+      "research": null,
+      "request_id": null,
+      "disposition": "included"
+     },
+     "assigned": true,
+     "editions": [
+      {
+       "reason": null,
+       "current": true,
+       "edition": {
+        "id": "1eded072-8ae8-4dda-8e4f-a1f7d954131c",
+        "topic": "Data Centers",
+        "closed": false,
+        "series": "QUALITY-of-LIFE Weekly Report",
+        "closed_at": null,
+        "published": true,
+        "video_url": "https://www.youtube.com/watch?v=ourvideo",
+        "period_end": "2026-11-15",
+        "edition_key": "data-centers-2026-11-09",
+        "close_reason": null,
+        "period_start": "2026-11-09",
+        "published_on": "2026-11-13"
+       },
+       "request_id": null,
+       "assigned_at": "2026-11-13T17:30:26.741865+00:00",
+       "disposed_at": "2026-11-13T17:30:26.747399+00:00",
+       "disposed_by": "founder@test.invalid",
+       "disposition": "included"
+      }
+     ],
+     "last_disposition": null,
+     "promised_publicly": false,
+     "commitment_resolved": false
+    },
+    "title": "data centers",
+    "topic": null,
+    "request": null,
+    "location": null,
+    "questions": [],
+    "created_at": "2026-11-13T17:30:26.500163+00:00",
+    "updated_at": "2026-11-13T17:30:26.500163+00:00",
+    "source_urls": [],
+    "intended_date": null,
+    "why_it_matters": null,
+    "social_post_url": null,
+    "promised_publicly": false,
+    "commitment_wording": null,
+    "commitment_post_url": null,
+    "intended_edition_id": null
+   },
+   {
+    "id": "57c33ae7-1f17-4c0a-804d-9f430cae6f3e",
+    "notes": null,
+    "state": {
+     "status": "captured",
+     "current": null,
+     "assigned": false,
+     "editions": [],
+     "last_disposition": null,
+     "promised_publicly": false,
+     "commitment_resolved": false
+    },
+    "title": "Air Quality",
+    "topic": "Air Quality",
+    "request": null,
+    "location": null,
+    "questions": [],
+    "created_at": "2026-11-13T17:30:26.507114+00:00",
+    "updated_at": "2026-11-13T17:30:26.507114+00:00",
+    "source_urls": [],
+    "intended_date": null,
+    "why_it_matters": null,
+    "social_post_url": null,
+    "promised_publicly": false,
+    "commitment_wording": null,
+    "commitment_post_url": null,
+    "intended_edition_id": null
+   },
+   {
+    "id": "5c9cc8b7-34a3-46d5-9d81-8a4e48d65832",
+    "notes": null,
+    "state": {
+     "status": "captured",
+     "current": null,
+     "assigned": false,
+     "editions": [],
+     "last_disposition": null,
+     "promised_publicly": false,
+     "commitment_resolved": false
+    },
+    "title": "Noise",
+    "topic": null,
+    "request": null,
+    "location": null,
+    "questions": [],
+    "created_at": "2026-11-13T17:30:26.509738+00:00",
+    "updated_at": "2026-11-13T17:30:26.509738+00:00",
+    "source_urls": [],
+    "intended_date": null,
+    "why_it_matters": null,
+    "social_post_url": null,
+    "promised_publicly": false,
+    "commitment_wording": null,
+    "commitment_post_url": null,
+    "intended_edition_id": null
+   },
+   {
+    "id": "f38a820a-c1cf-4a41-bd33-b204b5920c0f",
+    "notes": null,
+    "state": {
+     "status": "captured",
+     "current": null,
+     "assigned": false,
+     "editions": [],
+     "last_disposition": null,
+     "promised_publicly": false,
+     "commitment_resolved": false
+    },
+    "title": "noise",
+    "topic": null,
+    "request": null,
+    "location": null,
+    "questions": [],
+    "created_at": "2026-11-13T17:30:26.511991+00:00",
+    "updated_at": "2026-11-13T17:30:26.511991+00:00",
+    "source_urls": [],
+    "intended_date": null,
+    "why_it_matters": null,
+    "social_post_url": null,
+    "promised_publicly": false,
+    "commitment_wording": null,
+    "commitment_post_url": null,
+    "intended_edition_id": null
+   }
+  ],
+  "views": {
+   "inbox": [
+    "57c33ae7-1f17-4c0a-804d-9f430cae6f3e",
+    "5c9cc8b7-34a3-46d5-9d81-8a4e48d65832",
+    "f38a820a-c1cf-4a41-bd33-b204b5920c0f"
+   ],
+   "edition": [],
+   "deferred": [],
+   "promised": [],
+   "research": [],
+   "published": [
+    "1526d59f-8b55-4709-b8c8-7a64c2df08db"
+   ]
+  },
+  "editions": [
+   {
+    "id": "1eded072-8ae8-4dda-8e4f-a1f7d954131c",
+    "topic": "Data Centers",
+    "closed": false,
+    "series": "QUALITY-of-LIFE Weekly Report",
+    "assigned": 1,
+    "closed_at": null,
+    "published": true,
+    "video_url": "https://www.youtube.com/watch?v=ourvideo",
+    "period_end": "2026-11-15",
+    "unresolved": [],
+    "edition_key": "data-centers-2026-11-09",
+    "close_reason": null,
+    "period_start": "2026-11-09",
+    "published_on": "2026-11-13",
+    "linked_versions": []
+   }
+  ],
+  "categories": [
+   "Air Quality",
+   "Animal & Human Viruses / Diseases",
+   "Data Centers",
+   "Development & Land Use",
+   "EMF",
+   "Infrastructure",
+   "Light Pollution",
+   "Livestock, Crops, Pets & Wildlife Health",
+   "Noise",
+   "Noise Pollution",
+   "Radiation",
+   "Soil Quality",
+   "Water Quality",
+   "Weather & Climate Hazards",
+   "noise"
+  ],
+  "capabilities": {
+   "version_linking": false,
+   "answer_processing_installed": false
+  },
+  "selected_edition": null
+ },
+ "sources": {
+  "note": "Imported from the account's own Bluesky posts that start with \"QUALITY-of-LIFE WEEKLY REPORT:\". A post is a lead, not evidence. Quoted posts are other people's writing.",
+  "sync": {
+   "running": true,
+   "last_error": "bsky 503",
+   "last_stats": null,
+   "account_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+   "high_water_at": "2026-11-12T21:22:43+00:00",
+   "account_handle": "jodytracks.com",
+   "last_failure_at": "2026-11-13T17:30:26.724889+00:00",
+   "last_success_at": "2026-11-13T17:30:26.722535+00:00",
+   "backfill_done_at": "2026-11-13T17:30:26.722535+00:00",
+   "last_run_started_at": "2026-11-13T17:30:26.730444+00:00"
+  },
+  "review": [
+   {
+    "id": "e8285a38-2da2-4880-adc1-a0ea741fea4a",
+    "topic": null,
+    "stream": "news",
+    "content": {
+     "text": "QUALITY-of-LIFE WEEKLY REPORT: Data Centersville — y",
+     "links": [],
+     "media": [],
+     "quoted": {
+      "status": "none"
+     },
+     "thread": []
+    },
+    "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/bbb1",
+    "post_url": "https://bsky.app/profile/jodytracks.com/post/bbb1",
+    "revision": 1,
+    "posted_at": "2026-11-12T21:18:17+00:00",
+    "revisions": 1,
+    "routed_by": "automatic",
+    "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+    "story_text": "y",
+    "topic_text": "Data Centersville",
+    "route_status": "unmatched",
+    "author_handle": "jodytracks.com",
+    "first_seen_at": "2026-11-13T17:30:26.699965+00:00",
+    "last_fetched_at": "2026-11-13T17:30:26.699965+00:00",
+    "last_fetch_error": null,
+    "revision_saved_at": "2026-11-13T17:30:26.699965+00:00"
+   }
+  ],
+  "topics": [
+   {
+    "topic": "Air Quality",
+    "aliases": [],
+    "sources": [
+     {
+      "id": "3010a8a9-a8c6-4e4f-9e58-8b2857ff5a2b",
+      "topic": "Air Quality",
+      "stream": "news",
+      "content": {
+       "text": "QUALITY-of-LIFE WEEKLY REPORT: Noise — y",
+       "links": [],
+       "media": [],
+       "quoted": {
+        "status": "none"
+       },
+       "thread": []
+      },
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/bbb2",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/bbb2",
+      "revision": 1,
+      "posted_at": "2026-11-12T21:18:17+00:00",
+      "revisions": 1,
+      "routed_by": "founder@test.invalid",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "y",
+      "topic_text": "Noise",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.702775+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.702775+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.702775+00:00"
+     },
+     {
+      "id": "a6767de1-c0eb-4fad-8648-a921aedc224d",
+      "topic": "Air Quality",
+      "stream": "news",
+      "content": {
+       "text": "QUALITY-of-LIFE WEEKLY REPORT:   air   QUALITY: smoke",
+       "links": [],
+       "media": [],
+       "quoted": {
+        "status": "none"
+       },
+       "thread": []
+      },
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/bbb3",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/bbb3",
+      "revision": 1,
+      "posted_at": "2026-11-12T21:18:17+00:00",
+      "revisions": 1,
+      "routed_by": "automatic",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "smoke",
+      "topic_text": "air QUALITY",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.705895+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.705895+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.705895+00:00"
+     }
+    ]
+   },
+   {
+    "topic": "Animal & Human Viruses / Diseases",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Data Centers",
+    "aliases": [
+     "Data Center"
+    ],
+    "sources": [
+     {
+      "id": "1bc1ff1a-5e77-4f4a-b34e-a457fe883e97",
+      "topic": "Data Centers",
+      "stream": "news",
+      "content": {
+       "text": "QUALITY-of-LIFE WEEKLY REPORT: Data Centers — a later story",
+       "links": [],
+       "media": [],
+       "quoted": {
+        "status": "none"
+       },
+       "thread": []
+      },
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n2newpost",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/3n2newpost",
+      "revision": 1,
+      "posted_at": "2026-11-13T09:00:00+00:00",
+      "revisions": 1,
+      "routed_by": "automatic",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "a later story",
+      "topic_text": "Data Centers",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.768305+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.768305+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.768305+00:00"
+     },
+     {
+      "id": "620861d7-b9ec-492b-bbac-5ce67efe4b88",
+      "topic": "Data Centers",
+      "stream": "news",
+      "content": {
+       "text": "QUALITY-of-LIFE WEEKLY REPORT: Data Centers — SpaceX plans a $24 billion gas-powered AI facility in Texas.",
+       "links": [
+        "https://example.org/a"
+       ],
+       "media": [],
+       "quoted": {
+        "uri": "at://did:plc:other/app.bsky.feed.post/q1",
+        "text": "Their words",
+        "status": "available",
+        "author_handle": "reporter.example"
+       },
+       "thread": [
+        {
+         "uri": "at://x/app.bsky.feed.post/t1",
+         "text": "First reply",
+         "posted_at": "2026-11-12T21:25:00Z"
+        },
+        {
+         "uri": "at://x/app.bsky.feed.post/t2",
+         "text": "Second reply",
+         "posted_at": "2026-11-12T21:30:00Z"
+        },
+        {
+         "uri": "at://x/app.bsky.feed.post/t3",
+         "text": "Third reply",
+         "posted_at": "2026-11-13T10:00:00Z"
+        }
+       ]
+      },
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n25fosji4k2s",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/3n25fosji4k2s",
+      "revision": 4,
+      "posted_at": "2026-11-12T21:22:43+00:00",
+      "revisions": 4,
+      "routed_by": "automatic",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "SpaceX plans a $24 billion gas-powered AI facility in Texas.",
+      "topic_text": "Data Centers",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.684928+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.765394+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.765394+00:00"
+     },
+     {
+      "id": "ceb9a719-4302-47fe-877b-4f33223f868c",
+      "topic": "Data Centers",
+      "stream": "news",
+      "content": {
+       "text": "quality-of-life weekly report: data center\nOakland extends its data center moratorium for 10 months.",
+       "links": [],
+       "media": [],
+       "quoted": {
+        "status": "none"
+       },
+       "thread": []
+      },
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n25fguo3us2w",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/3n25fguo3us2w",
+      "revision": 1,
+      "posted_at": "2026-11-12T21:18:17+00:00",
+      "revisions": 1,
+      "routed_by": "automatic",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "Oakland extends its data center moratorium for 10 months.",
+      "topic_text": "data center",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.693284+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.693284+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.693284+00:00"
+     }
+    ]
+   },
+   {
+    "topic": "Development & Land Use",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "EMF",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Infrastructure",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Light Pollution",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Livestock, Crops, Pets & Wildlife Health",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Noise",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Noise Pollution",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Radiation",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Soil Quality",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Water Quality",
+    "aliases": [
+     "Water"
+    ],
+    "sources": [
+     {
+      "id": "f68801cd-e54f-4b7f-867a-aae893476582",
+      "topic": "Water Quality",
+      "stream": "news",
+      "content": {
+       "text": "Quality-of-Life Weekly Report: Water — a story",
+       "links": [],
+       "media": [],
+       "quoted": {
+        "status": "none"
+       },
+       "thread": []
+      },
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n227ngau522p",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/3n227ngau522p",
+      "revision": 1,
+      "posted_at": "2026-11-12T21:18:17+00:00",
+      "revisions": 1,
+      "routed_by": "automatic",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "a story",
+      "topic_text": "Water",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.696727+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.731324+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.696727+00:00"
+     }
+    ]
+   },
+   {
+    "topic": "Weather & Climate Hazards",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "noise",
+    "aliases": [],
+    "sources": []
+   }
+  ],
+  "edition": null
+ },
+ "edition_id": "1eded072-8ae8-4dda-8e4f-a1f7d954131c",
+ "queue_edition": {
+  "note": "Statuses are derived from what was recorded. A lead, a source story or a social post is not evidence, and none of them shows that our video was published.",
+  "leads": [
+   {
+    "id": "1526d59f-8b55-4709-b8c8-7a64c2df08db",
+    "notes": null,
+    "state": {
+     "status": "published",
+     "current": {
+      "edition": {
+       "id": "1eded072-8ae8-4dda-8e4f-a1f7d954131c",
+       "topic": "Data Centers",
+       "closed": false,
+       "series": "QUALITY-of-LIFE Weekly Report",
+       "closed_at": null,
+       "published": true,
+       "video_url": "https://www.youtube.com/watch?v=ourvideo",
+       "period_end": "2026-11-15",
+       "edition_key": "data-centers-2026-11-09",
+       "close_reason": null,
+       "period_start": "2026-11-09",
+       "published_on": "2026-11-13"
+      },
+      "research": null,
+      "request_id": null,
+      "disposition": "included"
+     },
+     "assigned": true,
+     "editions": [
+      {
+       "reason": null,
+       "current": true,
+       "edition": {
+        "id": "1eded072-8ae8-4dda-8e4f-a1f7d954131c",
+        "topic": "Data Centers",
+        "closed": false,
+        "series": "QUALITY-of-LIFE Weekly Report",
+        "closed_at": null,
+        "published": true,
+        "video_url": "https://www.youtube.com/watch?v=ourvideo",
+        "period_end": "2026-11-15",
+        "edition_key": "data-centers-2026-11-09",
+        "close_reason": null,
+        "period_start": "2026-11-09",
+        "published_on": "2026-11-13"
+       },
+       "request_id": null,
+       "assigned_at": "2026-11-13T17:30:26.741865+00:00",
+       "disposed_at": "2026-11-13T17:30:26.747399+00:00",
+       "disposed_by": "founder@test.invalid",
+       "disposition": "included"
+      }
+     ],
+     "last_disposition": null,
+     "promised_publicly": false,
+     "commitment_resolved": false
+    },
+    "title": "data centers",
+    "topic": null,
+    "request": null,
+    "location": null,
+    "questions": [],
+    "created_at": "2026-11-13T17:30:26.500163+00:00",
+    "updated_at": "2026-11-13T17:30:26.500163+00:00",
+    "source_urls": [],
+    "intended_date": null,
+    "why_it_matters": null,
+    "social_post_url": null,
+    "promised_publicly": false,
+    "commitment_wording": null,
+    "commitment_post_url": null,
+    "intended_edition_id": null
+   },
+   {
+    "id": "57c33ae7-1f17-4c0a-804d-9f430cae6f3e",
+    "notes": null,
+    "state": {
+     "status": "captured",
+     "current": null,
+     "assigned": false,
+     "editions": [],
+     "last_disposition": null,
+     "promised_publicly": false,
+     "commitment_resolved": false
+    },
+    "title": "Air Quality",
+    "topic": "Air Quality",
+    "request": null,
+    "location": null,
+    "questions": [],
+    "created_at": "2026-11-13T17:30:26.507114+00:00",
+    "updated_at": "2026-11-13T17:30:26.507114+00:00",
+    "source_urls": [],
+    "intended_date": null,
+    "why_it_matters": null,
+    "social_post_url": null,
+    "promised_publicly": false,
+    "commitment_wording": null,
+    "commitment_post_url": null,
+    "intended_edition_id": null
+   },
+   {
+    "id": "5c9cc8b7-34a3-46d5-9d81-8a4e48d65832",
+    "notes": null,
+    "state": {
+     "status": "captured",
+     "current": null,
+     "assigned": false,
+     "editions": [],
+     "last_disposition": null,
+     "promised_publicly": false,
+     "commitment_resolved": false
+    },
+    "title": "Noise",
+    "topic": null,
+    "request": null,
+    "location": null,
+    "questions": [],
+    "created_at": "2026-11-13T17:30:26.509738+00:00",
+    "updated_at": "2026-11-13T17:30:26.509738+00:00",
+    "source_urls": [],
+    "intended_date": null,
+    "why_it_matters": null,
+    "social_post_url": null,
+    "promised_publicly": false,
+    "commitment_wording": null,
+    "commitment_post_url": null,
+    "intended_edition_id": null
+   },
+   {
+    "id": "f38a820a-c1cf-4a41-bd33-b204b5920c0f",
+    "notes": null,
+    "state": {
+     "status": "captured",
+     "current": null,
+     "assigned": false,
+     "editions": [],
+     "last_disposition": null,
+     "promised_publicly": false,
+     "commitment_resolved": false
+    },
+    "title": "noise",
+    "topic": null,
+    "request": null,
+    "location": null,
+    "questions": [],
+    "created_at": "2026-11-13T17:30:26.511991+00:00",
+    "updated_at": "2026-11-13T17:30:26.511991+00:00",
+    "source_urls": [],
+    "intended_date": null,
+    "why_it_matters": null,
+    "social_post_url": null,
+    "promised_publicly": false,
+    "commitment_wording": null,
+    "commitment_post_url": null,
+    "intended_edition_id": null
+   }
+  ],
+  "views": {
+   "inbox": [
+    "57c33ae7-1f17-4c0a-804d-9f430cae6f3e",
+    "5c9cc8b7-34a3-46d5-9d81-8a4e48d65832",
+    "f38a820a-c1cf-4a41-bd33-b204b5920c0f"
+   ],
+   "edition": [
+    {
+     "reason": null,
+     "current": true,
+     "lead_id": "1526d59f-8b55-4709-b8c8-7a64c2df08db",
+     "disposition": "included"
+    }
+   ],
+   "deferred": [],
+   "promised": [],
+   "research": [],
+   "published": [
+    "1526d59f-8b55-4709-b8c8-7a64c2df08db"
+   ]
+  },
+  "editions": [
+   {
+    "id": "1eded072-8ae8-4dda-8e4f-a1f7d954131c",
+    "topic": "Data Centers",
+    "closed": false,
+    "series": "QUALITY-of-LIFE Weekly Report",
+    "assigned": 1,
+    "closed_at": null,
+    "published": true,
+    "video_url": "https://www.youtube.com/watch?v=ourvideo",
+    "period_end": "2026-11-15",
+    "unresolved": [],
+    "edition_key": "data-centers-2026-11-09",
+    "close_reason": null,
+    "period_start": "2026-11-09",
+    "published_on": "2026-11-13",
+    "linked_versions": []
+   }
+  ],
+  "categories": [
+   "Air Quality",
+   "Animal & Human Viruses / Diseases",
+   "Data Centers",
+   "Development & Land Use",
+   "EMF",
+   "Infrastructure",
+   "Light Pollution",
+   "Livestock, Crops, Pets & Wildlife Health",
+   "Noise",
+   "Noise Pollution",
+   "Radiation",
+   "Soil Quality",
+   "Water Quality",
+   "Weather & Climate Hazards",
+   "noise"
+  ],
+  "capabilities": {
+   "version_linking": false,
+   "answer_processing_installed": false
+  },
+  "selected_edition": "1eded072-8ae8-4dda-8e4f-a1f7d954131c"
+ },
+ "sources_edition": {
+  "note": "Imported from the account's own Bluesky posts that start with \"QUALITY-of-LIFE WEEKLY REPORT:\". A post is a lead, not evidence. Quoted posts are other people's writing.",
+  "sync": {
+   "running": true,
+   "last_error": "bsky 503",
+   "last_stats": null,
+   "account_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+   "high_water_at": "2026-11-12T21:22:43+00:00",
+   "account_handle": "jodytracks.com",
+   "last_failure_at": "2026-11-13T17:30:26.724889+00:00",
+   "last_success_at": "2026-11-13T17:30:26.722535+00:00",
+   "backfill_done_at": "2026-11-13T17:30:26.722535+00:00",
+   "last_run_started_at": "2026-11-13T17:30:26.730444+00:00"
+  },
+  "review": [
+   {
+    "id": "e8285a38-2da2-4880-adc1-a0ea741fea4a",
+    "topic": null,
+    "stream": "news",
+    "content": {
+     "text": "QUALITY-of-LIFE WEEKLY REPORT: Data Centersville — y",
+     "links": [],
+     "media": [],
+     "quoted": {
+      "status": "none"
+     },
+     "thread": []
+    },
+    "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/bbb1",
+    "post_url": "https://bsky.app/profile/jodytracks.com/post/bbb1",
+    "revision": 1,
+    "posted_at": "2026-11-12T21:18:17+00:00",
+    "revisions": 1,
+    "routed_by": "automatic",
+    "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+    "story_text": "y",
+    "topic_text": "Data Centersville",
+    "route_status": "unmatched",
+    "author_handle": "jodytracks.com",
+    "first_seen_at": "2026-11-13T17:30:26.699965+00:00",
+    "last_fetched_at": "2026-11-13T17:30:26.699965+00:00",
+    "last_fetch_error": null,
+    "revision_saved_at": "2026-11-13T17:30:26.699965+00:00"
+   }
+  ],
+  "topics": [
+   {
+    "topic": "Air Quality",
+    "aliases": [],
+    "sources": [
+     {
+      "id": "3010a8a9-a8c6-4e4f-9e58-8b2857ff5a2b",
+      "topic": "Air Quality",
+      "stream": "news",
+      "content": {
+       "text": "QUALITY-of-LIFE WEEKLY REPORT: Noise — y",
+       "links": [],
+       "media": [],
+       "quoted": {
+        "status": "none"
+       },
+       "thread": []
+      },
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/bbb2",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/bbb2",
+      "revision": 1,
+      "posted_at": "2026-11-12T21:18:17+00:00",
+      "revisions": 1,
+      "routed_by": "founder@test.invalid",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "y",
+      "topic_text": "Noise",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.702775+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.702775+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.702775+00:00"
+     },
+     {
+      "id": "a6767de1-c0eb-4fad-8648-a921aedc224d",
+      "topic": "Air Quality",
+      "stream": "news",
+      "content": {
+       "text": "QUALITY-of-LIFE WEEKLY REPORT:   air   QUALITY: smoke",
+       "links": [],
+       "media": [],
+       "quoted": {
+        "status": "none"
+       },
+       "thread": []
+      },
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/bbb3",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/bbb3",
+      "revision": 1,
+      "posted_at": "2026-11-12T21:18:17+00:00",
+      "revisions": 1,
+      "routed_by": "automatic",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "smoke",
+      "topic_text": "air QUALITY",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.705895+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.705895+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.705895+00:00"
+     }
+    ]
+   },
+   {
+    "topic": "Animal & Human Viruses / Diseases",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Data Centers",
+    "aliases": [
+     "Data Center"
+    ],
+    "sources": [
+     {
+      "id": "1bc1ff1a-5e77-4f4a-b34e-a457fe883e97",
+      "topic": "Data Centers",
+      "stream": "news",
+      "content": {
+       "text": "QUALITY-of-LIFE WEEKLY REPORT: Data Centers — a later story",
+       "links": [],
+       "media": [],
+       "quoted": {
+        "status": "none"
+       },
+       "thread": []
+      },
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n2newpost",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/3n2newpost",
+      "revision": 1,
+      "posted_at": "2026-11-13T09:00:00+00:00",
+      "revisions": 1,
+      "routed_by": "automatic",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "a later story",
+      "topic_text": "Data Centers",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.768305+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.768305+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.768305+00:00"
+     },
+     {
+      "id": "620861d7-b9ec-492b-bbac-5ce67efe4b88",
+      "topic": "Data Centers",
+      "stream": "news",
+      "content": {
+       "text": "QUALITY-of-LIFE WEEKLY REPORT: Data Centers — SpaceX plans a $24 billion gas-powered AI facility in Texas.",
+       "links": [
+        "https://example.org/a"
+       ],
+       "media": [],
+       "quoted": {
+        "uri": "at://did:plc:other/app.bsky.feed.post/q1",
+        "text": "Their words",
+        "status": "available",
+        "author_handle": "reporter.example"
+       },
+       "thread": [
+        {
+         "uri": "at://x/app.bsky.feed.post/t1",
+         "text": "First reply",
+         "posted_at": "2026-11-12T21:25:00Z"
+        },
+        {
+         "uri": "at://x/app.bsky.feed.post/t2",
+         "text": "Second reply",
+         "posted_at": "2026-11-12T21:30:00Z"
+        },
+        {
+         "uri": "at://x/app.bsky.feed.post/t3",
+         "text": "Third reply",
+         "posted_at": "2026-11-13T10:00:00Z"
+        }
+       ]
+      },
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n25fosji4k2s",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/3n25fosji4k2s",
+      "revision": 4,
+      "posted_at": "2026-11-12T21:22:43+00:00",
+      "revisions": 4,
+      "routed_by": "automatic",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "SpaceX plans a $24 billion gas-powered AI facility in Texas.",
+      "topic_text": "Data Centers",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.684928+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.765394+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.765394+00:00"
+     },
+     {
+      "id": "ceb9a719-4302-47fe-877b-4f33223f868c",
+      "topic": "Data Centers",
+      "stream": "news",
+      "content": {
+       "text": "quality-of-life weekly report: data center\nOakland extends its data center moratorium for 10 months.",
+       "links": [],
+       "media": [],
+       "quoted": {
+        "status": "none"
+       },
+       "thread": []
+      },
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n25fguo3us2w",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/3n25fguo3us2w",
+      "revision": 1,
+      "posted_at": "2026-11-12T21:18:17+00:00",
+      "revisions": 1,
+      "routed_by": "automatic",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "Oakland extends its data center moratorium for 10 months.",
+      "topic_text": "data center",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.693284+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.693284+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.693284+00:00"
+     }
+    ]
+   },
+   {
+    "topic": "Development & Land Use",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "EMF",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Infrastructure",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Light Pollution",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Livestock, Crops, Pets & Wildlife Health",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Noise",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Noise Pollution",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Radiation",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Soil Quality",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "Water Quality",
+    "aliases": [
+     "Water"
+    ],
+    "sources": [
+     {
+      "id": "f68801cd-e54f-4b7f-867a-aae893476582",
+      "topic": "Water Quality",
+      "stream": "news",
+      "content": {
+       "text": "Quality-of-Life Weekly Report: Water — a story",
+       "links": [],
+       "media": [],
+       "quoted": {
+        "status": "none"
+       },
+       "thread": []
+      },
+      "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n227ngau522p",
+      "post_url": "https://bsky.app/profile/jodytracks.com/post/3n227ngau522p",
+      "revision": 1,
+      "posted_at": "2026-11-12T21:18:17+00:00",
+      "revisions": 1,
+      "routed_by": "automatic",
+      "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+      "story_text": "a story",
+      "topic_text": "Water",
+      "route_status": "matched",
+      "author_handle": "jodytracks.com",
+      "first_seen_at": "2026-11-13T17:30:26.696727+00:00",
+      "last_fetched_at": "2026-11-13T17:30:26.731324+00:00",
+      "last_fetch_error": null,
+      "revision_saved_at": "2026-11-13T17:30:26.696727+00:00"
+     }
+    ]
+   },
+   {
+    "topic": "Weather & Climate Hazards",
+    "aliases": [],
+    "sources": []
+   },
+   {
+    "topic": "noise",
+    "aliases": [],
+    "sources": []
+   }
+  ],
+  "edition": {
+   "id": "1eded072-8ae8-4dda-8e4f-a1f7d954131c",
+   "as_of": "2026-11-13T17:30:26.751893+00:00",
+   "topic": "Data Centers",
+   "sources": [
+    {
+     "id": "ceb9a719-4302-47fe-877b-4f33223f868c",
+     "topic": "Data Centers",
+     "stream": "news",
+     "content": {
+      "text": "quality-of-life weekly report: data center\nOakland extends its data center moratorium for 10 months.",
+      "links": [],
+      "media": [],
+      "quoted": {
+       "status": "none"
+      },
+      "thread": []
+     },
+     "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n25fguo3us2w",
+     "post_url": "https://bsky.app/profile/jodytracks.com/post/3n25fguo3us2w",
+     "revision": 1,
+     "posted_at": "2026-11-12T21:18:17+00:00",
+     "revisions": 1,
+     "routed_by": "automatic",
+     "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+     "story_text": "Oakland extends its data center moratorium for 10 months.",
+     "topic_text": "data center",
+     "route_status": "matched",
+     "author_handle": "jodytracks.com",
+     "first_seen_at": "2026-11-13T17:30:26.693284+00:00",
+     "last_fetched_at": "2026-11-13T17:30:26.693284+00:00",
+     "last_fetch_error": null,
+     "revision_saved_at": "2026-11-13T17:30:26.693284+00:00"
+    },
+    {
+     "id": "620861d7-b9ec-492b-bbac-5ce67efe4b88",
+     "topic": "Data Centers",
+     "stream": "news",
+     "content": {
+      "text": "QUALITY-of-LIFE WEEKLY REPORT: Data Centers — SpaceX plans a $24 billion gas-powered AI facility in Texas.",
+      "links": [
+       "https://example.org/a"
+      ],
+      "media": [],
+      "quoted": {
+       "uri": "at://did:plc:other/app.bsky.feed.post/q1",
+       "text": "Their words",
+       "status": "available",
+       "author_handle": "reporter.example"
+      },
+      "thread": [
+       {
+        "uri": "at://x/app.bsky.feed.post/t1",
+        "text": "First reply",
+        "posted_at": "2026-11-12T21:25:00Z"
+       },
+       {
+        "uri": "at://x/app.bsky.feed.post/t2",
+        "text": "Second reply",
+        "posted_at": "2026-11-12T21:30:00Z"
+       }
+      ]
+     },
+     "post_uri": "at://did:plc:wn7c3svjrzpspuzmlecuqqeo/app.bsky.feed.post/3n25fosji4k2s",
+     "post_url": "https://bsky.app/profile/jodytracks.com/post/3n25fosji4k2s",
+     "revision": 3,
+     "posted_at": "2026-11-12T21:22:43+00:00",
+     "revisions": 4,
+     "routed_by": "automatic",
+     "author_did": "did:plc:wn7c3svjrzpspuzmlecuqqeo",
+     "story_text": "SpaceX plans a $24 billion gas-powered AI facility in Texas.",
+     "topic_text": "Data Centers",
+     "route_status": "matched",
+     "author_handle": "jodytracks.com",
+     "first_seen_at": "2026-11-13T17:30:26.684928+00:00",
+     "last_fetched_at": "2026-11-13T17:30:26.765394+00:00",
+     "last_fetch_error": null,
+     "revision_saved_at": "2026-11-13T17:30:26.719139+00:00"
+    }
+   ],
+   "published": true
+  }
+ }
+}

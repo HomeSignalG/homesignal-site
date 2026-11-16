@@ -1,0 +1,580 @@
+{
+ "_note": "TEST DATA built by test/weekly_stage2_pg/build_topic_queue_fixture.py from the prepared SQL (docs/weekly-1..7) on a disposable database. The two founder leads are UNVERIFIED and carry no address and no commitment. This is not a durable live queue.",
+ "capabilities": {
+  "answer_processing_installed": true,
+  "version_linking": true
+ },
+ "categories": [
+  "Air Quality",
+  "Data Centers",
+  "Water Quality"
+ ],
+ "editions": [
+  {
+   "assigned": 1,
+   "close_reason": null,
+   "closed": false,
+   "closed_at": null,
+   "edition_key": "air-quality-2026-11-09",
+   "id": "id-01",
+   "linked_versions": [
+    {
+     "linked_at": "2026-11-10T12:00:00Z",
+     "stage": "angles",
+     "version_id": "id-02"
+    }
+   ],
+   "period_end": "2026-11-15",
+   "period_start": "2026-11-09",
+   "published": false,
+   "published_on": null,
+   "series": "QUALITY-of-LIFE Weekly Report",
+   "topic": "Air Quality",
+   "unresolved": [
+    {
+     "lead_id": "id-03",
+     "title": "TEST: a publicly promised topic"
+    }
+   ],
+   "video_url": null
+  },
+  {
+   "assigned": 1,
+   "close_reason": null,
+   "closed": false,
+   "closed_at": null,
+   "edition_key": "data-centers-2026-11-09",
+   "id": "id-04",
+   "linked_versions": [],
+   "period_end": "2026-11-15",
+   "period_start": "2026-11-09",
+   "published": false,
+   "published_on": null,
+   "series": "QUALITY-of-LIFE Weekly Report",
+   "topic": "Data Centers",
+   "unresolved": [
+    {
+     "lead_id": "id-05",
+     "title": "SpaceX proposed Cochise County, Arizona data center"
+    }
+   ],
+   "video_url": null
+  },
+  {
+   "assigned": 1,
+   "close_reason": null,
+   "closed": false,
+   "closed_at": null,
+   "edition_key": "water-quality-2026-11-02",
+   "id": "id-06",
+   "linked_versions": [],
+   "period_end": "2026-11-08",
+   "period_start": "2026-11-02",
+   "published": true,
+   "published_on": "2026-11-08",
+   "series": "QUALITY-of-LIFE Weekly Report",
+   "topic": "Water Quality",
+   "unresolved": [],
+   "video_url": "https://video.example.test/watch?v=TEST"
+  },
+  {
+   "assigned": 2,
+   "close_reason": "TEST: no video this week; both topics were deferred",
+   "closed": true,
+   "closed_at": "2026-11-10T12:01:00Z",
+   "edition_key": "air-quality-2026-11-02",
+   "id": "id-07",
+   "linked_versions": [],
+   "period_end": "2026-11-08",
+   "period_start": "2026-11-02",
+   "published": false,
+   "published_on": null,
+   "series": "QUALITY-of-LIFE Weekly Report",
+   "topic": "Air Quality",
+   "unresolved": [],
+   "video_url": null
+  }
+ ],
+ "leads": [
+  {
+   "commitment_post_url": null,
+   "commitment_wording": null,
+   "created_at": "2026-11-10T12:02:00Z",
+   "id": "id-05",
+   "intended_date": null,
+   "intended_edition_id": null,
+   "location": "Cochise County, Arizona",
+   "notes": "UNVERIFIED LEAD. No source address was supplied.",
+   "promised_publicly": false,
+   "questions": [
+    "What is the power demand?",
+    "Who funds the infrastructure?",
+    "What ratepayer protections exist?",
+    "What are the water requirements?",
+    "What is the approval status?",
+    "How can the public take part?"
+   ],
+   "request": {
+    "created_at": "2026-11-10T12:03:00Z",
+    "id": "id-08",
+    "request_text": "Research lead for the QUALITY-of-LIFE Weekly Report (Data Centers), edition data-centers-2026-11-09, reporting period 2026-11-09 to 2026-11-15.\nLead: SpaceX proposed Cochise County, Arizona data center\nLocation: Cochise County, Arizona\n\nQuestions the research must answer:\n1. What is the power demand?\n2. Who funds the infrastructure?\n3. What ratepayer protections exist?\n4. What are the water requirements?\n5. What is the approval status?\n6. How can the public take part?\n\nNotes:\nUNVERIFIED LEAD. No source address was supplied.\n\nPublic coverage commitment: none recorded\n\nEvery statement above is an unverified lead. Find the primary records, say what is established and what is not, and say plainly if the lead cannot be confirmed. A promise to cover this is not a reason to confirm it.\n\nTEST ANSWER FORMAT: answer only in the WEEKLY-ANSWER v1 format.",
+    "topic": "Data Centers"
+   },
+   "social_post_url": null,
+   "source_urls": [],
+   "state": {
+    "assigned": true,
+    "commitment_resolved": false,
+    "current": {
+     "disposition": null,
+     "edition": {
+      "close_reason": null,
+      "closed": false,
+      "closed_at": null,
+      "edition_key": "data-centers-2026-11-09",
+      "id": "id-04",
+      "period_end": "2026-11-15",
+      "period_start": "2026-11-09",
+      "published": false,
+      "published_on": null,
+      "series": "QUALITY-of-LIFE Weekly Report",
+      "topic": "Data Centers",
+      "video_url": null
+     },
+     "request_id": "id-08",
+     "research": {
+      "status": "queued_for_research"
+     }
+    },
+    "editions": [
+     {
+      "assigned_at": "2026-11-10T12:04:00Z",
+      "current": true,
+      "disposed_at": null,
+      "disposed_by": null,
+      "disposition": null,
+      "edition": {
+       "close_reason": null,
+       "closed": false,
+       "closed_at": null,
+       "edition_key": "data-centers-2026-11-09",
+       "id": "id-04",
+       "period_end": "2026-11-15",
+       "period_start": "2026-11-09",
+       "published": false,
+       "published_on": null,
+       "series": "QUALITY-of-LIFE Weekly Report",
+       "topic": "Data Centers",
+       "video_url": null
+      },
+      "reason": null,
+      "request_id": "id-08"
+     }
+    ],
+    "last_disposition": null,
+    "promised_publicly": false,
+    "status": "queued_for_research"
+   },
+   "title": "SpaceX proposed Cochise County, Arizona data center",
+   "topic": "Data Centers",
+   "updated_at": "2026-11-10T12:05:00Z",
+   "why_it_matters": null
+  },
+  {
+   "commitment_post_url": null,
+   "commitment_wording": null,
+   "created_at": "2026-11-10T12:06:00Z",
+   "id": "id-09",
+   "intended_date": null,
+   "intended_edition_id": null,
+   "location": "Oregon (the lake is not yet identified)",
+   "notes": "UNVERIFIED LEAD. No source address was supplied.",
+   "promised_publicly": false,
+   "questions": [
+    "Which lake is it?",
+    "What does the court order say?",
+    "What is the project's purpose?",
+    "Which communities are affected?",
+    "What risks are documented?",
+    "What monitoring is in place?",
+    "What safeguards exist?",
+    "What is the appeal status?"
+   ],
+   "request": null,
+   "social_post_url": null,
+   "source_urls": [],
+   "state": {
+    "assigned": false,
+    "commitment_resolved": false,
+    "current": null,
+    "editions": [],
+    "last_disposition": null,
+    "promised_publicly": false,
+    "status": "captured"
+   },
+   "title": "Oregon lake drawdown and drinking-water concerns",
+   "topic": "Water Quality",
+   "updated_at": "2026-11-10T12:07:00Z",
+   "why_it_matters": null
+  },
+  {
+   "commitment_post_url": null,
+   "commitment_wording": null,
+   "created_at": "2026-11-10T12:08:00Z",
+   "id": "id-10",
+   "intended_date": null,
+   "intended_edition_id": null,
+   "location": null,
+   "notes": null,
+   "promised_publicly": false,
+   "questions": [],
+   "request": null,
+   "social_post_url": null,
+   "source_urls": [],
+   "state": {
+    "assigned": false,
+    "commitment_resolved": false,
+    "current": null,
+    "editions": [],
+    "last_disposition": null,
+    "promised_publicly": false,
+    "status": "captured"
+   },
+   "title": "TEST: a topic saved with a title only",
+   "topic": null,
+   "updated_at": "2026-11-10T12:09:00Z",
+   "why_it_matters": null
+  },
+  {
+   "commitment_post_url": null,
+   "commitment_wording": "TEST: we may cover this soon.",
+   "created_at": "2026-11-10T12:10:00Z",
+   "id": "id-11",
+   "intended_date": null,
+   "intended_edition_id": null,
+   "location": null,
+   "notes": null,
+   "promised_publicly": false,
+   "questions": [],
+   "request": null,
+   "social_post_url": null,
+   "source_urls": [],
+   "state": {
+    "assigned": false,
+    "commitment_resolved": false,
+    "current": null,
+    "editions": [],
+    "last_disposition": null,
+    "promised_publicly": false,
+    "status": "captured"
+   },
+   "title": "TEST: a topic with a draft commitment",
+   "topic": "Air Quality",
+   "updated_at": "2026-11-10T12:11:00Z",
+   "why_it_matters": null
+  },
+  {
+   "commitment_post_url": "https://social.example.test/post/42",
+   "commitment_wording": "TEST: we will look into this next week.",
+   "created_at": "2026-11-10T12:12:00Z",
+   "id": "id-03",
+   "intended_date": null,
+   "intended_edition_id": null,
+   "location": "TEST County",
+   "notes": null,
+   "promised_publicly": true,
+   "questions": [
+    "TEST: what does the permit allow?",
+    "TEST: what was measured?"
+   ],
+   "request": {
+    "created_at": "2026-11-10T12:13:00Z",
+    "id": "id-12",
+    "request_text": "Research lead for the QUALITY-of-LIFE Weekly Report (Air Quality), edition air-quality-2026-11-09, reporting period 2026-11-09 to 2026-11-15.\nLead: TEST: a publicly promised topic\nLocation: TEST County\nWhy this matters to residents' quality of life: TEST: residents asked about the air near a plant.\n\nQuestions the research must answer:\n1. TEST: what does the permit allow?\n2. TEST: what was measured?\n\nWhere the lead came from (starting points to check, not evidence):\n- https://news.example.test/a-story\nSocial post about it: https://social.example.test/post/42\n\nPublic coverage commitment: PROMISED PUBLICLY in a published post (https://social.example.test/post/42): \"TEST: we will look into this next week.\"\n\nEvery statement above is an unverified lead. Find the primary records, say what is established and what is not, and say plainly if the lead cannot be confirmed. A promise to cover this is not a reason to confirm it.\n\nTEST ANSWER FORMAT: answer only in the WEEKLY-ANSWER v1 format.",
+    "topic": "Air Quality"
+   },
+   "social_post_url": "https://social.example.test/post/42",
+   "source_urls": [
+    "https://news.example.test/a-story"
+   ],
+   "state": {
+    "assigned": true,
+    "commitment_resolved": false,
+    "current": {
+     "disposition": null,
+     "edition": {
+      "close_reason": null,
+      "closed": false,
+      "closed_at": null,
+      "edition_key": "air-quality-2026-11-09",
+      "id": "id-01",
+      "period_end": "2026-11-15",
+      "period_start": "2026-11-09",
+      "published": false,
+      "published_on": null,
+      "series": "QUALITY-of-LIFE Weekly Report",
+      "topic": "Air Quality",
+      "video_url": null
+     },
+     "request_id": "id-12",
+     "research": {
+      "status": "queued_for_research"
+     }
+    },
+    "editions": [
+     {
+      "assigned_at": "2026-11-10T12:14:00Z",
+      "current": false,
+      "disposed_at": "2026-11-10T12:15:00Z",
+      "disposed_by": "founder@test.invalid",
+      "disposition": "deferred",
+      "edition": {
+       "close_reason": "TEST: no video this week; both topics were deferred",
+       "closed": true,
+       "closed_at": "2026-11-10T12:16:00Z",
+       "edition_key": "air-quality-2026-11-02",
+       "id": "id-07",
+       "period_end": "2026-11-08",
+       "period_start": "2026-11-02",
+       "published": false,
+       "published_on": null,
+       "series": "QUALITY-of-LIFE Weekly Report",
+       "topic": "Air Quality",
+       "video_url": null
+      },
+      "reason": "TEST: the permit record is not public yet; carry it to next week",
+      "request_id": "id-13"
+     },
+     {
+      "assigned_at": "2026-11-10T12:17:00Z",
+      "current": true,
+      "disposed_at": null,
+      "disposed_by": null,
+      "disposition": null,
+      "edition": {
+       "close_reason": null,
+       "closed": false,
+       "closed_at": null,
+       "edition_key": "air-quality-2026-11-09",
+       "id": "id-01",
+       "period_end": "2026-11-15",
+       "period_start": "2026-11-09",
+       "published": false,
+       "published_on": null,
+       "series": "QUALITY-of-LIFE Weekly Report",
+       "topic": "Air Quality",
+       "video_url": null
+      },
+      "reason": null,
+      "request_id": "id-12"
+     }
+    ],
+    "last_disposition": {
+     "disposed_at": "2026-11-10T12:18:00Z",
+     "disposition": "deferred",
+     "edition": {
+      "close_reason": "TEST: no video this week; both topics were deferred",
+      "closed": true,
+      "closed_at": "2026-11-10T12:19:00Z",
+      "edition_key": "air-quality-2026-11-02",
+      "id": "id-07",
+      "period_end": "2026-11-08",
+      "period_start": "2026-11-02",
+      "published": false,
+      "published_on": null,
+      "series": "QUALITY-of-LIFE Weekly Report",
+      "topic": "Air Quality",
+      "video_url": null
+     },
+     "reason": "TEST: the permit record is not public yet; carry it to next week"
+    },
+    "promised_publicly": true,
+    "status": "queued_for_research"
+   },
+   "title": "TEST: a publicly promised topic",
+   "topic": "Air Quality",
+   "updated_at": "2026-11-10T12:20:00Z",
+   "why_it_matters": "TEST: residents asked about the air near a plant."
+  },
+  {
+   "commitment_post_url": null,
+   "commitment_wording": null,
+   "created_at": "2026-11-10T12:21:00Z",
+   "id": "id-14",
+   "intended_date": null,
+   "intended_edition_id": null,
+   "location": null,
+   "notes": null,
+   "promised_publicly": false,
+   "questions": [
+    "TEST: what did the utility report?"
+   ],
+   "request": {
+    "created_at": "2026-11-10T12:22:00Z",
+    "id": "id-15",
+    "request_text": "Research lead for the QUALITY-of-LIFE Weekly Report (Water Quality), edition water-quality-2026-11-02, reporting period 2026-11-02 to 2026-11-08.\nLead: TEST: a topic that reached a published report\n\nQuestions the research must answer:\n1. TEST: what did the utility report?\n\nPublic coverage commitment: none recorded\n\nEvery statement above is an unverified lead. Find the primary records, say what is established and what is not, and say plainly if the lead cannot be confirmed. A promise to cover this is not a reason to confirm it.\n\nTEST ANSWER FORMAT: answer only in the WEEKLY-ANSWER v1 format.",
+    "topic": "Water Quality"
+   },
+   "social_post_url": null,
+   "source_urls": [],
+   "state": {
+    "assigned": true,
+    "commitment_resolved": false,
+    "current": {
+     "disposition": "included",
+     "edition": {
+      "close_reason": null,
+      "closed": false,
+      "closed_at": null,
+      "edition_key": "water-quality-2026-11-02",
+      "id": "id-06",
+      "period_end": "2026-11-08",
+      "period_start": "2026-11-02",
+      "published": true,
+      "published_on": "2026-11-08",
+      "series": "QUALITY-of-LIFE Weekly Report",
+      "topic": "Water Quality",
+      "video_url": "https://video.example.test/watch?v=TEST"
+     },
+     "request_id": "id-15",
+     "research": {
+      "answer_id": "id-16",
+      "status": "ready_for_editorial_review"
+     }
+    },
+    "editions": [
+     {
+      "assigned_at": "2026-11-10T12:23:00Z",
+      "current": true,
+      "disposed_at": "2026-11-10T12:24:00Z",
+      "disposed_by": "founder@test.invalid",
+      "disposition": "included",
+      "edition": {
+       "close_reason": null,
+       "closed": false,
+       "closed_at": null,
+       "edition_key": "water-quality-2026-11-02",
+       "id": "id-06",
+       "period_end": "2026-11-08",
+       "period_start": "2026-11-02",
+       "published": true,
+       "published_on": "2026-11-08",
+       "series": "QUALITY-of-LIFE Weekly Report",
+       "topic": "Water Quality",
+       "video_url": "https://video.example.test/watch?v=TEST"
+      },
+      "reason": null,
+      "request_id": "id-15"
+     }
+    ],
+    "last_disposition": null,
+    "promised_publicly": false,
+    "status": "published"
+   },
+   "title": "TEST: a topic that reached a published report",
+   "topic": "Water Quality",
+   "updated_at": "2026-11-10T12:25:00Z",
+   "why_it_matters": null
+  },
+  {
+   "commitment_post_url": null,
+   "commitment_wording": null,
+   "created_at": "2026-11-10T12:26:00Z",
+   "id": "id-17",
+   "intended_date": null,
+   "intended_edition_id": null,
+   "location": null,
+   "notes": null,
+   "promised_publicly": false,
+   "questions": [],
+   "request": null,
+   "social_post_url": null,
+   "source_urls": [],
+   "state": {
+    "assigned": false,
+    "commitment_resolved": false,
+    "current": null,
+    "editions": [
+     {
+      "assigned_at": "2026-11-10T12:27:00Z",
+      "current": false,
+      "disposed_at": "2026-11-10T12:28:00Z",
+      "disposed_by": "founder@test.invalid",
+      "disposition": "deferred",
+      "edition": {
+       "close_reason": "TEST: no video this week; both topics were deferred",
+       "closed": true,
+       "closed_at": "2026-11-10T12:29:00Z",
+       "edition_key": "air-quality-2026-11-02",
+       "id": "id-07",
+       "period_end": "2026-11-08",
+       "period_start": "2026-11-02",
+       "published": false,
+       "published_on": null,
+       "series": "QUALITY-of-LIFE Weekly Report",
+       "topic": "Air Quality",
+       "video_url": null
+      },
+      "reason": "TEST: waiting for the next hearing",
+      "request_id": null
+     }
+    ],
+    "last_disposition": {
+     "disposed_at": "2026-11-10T12:30:00Z",
+     "disposition": "deferred",
+     "edition": {
+      "close_reason": "TEST: no video this week; both topics were deferred",
+      "closed": true,
+      "closed_at": "2026-11-10T12:31:00Z",
+      "edition_key": "air-quality-2026-11-02",
+      "id": "id-07",
+      "period_end": "2026-11-08",
+      "period_start": "2026-11-02",
+      "published": false,
+      "published_on": null,
+      "series": "QUALITY-of-LIFE Weekly Report",
+      "topic": "Air Quality",
+      "video_url": null
+     },
+     "reason": "TEST: waiting for the next hearing"
+    },
+    "promised_publicly": false,
+    "status": "deferred"
+   },
+   "title": "TEST: a topic deferred and waiting for a later edition",
+   "topic": "Air Quality",
+   "updated_at": "2026-11-10T12:32:00Z",
+   "why_it_matters": null
+  }
+ ],
+ "note": "Statuses are derived from what was recorded. A lead, a source story or a social post is not evidence, and none of them shows that our video was published.",
+ "selected_edition": "id-01",
+ "views": {
+  "deferred": [
+   "id-17"
+  ],
+  "edition": [
+   {
+    "current": true,
+    "disposition": null,
+    "lead_id": "id-03",
+    "reason": null
+   }
+  ],
+  "inbox": [
+   "id-09",
+   "id-10",
+   "id-11"
+  ],
+  "promised": [
+   "id-03"
+  ],
+  "published": [
+   "id-14"
+  ],
+  "research": [
+   "id-05",
+   "id-03"
+  ]
+ }
+}

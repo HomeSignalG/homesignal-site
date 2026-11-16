@@ -205,18 +205,21 @@ const seen = await page.evaluate(() => {
     finalContactVisible: vis(document.getElementById('daEnterpriseFinal'))
   };
 });
-ok(seen.control && seen.buttons === 2 && seen.visibleButtons === 0,
-  'HIDDEN (founder, 2026-10-02): the two Start free buttons are on the page and none is visible (control: the coverage button is)', seen);
-ok(seen.soon === 2 && seen.visibleSoon === 0, 'no "Opens at launch." note is visible either', seen);
-ok(seen.joinVisible === false && seen.joinHref === null && seen.joinText === null,
-  'FREE-ONLY (founder, 2026-10-15): there is no Join link on the landing page', seen);
-ok(seen.enterpriseVisible && seen.finalContactVisible, 'Contact HomeSignal → (Brokerage / Enterprise tier) and the closing "Contact us" are visible: they are the page\'s working actions', seen);
-// A hidden button cannot be clicked by a person; click it from script to prove it still does nothing.
-await page.$$eval('button[data-cta]', (bs) => bs.forEach((b) => b.click()));
-const afterClicks = await page.evaluate(() => ({ overlays: document.querySelectorAll('.overlay.show, .modal.show').length, onboarding: document.querySelectorAll('.onboarding.show').length }));
-ok(page.url() === urlBefore && afterClicks.overlays === 0 && afterClicks.onboarding === 0,
-  'clicking any of the two Start free buttons from script opens nothing and goes nowhere', { url: page.url(), afterClicks });
-ok((await page.$$eval('button[data-cta]', (bs) => bs.every((b) => b.getAttribute('aria-disabled') === 'true'))), 'each is aria-disabled so assistive technology reads it as unavailable');
+ok(seen.control && seen.buttons === 0 && seen.soon === 0, 'no Start free / inert commerce button and no "Opens at launch." note exists (founder, 2026-11-14; control: the coverage button is visible)', seen);
+ok(seen.joinVisible === false && seen.joinHref === null && seen.joinText === null, 'there is no Join link on the landing page', seen);
+ok(seen.enterpriseVisible && seen.finalContactVisible, 'Request a Quote and the closing "Contact us" are visible and working', seen);
+const pro = await page.evaluate(() => { const a = document.getElementById('daProfessional'); const cards = [...document.querySelectorAll('.da-plan')].map((c) => { const r = c.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top) }; });
+  const b = a && a.getBoundingClientRect(), q = document.getElementById('daEnterprise').getBoundingClientRect();
+  return { vis: !!a && b.width > 0, href: a && a.getAttribute('href'), text: a && a.textContent, cards, btnTops: a ? [Math.round(b.bottom), Math.round(q.bottom)] : [], overflowX: document.documentElement.scrollWidth > innerWidth }; });
+ok(pro.vis && pro.href === 'development-activity-reports.html#billing' && pro.text === 'Get Started', 'Professional\'s Get Started is visible and goes to the Billing card', pro);
+ok(pro.cards.length === 2 && Math.abs(pro.cards[0].w - pro.cards[1].w) <= 1 && Math.abs(pro.cards[0].h - pro.cards[1].h) <= 1, 'the two pricing cards are the same width and height at this viewport', pro.cards);
+ok(!pro.overflowX, 'no horizontal overflow at this viewport', { viewport: await page.evaluate(() => innerWidth) });
+for (const w of [390, 768]) {
+  await page.setViewportSize({ width: w, height: 900 });
+  const m = await page.evaluate(() => ({ cards: [...document.querySelectorAll('.da-plan')].map((c) => { const r = c.getBoundingClientRect(); return { w: Math.round(r.width), left: Math.round(r.left), top: Math.round(r.top) }; }), overflowX: document.documentElement.scrollWidth > innerWidth, btns: ['daProfessional', 'daEnterprise'].map((i) => { const r = document.getElementById(i).getBoundingClientRect(); return r.width > 0 && r.right <= innerWidth; }) }));
+  ok(m.cards.length === 2 && m.cards[0].w === m.cards[1].w && m.cards[1].top > m.cards[0].top && !m.overflowX && m.btns.every(Boolean), 'mobile/tablet ' + w + 'px: the cards stack at equal width, buttons fit, no sideways scroll', m);
+}
+await page.setViewportSize({ width: 1280, height: 900 });
 ok(await page.$eval('#daEnterprise', (a) => a.getAttribute('href') === 'contact.html' && a.textContent === 'Request a Quote')
    && await page.$eval('#daEnterpriseFinal', (a) => a.getAttribute('href') === 'contact.html' && a.textContent === 'Contact us'), 'both enterprise links open the existing contact page');
 ok(await page.$eval('#hero a.da-link', (a) => a.getAttribute('href') === '#sample' && a.textContent === 'View a sample report →'), 'the hero\'s visible action is View a sample report →, and it jumps to the sample');

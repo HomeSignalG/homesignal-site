@@ -43,8 +43,7 @@ const server = createServer(async (req, res) => {
   const f = join(SITE, p);
   try {
     if (!(await stat(f)).isFile()) throw new Error('dir');
-    res.writeHead(200, { 'content-type': TYPES[extname(f)] || 'application/octet-stream' });
-    res.end(await readFile(f));
+    const __body = await readFile(f); res.writeHead(200, { 'content-type': TYPES[extname(f)] || 'application/octet-stream' }); res.end(__body);
   } catch { res.writeHead(404, { 'content-type': 'text/html' }); res.end('<h1>404</h1>'); }
 });
 

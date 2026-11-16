@@ -1,0 +1,34 @@
+name: zip-dc-listing-suite
+
+# docs/zip-dc-listing.sql (the per-ZIP data-center listings the ZIP page build prints) against a DISPOSABLE Postgres
+# with stand-ins for production. No Supabase credential is used or reachable here.
+on:
+  pull_request:
+    paths:
+      - 'docs/zip-dc-listing.sql'
+      - 'test/zip_dc_listing_pg/**'
+      - '.github/workflows/zip-dc-listing-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/zip-dc-listing.sql'
+      - 'test/zip_dc_listing_pg/**'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "a Supabase credential is present; this suite must not see one"; exit 1
+          fi
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql
+      - name: Run the suite (exit code is the result)
+        run: bash test/zip_dc_listing_pg/run.sh

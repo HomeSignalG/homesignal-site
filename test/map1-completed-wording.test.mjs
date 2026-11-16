@@ -30,7 +30,7 @@ ok(!/standing today/i.test(CODE), '1d no "standing today"');
 ok(!/Operating now/.test(CODE) && !/operating now/.test(CODE), '1e no "Operating now" in shipped text or code');
 
 // 2. Empty state: says what Jody has, never that nothing operates
-const empty = (PAGE.match(/listInto\("builtList", builtRows, "([^"]*)"\)/) || [])[1] || '';
+const empty = (PAGE.match(/listInto\("builtList", LIST_ROWS\.built, "([^"]*)"/) || [])[1] || '';
 ok(/^No completed agency records or source-listed operating data centers in Jody for this area\./.test(empty), '2a empty state is about Jody\'s records, both kinds');
 ok(/This does not mean nothing operates here\./.test(empty), '2b empty state refuses the "nothing operates" reading');
 ok(!/operating right now/.test(CODE), '2c old empty sentence is gone');

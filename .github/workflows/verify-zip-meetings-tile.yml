@@ -33,3 +33,9 @@ jobs:
           ZIPS: ${{ inputs.zips }}
           MIN: ${{ inputs.min }}
         run: node scripts/verify-zip-meetings-tile.mjs
+      - name: Check the meetings card (desktop and phone)
+        if: always()
+        env:
+          SITE_BASE: https://jodytracks.com
+          ZIPS: ${{ inputs.zips }}
+        run: node scripts/verify-zip-meetings-card.mjs

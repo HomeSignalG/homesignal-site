@@ -75,6 +75,28 @@ do $$ declare e jsonb; e2 jsonb; r jsonb; rv public.youtube_video_revisions%rowt
   perform pg_temp.refused($q$ select public.hs_video_ending_register('../x.mp4', 'X', repeat('c', 64)) $q$, 'a path outside the layout');
 end $$;
 
+-- two kinds of recording: vertical ends Shorts, horizontal ends main videos
+insert into storage.objects (bucket_id, name, metadata)
+values ('video-endings', '44444444-4444-4444-4444-444444444444.mp4', '{"size": 10, "mimetype": "video/mp4"}'),
+       ('video-endings', '55555555-5555-5555-5555-555555555555.mp4', '{"size": 10, "mimetype": "video/mp4"}');
+do $$ declare v jsonb; h jsonb; begin
+  v := public.hs_video_ending_register('44444444-4444-4444-4444-444444444444.mp4', 'Vertical', repeat('d', 64), 'vertical');
+  h := public.hs_video_ending_register('55555555-5555-5555-5555-555555555555.mp4', 'Horizontal', repeat('e', 64), 'horizontal');
+  perform pg_temp.ok(v ->> 'shape' = 'vertical' and h ->> 'shape' = 'horizontal', 'each recording keeps its kind');
+  perform pg_temp.ok(exists (select 1 from jsonb_array_elements(public.hs_video_endings_list()) x where x ->> 'shape' = 'vertical'),
+                     'the list says which kind each is');
+  perform pg_temp.refused(format($q$ select public.hs_video_ending_choose('impact', 'story-3', 'main', %L) $q$, v ->> 'id'),
+                          'a vertical recording on a main video');
+  perform pg_temp.refused(format($q$ select public.hs_video_ending_choose('impact', 'story-3', 'short_a', %L) $q$, h ->> 'id'),
+                          'a horizontal recording on a Short');
+  perform pg_temp.ok((public.hs_video_ending_choose('impact', 'story-3', 'short_b', (v ->> 'id')::uuid) ->> 'changed')::boolean
+                     and (public.hs_video_ending_choose('impact', 'story-3', 'main', (h ->> 'id')::uuid) ->> 'changed')::boolean,
+                     'each kind goes on its own kind of file');
+  perform pg_temp.ok(public.video_endings_current('impact', 'story-3') -> 'short_b' ->> 'shape' = 'vertical', 'the engine sees the kind');
+  perform pg_temp.refused($q$ select public.hs_video_ending_register('44444444-4444-4444-4444-444444444444.mp4', 'X', repeat('d', 64), 'square') $q$,
+                          'a kind other than vertical or horizontal');
+end $$;
+
 -- grants: the engine reader is service-role only
 select pg_temp.ok(not has_function_privilege('authenticated', 'public.video_endings_current(text,text)', 'execute')
                   and not has_function_privilege('anon', 'public.video_endings_current(text,text)', 'execute')

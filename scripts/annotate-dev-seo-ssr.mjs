@@ -48,6 +48,24 @@ export function annotateEntity(HS, e) {
   return out;
 }
 
+// Project page status history (ingest bluesky/lib/project-record-history.mjs): each event's
+// HomeSignal status word is labelled by the same canonicalLifecycle call as the page's own
+// status. The agency's own words (stage) are passed through untouched.
+export function annotateHistory(HS, rec) {
+  if (!rec || !Array.isArray(rec.history)) return rec;
+  const label = (st) => (st ? HS.canonicalLifecycle({ status: st }).label : undefined);
+  return {
+    ...rec,
+    history: rec.history.map((ev) => {
+      const o = { ...ev };
+      const f = label(ev.from_status), t = label(ev.to_status);
+      if (f) o.from_label = f;
+      if (t) o.to_label = t;
+      return o;
+    }),
+  };
+}
+
 // City pages (SEO plan step 9). The ingest plane carries every city entity as a RAW
 // fact [type, name, status, n]; the Type and lifecycle MIX is the same two calls above,
 // counted. A Type the authority does not give (null) is counted as "Type not stated",
@@ -106,7 +124,7 @@ export function annotatePlane(plane, HS) {
   if (plane.projects && typeof plane.projects === 'object') {
     out.projects = {};
     for (const [key, rec] of Object.entries(plane.projects)) {
-      out.projects[key] = annotateEntity(HS, rec);
+      out.projects[key] = annotateHistory(HS, annotateEntity(HS, rec));
     }
   }
   out.ssr_authority = 'lib/project-type.js';

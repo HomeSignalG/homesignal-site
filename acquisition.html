@@ -9,7 +9,7 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="canonical" href="https://homesignal.net/acquisition.html">
-<link rel="stylesheet" href="layout.css?v=c3f3f5d5">
+<link rel="stylesheet" href="layout.css?v=0a9f8b10">
 <style>
 /* ============================================================
    Dashboard styles (structure from the artifact — DESIGN ONLY, no
@@ -212,7 +212,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     </div>
    </div>
   </header>
-  <nav class="tabs"><button class="active" data-tab="exec">1 · Executive Summary</button><button data-tab="feed">2 · Feed Intelligence</button><button data-tab="projects">3 · Project Pipeline</button><button data-tab="outreach">4 · Outreach Tracker</button><button data-tab="engagement">5 · Engagement Tracker</button><button data-tab="website">6 · Website Behavior</button><button data-tab="tags">7 · Tag Intelligence</button><button data-tab="alertperf">8 · Alert Performance</button><button data-tab="homeowners">9 · Homeowner Intelligence</button><button data-tab="acquisition">10 · Acquisition Metrics</button><button data-tab="videoproducer">11 · Video Producer</button><button data-tab="bluesky">12 · Bluesky Posts</button><button data-tab="premium">13 · Premium Waitlist</button><button data-tab="arearequests">14 · Area requests</button><button data-tab="saleshandy">15 · Saleshandy</button><button data-tab="youtubevideos">16 · YouTube Videos</button><button data-tab="impactstories">17 · Impact Stories</button><button data-tab="dossiers">18 · Development Dossiers</button><button data-tab="claimcheck">19 · Claim Check</button></nav>
+  <nav class="tabs"><button class="active" data-tab="exec">1 · Executive Summary</button><button data-tab="feed">2 · Feed Intelligence</button><button data-tab="projects">3 · Project Pipeline</button><button data-tab="outreach">4 · Outreach Tracker</button><button data-tab="engagement">5 · Engagement Tracker</button><button data-tab="website">6 · Website Behavior</button><button data-tab="tags">7 · Tag Intelligence</button><button data-tab="alertperf">8 · Alert Performance</button><button data-tab="homeowners">9 · Homeowner Intelligence</button><button data-tab="acquisition">10 · Acquisition Metrics</button><button data-tab="videoproducer">11 · Video Producer</button><button data-tab="bluesky">12 · Bluesky Posts</button><button data-tab="premium">13 · Premium Waitlist</button><button data-tab="arearequests">14 · Area requests</button><button data-tab="saleshandy">15 · Saleshandy</button><button data-tab="youtubevideos">16 · YouTube Videos</button><button data-tab="impactstories">17 · Impact Stories</button><button data-tab="dossiers">18 · Development Dossiers</button><button data-tab="claimcheck">19 · Claim Check</button><button data-tab="weeklyreport">20 · Weekly Report</button></nav>
   <main class="hs-container">
     <div class="tab active" id="tab-exec"></div>
     <div class="tab" id="tab-feed"></div>
@@ -233,6 +233,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     <div class="tab" id="tab-impactstories"><div id="ve-impact-host"></div><div id="is-host"></div></div>
     <div class="tab" id="tab-dossiers"></div>
     <div class="tab" id="tab-claimcheck"></div>
+    <div class="tab" id="tab-weeklyreport"></div>
   </main>
   <footer class="hs-container">Internal · staff &amp; investors. Numbers are a point-in-time snapshot (<span id="dash-foot-date">—</span>), served only to allowlisted accounts through a gated read-only function — no data ships in this page. Regenerated from the HomeSignal ingest pipeline.</footer>
 </div>
@@ -273,11 +274,26 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   </div>
 </div>
 
+<!-- SKIP REASON MODAL: why a post is being skipped, kept (hs_social_post_skip) so selection can learn. -->
+<div id="bsky-skip-overlay" class="bsky-edit-overlay">
+  <div class="bsky-edit-modal" style="max-width:520px">
+    <button class="bsky-edit-close" id="bsky-skip-close">&times;</button>
+    <h3>Skip this post</h3>
+    <p class="bsky-edit-sub" id="bsky-skip-sub">Tell the selector why, so it can pick better posts. Optional, but it is how it learns.</p>
+    <div id="bsky-skip-chips" style="display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px"></div>
+    <textarea id="bsky-skip-note" class="bsky-edit-textarea" style="min-height:90px" maxlength="2000" placeholder="Anything else? e.g. 'a bridge repaint is not a neighborhood change'"></textarea>
+    <div class="bsky-edit-actions">
+      <button class="bsky-btn" id="bsky-skip-cancel" style="background:#e4e8e4;color:#16211c">Cancel</button>
+      <button class="bsky-btn" id="bsky-skip-confirm" style="background:#c23b34;color:#fff">Skip post</button>
+    </div>
+  </div>
+</div>
+
 <!-- The SHIPPED Map 1 classifier. The Bluesky MAPS theme filter derives membership from
      HS.resolveMarker so the dashboard and the map can never disagree about what a Data
      center is (lib/maps-social-theme.js). Both are self-contained helper IIFEs — they
      define functions on window.HS and touch no DOM at load. -->
-<script src="lib/project-type.js?v=ed9e58be"></script>
+<script src="lib/project-type.js?v=852af398"></script>
 <script src="lib/map.js?v=c2fa4469"></script>
 <script src="lib/maps-social-theme.js?v=0d9ae778"></script>
 <!-- WHICH MAP IMAGE BELONGS TO WHICH DRAFT. The same module scripts/maps-social-image.mjs
@@ -292,20 +308,24 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
 <script src="lib/acq-saleshandy.js?v=eca3a26c"></script>
 <script src="lib/acq-youtube-videos.js?v=93a936a9"></script>
 <script src="lib/acq-video-suggest.js?v=b1284c80"></script>
-<script src="lib/acq-video-endings.js?v=19b75146"></script>
+<script src="lib/acq-video-endings.js?v=6e124c92"></script>
 <script src="lib/acq-bluesky-videos.js?v=574d20af"></script>
 <script src="lib/acq-bluesky-schedule.js?v=d543ca4c"></script>
 <!-- Tab 12 queue order: subscriber ZIPs first, then drafts to review, approved last. A view only. -->
-<script src="lib/acq-bluesky-queue-order.js?v=506d7e41"></script>
+<script src="lib/acq-bluesky-queue-order.js?v=544c17d9"></script>
 <script src="lib/acq-engagement.js?v=d81c8179"></script>
 <script src="lib/acq-youtube.js?v=44fa15cc"></script>
 <script src="lib/creator-script.js?v=4cae37b2"></script>
 <script src="lib/acq-impact-creator.js?v=4964cd46"></script>
-<script src="lib/acq-impact-discovery.js?v=f402aaab"></script>
+<script src="lib/acq-impact-dc-check.js?v=9f49b5d0"></script>
+<script src="lib/acq-impact-discovery.js?v=8401e707"></script>
 <script src="lib/acq-impact-engagement.js?v=d36b6629"></script>
-<script src="lib/acq-impact-stories.js?v=0db53caa"></script>
+<script src="lib/acq-impact-stories.js?v=6564843e"></script>
 <script src="lib/acq-development-review.js?v=ddfaa1d6"></script>
 <script src="lib/acq-claim-check.js?v=3a241441"></script>
+<script src="lib/acq-weekly-slice.js?v=08ab7b29"></script>
+<script src="lib/acq-weekly-video.js?v=4afa75bd"></script>
+<script src="lib/acq-weekly-topics.js?v=58db4da5"></script>
 <script src="assets/acquisition-video-producer.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script>
@@ -465,6 +485,12 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       var el = document.getElementById('tab-claimcheck');
       if (el && window.HS && window.HS.acqClaimCheck) window.HS.acqClaimCheck.load(window.hsClient, el);
     },
+    // Live, gated (hs_weekly_*): Tab 20 Weekly Report topic queue. Never baked into the snapshot; render() skips it.
+    // QUEUE ONLY: acq-weekly-slice.js is loaded as a library (the research answer format) and is never mounted here.
+    weeklyreport: function () {
+      var el = document.getElementById('tab-weeklyreport');
+      if (el && window.HS && window.HS.acqWeeklyTopics) window.HS.acqWeeklyTopics.load(window.hsClient, el);
+    },
     videoproducer: function () {
       var container = document.getElementById('tab-videoproducer');
       if (
@@ -543,6 +569,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       if(id==='impactstories') return;
       if(id==='dossiers') return;
       if(id==='claimcheck') return;
+      if(id==='weeklyreport') return;
       el.innerHTML=tabs[id];
     });
     var vpEl=$('tab-videoproducer');
@@ -1391,9 +1418,12 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       fam += ' <span class="tile-tag" style="background:#f3ecfb;color:#5a3a8a;border:1px solid #d8c6ef">'+
         esc(String(HS.mapsSocialThemeLabel(thKey)||'').toUpperCase())+'</span>';
     }
+    // Quality-of-life score the engine stored on the draft (read only); a draft made before it shows none.
+    var qs=(window.HS&&HS.bskyQolScore)?HS.bskyQolScore(p):null;
+    var qolTag=(qs===null)?'':(' <span class="tile-tag" title="Quality-of-life impact score out of 100, from what the record states (homesignal-ingest qol-score)" style="background:#fff6e0;color:#7a5200;border:1px solid #ecd48f">QoL '+Math.round(qs)+'/100</span>');
     return '<div class="card" data-post="'+esc(p.id)+'" style="margin-bottom:12px">'+
       '<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">'+
-        '<div>'+fam+' '+statusTag+' <span class="muted" style="font-size:12px">'+esc(p.tile)+' · '+when+'</span></div>'+
+        '<div>'+fam+' '+statusTag+qolTag+' <span class="muted" style="font-size:12px">'+esc(p.tile)+' · '+when+'</span></div>'+
         '<div style="font-variant-numeric:tabular-nums;'+(over?'color:var(--persist);font-weight:700':'color:var(--muted)')+'">'+n+'/300</div>'+
       '</div>'+
       '<div style="white-space:pre-wrap;margin:10px 0;line-height:1.5">'+esc(p.post_text)+'</div>'+
@@ -1464,7 +1494,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         bskySubscriberStrip(sub, allRows)+g.subscriber.map(blueskyRow).join('');
     }
     var nd=g.review.length;
-    html+=bskyGroupHead('To review', nd+' draft'+(nd===1?'':'s')+', newest first', false)+
+    html+=bskyGroupHead('To review', nd+' draft'+(nd===1?'':'s')+', highest quality-of-life score first (unscored last)', false)+
       (nd?g.review.map(blueskyRow).join(''):'<div class="muted">'+esc(visible.length?'No other drafts in this view.':emptyMsg)+'</div>');
     var na=g.approved.length;
     if(na){
@@ -1892,6 +1922,16 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       var stamp=document.getElementById('bsky-stamp'); if(stamp) stamp.textContent='updated '+new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
     }catch(e){ body.innerHTML='<div class="muted">Queue error.</div>'; }
   }
+  // ONE ACTION PER POST AT A TIME. Approve takes a second or two (claim check, then the RPC),
+  // and the button stayed live meanwhile, so a second click sent a second approve for a post
+  // the first had already approved. The database refused it ("only a draft can be approved")
+  // and the founder saw "Approve failed" over a post that was in fact approved.
+  var _bskyBusy={};
+  async function blueskyActionGuarded(id, act){
+    if(_bskyBusy[id]) return;
+    _bskyBusy[id]=true;
+    try{ await blueskyAction(id, act); } finally { delete _bskyBusy[id]; }
+  }
   async function blueskyAction(id, act){
     try{
       if(act==='approve'){
@@ -1929,10 +1969,12 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         // ("re-read it before approving") means the row moved; refreshBluesky() rebuilds
         // _bskyRows, so the NEXT click reviews the current revision. It does not call
         // hs_approve_social_post: the founder must look again and approve again.
+        // Already approved by an earlier click or another tab: not a failure, just refresh.
+        if(r.error && /only a draft can be approved/i.test(r.error.message||'')){ refreshBluesky(); return; }
         if(r.error){ alert('Approve failed: '+(r.error.message||'')); refreshBluesky(); return; }
       } else if(act==='skip'){
-        var r2=await window.hsClient.from('social_posts').update({status:'skipped'}).eq('id',id);
-        if(r2.error){ alert('Skip failed: '+(r2.error.message||'')); return; }
+        openBskySkip(id);
+        return; // modal records the reason and skips; it refreshes the queue itself
       } else if(act==='edit'){
         openBskyEdit(id);
         return; // modal handles its own save/refresh — no DB write yet
@@ -2072,6 +2114,50 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     $('bsky-edit-overlay').style.display='flex';
     ta.focus();
   }
+  // ---- Skip with a reason. hs_social_post_skip skips the post AND saves the reason, with a
+  // snapshot of the post (ZIP, theme, quality-of-life score, project type, text), in one
+  // transaction. The codes below must match social_post_skip_reasons_codes (docs/social-skip-reasons.sql).
+  var BSKY_SKIP_REASONS=[
+    ['not_neighborhood_change','Not a change residents would notice'],
+    ['too_minor','Too minor'],
+    ['wrong_project_type','Wrong project type'],
+    ['duplicate','Duplicate'],
+    ['already_covered','Already covered'],
+    ['bad_name_or_address','Bad name or address'],
+    ['poor_map','Poor map'],
+    ['wrong_place','Wrong place'],
+    ['other','Other']
+  ];
+  var bskySkipId=null, bskySkipBusy=false;
+  function openBskySkip(id){
+    bskySkipId=id;
+    var p=_bskyRows[id]||null;
+    $('bsky-skip-sub').textContent='ZIP '+((p&&p.zip)||'')+' \u2014 tell the selector why, so it can pick better posts. Optional, but it is how it learns.';
+    $('bsky-skip-chips').innerHTML=BSKY_SKIP_REASONS.map(function(r){
+      return '<label style="display:inline-flex;align-items:center;gap:5px;border:1px solid #cfd8d3;border-radius:14px;padding:4px 10px;font-size:12.5px;cursor:pointer">'+
+        '<input type="checkbox" data-skip-code="'+r[0]+'"> '+esc(r[1])+'</label>';
+    }).join('');
+    $('bsky-skip-note').value='';
+    $('bsky-skip-confirm').disabled=false;
+    $('bsky-skip-overlay').style.display='flex';
+    $('bsky-skip-note').focus();
+  }
+  function closeBskySkip(){ $('bsky-skip-overlay').style.display='none'; bskySkipId=null; }
+  async function confirmBskySkip(){
+    if(!bskySkipId||bskySkipBusy) return;
+    bskySkipBusy=true; $('bsky-skip-confirm').disabled=true;
+    var id=bskySkipId;
+    var codes=[].map.call(document.querySelectorAll('#bsky-skip-chips input:checked'),function(i){return i.getAttribute('data-skip-code');});
+    try{
+      var r=await window.hsClient.rpc('hs_social_post_skip',{p_id:id,p_reasons:codes,p_note:$('bsky-skip-note').value});
+      // Already skipped (another tab or click): nothing to report, just re-read the queue.
+      if(r.error && !/only a draft or an approved post can be skipped/i.test(r.error.message||'')){
+        alert('Skip failed: '+(r.error.message||'')); $('bsky-skip-confirm').disabled=false; return;
+      }
+      closeBskySkip(); refreshBluesky();
+    }catch(e){ alert('Skip error.'); $('bsky-skip-confirm').disabled=false; }
+    finally{ bskySkipBusy=false; }
+  }
   function closeBskyEdit(){ $('bsky-edit-overlay').style.display='none'; bskyEditId=null; }
   // \u26a0\ufe0f FREE TEXT DOES NOT INHERIT A VALIDATION. This modal writes post_text
   // straight to PostgREST under the owner's RLS policy, so it never touches the composer
@@ -2149,6 +2235,10 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     document.body.appendChild(marker);
     $('bsky-edit-textarea').addEventListener('input', bskyEditCountUpdate);
     $('bsky-edit-cancel').addEventListener('click', closeBskyEdit);
+    $('bsky-skip-cancel').addEventListener('click', closeBskySkip);
+    $('bsky-skip-close').addEventListener('click', closeBskySkip);
+    $('bsky-skip-confirm').addEventListener('click', confirmBskySkip);
+    $('bsky-skip-overlay').addEventListener('click', function(e){ if(e.target===$('bsky-skip-overlay')) closeBskySkip(); });
     $('bsky-edit-close').addEventListener('click', closeBskyEdit);
     $('bsky-edit-save').addEventListener('click', saveBskyEdit);
     $('bsky-edit-overlay').addEventListener('click', function(e){ if(e.target===$('bsky-edit-overlay')) closeBskyEdit(); });
@@ -2193,7 +2283,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         var zo=btn.getAttribute('data-zo');
         if(zo){ zipOrderAction(zo); return; }
         var wrap=btn.closest('[data-post]'); if(!wrap) return;
-        blueskyAction(wrap.getAttribute('data-post'), btn.getAttribute('data-act'));
+        blueskyActionGuarded(wrap.getAttribute('data-post'), btn.getAttribute('data-act'));
       });
     }
     refreshBluesky();

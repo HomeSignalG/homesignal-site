@@ -86,8 +86,8 @@
   } catch (e) {}
 })();
 </script>
-<link rel="stylesheet" href="layout.css?v=c3f3f5d5">
-<link rel="stylesheet" href="app.css?v=aad7c2d4"/>
+<link rel="stylesheet" href="layout.css?v=0a9f8b10">
+<link rel="stylesheet" href="app.css?v=a6a760af"/>
 <style>
   :root{
     --ink:#0F1A1C; --soft:#46565A; --mute:#5b6d71; --line:#E7ECEA; --paper:#EEF2F1; --card:#fff;
@@ -208,6 +208,23 @@
   .viewseg button{border:0;background:transparent;font:600 12px var(--font);color:var(--soft);padding:6px 13px;cursor:pointer}
   .viewseg button.on{background:var(--green);color:#fff}
   .map-frame{position:relative;height:600px;border-radius:14px;overflow:hidden}
+  /* MAP 1 PROJECT PANEL (lib/map1-project-panel.js): one project's information and documents, opened by a
+     ?project= link or by "Details & documents" in a popup. Below the map so it never covers the pins. */
+  .projpanel{position:relative;margin-top:12px;border:1px solid var(--line,#d9e2df);border-radius:12px;padding:14px 16px;background:#fff}
+  .projpanel .pp-h{margin:0 28px 8px 0;font-size:18px;line-height:1.3}
+  .projpanel .pp-row{display:flex;gap:10px;flex-wrap:wrap;margin:3px 0;font-size:14px}
+  .projpanel .pp-k{min-width:110px;color:#5d6f72}
+  .projpanel .pp-v{flex:1 1 200px}
+  .projpanel .pp-sec{margin-top:12px;font-weight:600;font-size:14px}
+  .projpanel .pp-list{margin:4px 0 0;padding-left:18px;font-size:14px}
+  .projpanel .pp-list li{margin:3px 0}
+  .projpanel .pp-note{font-size:12px;color:#5d6f72}
+  .projpanel .pp-d{font-weight:600}
+  .projpanel .pp-muted,.projpanel .pp-p{color:#5d6f72;font-size:14px}
+  .projpanel .pp-foot{margin-top:12px;font-size:12px;color:#5d6f72}
+  .projpanel .pp-close{position:absolute;top:8px;right:10px;border:0;background:none;font-size:22px;line-height:1;cursor:pointer;color:#5d6f72}
+  .hs-embed .projpanel{display:none}
+  .pp-open{margin-top:6px;border:1px solid #c9d6d2;background:#f4f8f7;border-radius:8px;padding:3px 8px;font-size:12px;cursor:pointer}
   #map{position:absolute;inset:0;z-index:0}
   #mapInner{position:absolute;inset:0}
   .mapgl{position:absolute;inset:0;display:none;background:#0a1012;z-index:1}
@@ -355,6 +372,7 @@
     background:#fdecec;border:1px solid #f5c9c9;border-radius:6px;padding:2px 7px}
   .empty{color:var(--mute);font-size:13px;padding:12px 0}
   .listmore{color:var(--mute);font-size:12.5px;padding:8px 0 2px}
+  .listhidden{color:var(--mute);font-size:12.5px;padding:8px 0 2px;font-style:italic}
 
   .foot{color:var(--mute);font-size:12px;margin:8px 0 40px;line-height:1.6}
   /* About block: real, visible, crawlable copy for the landing page. It is the same text for people and
@@ -903,6 +921,7 @@
               </div>
             </div>
           </div>
+          <section class="projpanel" id="projPanel" hidden aria-live="polite" aria-label="Project information"></section>
         </div>
         <div class="card read">
           <h2 id="withinLbl">Within 1 mile of</h2>
@@ -998,6 +1017,7 @@
         </div>
       </div>
 
+      <div id="dcFresh"></div>
       <div id="srcFresh"></div>
       <div class="foot" id="foot"></div>
     </div>
@@ -1040,18 +1060,21 @@
 <script src="config.js"></script>
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
-<script src="lib/data.js?v=65b0cd6d"></script>
+<script src="lib/data.js?v=4033ae3a"></script>
 <script src="lib/topic-prefs.js?v=fe87d99b"></script>
-<script src="lib/templates.js?v=6bbb33ed"></script>
-<script src="lib/project-type.js?v=ed9e58be"></script>
+<script src="lib/templates.js?v=7373e258"></script>
+<script src="lib/dc-freshness.js?v=9f6266a3"></script>
+<script src="lib/project-type.js?v=852af398"></script>
 <script src="lib/map.js?v=c2fa4469"></script>
-<script src="lib/residential-qualify.js?v=20260905"></script>
-<script src="lib/n5-radius.js?v=f26fcf4f"></script>
+<script src="lib/residential-qualify.js?v=c1df4b64"></script>
+<script src="lib/n5-radius.js?v=4f9e7a28"></script>
 <script src="lib/zip-authoritative.js?v=20261029a"></script>
+<script src="lib/project-page-link.js?v=20261112a"></script>
 <script src="lib/state-cleanup.js?v=20261022a"></script>
 <script src="lib/water-rights.js?v=add4200a"></script>
 <script src="lib/water-rights-map.js?v=f867f0d7"></script>
-<script src="lib/commercial-coverage.js?v=20260905"></script>
+<script src="lib/map1-project-panel.js?v=9d60c8c6"></script>
+<script src="lib/commercial-coverage.js?v=9fae86f0"></script>
 <script src="lib/premium-waitlist.js?v=3cb9baaf"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
 <script src="shell.js?v=4fa4fbd4"></script>
@@ -1385,6 +1408,8 @@ HS.onReady(function(){
   // rather than a nicety. Populated per load from the plane's own source_name values, so a
   // load that returns no national records shows no credit - never a hardcoded claim.
   var NATIONAL_SOURCES = [];
+  // source_name of every data-centre pin that can reach the page (lib/dc-freshness.js).
+  var NATIONAL_SOURCE_NAMES = [];
   var LAST_DRAW = null;            // {data,sites} of the last render — lets a radius change re-cull/re-frame the ZIP view with no network pull
   var LAST_HOME = { lat:41.5105, lng:-112.0155 };
   var CUR_RADIUS = 1;              // search radius in miles (½ / 1 / 2 / 3 / 5 / 10 / 20)
@@ -2008,6 +2033,7 @@ HS.onReady(function(){
     // A facility's record_url IS its ECHO report, so for env sites show the shared env links (ECHO +
     // TCEQ); a non-env point (e.g. a TABS permit) keeps its labeled record link.
     var links = hasEnvRecord(s) ? envLinks(s).join("") : (link ? recordLink(s, link) : "");
+    if(window.HS && HS.projectPages) links += HS.projectPages.linkHTML(s);
     return "<button class='cl' id='mk3close' aria-label='Close'>×</button>"+
       "<div class='ci-n'>"+esc(s.label||"")+"</div>"+
       "<div class='ci-t'>"+esc(typeLine)+(dist?" · "+dist:"")+"</div>"+
@@ -2562,6 +2588,14 @@ HS.onReady(function(){
     }, function(){ /* no ZIP page known: no sign-up offered for this address */ });
   }
 
+  // Project pages (lib/project-page-link.js): read this ZIP's published index once; when it
+  // lands after the lists were drawn, fill their link slots. Popups read it when opened.
+  var PP_WIRED = false;
+  function loadProjectPages(zip){
+    if(!(window.HS && HS.projectPages)) return;
+    if(!PP_WIRED){ PP_WIRED = true; HS.projectPages.onLoad(function(){ HS.projectPages.fill(document); }); }
+    HS.projectPages.load(zip);
+  }
   function loadZip(zip){
     ZIP_MODE = true; ZIP_CODE = zip; HOME_ANCHOR = true;
     document.body.classList.remove("addrzip");
@@ -2570,6 +2604,7 @@ HS.onReady(function(){
     // HOME-specific control stays hidden.
     document.body.classList.remove("hashome");
     var token = ++REQ_SEQ;                  // same stale-response guard as address mode
+    ppHide();   // a panel belongs to the ZIP it was opened on
     paintZipBoundary(zip);                  // the ZIP's real outline, on every view of every ZIP map
     N5_NOTE = "";                           // ZIP mode never carries an address-radius note
     ZIP_AUTH = null;                        // cleared until this ZIP's authoritative read lands
@@ -2811,6 +2846,8 @@ HS.onReady(function(){
         // nothing visible. Measured: an array of junk rows survives the object filter and used
         // to render the literal "Data-centre locations from undefined".
         NATIONAL_SOURCES = HS.map1DcCredits(natlSites);
+        NATIONAL_SOURCE_NAMES = natlSites.filter(function(s){ return s && s.source_name && s.record_url; })
+          .map(function(s){ return s.source_name; });
         // The cached report's development counters describe ITS centroid-radius development set,
         // which no longer renders in ZIP mode - authoritative whole-ZIP geography replaced it.
         // Leaving them makes the headline tile contradict the map the resident is looking at
@@ -2857,6 +2894,7 @@ HS.onReady(function(){
           setIndexable(false);              // an empty ZIP is never indexed, either way
           $("results").style.display = "block";
           status(HS.zipAuthNote(auth, zip, []));
+          focusPendingProject();            // a ?project= link still gets its answer
         }
       })
       .catch(function(){
@@ -2864,6 +2902,7 @@ HS.onReady(function(){
         window.__HS_SITES = [];
         $("results").style.display = "block";
         status("Couldn't load ZIP " + zip + ". Enter your address for the live view.", true);
+        focusPendingProject();
       });
   }
 
@@ -3104,37 +3143,20 @@ HS.onReady(function(){
     var bt = builtBandText(builtRows);
     if($("builtHead")) $("builtHead").textContent = bt.h;
     if($("builtSub")) $("builtSub").textContent = bt.s;
-    listInto("builtList", builtRows, "No completed agency records or source-listed operating data centers in Jody for this area. This does not mean nothing operates here.");
-    listInto("unknownList", unknownRows, "Nothing on record here without a stated lifecycle.");
-    listInto("apprList", appr, "Nothing approved on record right now.");
-    // STATE CLEANUP SITES — their own band, shown only when this view holds one.
-    var cuBand = $("cleanupBand"), cuList = $("cleanupList");
-    if(cuBand && cuList){
-      cuBand.hidden = !cleanupSites.length;
-      cuList.innerHTML = cleanupSites.length ? HS.stateCleanupListHTML(cleanupSites, esc, LIST_CAP) : "";
-    }
-    // WATER RIGHTS FILINGS — their own band, shown only when this view holds one.
-    var wrBand = $("waterBand"), wrList = $("waterList");
-    if(wrBand && wrList){
-      wrBand.hidden = !waterSites.length;
-      wrList.innerHTML = waterSites.length ? HS.waterRightsListHTML(waterSites, esc, LIST_CAP) : "";
-    }
-    // showCurrentStatus is scoped to the PROPOSED rail alone. It is the rail whose
-    // heading a reader takes as a statement about now, and the only one that can hold a
-    // decided application. Approved/Operating rails are byte-for-byte unchanged.
-    listInto("propList", prop, "No proposed item on record right now.", { showCurrentStatus: true });
+    // THE COLUMNS FOLLOW THE FILTERS (2026-11-15). The rows are kept here and drawn by
+    // renderLists(), which applyFilter() also calls, so a Status / Type / switch change
+    // redraws the lists from the SAME siteVisible() the three map views use.
+    LIST_ROWS = { built: builtRows, unknown: unknownRows, appr: appr, prop: prop,
+                  cleanup: cleanupSites, water: waterSites };
+    renderLists();
     // ── DISCLOSE A MIXED BROWSING CATEGORY ─────────────────────────────────────────
     // The rail's sub-line read "Hearings and notices you can still weigh in on" — an
     // active claim over every row in it. Once a decided application legitimately sits
     // here, that sentence is wrong for those rows, so the heading says what the category
     // actually means. Shown ONLY when the rail really holds one, so a page with none is
     // unchanged and the sentence never appears without something to explain.
-    var propNote = HS.proposedRailNote ? HS.proposedRailNote(prop) : "";
-    var propSub = $("propSub");
-    if(propSub){
-      propSub.innerHTML = "Hearings and notices in this area"
-        + (propNote ? "<span class='histnote'>" + esc(propNote) + "</span>" : "");
-    }
+    // (The Proposed sub-line, with its decided-application note, is drawn by renderLists()
+    // from the rows the filters leave visible.)
     // Non-headlined civic list (engine contract): real public hearings that aren't development.
     // Neutral dot + plain date (not a "closes in N days" comment countdown). Band hides when empty.
     // (The civic list band was removed 2026-09-26, founder decision: these notices live on the
@@ -3164,6 +3186,11 @@ HS.onReady(function(){
     // it shows the source-wide facts only and makes no ZIP claim.
     if(window.HS && HS.mountSourceFreshness){
       HS.mountSourceFreshness($("srcFresh"), { zip: ZIP_MODE ? ZIP_CODE : null, ids: HS.sourceFreshnessIds(sites) });
+    }
+    // DATA-CENTRE SOURCE FRESHNESS (founder, 2026-11-12): last successful refresh and its age per
+    // data-centre source with a pin here, kept apart from our last attempt (lib/dc-freshness.js).
+    if(window.HS && HS.mountDcFreshness){
+      HS.mountDcFreshness($("dcFresh"), NATIONAL_SOURCES.length ? NATIONAL_SOURCE_NAMES : [], HS.sb);
     }
     // Hooked at the END of render because render OWNS the camera and clears the layers:
     // every pass does `map.setView(...)`, so a fit applied from the RPC's own callback would
@@ -3326,7 +3353,7 @@ HS.onReady(function(){
       var solidPoint = s.scope==="point" && !isApproxPoint(s);
       var size = solidPoint ? 14 : 12;
       var m = L.marker(ll, { icon: siteIcon(mk, size, solidPoint, markerTitle(s, mk)) });
-      m.bindPopup(popupHTML(s));
+      m.bindPopup(function(){ return popupHTML(s); });
       m.on("mouseover", function(){ this.openPopup(); });
       siteMarkers.push({ m:m, bucket:bucketOf(s.type, s), s:s, mk:mk, size:size, solidPoint:solidPoint });
       bounds.push(ll);
@@ -3339,6 +3366,7 @@ HS.onReady(function(){
     // their footprint re-frame the view — the parcel geometry is the point of the ZIP-precise page).
     drawParcels();
     publishVerifyState();
+    focusPendingProject();
   }
 
   // Expose map/filter state for verify-development + verify-representative-zips (closure-safe).
@@ -3553,6 +3581,7 @@ HS.onReady(function(){
     });
     syncTypeEmptyNote();
     syncStageEmptyNote();
+    renderLists();
     if(V3.active){ build3DFacilities(); }   // legend toggles apply to the 3D views too
     if(GL.active){ buildGLMarkers(); }
     publishVerifyState();
@@ -3837,6 +3866,13 @@ HS.onReady(function(){
   function recordKind(s){
     var url = String((s && (s.record_url || s.url)) || "").toLowerCase();
     var src = String((s && s.src) || "").toLowerCase();
+    // A national data-centre listing (Compute Atlas, Epoch, OpenStreetMap) is a third-party
+    // dataset, not a government record: its link is the source that dataset cites (often a
+    // news story) or the OpenStreetMap object itself. Say so; never call it an official record.
+    if(s && s.record_kind === "national_project"){
+      if(/openstreetmap\.org/.test(url)) return "OpenStreetMap entry (third-party)";
+      return "Source cited by " + (s.source_name ? String(s.source_name) : "a third-party dataset") + " (third-party)";
+    }
     // Federal facility registry → EPA ECHO detailed facility report.
     if(/echo\.epa\.gov/.test(url) || /\bepa\s+frs\b/.test(src)) return "EPA facility record";
     // State construction / licensing permit filings (carry a project number; e.g. TX TDLR TABS).
@@ -3863,6 +3899,8 @@ HS.onReady(function(){
     // below), so don't also render a duplicate "EPA facility record" link here; a non-env point
     // (e.g. a TABS permit) keeps its labeled record link.
     var a = (!hasEnvRecord(s) && link) ? " · " + recordLink(s, link) : "";
+    // The record's own project page, when the build published one (lib/project-page-link.js).
+    if(window.HS && HS.projectPages) a += HS.projectPages.linkHTML(s);
     // Prefer the engine-stamped canonical_addr (v17 — the ONE normalizer is engine-side); the
     // filed location_addr is only a fallback for rows cached before v17. Same key + precedence
     // the list view uses (listInto) to route to our internal property page.
@@ -3908,9 +3946,124 @@ HS.onReady(function(){
     var statusHtml = (bucketOf(s.type, s) === "proposed") ? currentStatusHTML(s, "popunv") : "";
     // The source line leads with the source; with none to name, the links lose their leading dot.
     var sl = srcLabel(s);
+    // The project panel (lib/map1-project-panel.js): name, location, status, dates, documents and open questions.
+    var ppKey = (HS.map1SiteMapKey && ZIP_MODE) ? HS.map1SiteMapKey(s) : null;
+    var ppBtn = ppKey ? "<div><button type='button' class='pp-open' data-pp-key='"+esc(ppKey)+"'>Details &amp; documents</button></div>" : "";
     return "<div class='pt'>"+esc(s.label)+"</div><div class='pk'>"+kind+distStr+"</div>"+
       decHtml+statusHtml+
-      "<div style='margin-top:4px'>"+esc(sl)+(sl ? a : a.replace(/^ · /, ""))+"</div>"+envHtml+approxNote+fanNote;
+      "<div style='margin-top:4px'>"+esc(sl)+(sl ? a : a.replace(/^ · /, ""))+"</div>"+envHtml+approxNote+fanNote+ppBtn;
+  }
+
+  // ── MAP 1 PROJECT LINK + PANEL (lib/map1-project-panel.js, docs/map1-project-link.sql) ─────────
+  // /map/<zip>/?project=<key> opens Map 1 on one project: public.map1_project_locate says which ZIP draws it
+  // today and under which map key; after the ZIP renders, the project's own stage and type are switched on
+  // (in this tab only: the address bar keeps the link exactly as it came, with no filter in it), the map
+  // centres on it, its popup opens and the panel below the map shows its information and documents.
+  // The panel reads approved documents only (public.map1_project_documents).
+  var PP = { key: (HS.map1ProjectParam ? HS.map1ProjectParam(window.location.href) : null),
+             zip: null, mapKey: null, pending: false, located: null, docSeq: 0 };
+  function ppRpc(fn, body){
+    return fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, {
+      method:"POST",
+      headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY, "Content-Type":"application/json" },
+      body: JSON.stringify(body)
+    }).then(function(r){ if(!r.ok) throw new Error("http " + r.status); return r.json(); });
+  }
+  function ppSiteByKey(key){
+    for(var i = 0; i < siteMarkers.length; i++){
+      if(HS.map1SiteMapKey(siteMarkers[i].s) === key) return siteMarkers[i];
+    }
+    return null;
+  }
+  function ppEl(){ return document.getElementById("projPanel"); }
+  function ppShow(html){
+    var el = ppEl(); if(!el) return;
+    el.innerHTML = html; el.hidden = false;
+  }
+  function ppHide(){ var el = ppEl(); if(el){ el.hidden = true; el.innerHTML = ""; } }
+  function ppNotice(kind){ ppShow(HS.map1ProjectPanelHTML(null, { esc: esc, zip: ZIP_CODE, notice: kind })); window.__HS_PROJECT_NOTICE = kind; }
+  function ppRender(s, docs, docsState){
+    ppShow(HS.map1ProjectPanelHTML(s, {
+      esc: esc, zip: ZIP_CODE, kindLabel: kindLabel(s),
+      decisionHtml: decisionNoteHTML(s, "popdec"),
+      currentStatusHtml: (bucketOf(s.type, s) === "proposed") ? currentStatusHTML(s, "popunv") : "",
+      docs: docs, docsState: docsState
+    }));
+  }
+  // Open the panel for one drawn site, then read its approved documents.
+  function ppOpen(x, scroll){
+    var s = x.s, key = HS.map1SiteMapKey(s), seq = ++PP.docSeq;
+    ppRender(s, null, "loading");
+    if(scroll){ var el = ppEl(); if(el && el.scrollIntoView) try { el.scrollIntoView({ block:"nearest" }); } catch(e){} }
+    ppRpc("map1_project_documents", { p_map_keys: [key] }).then(function(rows){
+      if(seq !== PP.docSeq) return;
+      ppRender(s, Array.isArray(rows) ? rows.filter(function(r){ return r && r.map_key === key; }) : [], "ok");
+    }).catch(function(){
+      if(seq !== PP.docSeq) return;
+      ppRender(s, null, "failed");
+    });
+  }
+  // Make one drawn site visible without touching the address bar: its stage, and one of its types.
+  function ppReveal(x){
+    var changed = false;
+    if(!FILTER[x.bucket]){ FILTER[x.bucket] = true; syncStageControls(); changed = true; }
+    if(HS.categoryVisible && !HS.categoryVisible(x.mk || x.s) && HS.markerCategories){
+      var types = HS.markerCategories(x.mk || x.s).filter(function(k){ return TYPE_KEYS.indexOf(k) !== -1; });
+      if(types.length){ HS.setCategoryFilter(types[0], true); syncTypeControls(); changed = true; }
+    }
+    if(changed) applyFilter();
+  }
+  function focusPendingProject(){
+    if(!PP.pending || !ZIP_MODE || ZIP_CODE !== PP.zip) return;
+    PP.pending = false;
+    var x = PP.mapKey ? ppSiteByKey(PP.mapKey) : null;
+    if(!x){
+      // Only the lookup's own answer may say the project is absent; a failed read never does.
+      var st = PP.located && PP.located.state;
+      var notice = PP.lookupFailed ? "lookup_unavailable"
+                 : (st === "found" ? "not_shown" : (st === "not_on_map" || st === "unknown_key" || st === "ambiguous") ? st : "lookup_unavailable");
+      ppNotice(notice); return;
+    }
+    ppReveal(x);
+    try { map.setView(x.m.getLatLng(), 16, { animate:false }); } catch(e){}
+    try { x.m.openPopup(); } catch(e){}
+    ppOpen(x, true);
+    window.__HS_PROJECT_FOCUS = { key: PP.key, mapKey: PP.mapKey, zip: ZIP_CODE };
+  }
+  document.addEventListener("click", function(ev){
+    var t = ev.target && ev.target.closest ? ev.target.closest("[data-pp-key],[data-pp='close']") : null;
+    if(!t) return;
+    if(t.getAttribute("data-pp") === "close"){ ppHide(); return; }
+    var x = ppSiteByKey(t.getAttribute("data-pp-key"));
+    if(x) ppOpen(x, true);
+  }, true);   // capture phase: handled before any popup or map handler can stop the click
+  // Resolve the link's key before the ZIP loads, so a project that moved ZIPs (or was merged) still opens.
+  function ppBoot(routeZip, load){
+    if(!PP.key){ load(routeZip); return; }
+    ppRpc("map1_project_locate", { p_key: PP.key, p_zip: routeZip || null }).then(function(r){
+      // An answer without a known state is not an answer (e.g. a stub or a changed function): treat it as unavailable.
+      if(!r || ["found", "not_on_map", "unknown_key", "ambiguous", "bad_key"].indexOf(r.state) === -1) throw new Error("no state");
+      PP.located = r;
+      var zip = (r && r.state === "found" && /^\d{5}$/.test(String(r.zip || ""))) ? String(r.zip) : routeZip;
+      if(r && r.state === "found"){
+        PP.mapKey = String(r.map_key || "");
+        if(zip !== routeZip && window.history && window.history.replaceState){
+          try {
+            var u = new URL(window.location.href);
+            window.history.replaceState(window.history.state, "", "/map/" + zip + "?project=" + encodeURIComponent(PP.key) + u.hash);
+          } catch(e){}
+        }
+      }
+      PP.zip = zip; PP.pending = !!zip;
+      if(zip) load(zip); else ppNotice(r.state === "bad_key" ? "unknown_key" : r.state);
+    }).catch(function(){
+      // The lookup could not be read (network, or map1_project_locate not installed): open the ZIP the link names.
+      // A key Map 1 draws under its own name still matches; anything else says the lookup failed, never "not on the map".
+      PP.lookupFailed = true;
+      PP.mapKey = /^n5:/.test(PP.key) ? PP.key : (/^nat:/.test(PP.key) ? PP.key.slice(4) : null);
+      PP.zip = routeZip; PP.pending = !!routeZip;
+      if(routeZip) load(routeZip); else ppNotice("lookup_unavailable");
+    });
   }
 
   // ONE PROJECT = ONE CARD. The rails are built from SITES, and one project can legitimately own
@@ -3935,11 +4088,86 @@ HS.onReady(function(){
     });
     return out;
   }
+  // ── THE COLUMNS FOLLOW THE FILTERS ────────────────────────────────────────────
+  // render() stores each column's rows; this draws them through siteVisible(), the one
+  // predicate the 2D, 3D aerial and 3D satellite views use, so a row is listed exactly
+  // when its pin is drawn. A column whose rows are all filtered out says WHY, and how many,
+  // rather than claiming the area has nothing ("Nothing approved on record" would be false).
+  var LIST_ROWS = null;
+  function visibleSplit(items){
+    var all = dedupeByProject(items || []);
+    var shown = all.filter(function(s){ return siteVisible(s); });
+    return { all: all, shown: shown, hidden: all.length - shown.length };
+  }
+  function hiddenNoteText(n, stageKey){
+    var what = n === 1 ? "1 record here is" : n + " records here are";
+    if(stageKey && !FILTER[stageKey]){
+      return what + " hidden by your Status filter. Check “" + (STAGE_LABEL[stageKey] || stageKey)
+        + "” above to list " + (n === 1 ? "it" : "them") + ".";
+    }
+    return what + " hidden by your Project Type or Regulatory filters.";
+  }
+  function renderLists(){
+    if(!LIST_ROWS || !$("builtList")) return;
+    listInto("builtList", LIST_ROWS.built, "No completed agency records or source-listed operating data centers in Jody for this area. This does not mean nothing operates here.", { stage: "operating" });
+    listInto("unknownList", LIST_ROWS.unknown, "Nothing on record here without a stated lifecycle.", { stage: "unknown" });
+    listInto("apprList", LIST_ROWS.appr, "Nothing approved on record right now.", { stage: "approved" });
+    // STATE CLEANUP SITES — their own band, shown only when this view holds one; listed only
+    // while their own switch is on, as on the map.
+    var cuBand = $("cleanupBand"), cuList = $("cleanupList"), cu = LIST_ROWS.cleanup || [];
+    if(cuBand && cuList){
+      cuBand.hidden = !cu.length;
+      var cuOn = HS.stateCleanupVisible ? HS.stateCleanupVisible() : true;
+      cuList.innerHTML = !cu.length ? ""
+        : cuOn ? HS.stateCleanupListHTML(cu, esc, LIST_CAP)
+        : "<div class='empty listhidden'>Hidden: turn on “State cleanup sites” above to list them.</div>";
+    }
+    // WATER RIGHTS FILINGS — their own band, shown only when this view holds one.
+    var wrBand = $("waterBand"), wrList = $("waterList"), wr = LIST_ROWS.water || [];
+    if(wrBand && wrList){
+      wrBand.hidden = !wr.length;
+      var wrOn = HS.waterRightsVisible ? HS.waterRightsVisible() : true;
+      wrList.innerHTML = !wr.length ? ""
+        : wrOn ? HS.waterRightsListHTML(wr, esc, LIST_CAP)
+        : "<div class='empty listhidden'>Hidden: turn on “Water rights filings” above to list them.</div>";
+    }
+    // showCurrentStatus is scoped to the PROPOSED rail alone. It is the rail whose
+    // heading a reader takes as a statement about now, and the only one that can hold a
+    // decided application. Approved/Operating rails are byte-for-byte unchanged.
+    var propShown = listInto("propList", LIST_ROWS.prop, "No proposed item on record right now.", { showCurrentStatus: true, stage: "proposed" });
+    // ── DISCLOSE A MIXED BROWSING CATEGORY ─────────────────────────────────────────
+    // The rail's sub-line read "Hearings and notices you can still weigh in on" — an
+    // active claim over every row in it. Once a decided application legitimately sits
+    // here, that sentence is wrong for those rows, so the heading says what the category
+    // actually means. Shown ONLY when the LISTED rows really hold one.
+    var propNote = HS.proposedRailNote ? HS.proposedRailNote(propShown || []) : "";
+    var propSub = $("propSub");
+    if(propSub){
+      propSub.innerHTML = "Hearings and notices in this area"
+        + (propNote ? "<span class='histnote'>" + esc(propNote) + "</span>" : "");
+    }
+    publishListState();
+  }
+  // Test/probe hook: what each column lists right now (row identities), beside the map.
+  function publishListState(){
+    var out = {};
+    ["builtList","unknownList","apprList","propList"].forEach(function(id){
+      var el = $(id); if(!el) return;
+      out[id] = Array.prototype.map.call(el.querySelectorAll(".rec"), function(r){ return r.getAttribute("data-ref"); });
+    });
+    window.__HS_LISTS = out;
+  }
   function listInto(id, items, emptyMsg, opts){
     opts = opts || {};
     var el = $(id);
-    items = dedupeByProject(items);
-    if(!items.length){ el.innerHTML = "<div class='empty'>"+emptyMsg+"</div>"; return; }
+    var split = visibleSplit(items);
+    items = split.shown;
+    var hiddenNote = split.hidden ? "<div class='listhidden'>" + esc(hiddenNoteText(split.hidden, opts.stage)) + "</div>" : "";
+    if(!items.length){
+      el.innerHTML = split.hidden ? "<div class='empty listhidden'>" + esc(hiddenNoteText(split.hidden, opts.stage)) + "</div>"
+        : "<div class='empty'>"+emptyMsg+"</div>";
+      return items;
+    }
     el.innerHTML = items.slice(0, LIST_CAP).map(function(s, i){
       // The dot is the record's LIFECYCLE colour — the same bucketOf the pin and the band use —
       // never its raw `type` (an EPA point's legacy `type:"built"` is not lifecycle evidence).
@@ -3957,6 +4185,9 @@ HS.onReady(function(){
       // links every fact to its own official record); label it as such, not "record ▸".
       if(pkey){ a = " · <a href='"+esc(propertyHref(pkey))+"'>Address page →</a>"; }
       else if(link){ a = " · " + recordLink(s, link); }
+      // The record's own project page, when the build published one; a slot filled later
+      // when the ZIP's index lands after this list was drawn (lib/project-page-link.js).
+      if(window.HS && HS.projectPages) a += HS.projectPages.slotHTML(s);
       // Environmental record (shared helper): the headline signal, colored by severity, with the
       // official ECHO/TCEQ links. Only an alert/watch signal is worth a list flag — a clean
       // "no recorded violations" stays quiet in the compact list.
@@ -3991,7 +4222,8 @@ HS.onReady(function(){
       return "<div class='rec' data-ref='"+esc(railKey(s, i))+"'><span class='dot' style='background:"+col+"'></span>"+
         "<div style='flex:1'><div class='t'>"+esc(s.label)+"</div>"+
         "<div class='s'>"+esc(tag)+dstr+when+decidedTag+srcPart(s)+a+"</div>"+decHtml+statusHtml+v+"</div></div>";
-    }).join("") + listMoreHTML(items.length);
+    }).join("") + listMoreHTML(items.length) + hiddenNote;
+    return items;
   }
   // A rail shows at most LIST_CAP rows. When it holds more, it says so, rather than reading as
   // the whole list: on a dense ZIP the Operating rail used to stop at 12 with nothing to say
@@ -4674,6 +4906,7 @@ HS.onReady(function(){
       var approxPt=isApproxPoint(s);
       var el=glMarkerEl(s, approxPt);
       var popup=new maplibregl.Popup({offset:12,maxWidth:"260px"}).setHTML(popupHTML(s));
+      popup.on("open", function(){ popup.setHTML(popupHTML(s)); });
       var marker=new maplibregl.Marker({element:el}).setLngLat([ll[1],ll[0]]).setPopup(popup).addTo(GL.map);
       el.addEventListener("mouseenter",function(){ if(GL.cur&&GL.cur!==popup)GL.cur.remove(); if(!popup.isOpen())marker.togglePopup(); GL.cur=popup; });
       GL.markers.push({marker:marker,bucket:bkt});
@@ -4751,7 +4984,7 @@ HS.onReady(function(){
       var mk=L.marker([ll[0], ll[1]], {
         icon:L.divIcon({ html:el.outerHTML, className:"", iconSize:[size,size], iconAnchor:[size/2, size/2] })
       });
-      mk.bindPopup(popupHTML(s), { maxWidth:260 });
+      mk.bindPopup(function(){ return popupHTML(s); }, { maxWidth:260 });
       mk.addTo(GL.rasterLayer);
     });
   }
@@ -5700,6 +5933,7 @@ HS.onReady(function(){
   // The outline is keyed to its ZIP, so a late answer for a ZIP the page has left is dropped.
   function paintZipBoundary(zip){
     BOUNDARY_ZIP = (zip && /^\d{5}$/.test(String(zip))) ? String(zip) : null;
+    if(BOUNDARY_ZIP) loadProjectPages(BOUNDARY_ZIP);       // which records here have a project page
     ZIP_BOUNDARY = null;
     drawZipBoundary();                                     // clear any previous ZIP's line
     if(!window.HS || !HS.sb || !HS.boundaryFC) return;
@@ -5784,9 +6018,14 @@ HS.onReady(function(){
     if(!z && window.HS && HS.hasViewedZipContext && HS.hasViewedZipContext() && HS.state && /^\d{5}$/.test(String(HS.state.zip))){
       z = String(HS.state.zip);
     }
-    if(z && /^\d{5}$/.test(z)){
-      if(window.HS && HS.state) HS.state.zip = z;
-      loadZip(z); loadDevTracker(z);
+    if(PP.key && !(z && /^\d{5}$/.test(z))) z = null;
+    if(PP.key || (z && /^\d{5}$/.test(z))){
+      // A ?project= link resolves its project first (ppBoot); every other route loads as before.
+      ppBoot((z && /^\d{5}$/.test(z)) ? z : null, function(zz){
+        if(zz !== z && window.HS && HS.declareRouteZipPlace) HS.declareRouteZipPlace(zz);
+        if(window.HS && HS.state) HS.state.zip = zz;
+        loadZip(zz); loadDevTracker(zz);
+      });
     }
   })();
 });  // end HS.onReady — the page runtime above ran after the shell injected #hs-content

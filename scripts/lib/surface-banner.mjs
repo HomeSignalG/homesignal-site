@@ -76,6 +76,13 @@ export const SURFACES = {
     note: 'reads the RENDERED page only; the page reads public.meetings live (no materializer). '
         + 'Says nothing about notices, news or development.',
   },
+  'verify-zip-meetings-card': {
+    surface: '/community/<zip>/ (Government & civic meetings card: rows, dates, links, Cancelled badges, remainder count) at desktop and phone widths',
+    tables: [],
+    capped: false,
+    note: 'reads the RENDERED page only; the page reads public.meetings live (no materializer). '
+        + 'Says nothing about notices, news or development.',
+  },
   'verify-coverage-state': {
     surface: 'community.html?zip=',
     tables: ['app_community_meta'],

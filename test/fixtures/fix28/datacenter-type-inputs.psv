@@ -1,5 +1,9 @@
 # FIX 28 — FROZEN DATA CENTER TYPE CLASSIFICATION CORPUS
 #
+# 2026-11-13: row 75 moved 0 -> 1 by founder decision 1 (a record whose own words state that the
+# work BUILDS a data centre outranks the commercial gate's "other project"). The inputs, and so
+# the fingerprint, are unchanged; only that one verdict moved, in the JS and the SQL together.
+#
 # Every DISTINCT classifier input behind the 1,218 point-scope Data-center CANDIDATE
 # records in production `public.development_reports.sites` on 2026-09-15, captured BEFORE
 # any Fix 28 implementation. 426 rows. The fields are exactly what HS.trackerSiteItem reads
@@ -86,7 +90,7 @@
 72|1|0|Industrial|industrial|proposed||Pennhurst Data Centers
 73|1|0|Industrial|industrial|proposed||The Data Centers
 74|0|0|other project|development|approved||ACC Installing data center containment racking for Oppidan Data Center Facility located at 3900 S. Mendenhall Road, Memp
-75|0|0|other project|development|approved||ACC Project: Building a Data Center - Phase 1 The first phase of the data center project focuses on the initial deployme
+75|1|0|other project|development|approved||ACC Project: Building a Data Center - Phase 1 The first phase of the data center project focuses on the initial deployme
 76|0|0|other project|development|built||IRON MOUNTAIN DATA CENTER - PUMP
 77|0|0|other project|development|built||IRON MOUNTAIN SC-31 DATA HALL TI
 78|0|0|other project|development|built||LA SALLE 1G SERVERS DATA CENTER T.I F/A

@@ -313,7 +313,14 @@ ok(prefixes.length >= 8 && exact.includes('zip-pages-manifest.json'), 'the audit
 const walk = (d, base = '') => readdirSync(d, { withFileTypes: true }).flatMap((e) =>
   e.isDirectory() ? walk(join(d, e.name), base + e.name + '/') : [base + e.name]);
 const written = walk(out).filter((p) => p !== 'sitemap.xml');
-const refused = written.filter((p) => !exact.includes(p) && !prefixes.some((x) => p.startsWith(x)));
+// The audit compares the artifact with the staged contract (scripts/stage_site.py), so a file the
+// build overwrites that the contract already ships (lib/generated/project-page-zips.json, whose
+// placeholder is committed) is accepted there too.
+const staged = new Set(JSON.parse(spawnSync('python3', ['-c',
+  'import json,sys; sys.path.insert(0,"scripts"); import stage_site; print(json.dumps(stage_site.staged_paths(".")))'],
+  { cwd: root, encoding: 'utf8' }).stdout || '[]'));
+ok(staged.has('index.html'), 'the staged contract was read', staged.size);
+const refused = written.filter((p) => !exact.includes(p) && !prefixes.some((x) => p.startsWith(x)) && !staged.has(p));
 ok(written.some((p) => p.startsWith('development/')) && refused.length === 0,
    'the artifact audit accepts every file the build writes', JSON.stringify(refused.slice(0, 10)));
 

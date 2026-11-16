@@ -1,0 +1,96 @@
+name: official-documents-suite
+
+# OFFICIAL-DOCUMENT DEVELOPMENT PROJECTS, PR 1 (site half): docs/official-documents-contract.sql on the real
+# Step-2A files (9 checks + 5 prohibited mutations), and docs/official-documents-map-gate.sql on a
+# DISPOSABLE PostGIS. Builds the shipped data-centre chain, records Map 1 and the canonical tables with
+# Compute Atlas only, then proves: with G3 (map admission) closed, stored official-documents observations
+# leave every canonical table and Map 1 byte-identical; with G3 open (in the suite only) each design case
+# (alteration, expansion badge reader, case-key identity, shared parcel, held and fail-closed classes,
+# supersession, incremental runs) behaves as designed; the kill switch restores the no-source Map 1 and the
+# rollback restores the opened state. Then every prohibited mutation of the file must fail the suite.
+# Never touches production: no secret is read, and the job refuses to run if one is present.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/official-documents-map-gate.sql'
+      - 'docs/official-documents-contract.sql'
+      - 'docs/dc-step2a-foundation.sql'
+      - 'docs/dc-step2b1a-atomic-evidence-commit.sql'
+      - 'docs/dc-artifact-foundation.sql'
+      - 'test/official_documents_pg/**'
+      - 'docs/dc-step3a-canonical-identity.sql'
+      - 'docs/dc-step3b-canonical-geography.sql'
+      - 'docs/dc-step3d-derived-location.sql'
+      - 'docs/map1-dc-publication.sql'
+      - 'docs/dc-marker-loss-watcher.sql'
+      - 'test/dc_epoch_geography_pg/fixture.sql'
+      - '.github/workflows/official-documents-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/official-documents-map-gate.sql'
+      - 'docs/official-documents-contract.sql'
+      - 'docs/dc-step2a-foundation.sql'
+      - 'docs/dc-step2b1a-atomic-evidence-commit.sql'
+      - 'docs/dc-artifact-foundation.sql'
+      - 'test/official_documents_pg/**'
+      - 'docs/dc-step3a-canonical-identity.sql'
+      - 'docs/dc-step3b-canonical-geography.sql'
+      - 'docs/dc-step3d-derived-location.sql'
+      - 'docs/map1-dc-publication.sql'
+      - 'docs/dc-marker-loss-watcher.sql'
+      - 'test/dc_epoch_geography_pg/fixture.sql'
+      - '.github/workflows/official-documents-suite.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: official_documents_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Shipped file passes; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: official_documents_disposable
+        run: |
+          set -o pipefail
+          bash test/official_documents_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/od.log
+      - name: Receipt
+        if: always()
+        run: |
+          { echo '## Official documents: gates, map admission, open actions, kill switch'; echo '```'
+            grep -E 'SHIPPED|KILLED|SURVIVED|HARNESS|PASS —|FAIL|\|f\|' /tmp/od.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

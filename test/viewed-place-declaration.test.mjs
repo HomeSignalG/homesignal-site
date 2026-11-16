@@ -134,7 +134,7 @@ ok(/HS\.setViewLabel\(String\(c\.name\)\.indexOf\(String\(S\.zip\)\) >= 0/.test(
 console.log('--- 9. MAP 1 declares at boot, and only for an EXPLICIT route ZIP ---');
 const bDecl = map1.indexOf('HS.declareRouteZipPlace(z)');
 const bFallback = map1.indexOf('HS.hasViewedZipContext');
-const bLoad = map1.indexOf('loadZip(z); loadDevTracker(z);');
+const bLoad = map1.indexOf('loadZip(zz); loadDevTracker(zz);');
 ok(bDecl > 0 && bLoad > 0 && bDecl < bLoad, 'Map 1 declares before loadZip issues any fetch', { bDecl, bLoad });
 ok(bDecl > 0 && bFallback > 0 && bDecl < bFallback,
   'it declares BEFORE the shell-context fallback, so only an explicit route ZIP declares',

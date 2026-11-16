@@ -9,6 +9,9 @@
 --     video_endings_current). It is part of the approved pictures: changing it means preparing the visuals again.
 --   Tab 20 (weekly): the choice is stored; the weekly report has no renderer yet.
 -- The join itself: homesignal-ingest video/ending.py. Apply AFTER that engine is merged on main.
+-- Two kinds of recording (founder, same day: "make the 2 buttons"): 'vertical' (phone upright) ends Shorts and
+-- 'horizontal' (phone sideways) ends main videos, so neither is shown inside blurred bars. Choosing one on the other
+-- kind of file is refused. A recording uploaded before the kinds existed has no shape and fits either.
 begin;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
@@ -37,6 +40,9 @@ create table if not exists public.video_endings (
   created_at timestamptz not null default now(),
   archived_at timestamptz
 );
+alter table public.video_endings add column if not exists shape text;
+alter table public.video_endings drop constraint if exists video_endings_shape_check;
+alter table public.video_endings add constraint video_endings_shape_check check (shape in ('vertical', 'horizontal'));
 alter table public.video_endings enable row level security;
 revoke all on public.video_endings from anon, authenticated;
 
@@ -65,24 +71,33 @@ create trigger video_ending_choices_append_only before update or delete on publi
   for each row execute function public._hs_ve_no_change();
 
 create or replace function public._hs_ve_json(e public.video_endings) returns jsonb language sql immutable as $$
-  select jsonb_build_object('id', e.id, 'path', e.path, 'sha256', e.sha256, 'label', e.label, 'bytes', e.bytes)
+  select jsonb_build_object('id', e.id, 'path', e.path, 'sha256', e.sha256, 'label', e.label, 'bytes', e.bytes, 'shape', e.shape)
 $$;
 
 -- Record an upload the page just made. The storage row must exist with the stated size.
-create or replace function public.hs_video_ending_register(p_path text, p_label text, p_sha256 text)
+-- Which kind a file needs: Shorts are vertical, main videos horizontal.
+create or replace function public._hs_ve_shape_for(p_asset text) returns text language sql immutable as $$
+  select case when p_asset in ('short1', 'short2', 'short_a', 'short_b') then 'vertical' else 'horizontal' end
+$$;
+
+drop function if exists public.hs_video_ending_register(text, text, text);
+create or replace function public.hs_video_ending_register(p_path text, p_label text, p_sha256 text, p_shape text default null)
 returns jsonb language plpgsql security definer set search_path = public, storage as $fn$
 declare who text := public._hs_yv_admin(); o storage.objects%rowtype; e public.video_endings%rowtype;
 begin
   if p_path !~ '^[0-9a-f-]{36}\.(mp4|mov|webm|m4v)$' then raise exception 'bad file name' using errcode = '22023'; end if;
   if p_sha256 !~ '^[0-9a-f]{64}$' then raise exception 'bad checksum' using errcode = '22023'; end if;
+  if p_shape is not null and p_shape not in ('vertical', 'horizontal') then
+    raise exception 'a recording is vertical (for Shorts) or horizontal (for main videos)' using errcode = '22023';
+  end if;
   if length(btrim(coalesce(p_label, ''))) not between 1 and 80 then
     raise exception 'give the recording a name (up to 80 characters)' using errcode = '22023';
   end if;
   select * into o from storage.objects where bucket_id = 'video-endings' and name = p_path;
   if not found then raise exception 'the upload did not arrive; upload it again' using errcode = 'P0002'; end if;
-  insert into public.video_endings (id, path, label, sha256, bytes, mime, uploaded_by)
+  insert into public.video_endings (id, path, label, sha256, bytes, mime, uploaded_by, shape)
   values (split_part(p_path, '.', 1)::uuid, p_path, btrim(p_label), p_sha256,
-          coalesce((o.metadata ->> 'size')::bigint, 1), coalesce(o.metadata ->> 'mimetype', 'video/mp4'), who)
+          coalesce((o.metadata ->> 'size')::bigint, 1), coalesce(o.metadata ->> 'mimetype', 'video/mp4'), who, p_shape)
   on conflict (id) do nothing
   returning * into e;
   if e.id is null then select * into e from public.video_endings where path = p_path; end if;
@@ -144,6 +159,11 @@ begin
   if p_ending is not null then
     select * into e from public.video_endings where id = p_ending and archived_at is null;
     if not found then raise exception 'that recording is not in your library' using errcode = 'P0002'; end if;
+    if e.shape is not null and e.shape <> public._hs_ve_shape_for(p_asset) then
+      raise exception '%', case when e.shape = 'vertical'
+        then 'that is a vertical recording; it goes on Shorts, not on a main video'
+        else 'that is a horizontal recording; it goes on main videos, not on a Short' end using errcode = '22023';
+    end if;
   end if;
   prev := public._hs_ve_current(p_tab, p_target) -> p_asset;
   if (prev is null or prev = 'null'::jsonb) and p_ending is null then
@@ -189,7 +209,8 @@ begin
                             'prepare_again', p_tab = 'impact');
 end $fn$;
 
-revoke all on function public.hs_video_ending_register(text, text, text) from public, anon;
+revoke all on function public.hs_video_ending_register(text, text, text, text) from public, anon;
+revoke all on function public._hs_ve_shape_for(text) from public, anon, authenticated;
 revoke all on function public.hs_video_endings_list() from public, anon;
 revoke all on function public.hs_video_ending_archive(uuid) from public, anon;
 revoke all on function public.hs_video_ending_choices(text, text) from public, anon;
@@ -197,7 +218,7 @@ revoke all on function public.hs_video_ending_choose(text, text, text, uuid) fro
 revoke all on function public._hs_ve_current(text, text) from public, anon, authenticated;
 revoke all on function public._hs_ve_json(public.video_endings) from public, anon, authenticated;
 revoke all on function public.video_endings_current(text, text) from public, anon, authenticated;
-grant execute on function public.hs_video_ending_register(text, text, text) to authenticated;
+grant execute on function public.hs_video_ending_register(text, text, text, text) to authenticated;
 grant execute on function public.hs_video_endings_list() to authenticated;
 grant execute on function public.hs_video_ending_archive(uuid) to authenticated;
 grant execute on function public.hs_video_ending_choices(text, text) to authenticated;

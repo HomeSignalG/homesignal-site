@@ -26,7 +26,7 @@ Rule D: >= 3 publishable Development entities from the compact ingest plane
 (`data/development_seo_plane.json`). The site does not re-decide materiality. A ZIP
 absent from the plane is not eligible. INDEX = Rule F OR Rule D.
 """
-import argparse, hashlib, html, json, os, re, subprocess, sys, tempfile, time, unicodedata, urllib.parse, urllib.request
+import argparse, hashlib, html, json, os, re, subprocess, sys, tempfile, time, unicodedata, urllib.error, urllib.parse, urllib.request
 from datetime import datetime, timezone
 
 # Loaded by path in some tests (importlib spec_from_file_location), where this directory is not
@@ -59,6 +59,10 @@ RULE_D_MIN = 3                               # >= 3 publishable Development enti
 RULE_D_PLANE_MAX_AGE_HOURS = 36
 # A manual identity-only cutover dispatch may accept an older plane (pages.yml `plane_max_age_hours`); never longer than this.
 RULE_D_PLANE_MAX_AGE_CEILING_HOURS = 336
+# Data-center listings on the ZIP document (docs/zip-dc-listing.sql). A ZIP's stored row is
+# used only when it was checked within this many hours and the reader did not truncate it.
+DC_LISTING_MAX_AGE_HOURS = 48
+DC_LISTING_CAP = 12                          # listings printed; the rest are named, with a map link
 SIB_CAP = 10                                 # sibling ZIP links per page (see link_siblings)
 WEATHER_AGENCY = "api.weather.gov"
 GN_CATEGORIES = ("Government & civic", "Planning & zoning")
@@ -184,7 +188,30 @@ def fetch_data(key, now_iso):
     d["meetings"] = fetch_all("meetings", key,
                               "id,community_id,title,meeting_date,category,source_url,is_cancelled",
                               f"&meeting_date=gte.{urllib.parse.quote(meeting_cutoff(now_iso))}")
+    d["dc_listings"] = fetch_dc_listings(key)
     return d
+
+
+def fetch_dc_listings(key):
+    """Data-center listings stored per ZIP (docs/zip-dc-listing.sql): what
+    public.map1_dc_zip_members returns as 'member' for each ZIP, refreshed by pg_cron. Only ZIPs
+    with at least one listing are read. A table that is not there yet (HTTP 404) means "print no
+    listings" and is said in the log; any other failure stops the build like every other read."""
+    url = f"{SUPA}/rest/v1/zip_dc_listing?select=zip&limit=1"
+    req = urllib.request.Request(url, headers={"apikey": key, "Authorization": f"Bearer {key}"})
+    try:
+        with urllib.request.urlopen(req, timeout=REQ_TIMEOUT):
+            pass
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            print("  data-center listings: zip_dc_listing not found (HTTP 404) - none printed",
+                  flush=True)
+            return None
+    except Exception:
+        pass                                    # transient: fetch_all retries or fails loudly
+    return fetch_all("zip_dc_listing", key,
+                     "zip,listings,member_count,truncated,checked_at",
+                     "&member_count=gt.0", keyset="zip")
 
 
 # ---------------------------------------------------------------- assemble (pure half)
@@ -562,8 +589,42 @@ def parse_projects(raw_projects, plane_day=""):
             "address": str(r.get("address") or "").strip(),
             "tracked": tracked, "as_of": as_of, "changed_on": changed_on,
             "source": source_name(reg),
+            "status": str(r.get("status") or "").strip(),
+            **parse_project_history(key, r),
         }
     return projects
+
+
+HISTORY_KINDS = ("first_detected", "status_changed")
+HISTORY_MAX = 20
+
+
+def parse_project_history(key, r):
+    """The status history the producer attached from the change ledger (ingest
+    bluesky/lib/project-record-history.mjs). Absent fields stay absent: a record whose
+    ledger was not read says nothing about changes. A malformed entry fails the build."""
+    out = {"history": [], "history_total": 0, "history_read": r.get("history_read") is True,
+           "agency_status": str(r.get("agency_status") or "").strip()[:80],
+           "watched_since": ""}
+    ws = str(r.get("watched_since") or "")[:10]
+    if ws:
+        if not DAY_RE.match(ws):
+            sys.exit(f"ERROR: project {key!r} has a malformed watched_since {ws!r}")
+        out["watched_since"] = ws
+    hist = r.get("history")
+    if hist is None:
+        return out
+    if not isinstance(hist, list) or len(hist) > HISTORY_MAX:
+        sys.exit(f"ERROR: project {key!r} carries a malformed history")
+    for ev in hist:
+        if (not isinstance(ev, dict) or ev.get("kind") not in HISTORY_KINDS
+                or not DAY_RE.match(str(ev.get("day") or ""))):
+            sys.exit(f"ERROR: project {key!r} carries a malformed history event {ev!r}")
+        out["history"].append({k: str(ev.get(k) or "").strip()[:80] for k in
+                               ("day", "kind", "from_stage", "to_stage", "from_label", "to_label")})
+    total = r.get("history_total", len(out["history"]))
+    out["history_total"] = total if isinstance(total, int) and total >= len(out["history"]) else len(out["history"])
+    return out
 
 
 def link_projects(pages, cities, projects):
@@ -735,6 +796,7 @@ def assemble(d, now_iso):
                             "date": (c.get("occurred_at") or "")[:10], "cat": cat})
     for z in pages:
         pages[z]["um"] = meetings_for(z)
+    attach_dc_listings(pages, d.get("dc_listings"), now_iso)
 
     for p in pages.values():
         # The url is the final tie-break. app_changes is deleted and reinserted on every ZIP
@@ -749,6 +811,42 @@ def assemble(d, now_iso):
         p["rule_f"] = p["rule_f_count"] >= RULE_F_MIN
     link_siblings(pages)
     return pages
+
+
+LISTING_STATUS_ORDER = {"Proposed": 0, "Approved": 1, "Operating": 2}
+
+
+def attach_dc_listings(pages, rows, now_iso):
+    """Put each ZIP's stored data-center listings on its page record (p["dc_listings"]).
+
+    The rows are map1_dc_zip_members' own 'member' rows for that ZIP (docs/zip-dc-listing.sql);
+    nothing is decided here. A row older than DC_LISTING_MAX_AGE_HOURS, truncated, or not for a
+    page is skipped, and that means "not printed", never "no data centers"."""
+    now = datetime.fromisoformat(now_iso.replace("Z", "+00:00")) if now_iso else None
+    if now is not None and now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    used = stale = trunc = 0
+    for r in rows or []:
+        p = pages.get(r.get("zip"))
+        if p is None:
+            continue
+        age = _plane_age_hours(r.get("checked_at"), now)
+        if age is None or age > DC_LISTING_MAX_AGE_HOURS:
+            stale += 1
+            continue
+        if r.get("truncated") is True:
+            trunc += 1
+            continue
+        items = [x for x in (r.get("listings") or [])
+                 if isinstance(x, dict) and x.get("project_name") and safe_url(x.get("source_url"))]
+        items.sort(key=lambda x: (LISTING_STATUS_ORDER.get(x.get("map_status"), 3),
+                                  str(x.get("project_name")).lower(), str(x.get("source_key"))))
+        if items:
+            p["dc_listings"] = items
+            used += 1
+    if rows is not None:
+        print(f"  data-center listings: {used} ZIP pages, {stale} skipped as older than "
+              f"{DC_LISTING_MAX_AGE_HOURS}h, {trunc} skipped as truncated", flush=True)
 
 
 def link_siblings(pages):
@@ -831,6 +929,75 @@ def _dev_items(items):
     return f'<section class="zsec"><h2>Development</h2><ul>' + "".join(li) + "</ul></section>"
 
 
+# ── DATA-CENTER LISTINGS (2026-11-14) ─────────────────────────────────────────────────────
+# The words below are lib/templates.js's (listingSourceWord, browsingStatusLabel for a listing,
+# listingLinkNote, thirdPartyListingNote). test/zip-page-dc-listings.test.mjs runs both on the same
+# rows and fails if they differ. A listing is its publisher's own record, not an official filing.
+def listing_source_word(x):
+    w = str(x.get("raw_status") or x.get("normalized_status") or "").strip()
+    return re.sub(r"\s+", " ", re.sub(r"_+", " ", w)).lower()
+
+
+def listing_status_label(x):
+    raw = str(x.get("map_status") or "").strip()
+    word = listing_source_word(x)
+    same = bool(word) and word.lower() == raw.lower()
+    return (raw + " · " if raw else "") + ("listed as " + word if word and not same else "third-party listing")
+
+
+def listing_link_host(href):
+    try:
+        h = urllib.parse.urlparse(href).hostname or ""
+    except ValueError:
+        return ""
+    return re.sub(r"^www\.", "", h)
+
+
+def listing_link_note(x, href):
+    host = listing_link_host(href)
+    if not host:
+        return ""
+    src = str(x.get("source_name") or "").strip()
+    return "Opens " + host + (", the page " + src + " cites" if src else "")
+
+
+def listing_note(x):
+    src = str(x.get("source_name") or "a third-party source").strip()
+    lic = ", " + str(x.get("source_licence")).strip() if x.get("source_licence") else ""
+    st = listing_source_word(x) or str(x.get("map_status") or "").strip().lower()
+    dev = x.get("developer_or_operator")
+    return (("Listed as " + st + " by ") if st else "Listed by ") + src + lic + ", a third-party source." \
+        + " Not an official application, approval or permit; no official filing has been verified." \
+        + (" Developer or operator named by the source: " + str(dev).strip() + "." if dev else "")
+
+
+def _dc_listing_items(items, z):
+    """The ZIP's data-center listings, as Map 1 draws them. Omitted when there are none or the
+    stored row was not usable: this function never prints an absence sentence. Its own class
+    beside zsec, and a lead paragraph before the list, so the live proof
+    (scripts/prove-zip-pages-live.mjs) never counts it as an Alerts section."""
+    li = []
+    for x in items[:DC_LISTING_CAP]:
+        u = safe_url(x.get("source_url"))
+        name = esc(x.get("project_name") or "")
+        if not u or not name:
+            continue
+        note = listing_link_note(x, u)
+        li.append(f'<li><a href="{esc(u)}" rel="nofollow noopener">{name}</a>'
+                  f' <span class="quiet">{esc(listing_status_label(x))}</span>'
+                  + (f' <span class="quiet">{esc(note)}</span>' if note else "")
+                  + f'<br><span class="quiet">{esc(listing_note(x))}</span></li>')
+    if not li:
+        return ""
+    more = len(items) - len(li)
+    tail = (f'<p class="quiet"><a href="/map/{esc(z)}/">{more} more data-center listing'
+            f'{"s" if more != 1 else ""} on the development map for {esc(z)}</a></p>' if more > 0 else "")
+    return ('<section class="zsec zdcl"><h2>Data-center listings</h2>'
+            '<p class="quiet">Data centers that third-party sources list in this ZIP, as drawn on the '
+            'development map. These are the sources\' own listings, not official filings.</p>'
+            '<ul>' + "".join(li) + '</ul>' + tail + '</section>')
+
+
 # A weather alert's stored URL is the NWS API (raw GeoJSON, and a 404 once the API forgets the alert), so the
 # crawlable list opens the readable NWS forecast page for the page's own ZIP instead - the same rule, host and page
 # as lib/templates.js (recordHref); test/card-link-kinds.test.mjs fails if the two drift. The stored source_ref is
@@ -871,8 +1038,65 @@ def _items(items, heading, empty, kind, zip_code=""):
 OG_IMAGE = f"{BASE}/og-default.png"
 # ONE stylesheet tag for every generated page type (ZIP and city), so its cache key is
 # written once and test/lib-cache-keys.test.mjs keeps seeing exactly one generator tag.
-APP_CSS_LINK = ('<link rel="stylesheet" href="/layout.css?v=c3f3f5d5">\n'
-                '<link rel="stylesheet" href="/app.css?v=aad7c2d4">\n')
+APP_CSS_LINK = ('<link rel="stylesheet" href="/layout.css?v=0a9f8b10">\n'
+                '<link rel="stylesheet" href="/app.css?v=a6a760af">\n')
+
+
+# The static pages (city, project, project list, guide and area hub) load no script, so they
+# carry the site's own header and footer as plain HTML, taken from partials/shell.html by
+# development_pages.site_chrome() (the dossier pages use the same copy). Share stays hidden
+# (no script to run it); Sign in is a plain link back to this page. Founder, 2026-11-15: the
+# guide page Google showed had no header, no footer and no page width.
+# Developer comments in partials/shell.html are left out: they carry dates and notes that are
+# not page content and would ship in ~26,000 pages.
+_NO_COMMENTS = re.compile(r"\s*<!--.*?-->", re.S)
+STATIC_HEADER = _NO_COMMENTS.sub("", dvp.SITE_HEADER)
+STATIC_FOOTER = _NO_COMMENTS.sub("", dvp.SITE_FOOTER.split('\n<div class="overlay"', 1)[0])
+STATIC_CSS_TEXT = (
+    dvp.CHROME_CSS
+    + 'body{margin:0;background:var(--bg,#f4f6f4)}\n'
+    '#hs-ssr{box-sizing:border-box;max-width:860px;margin:0 auto;padding:28px 20px 48px;'
+    'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;'
+    'font-size:16px;line-height:1.6;color:var(--ink,#16211c)}\n'
+    '#hs-ssr h1{font-size:30px;line-height:1.2;margin:4px 0 12px}\n'
+    '#hs-ssr h2{font-size:21px;line-height:1.3;margin:0 0 8px}\n'
+    '#hs-ssr h3{font-size:16px;margin:18px 0 6px}\n'
+    '#hs-ssr p{margin:0 0 10px}\n'
+    '#hs-ssr ul{margin:0 0 10px;padding-left:22px}\n'
+    '#hs-ssr li{margin:3px 0}\n'
+    '#hs-ssr a{color:var(--green-deep,#1f6b45)}\n'
+    '#hs-ssr .eyebrow{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;'
+    'color:var(--ink-3,#83918a);margin:0 0 6px}\n'
+    '#hs-ssr .zsec{margin:28px 0 0}\n'
+    '#hs-ssr .quiet{border:0;padding:0;margin:0;background:none;'
+    'font-size:13px;color:var(--ink-3,#83918a)}\n'
+    '#hs-ssr p.quiet{margin-top:28px}\n'
+    '#hs-ssr dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px;margin:0}\n'
+    '#hs-ssr dt{font-weight:600;color:var(--ink-2,#4a5a52)}#hs-ssr dd{margin:0}\n'
+    '#hs-ssr form label{font-weight:600;margin-right:6px}\n'
+    '#hs-ssr input{font:inherit;padding:8px 10px;border:1px solid var(--line,#e4e8e4);'
+    'width:9em;max-width:100%}\n'
+    '#hs-ssr button{font:inherit;font-weight:600;padding:8px 14px;border:0;'
+    'background:var(--green-deep,#1f6b45);color:#fff;cursor:pointer}\n'
+    '@media (max-width:620px){#hs-ssr{padding:20px 16px 40px}#hs-ssr h1{font-size:25px}}\n')
+# One shared, content-addressed file (not inlined): inlined, these rules added ~11 KB to each of
+# ~26,000 project pages and pushed the artifact past the Pages budget. guides/ is a generated tree.
+STATIC_CSS_PATH = f"guides/page.{hashlib.sha256(STATIC_CSS_TEXT.encode('utf-8')).hexdigest()[:8]}.css"
+STATIC_CSS = f'<link rel="stylesheet" href="/{STATIC_CSS_PATH}">\n'
+
+
+def write_static_css(out_dir):
+    path = os.path.join(out_dir, STATIC_CSS_PATH)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(STATIC_CSS_TEXT)
+
+
+def static_body(nav, path, body):
+    """<body> of a static page: the site header, the page, the site footer."""
+    header = STATIC_HEADER.replace(dvp.RETURN_TOKEN, urllib.parse.quote(path, safe=""), 1)
+    return (f'<body data-nav="{nav}">\n{header}\n{body}\n{STATIC_FOOTER}\n'
+            '</body>\n</html>\n')
 
 
 def coverage_panel(p):
@@ -1001,6 +1225,7 @@ def render(p, built):
            f'<p>{lead} that apply to the whole of '
            f'ZIP {esc(z)}{county_bit}.</p></header>')
         + ("" if cov else _dev_items(p.get("dev_entities") or []))
+        + ("" if cov else _dc_listing_items(p.get("dc_listings") or [], z))
         + _items(p["gn"][:GN_CAP], "Government notices",
                  "No government notices on file for this ZIP yet.", "gn")
         + _items(um_items, "Upcoming public meetings",
@@ -1077,12 +1302,12 @@ def render(p, built):
         # both hosts run ONE runtime, so a dependency added to community.html alone breaks
         # this one. Fails CLOSED if absent (outcome 'unavailable', no absence claim).
         '<script src="/lib/zip-authoritative.js?v=20261029a"></script>\n'
-        '<script src="/lib/data.js?v=65b0cd6d"></script>\n<script src="/lib/topic-prefs.js?v=fe87d99b"></script>\n'
-        '<script src="/lib/templates.js?v=6bbb33ed"></script>\n<script src="/lib/impact.js"></script>\n'
+        '<script src="/lib/data.js?v=4033ae3a"></script>\n<script src="/lib/topic-prefs.js?v=fe87d99b"></script>\n'
+        '<script src="/lib/templates.js?v=7373e258"></script>\n<script src="/lib/impact.js"></script>\n'
         # lib/project-type.js: the canonical Development Type (pure — no DOM, no map runtime).
         # The Development & Growth Type badge reads HS.canonicalProjectType from it. Same parity
         # rule as the files around it: both hosts run ONE runtime. lib/map.js stays OFF (§5a).
-        '<script src="/lib/project-type.js?v=ed9e58be"></script>\n'
+        '<script src="/lib/project-type.js?v=852af398"></script>\n'
         # gov-notice-copy.js MUST load before community-page.js: the shared runtime calls
         # HS.govNoticeCopy.build() for a ZIP with no notices, and this document is the other
         # host of that same runtime. It was added to community.html alone, so every generated
@@ -1096,7 +1321,7 @@ def render(p, built):
         '<script src="/shell.js?v=4fa4fbd4"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
         '<script src="/lib/water-rights.js?v=add4200a"></script>\n'
-        '<script src="/lib/community-page.js?v=ca77e558"></script>\n'
+        '<script src="/lib/community-page.js?v=97633cae"></script>\n'
         "</body>\n</html>\n")
 
 
@@ -1199,8 +1424,8 @@ def render_city(c, pages, built):
         '<meta http-equiv="Content-Security-Policy" content="default-src \'self\'; '
         "base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; "
         "style-src 'self' 'unsafe-inline'; script-src 'none'; form-action 'self'\">\n"
-        + APP_CSS_LINK + '</head>\n'
-        f'<body data-nav="city">\n{body}\n</body>\n</html>\n')
+        + APP_CSS_LINK + STATIC_CSS + '</head>\n'
+        + static_body("city", city_path(c), body))
 
 
 def build_cities(cities, pages, out_dir, built, state=None):
@@ -1243,7 +1468,7 @@ def _head(title, desc, canon, og_type="website", robots="index, follow", ld=None
         "base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; "
         "style-src 'self' 'unsafe-inline'; script-src 'none'; form-action 'self'\">\n"
         + (_ld_json(ld) if ld else "")
-        + APP_CSS_LINK + '</head>\n')
+        + APP_CSS_LINK + STATIC_CSS + '</head>\n')
 
 
 def _ld_json(obj):
@@ -1322,8 +1547,14 @@ def render_project(pr, pages, built, projects=None):
         facts.append(("Address", esc(addr)))
     if pr["type"]:
         facts.append(("Type", esc(pr["type"])))
-    facts.append(("Where it stands" if pr["tracked"] else "Last recorded status",
-                  esc(pr["lifecycle"])))
+    stands = esc(pr["lifecycle"])
+    if pr.get("status") == "Decided":
+        # A decided application browses as Proposed (lib/project-type.js); say a decision exists.
+        stands += ' <span class="quiet">(a decision is on record; see the agency\'s own status)</span>'
+    facts.append(("Where it stands" if pr["tracked"] else "Last recorded status", stands))
+    if pr.get("agency_status"):
+        facts.append(("Agency's own status" if pr["tracked"] else "Agency's status when last seen",
+                      esc(pr["agency_status"])))
     if as_of_el:
         facts.append(("Status as of" if pr["tracked"] else "Last seen", as_of_el))
     if pr["date"]:
@@ -1390,7 +1621,8 @@ def render_project(pr, pages, built, projects=None):
         + status_line + '</header>'
         + notice
         + f'<section class="zsec"><h2>On the record</h2><dl>{dl}</dl></section>'
-        f'<section class="zsec"><h2>Where it is</h2>'
+        + _history_section(pr)
+        + f'<section class="zsec"><h2>Where it is</h2>'
         f'<p>On the HomeSignal page for {"these ZIP codes" if len(zips) > 1 else "this ZIP code"}:</p>'
         f'<ul>{zli}</ul>'
         f'<p><a href="/map/{esc(zips[0])}/">See it on the Development map</a></p>'
@@ -1404,7 +1636,51 @@ def render_project(pr, pages, built, projects=None):
           f'<a href="{GUIDE_CHECK}">How to check proposed development near a house</a></nav>'
         + '</main>')
     return (_head(title, desc, canon, og_type="article", ld=ld)
-            + f'<body data-nav="project">\n{body}\n</body>\n</html>\n')
+            + static_body("project", pr["path"], body))
+
+
+def _history_section(pr):
+    """Status history from the change ledger. Each line is dated by the day HomeSignal
+    OBSERVED it, which is said on the page: it is not the agency's own decision date. A record
+    whose ledger was not read gets no section; one read with no change says only what was seen."""
+    if not pr.get("history_read"):
+        return ""
+    ws = pr.get("watched_since") or ""
+    ws_el = f'<time datetime="{esc(ws)}">{esc(human_day(ws))}</time>' if ws else ""
+    rows = []
+    for ev in pr.get("history") or []:
+        d = f'<time datetime="{esc(ev["day"])}">{esc(human_day(ev["day"]))}</time>'
+        if ev["kind"] == "first_detected":
+            what = "First seen by HomeSignal"
+            if ev["to_stage"]:
+                what += f'; agency status: <strong>{esc(ev["to_stage"])}</strong>'
+            elif ev["to_label"]:
+                what += f': {esc(ev["to_label"])}'
+        else:
+            bits = []
+            if ev["from_stage"] or ev["to_stage"]:
+                bits.append(f'Agency status changed from <strong>{esc(ev["from_stage"] or "not stated")}</strong> '
+                            f'to <strong>{esc(ev["to_stage"] or "not stated")}</strong>')
+            if ev["from_label"] != ev["to_label"] and (ev["from_label"] or ev["to_label"]):
+                bits.append(f'HomeSignal status {esc(ev["from_label"] or "not stated")} → '
+                            f'{esc(ev["to_label"] or "not stated")}')
+            if not bits:
+                continue
+            what = "; ".join(bits)
+        rows.append(f"<li>{d}: {what}</li>")
+    if not rows and not ws_el:
+        return ""
+    total = pr.get("history_total") or len(rows)
+    more = (f'<p class="quiet">Showing the {len(rows)} newest of {total} recorded changes.</p>'
+            if total > len(rows) else "")
+    since = (f'<p>HomeSignal has watched this record since {ws_el}.</p>' if ws_el else "")
+    body = (f"<ol>{''.join(rows)}</ol>{more}" if rows
+            else "<p>No status change recorded since then.</p>")
+    return (f'<section class="zsec"><h2>Status history</h2>{since}{body}'
+            f'<p class="quiet">Each date is the day HomeSignal saw the change in the agency\'s '
+            f'public records, not necessarily the day the agency acted. Not every project moves '
+            f'through every stage: an application can be withdrawn, denied, revised or paused, '
+            f'and the agency\'s own status word is shown as published.</p></section>')
 
 
 def _related_section(pr, zips, first, pages, projects):
@@ -1469,7 +1745,7 @@ def render_project_list(z, keys, projects, pages):
             + (f'<a href="{esc(map_path(z))}">Development map for {esc(z)}</a> · ' if p.get("map_summary") else "")
             + f'<a href="/">HomeSignal home</a></nav></main>')
     return (_head(title, desc, f"{BASE}{project_list_path(z)}", robots="index, follow")
-            + f'<body data-nav="project-list">\n{body}\n</body>\n</html>\n')
+            + static_body("project-list", project_list_path(z), body))
 
 
 def build_projects(projects, pages, out_dir, built, state=None):
@@ -1496,6 +1772,7 @@ def build_projects(projects, pages, out_dir, built, state=None):
         open(os.path.join(d, "index.html"), "wb").write(h)
         written += 1
         nbytes += len(h)
+    zips_with_pages = []
     for z in sorted(pages):
         keys = pages[z].get("project_list")
         if not keys:
@@ -1505,7 +1782,38 @@ def build_projects(projects, pages, out_dir, built, state=None):
         h = render_project_list(z, keys, projects, pages).encode("utf-8")
         open(os.path.join(d, "index.html"), "wb").write(h)
         nbytes += len(h)
+        j = json.dumps(project_page_index(z, keys, projects), sort_keys=True,
+                       separators=(",", ":")).encode("utf-8")
+        open(os.path.join(d, PROJECT_INDEX_FILE), "wb").write(j)
+        nbytes += len(j)
+        zips_with_pages.append(z)
+    # Which ZIPs have a project index. Map 1 reads this first and asks for a ZIP's
+    # pages.json only when the ZIP is listed, so it never requests a file that does not
+    # exist. It overwrites the committed placeholder (lib/generated/project-page-zips.json,
+    # an empty list, which links nothing).
+    gd = os.path.join(out_dir, "lib", "generated")
+    os.makedirs(gd, exist_ok=True)
+    zj = json.dumps({"v": 1, "zips": sorted(zips_with_pages)}, separators=(",", ":")).encode("utf-8")
+    open(os.path.join(gd, PROJECT_ZIPS_FILE), "wb").write(zj)
+    nbytes += len(zj)
     return written, nbytes
+
+
+PROJECT_INDEX_FILE = "pages.json"
+PROJECT_ZIPS_FILE = "project-page-zips.json"
+
+
+def project_page_index(z, keys, projects):
+    """/community/<zip>/projects/pages.json: which source records on this ZIP have a project
+    page, keyed by the record's source_key (the id Map 1's pins carry as zip_project_ref).
+    Map 1 links a pin or list row to its page only through this file, so it never guesses a
+    URL. Two pages for one source_key (an old seq kept beside a re-keyed one): the tracked
+    page wins, then the lower key, so the choice is deterministic."""
+    out = {}
+    for k in sorted(keys, key=lambda k: (0 if projects[k]["tracked"] else 1, k)):
+        sk = k.rsplit("|", 1)[0]
+        out.setdefault(sk, projects[k]["path"])
+    return {"v": 1, "zip": z, "pages": out}
 
 
 # ---------------------------------------------------------------- guide pages (plan step 13)
@@ -1543,7 +1851,7 @@ def _page(title, desc, path, body_html, built):
             + '<nav class="zsec"><a href="/">HomeSignal home</a> · '
               '<a href="/how-it-works.html">How HomeSignal works</a></nav></main>')
     return (_head(title, desc, f"{BASE}{path}", og_type="article")
-            + f'<body data-nav="guide">\n{body}\n</body>\n</html>\n')
+            + static_body("guide", path, body))
 
 
 def render_guide_what(cities, built):
@@ -2458,6 +2766,7 @@ def main():
     fc_pages, fc_index = fcp.build(fc_claims, a.out, now_iso[:10], _head, state, base=BASE)
     fc_paths = fc_pages + [fc_index]
     n_land_links = dvp.write_land_index(dossiers, a.out)
+    write_static_css(a.out)
     guide_paths = build_guides(cities, projects, pages, a.out, now_iso[:10], state,
                                areas=load_focus_areas(), indexable=indexable)
     project_lastmod = {pr["path"]: pr["changed_on"] for pr in projects.values()}

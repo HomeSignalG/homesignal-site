@@ -9,7 +9,7 @@
 <meta name="description" content="Make Development Activity reports for your brokerage's HomeSignal trial.">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="layout.css?v=c3f3f5d5">
+<link rel="stylesheet" href="layout.css?v=0a9f8b10">
 <style>
 /* ============================================================================
    DEVELOPMENT ACTIVITY — THE CUSTOMER PAGE (build step 5c of
@@ -60,9 +60,9 @@
    comparison is the number on that report. The page makes no report, scores nothing and ranks nothing; to compare a new address, make its
    report first (that is a report, charged by the one rule).
 
-   Build step 11: the BILLING card. A brokerage member sees their plan in words: the free trial, the $79/month plan with how many of its 100
+   Build step 11: the BILLING card. A brokerage member sees their plan in words: the free trial, the $78/month plan with how many of its 100
    reports this month are left and when the month ends, or what is wrong with a subscription that is not active. An OWNER with no live
-   subscription may press "Subscribe for $79/month": the page asks the billing function (manage-billing) for a checkout and sends the
+   subscription may press "Subscribe for $78/month": the page asks the billing function (manage-billing) for a checkout and sends the
    browser to the payment provider's own page. Nothing about the plan changes by pressing it or by coming back: the plan changes only when
    the provider's signed event reaches HomeSignal's server, so after a checkout the page just asks again ("Check again"). The page decides
    nothing about money: which reports a brokerage may still make, which allotment one used and when the month ends are the database's,
@@ -580,6 +580,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
         <h2 id="billing-title">Billing</h2>
         <p class="plan" id="billing-plan"></p>
         <p class="sub" id="billing-sub"></p>
+        <p class="hint" id="billing-terms">Professional plan: $78 per month. Billed monthly and renews automatically each month until you cancel. Includes 100 reports per monthly billing period, 0.5-mile radius.</p>
         <div class="row">
           <button type="button" class="go" id="subscribe" hidden>Subscribe</button>
           <button type="button" class="go ghost" id="billing-refresh">Check again</button>
@@ -636,7 +637,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     <div class="auth-toggle" id="auth-back-wrap" style="display:none;"><button type="button" class="auth-link" id="auth-back-link">Use a different email</button></div>
   </div>
 </div>
-<script src="lib/project-type.js?v=ed9e58be"></script>
+<script src="lib/project-type.js?v=852af398"></script>
 <script src="lib/da-report-view.js?v=39cc47d8"></script>
 <script src="lib/da-report-compare.js?v=a97e336e"></script>
 <script src="lib/share-modal.js?v=971e0041"></script>
@@ -683,7 +684,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   // so it can never use a second free report; any answer from the server ends that request and the next report gets a new key.
   var attempt = null; // { key, address }
   var invite = null;
-  // Arriving on #billing (the landing page's "Join for $79/month" link, and the payment page's return address) means "take me to the plan card":
+  // Arriving on #billing (the landing page's Professional "Get Started" link, and the payment page's return address) means "take me to the plan card":
   // a signed-out visitor is asked to sign in, and a signed-in member is scrolled to the card. This never presses Subscribe: starting a checkout is
   // the owner's own click, and the checkout itself is still made by manage-billing (the one signed path).
   var wantBilling = (location.hash || '') === '#billing', billingAsked = false;
@@ -807,8 +808,8 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     count.className = 'count';
     var left = trial && typeof trial.credits_remaining === 'number' ? trial.credits_remaining : null;
     if (a === 'trial') {
-      // usage reads as "7 of 100 free reports used"; only when the allowance is not yet known does it fall back to the count left
-      count.textContent = freeLimit !== null && left !== null ? (freeLimit - left) + ' of ' + freeLimit + ' free reports used' : (left === 1 ? '1 free report left' : left + ' free reports left');
+      // usage reads as "7 of 100 reports used"; only when the allowance is not yet known does it fall back to the count left
+      count.textContent = freeLimit !== null && left !== null ? (freeLimit - left) + ' of ' + freeLimit + ' reports used' : (left === 1 ? '1 free report left' : left + ' free reports left');
       sub.textContent = mine()
         ? 'A report with no development data (“No data ingested”) does not use one.'
         : "Shared by everyone on your brokerage. A report with no development data (“No data ingested”) does not use one.";
@@ -816,7 +817,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       count.textContent = 'Signed in as a HomeSignal admin';
       sub.textContent = 'Reports you make here show what a customer sees, and never use a free report.';
     } else if (a === 'complete') {
-      count.textContent = freeLimit !== null ? freeLimit + ' of ' + freeLimit + ' free reports used' : 'All ' + freeWords() + ' are used'; count.className = 'count out';
+      count.textContent = freeLimit !== null ? freeLimit + ' of ' + freeLimit + ' reports used' : 'All ' + freeWords() + ' are used'; count.className = 'count out';
       sub.textContent = mine() ? 'Your free trial is complete. Your saved reports stay available.' : "Your brokerage's free trial is complete.";
     } else if (a === 'ended') {
       count.textContent = 'This trial has ended'; count.className = 'count out';
@@ -848,7 +849,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 
   // ---- the tile's commercial action: always present for a member, whatever the free reports say --------------------------
   function ctaSay(text, isError){ var s = $('trial-cta-status'); s.textContent = text || ''; s.className = isError ? 'err' : ''; }
-  /** "Subscribe — $79/month" until the plan is paid; "Manage plan" once it is (or while a payment needs attention). Shown with free reports left or none. */
+  /** "Subscribe — $78/month" until the plan is paid; "Manage plan" once it is (or while a payment needs attention). Shown with free reports left or none. */
   function showTrialCta(a){
     var wrap = $('trial-cta-wrap'), btn = $('trial-cta');
     ctaSay('', false);
@@ -887,7 +888,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       return;
     }
     var owner = plan.role === 'owner';
-    var offer = ' Paid plans are coming.';
+    var offer = ' Professional plan: $78 a month, billed monthly and renewing automatically until you cancel, with 100 reports each billing period, each covering 0.5 mile around the property.';
     var who = owner ? '' : " Only your brokerage's owner can subscribe.";
     var closed = '';
     if (plan.state === 'paid') {
