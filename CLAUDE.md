@@ -366,6 +366,25 @@ Google does not render a page whose initial robots says noindex, so a script cou
   artifact in Chromium). Production check: dispatch `verify-map-landing-live.yml` after a deploy.
 - Search Console state is not readable from this repo; inspect `https://jodytracks.com/homesignalmap.html` there and request indexing.
 
+## PUBLIC HEARINGS ARE VISIBLE BEFORE THEY ARE DECIDED ⚖️ FOUNDER POLICY (2026-11-17) — PLAN ONLY, NOT BUILT
+
+Residents must learn of a chance to take part in a development decision BEFORE the decision. Universal, every ZIP and
+jurisdiction; Neskowin / 97149 is a test case, never the scope. Audit and plan: `docs/public-hearing-visibility-plan-2026-11-17.md`.
+The engine half and the full rule text: homesignal-ingest CLAUDE.md, same title.
+1. An officially confirmed public hearing appears on every ZIP page the hearing's government reaches.
+2. A hearing announced by a recognized local government advisory committee may appear labelled **"Official confirmation
+   pending"** with a direct link to the committee's own source. Recognition is a registry entry, never a guess.
+3. A provisional announcement is reconciled automatically with the later official notice; the decision is recorded, not overwritten.
+4. Announcement date, notice publication date, hearing date and decision date are four separate fields. A posting date is never a hearing date.
+5. Comment instructions, participation links and deadlines are shown when the source states them.
+6. A hearing attaches to its development project by evidence (case number, named parcel, named project). **No Map pin is required.**
+7. Duplicate, cancelled, superseded and outdated notices never show as current. A cancelled hearing stays listed, badged "Cancelled"
+   (ruling 2026-10-19), and is never actionable.
+8. Nationwide; no place name, feed id or ZIP appears in the rule.
+- Hearings live in `public.meetings` (read live). Do NOT carry a hearing only as an `app_changes` notice: an `app_changes` row is never re-evaluated.
+- ⛔ Not built, not applied, not deployed. Any database change or deploy needs founder approval.
+- Do not edit the Tillamook `county_cases` files or section for this work; the Tillamook session owns them.
+
 ## Permanent historical intelligence — preserve the longitudinal asset
 
 **HomeSignal's longitudinal development history is a core company data asset. Current product
