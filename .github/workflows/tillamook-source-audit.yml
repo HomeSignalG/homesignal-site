@@ -1,0 +1,16 @@
+name: tillamook-source-audit (scratch, never merge)
+on:
+  push:
+    branches: [claude/tillamook-source-audit]
+permissions:
+  contents: read
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node scripts/_tm_audit.mjs
