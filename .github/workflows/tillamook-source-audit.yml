@@ -13,4 +13,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - run: sudo apt-get install -y -qq poppler-utils
       - run: node scripts/_tm_audit.mjs
