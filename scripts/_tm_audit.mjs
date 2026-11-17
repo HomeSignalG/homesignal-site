@@ -1,10 +1,17 @@
-const r = await fetch('https://www.neskowincac.org/upcoming-events', { headers: { 'user-agent': 'HomeSignal-source-check/1.0 (+https://jodytracks.com)' } });
-const h = await r.text();
-console.log('STATUS', r.status, 'bytes', h.length, 'robots-meta', (h.match(/<meta[^>]*robots[^>]*>/i) || [''])[0]);
-const i = h.indexOf('Campground Application Hearing');
-console.log('--- markup around the Dec 3 event ---');
-console.log(h.slice(Math.max(0, i - 2500), i + 2500));
-console.log('--- all event title anchors ---');
-for (const m of h.matchAll(/<a[^>]+href="([^"]*event[^"]*)"[^>]*>/gi)) console.log(m[1]);
-const rr = await fetch('https://www.neskowincac.org/robots.txt', { headers: { 'user-agent': 'HomeSignal-source-check/1.0' } });
-console.log('--- robots.txt', rr.status, (await rr.text()).slice(0, 600));
+const UA = 'HomeSignal-source-check/1.0 (+https://jodytracks.com)';
+const get = async u => { const r = await fetch(u, { headers: { 'user-agent': UA } }); return [r, await r.text()]; };
+let [r, t] = await get('https://www.neskowincac.org/robots.txt');
+console.log('ROBOTS', r.status);
+const blocks = t.split(/\n\s*\n/);
+for (const b of blocks) if (/User-agent:\s*\*/i.test(b) || /Sitemap/i.test(b)) console.log(b);
+console.log('ANY Disallow lines under * :', blocks.filter(b => /User-agent:\s*\*/i.test(b)).join('\n'));
+for (const u of ['https://www.neskowincac.org/upcoming-events?format=ical', 'https://www.neskowincac.org/upcoming-events?format=json']) {
+  [r, t] = await get(u);
+  console.log('\n=====', u, r.status, r.headers.get('content-type'), 'bytes', t.length);
+  if (/ical/.test(u)) {
+    const ev = t.split('BEGIN:VEVENT').slice(1);
+    console.log('events', ev.length);
+    console.log('HEADER', t.slice(0, 400).replace(/\r?\n/g, ' | '));
+    for (const e of ev) if (/campground/i.test(e)) console.log('VEVENT', e.replace(/\r?\n/g, ' | ').slice(0, 1500));
+  } else console.log(t.slice(0, 300));
+}
