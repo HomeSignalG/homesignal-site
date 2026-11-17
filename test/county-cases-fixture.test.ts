@@ -14,7 +14,9 @@ function check(name: string, cond: boolean, detail?: string) {
   else { failures++; console.error(`  ✗ ${name}${detail ? " — " + detail : ""}`); }
 }
 
-const ENTRY = (registry as unknown as { county_cases: CountyCasesRegistryEntry[] }).county_cases[0];
+const SHIPPED = (registry as unknown as { county_cases: CountyCasesRegistryEntry[] }).county_cases[0];
+// The fixture tests the connector's logic, so it runs without the shipped holds; the holds are checked on their own below.
+const ENTRY: CountyCasesRegistryEntry = { ...SHIPPED, hold_cases: [] };
 const ENTRY_WIDE: CountyCasesRegistryEntry = { ...ENTRY, max_page_reads: 12 };
 const COMM = [{ state: "OR", county: "Tillamook" }];
 const CAMP_REQ = "Request for Conditional Use approval of a recreational campground master plan consisting of 18 sites and amenities on a property zoned Rural Residential 2-Acre (RR-2) and Recreation Management (RM) located north and east of the Unincorporated Community of Neskowin. The subject property is accessed via Highway 101, and designated as Tax Lot 202 of Section 13, Township 5 South, Range 11 West of the Willamette Meridian, Tillamook County, Oregon.";
@@ -153,6 +155,19 @@ console.log("everything resolvable: who is emitted and why");
   check("partition dropped as routine, appeal-period excluded, no-lot case quarantined with its own reason",
     !ids.includes("851-26-000365-PLNG") && !ids.includes("851-24-000293-PLNG") && R.excluded_by_status.some((x) => x.status === "Appeal Period") && q.includes("no_tax_lot_named"));
   check("no request to any host other than the county site and its ArcGIS parcel service", log.every((u) => /tillamookcounty\.gov|services3\.arcgis\.com\/JnnlTIrcZLzs7d68/.test(u)));
+}
+
+console.log("a held case is quarantined whatever the county's list says");
+{
+  const held: CountyCasesRegistryEntry = { ...ENTRY_WIDE, hold_cases: [{ case_id: "851-25-000548-PLNG", reason: "outcome not verified" }] };
+  const { sites, reports } = await run({ synth: true, entry: held }); const R = reports[0];
+  const ids = sites.map((s) => s.case_number);
+  check("the held case (by any of its ids) is not emitted and says why", !ids.includes("851-25-000549-PLNG") && R.quarantined.some((x) => x.reason.startsWith("held_pending_verification") && x.sample === "851-25-000548-PLNG"));
+  const { sites: s3, reports: r3 } = await run({ synth: true, entry: SHIPPED });
+  check("the SHIPPED registry holds Sahhali South (both applications) and still emits the campground", !s3.some((s) => /^851-25-00054[89]-PLNG$/.test(s.case_number)) && s3.some((s) => s.case_number === "851-26-000190-PLNG") && (SHIPPED.hold_cases ?? []).map((h) => h.case_id).sort().join() === "851-25-000548-PLNG,851-25-000549-PLNG" && r3[0].quarantined.some((x) => x.reason.startsWith("held_pending_verification")));
+  check("the campground is unaffected by the hold", ids.includes("851-26-000190-PLNG"));
+  const { sites: s2 } = await run({ synth: true, entry: ENTRY_WIDE });
+  check("CONTROL: without the hold the same case is emitted", s2.some((s) => s.case_number === "851-25-000549-PLNG"));
 }
 
 console.log("a parcel that straddles the ZIP line: centroid in the neighbouring ZIP, parcel reaches this one");
