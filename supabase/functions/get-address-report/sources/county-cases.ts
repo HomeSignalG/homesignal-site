@@ -37,6 +37,13 @@ export interface CountyCasesRegistryEntry {
   significant_if: string[];       // regex sources, matched case-insensitively against type + request
   routine_if?: string[];          // a match drops the case
   residential_if?: string[];      // a match maps use_type to Residential; otherwise "Development"
+  /** A single-lot case whose text matches one of these (an amendment to an existing plan) is routine UNLESS
+   *  its text states a scale (`scale_if`) or names a use that is significant on its own. One parcel alone is never
+   *  a reason to exclude: a large commercial or industrial project can occupy one lot. */
+  single_lot_minor_if?: string[];
+  scale_if?: string[];
+  /** Markers that a county's "page not found" screen carries even when it answers HTTP 200. */
+  page_gone_if?: string[];
   /** "OR" etc. Used to bound the pin sanity box. */
   bbox: { min_lat: number; max_lat: number; min_lng: number; max_lng: number };
   file_date_kind?: FileDateKind;
@@ -63,6 +70,11 @@ export interface CountyCasesRunReport {
   excluded_by_status: { status: string; count: number }[];
   unmapped_statuses: { status: string; count: number; sample?: string | null }[];
   not_in_zip: number;
+  /** Single-lot amendments to an existing plan that state no scale (routine), by case id. */
+  routine_single_lot?: string[];
+  /** Cases whose pin was moved from the parcel centroid to a point ON the parcel inside this ZIP because the
+   *  centroid lies in a neighbouring ZIP but the parcel itself reaches this one. */
+  pinned_by_parcel_overlap?: string[];
   duplicates_folded?: number;
   quarantined: { reason: string; sample: string }[];
 }
@@ -106,19 +118,50 @@ export function parseCaseIndex(html: string, base: string): IndexCase[] {
   return out;
 }
 
+export type TaxlotParse = { keys: string[] } | { reason: "no_tax_lot_named" | "tax_lot_text_truncated" | "tax_lot_wording_unrecognized" | "quarter_section_ambiguous" };
+
 /** Tax lots named in a request, e.g. "Tax Lots 1300, 1301 and 1400 of Section 24AB, Township 5 South,
- *  Range 11 West" → MapTaxlot keys "5S1124AB01300"… Returns null when the text does not state a complete,
- *  unambiguous description (never a partial guess). West-of-the-Willamette ranges only. */
-export function taxlotKeys(request: string): string[] | null {
-  const re = /Tax\s+Lots?\s+([\d,\s]+(?:\s*(?:and|&)\s*[\d,\s]+)?)\s*(?:,\s*)?(?:in|of)\s+Section\s+(\d{1,2})([A-D]{0,2})\s*,?\s*Township\s+(\d{1,2})\s+(North|South)\s*,?\s*Range\s+(\d{1,2})\s+(West)/i;
+ *  Range 11 West" → MapTaxlot keys "5S1124AB01300"… (township, N/S, range PADDED to two digits, section,
+ *  two-letter quarter or "00", five-digit lot — the county layer's own key shape, e.g. "1S0928CB02202").
+ *  Accepts "in|of Section 26 of Township …". Never a partial guess: anything else returns a reason. West-of-the-Willamette only. */
+export function parseTaxlots(request: string): TaxlotParse {
+  const at = request.search(/Tax\s+Lots?\b/i);
+  if (at < 0) return { reason: "no_tax_lot_named" };
+  const re = /Tax\s+Lots?\s+([\d,\s]+(?:\s*(?:and|&)\s*[\d,\s]+)?)\s*(?:,\s*)?(?:in|of)\s+(?:Index\s+)?Section\s+(\d{1,2})([A-D]{0,2})\s*,?\s*(?:of\s+)?Township\s+(\d{1,2})\s+(North|South)\s*,?\s*Range\s+(\d{1,2})\s+(West)/i;
   const m = request.match(re);
-  if (!m) return null;
+  if (!m) {
+    // A lot list that simply stops (the county's index shortens long descriptions) is distinct from one worded differently.
+    const tail = request.slice(at);
+    const stops = !/\bRange\b/i.test(tail) && !/[.!?]["')]?\s*$/.test(request.trim());
+    return { reason: stops ? "tax_lot_text_truncated" : "tax_lot_wording_unrecognized" };
+  }
   const lots = (m[1].match(/\d{1,5}/g) ?? []).map((x) => x.padStart(5, "0"));
   const quarter = (m[3] || "").toUpperCase();
-  if (!lots.length || quarter.length === 1) return null;
+  if (!lots.length || quarter.length === 1) return { reason: "quarter_section_ambiguous" };
   const sec = m[2].padStart(2, "0");
-  const key = (lot: string) => `${m[4]}${m[5][0].toUpperCase()}${m[6]}${sec}${quarter || "00"}${lot}`;
-  return [...new Set(lots.map(key))];
+  const key = (lot: string) => `${m[4]}${m[5][0].toUpperCase()}${m[6].padStart(2, "0")}${sec}${quarter || "00"}${lot}`;
+  return { keys: [...new Set(lots.map(key))] };
+}
+export function taxlotKeys(request: string): string[] | null {
+  const p = parseTaxlots(request);
+  return "keys" in p ? p.keys : null;
+}
+
+/** The county case page repeats the full request text the index list cuts short. Finds the page's copy of THIS
+ *  request by a run of its own plain words (so a different description can never be adopted) and returns the
+ *  text from there. Null when the page does not carry the same description. */
+export function requestFromPage(pageHtml: string, indexRequest: string): string | null {
+  const words = indexRequest.split(/\s+/);
+  let run: string[] = [];
+  for (let i = 0; i + 8 <= words.length; i++) {
+    const w = words.slice(i, i + 8);
+    if (w.every((x) => /^[A-Za-z]+$/.test(x))) { run = w; break; }
+  }
+  if (!run.length) return null;
+  const t = clean(pageHtml);
+  const m = t.match(new RegExp(run.join("\\s+"), "i"));
+  if (!m || m.index === undefined) return null;
+  return t.slice(m.index, m.index + 3000);
 }
 
 const MONTHS: Record<string, number> = { january: 1, february: 2, march: 3, april: 4, may: 5, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12 };
@@ -164,6 +207,40 @@ export function pinFromParcels(
   const spread = Math.max(...pts.map((p) => haversineM([lat, lng], [p.lat, p.lng])));
   if (spread > opt.max_spread_m) return { reason: `parcels_spread_${Math.round(spread)}m` };
   return { lat, lng, found: pts.length, wanted: wanted.length };
+}
+
+type Ring = number[][]; // [lng, lat] pairs (ArcGIS, outSR 4326)
+function pointInRings(lat: number, lng: number, rings: Ring[]): boolean {
+  let inside = false; // even-odd across every ring: holes subtract, multipart parts combine
+  for (const ring of rings) {
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i], [xj, yj] = ring[j];
+      if ((yi > lat) !== (yj > lat) && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+  }
+  return inside;
+}
+/** Points ON a parcel for ZIP intersection tests: interior grid points first (preferred as a pin), then boundary
+ *  vertices. Interior points are kept only when they fall inside the parcel's own polygon. Bounded. */
+export function parcelSamplePoints(rings: Ring[] | undefined, max: number): { lat: number; lng: number; kind: "interior" | "vertex" }[] {
+  if (!rings?.length || max <= 0) return [];
+  const all = rings.flat().filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+  if (!all.length) return [];
+  const lngs = all.map((p) => p[0]), lats = all.map((p) => p[1]);
+  const [x0, x1, y0, y1] = [Math.min(...lngs), Math.max(...lngs), Math.min(...lats), Math.max(...lats)];
+  const out: { lat: number; lng: number; kind: "interior" | "vertex" }[] = [];
+  const n = 7;
+  for (let a = 0; a < n; a++) for (let b = 0; b < n; b++) {
+    const lng = x0 + ((a + 0.5) / n) * (x1 - x0), lat = y0 + ((b + 0.5) / n) * (y1 - y0);
+    if (pointInRings(lat, lng, rings as Ring[])) out.push({ lat, lng, kind: "interior" });
+  }
+  const step = Math.max(1, Math.ceil(all.length / Math.max(1, Math.floor(max / 2))));
+  for (let i = 0; i < all.length; i += step) out.push({ lat: all[i][1], lng: all[i][0], kind: "vertex" });
+  if (out.length <= max) return out;
+  // keep a spread of both kinds within the bound
+  const interior = out.filter((p) => p.kind === "interior"), vertex = out.filter((p) => p.kind === "vertex");
+  const take = <T,>(a: T[], k: number) => a.filter((_, i) => i % Math.max(1, Math.ceil(a.length / Math.max(1, k))) === 0).slice(0, k);
+  return [...take(interior, Math.ceil(max / 2)), ...take(vertex, Math.floor(max / 2))];
 }
 
 // ───────────────────────────── engine entry point ─────────────────────────────
@@ -250,13 +327,45 @@ async function runEntry(entry: CountyCasesRegistryEntry, zip: string, deps: Coun
   report.unmapped_statuses = [...unmapped].map(([status, v]) => ({ status, count: v.count, sample: v.sample }));
 
   const limit = entry.max_cases ?? 25;
-  const keyed: { c: IndexCase; bucket: string; keys: string[]; merged?: string[] }[] = [];
+  const minorSingle = (entry.single_lot_minor_if ?? []).map((p) => new RegExp(p, "i"));
+  const scale = (entry.scale_if ?? []).map((p) => new RegExp(p, "i"));
+  const gone = (entry.page_gone_if ?? []).map((p) => new RegExp(p, "i"));
+  const delay = entry.crawl_delay_ms ?? 10000;
+  const budget = entry.max_page_reads ?? 4;
+  let pageReads = 0;
+  const pageOf = (url: string) => memo(`pg:${url}`, async () => {
+    if (pageReads >= budget) throw new Error("page_read_budget");
+    pageReads++;
+    await paced(deps, new URL(url).host, delay);
+    return getText(deps, url);
+  });
+  const routineSingle: string[] = [];
+  const keyed: { c: IndexCase; bucket: string; keys: string[]; merged?: string[]; page?: string }[] = [];
   for (const w of wantStatus) {
-    const keys = taxlotKeys(w.c.request);
-    if (!keys) { quarantine("no_complete_tax_lot_description", w.c.case_ids[0]); continue; }
-    keyed.push({ ...w, keys });
+    let p = parseTaxlots(w.c.request);
+    let page: string | undefined;
+    if ("reason" in p && p.reason === "tax_lot_text_truncated") {
+      // The county's list view shortens long descriptions; its case page carries the whole text. Adopt the page's
+      // lot list only when the page repeats THIS description and agrees with every complete lot the list showed.
+      try {
+        page = await pageOf(w.c.url);
+        const full = requestFromPage(page, w.c.request);
+        const fp = full ? parseTaxlots(full) : null;
+        if (fp && "keys" in fp) {
+          const shown = ((w.c.request.match(/Tax\s+Lots?\s+([\d,\s]+)$/i)?.[1] ?? "").split(",").map((x) => x.trim()).filter((x, i, a) => x !== "" && i < a.length - 1)).map((x) => x.padStart(5, "0"));
+          if (shown.every((l) => fp.keys.some((k) => k.endsWith(l)))) p = fp;
+          else quarantine("tax_lot_page_disagrees_with_index", w.c.case_ids[0]);
+        } else quarantine(fp ? fp.reason : "tax_lot_text_truncated", w.c.case_ids[0]);
+      } catch (e) { quarantine(String((e as Error).message) === "page_read_budget" ? "page_read_budget_exhausted" : "case_page_unreadable", w.c.case_ids[0]); }
+      if ("reason" in p) continue;
+    }
+    if ("reason" in p) { quarantine(p.reason, w.c.case_ids[0]); continue; }
+    const hay = `${w.c.type} ${w.c.request}`;
+    if (p.keys.length === 1 && minorSingle.some((r) => r.test(hay)) && !scale.some((r) => r.test(hay))) { routineSingle.push(w.c.case_ids[0]); continue; }
+    keyed.push({ ...w, keys: p.keys, page });
     if (keyed.length >= limit) break;
   }
+  if (routineSingle.length) report.routine_single_lot = routineSingle;
   if (!keyed.length) return { records, report };
   // Related planning applications on the same land are ONE project / ONE marker: a case that shares any
   // tax lot with an earlier (newer-first) case is folded into it and listed as a related case.
@@ -270,7 +379,7 @@ async function runEntry(entry: CountyCasesRegistryEntry, zip: string, deps: Coun
 
   // Parcel lookup — ONE query for every lot of every candidate case.
   const allKeys = [...new Set(keyed.flatMap((k) => k.keys))];
-  const found: { key: string; lat: number; lng: number }[] = [];
+  const found: { key: string; lat: number; lng: number; rings?: Ring[] }[] = [];
   try {
     for (let i = 0; i < allKeys.length; i += 150) {
       const chunk = allKeys.slice(i, i + 150);
@@ -281,38 +390,65 @@ async function runEntry(entry: CountyCasesRegistryEntry, zip: string, deps: Coun
       for (const f of j.features ?? []) {
         const c = f.centroid;
         const k = f.attributes?.[entry.parcel_key_field];
-        if (k && c && Number.isFinite(c.x) && Number.isFinite(c.y)) found.push({ key: String(k).trim(), lat: c.y, lng: c.x });
+        if (k && c && Number.isFinite(c.x) && Number.isFinite(c.y)) found.push({ key: String(k).trim(), lat: c.y, lng: c.x, rings: f.geometry?.rings });
       }
     }
   } catch (e) { quarantine("parcel_lookup_failed", String((e as Error).message)); return { records, report }; }
 
-  const pins: { k: typeof keyed[number]; lat: number; lng: number; found: number }[] = [];
+  const pins: { k: typeof keyed[number]; lat: number; lng: number; found: number; cands: { lat: number; lng: number; kind: "centroid" | "interior" | "vertex" }[] }[] = [];
   for (const k of keyed) {
     const p = pinFromParcels(k.keys, found, { min_found_share: entry.min_found_share ?? 1, max_spread_m: entry.max_spread_m ?? 1500, bbox: entry.bbox });
     if ("reason" in p) { quarantine(p.reason, k.c.case_ids[0]); continue; }
-    pins.push({ k, lat: p.lat, lng: p.lng, found: p.found });
+    // Candidate points for the ZIP test: the centroid, then points ON the named parcels themselves.
+    const mine = found.filter((f, i, a) => k.keys.includes(f.key) && a.findIndex((x) => x.key === f.key) === i);
+    const per = Math.max(6, Math.floor(120 / Math.max(1, mine.length)));
+    const cands: { lat: number; lng: number; kind: "centroid" | "interior" | "vertex" }[] = [{ lat: p.lat, lng: p.lng, kind: "centroid" }];
+    for (const m of mine) cands.push({ lat: m.lat, lng: m.lng, kind: "centroid" }, ...parcelSamplePoints(m.rings, per));
+    pins.push({ k, lat: p.lat, lng: p.lng, found: p.found, cands });
   }
-  // ZIP scope: the canonical polygon when available, else the centroid radius. Never both unknown.
+  // ZIP scope. A project belongs on this ZIP when ANY part of its named parcels intersects the ZIP polygon, not only
+  // its centroid: a development can span two ZIP areas. The pin is the centroid when that is a member; otherwise a
+  // point ON the parcel that lies inside this ZIP (so the Map's point-in-ZIP placement agrees). Membership is
+  // always the canonical polygon's verdict; no point is ever invented off the parcels.
   let keep: boolean[];
   if (deps.zipMembers) {
-    try { keep = (await deps.zipMembers(pins.map((p) => [p.lat, p.lng] as const))).map((v) => v === "member"); }
-    catch (e) { quarantine("zip_membership_failed", String((e as Error).message)); return { records, report }; }
+    try {
+      const flat = pins.flatMap((p) => p.cands.map((c) => [c.lat, c.lng] as const));
+      const verdicts = flat.length ? await deps.zipMembers(flat) : [];
+      let at = 0;
+      keep = pins.map((p) => {
+        const v = verdicts.slice(at, at + p.cands.length).map((x) => x === "member"); at += p.cands.length;
+        if (!v.some(Boolean)) return false;
+        if (v[0]) return true; // centroid is a member: pin unchanged
+        const members = p.cands.filter((_, i) => v[i]);
+        const pool = members.some((m) => m.kind === "interior") ? members.filter((m) => m.kind === "interior") : members;
+        const best = pool.reduce((a, b) => (haversineM([p.lat, p.lng], [a.lat, a.lng]) <= haversineM([p.lat, p.lng], [b.lat, b.lng]) ? a : b));
+        p.lat = best.lat; p.lng = best.lng;
+        (p as { overlap?: boolean }).overlap = true;
+        return true;
+      });
+    } catch (e) { quarantine("zip_membership_failed", String((e as Error).message)); return { records, report }; }
   } else if (deps.zipCentroid && entry.spatial_zip_radius_mi) {
     keep = pins.map((p) => haversineM([deps.zipCentroid!.lat, deps.zipCentroid!.lng], [p.lat, p.lng]) <= entry.spatial_zip_radius_mi! * 1609.344);
   } else { quarantine("no_zip_scope_available", zip); return { records, report }; }
 
-  let pageReads = 0;
   for (let i = 0; i < pins.length; i++) {
     if (!keep[i]) { report.not_in_zip++; continue; }
     const { k, lat, lng } = pins[i];
     let fileDate: string | null = null;
     let history: string | null = null;
-    try {
-      if (pageReads >= (entry.max_page_reads ?? 4)) throw new Error("page_read_budget");
-      const page = await memo(`pg:${k.c.url}`, async () => { pageReads++; await paced(deps, new URL(k.c.url).host, entry.crawl_delay_ms ?? 10000); return getText(deps, k.c.url); });
-      if (entry.date_label) fileDate = statedDate(page, entry.date_label);
-      history = statusHistory(page);
-    } catch { /* the page is optional context; the record stands on the index row */ }
+    // A pin needs a WORKING official record: the case page must load and be that case's page. A dead link, a
+    // county "not found" screen, or an unread page is quarantined for follow-up and never published.
+    let page: string;
+    try { page = k.page ?? await pageOf(k.c.url); }
+    catch (e) {
+      const m = String((e as Error).message);
+      quarantine(/HTTP (404|410)\b/.test(m) ? "record_page_gone" : m === "page_read_budget" ? "record_page_unverified_budget" : "record_page_unreadable", k.c.case_ids[0]);
+      continue;
+    }
+    if (gone.some((r) => r.test(clean(page))) || !clean(page).toUpperCase().includes(k.c.case_ids[0])) { quarantine("record_page_gone", k.c.case_ids[0]); continue; }
+    if (entry.date_label) fileDate = statedDate(page, entry.date_label);
+    history = statusHistory(page);
     if (cutoff && fileDate && fileDate < cutoff) continue;
     const kind = k.c.type || "Land use application";
     const title = `${kind} — ${k.c.case_ids.join(" / ")}`;
@@ -348,13 +484,15 @@ async function runEntry(entry: CountyCasesRegistryEntry, zip: string, deps: Coun
       record_url_precision: entry.record_url_precision ?? "record",
       scope_text: k.c.request.slice(0, 300),
       // Honesty about the pin: a parcel CENTROID, not a construction site; the whole named footprint resolved.
-      location_basis: "parcel_centroid",
+      location_basis: (pins[i] as { overlap?: boolean }).overlap ? "parcel_portion_in_zip" : "parcel_centroid",
+      zip_overlap: (pins[i] as { overlap?: boolean }).overlap ? "parcel_reaches_this_zip_centroid_is_in_another" : null,
       location_approx: true,
       parcels_named: k.keys.length,
       parcels_matched: pins[i].found,
       related_cases: k.c.case_ids.slice(1).concat(k.merged ?? []),
       status_history: history,
     } as unknown as NormalizedRecord);
+    if ((pins[i] as { overlap?: boolean }).overlap) (report.pinned_by_parcel_overlap ??= []).push(k.c.case_ids[0]);
     report.emitted++;
   }
   return { records, report };

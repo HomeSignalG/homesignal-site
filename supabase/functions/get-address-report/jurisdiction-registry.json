@@ -17891,6 +17891,17 @@
         "\\bplat\\b",
         "dwelling"
       ],
+      "single_lot_minor_if": [
+        "\\bamend(ment)?s?\\b.{0,120}(planned development|master plan)"
+      ],
+      "scale_if": [
+        "\\b\\d[\\d,]*[- ]?(\\w+[- ]){0,2}(unit|site|room|bed|acre|stor(y|ies)|space|stall|square)",
+        "\\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)[- ](unit|site|room|story)",
+        "multi-?family|hotel|motel|resort|commercial|industrial|warehouse|campground|subdivision"
+      ],
+      "page_gone_if": [
+        "not a web page matching your entry"
+      ],
       "status_to_bucket": {
         "proposed": [
           "Planning Commission Hearing",

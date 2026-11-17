@@ -7073,3 +7073,11 @@ The pin is a parcel centroid, labelled approximate (`location_approx`). Status i
 words such as "Appeal Period" are excluded because they do not say which decision), and the case page's status-update text is kept verbatim.
 Cases that share a lot are one marker. Full record, terms check and robots crawl delay: `docs/source-registry.md` "TILLAMOOK COUNTY LAND-USE CASES".
 Tests: `test/county-cases-fixture.test.ts`. County-wide notices stay separate (homesignal-ingest feeds); this connector adds only verified pins.
+
+- **Fixes after the first live read (2026-11-17), from `docs/source-registry.md` "TILLAMOOK ... live read":**
+  - Live 2026-11-16: 315 index rows, 67 significant, 1 emitted. 17 were quarantined `no_complete_tax_lot_description`.
+  - **The county's list view CUTS long descriptions** (Sahhali South ends "…Tax Lots 1300, 1301, 1400, 15"); the case page has the whole text. A cut-off lot list now sends the connector to the case page, which is adopted only if it repeats THIS description and agrees with every complete lot the list showed. All named lots must still resolve.
+  - **Parcel keys pad the range to two digits** (`1S0926…`, the layer's own shape); "in Section X of Township …" wording is accepted. Quarantine reasons are now distinct: `no_tax_lot_named`, `tax_lot_text_truncated`, `tax_lot_wording_unrecognized`, `quarter_section_ambiguous`.
+  - **ZIP membership is by parcel, not centroid.** A project belongs on a ZIP when any part of its named parcels intersects the ZIP polygon (centroid, then points on the parcels). The pin is the centroid when that is a member, else a point ON the parcel inside this ZIP (`location_basis: parcel_portion_in_zip`). Measured: the Neskowin campground's centroid is in ZCTA 97112 and about 47% of its parcel is in 97149.
+  - **Single-lot amendments are routine only when they state no scale** (`single_lot_minor_if` / `scale_if` in the registry). A large project on one lot stays in.
+  - **A pin needs a working county case page** that carries its own case id; a 404, or a "not found" screen served as HTTP 200 (`page_gone_if`), is quarantined `record_page_gone`.
