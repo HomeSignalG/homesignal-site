@@ -42,6 +42,9 @@ export interface CountyCasesRegistryEntry {
    *  a reason to exclude: a large commercial or industrial project can occupy one lot. */
   single_lot_minor_if?: string[];
   scale_if?: string[];
+  /** Cases held out until a person verifies their outcome (e.g. the county's list page is stale). A held case is
+   *  quarantined with its reason and never emitted, whatever status the list shows. */
+  hold_cases?: { case_id: string; reason: string }[];
   /** Markers that a county's "page not found" screen carries even when it answers HTTP 200. */
   page_gone_if?: string[];
   /** "OR" etc. Used to bound the pin sanity box. */
@@ -315,6 +318,8 @@ async function runEntry(entry: CountyCasesRegistryEntry, zip: string, deps: Coun
     const hay = `${c.type} ${c.request}`;
     if (!sig.some((r) => r.test(hay)) || routine.some((r) => r.test(hay))) continue;
     report.significant++;
+    const held = (entry.hold_cases ?? []).find((h) => c.case_ids.includes(h.case_id));
+    if (held) { quarantine("held_pending_verification: " + held.reason, held.case_id); continue; }
     const st = resolveNormalized(lookup, c.status);
     if (st.value === undefined) {
       const u = unmapped.get(c.status) ?? { count: 0, sample: c.case_ids[0] };
