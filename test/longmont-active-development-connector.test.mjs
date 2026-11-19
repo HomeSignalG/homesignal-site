@@ -1,0 +1,30 @@
+// Longmont Active Development (layer 10): coded statuses, polygon pin, dataset link, no date floor.
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+let fails = 0;
+const ok = (c, n) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + n); if (!c) fails++; };
+const { arcgisForZip, coverageMatches } = await import(join(root, 'supabase/functions/get-address-report/sources/arcgis.ts'));
+const REG = JSON.parse(readFileSync(join(root, 'supabase/functions/get-address-report/jurisdiction-registry.json'), 'utf8'));
+const E = REG.arcgis.find((e) => e.registry_id === 'longmont-active-development');
+ok(!!E && E.jurisdiction === 'City of Longmont, Colorado', 'entry exists, labelled City of Longmont');
+const B = E.status_to_bucket, all = Object.values(B).flat();
+ok(new Set(all).size === all.length, 'no code is in two buckets');
+ok(['DR','NM','PH','R'].every((c) => B.proposed.includes(c)) && ['A','UC'].every((c) => B.approved.includes(c)) && ['W','D'].every((c) => B.exclude.includes(c)), 'DR/NM/PH/R proposed, A/UC approved, W/D excluded (layer domain)');
+ok(['DR','PH','R','A','UC','W'].every((c) => all.includes(c)), 'all six live codes are bucketed');
+ok(!E.recency_days && !E.recency_expr, 'no filing-date floor (Submittal_Date is a string)');
+ok(E.record_url_precision === 'dataset' && /longmontcolorado\.gov/.test(E.dataset_url), 'record link is the city\'s own page, dataset precision');
+const feat = (st, id) => ({ attributes: { OBJECTID: id, Project_Name: 'Test Plat ' + id, File_No: 'DV-' + id, Location: '1 MAIN ST', Project_Type_1: 'Site Plan', Project_Status: st, Submittal_Date: '3/4/2024' },
+  geometry: { rings: [[[-105.11, 40.16], [-105.10, 40.16], [-105.10, 40.17], [-105.11, 40.17], [-105.11, 40.16]]] } });
+const FIX = { geometryType: 'esriGeometryPolygon', features: [feat('UC', 1), feat('DR', 2), feat('W', 3), feat('A', 4)] };
+let n = 0;
+const stub = async () => ({ ok: true, status: 200, json: async () => (n++ === 0 ? FIX : { features: [] }) });
+const { sites } = await arcgisForZip('80501', [{ state: 'CO', county: 'Boulder' }], [E], { fetch: stub, zipCentroid: { lat: 40.165, lng: -105.105 } });
+ok(sites.length === 3, `withdrawn excluded, others emitted (${sites.length})`);
+ok(sites.every((s) => s.record_url && s.record_url.startsWith('https://longmontcolorado.gov/')), 'every record has the official link');
+ok(sites.every((s) => typeof s.lat === 'number' && s.scope === 'point'), 'pinned from the polygon');
+ok(!sites.some((s) => /DV-3/.test(JSON.stringify(s))), 'withdrawn record absent');
+ok(coverageMatches(E.coverage, [{ state: 'CO', county: 'Boulder' }]) && !coverageMatches(E.coverage, [{ state: 'CO', county: 'Larimer' }]), 'coverage gate');
+console.log(fails ? `${fails} FAILED` : 'All longmont assertions passed.');
+process.exit(fails ? 1 : 0);

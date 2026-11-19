@@ -1,0 +1,10 @@
+{
+  "_doc": "Source families whose retirement is established by a documented decision. A radius key from any OTHER family with no hydrated record is a lost record (RECORDS_NOT_LOADED); absence of rows is never evidence of retirement. Add an entry only with a cited decision.",
+  "retired": {
+    "denton-county-dev-permits": {
+      "decision": "Rejected: Denton County's own permit layer stalled at 2023-06-09 on both server copies; no replacement exists.",
+      "evidence": "CLAUDE.md, TEXAS DEV-COVERAGE PASS (2026-07-27); homesignal-site docs/source-registry.md",
+      "decided": "2026-07-27"
+    }
+  }
+}

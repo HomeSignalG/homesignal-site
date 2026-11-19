@@ -1,0 +1,3659 @@
+{
+ "_doc": "IMMUTABLE historical evidence: the 2026-11-19 audit membership. The registry has grown since and keeps growing; a source registered after this audit is NOT in this file and is UNVERIFIED until audited. Never edit to track the live registry.",
+ "audit_date": "2026-11-19",
+ "audited": {
+  "adams-county-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Adams",
+     "state": "CO"
+    }
+   ],
+   "jurisdiction": "Adams County, Colorado",
+   "publishing_agency": "Adams County, Colorado",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "adot-tip-fy2026-2030": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "AZ"
+    }
+   ],
+   "jurisdiction": "Arizona Department of Transportation (ADOT) \u2014 adopted FY2026-2030 Transportation Improvement Program",
+   "publishing_agency": "Arizona Department of Transportation (ADOT) \u2014 adopted FY2026-2030 Transportation Improvement Program",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "transportation improvement program"
+   }
+  },
+  "akdot-stip-24-27": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "AK"
+    }
+   ],
+   "jurisdiction": "Alaska Department of Transportation & Public Facilities (AKDOT&PF) \u2014 STIP FFY 2024-2027 (Approved Final)",
+   "publishing_agency": "Alaska Department of Transportation & Public Facilities (AKDOT&PF) \u2014 STIP FFY 2024-2027 (Approved Final)",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "stip"
+   }
+  },
+  "albuquerque-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Bernalillo",
+     "state": "NM"
+    },
+    {
+     "county": "Sandoval",
+     "state": "NM"
+    }
+   ],
+   "jurisdiction": "City of Albuquerque, New Mexico",
+   "publishing_agency": "City of Albuquerque, New Mexico",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "aldot-atrip-ii-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "AL"
+    }
+   ],
+   "jurisdiction": "Alabama Department of Transportation (ALDOT) \u2014 ATRIP-II",
+   "publishing_agency": "Alabama Department of Transportation (ALDOT) \u2014 ATRIP-II",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "improvement program"
+   }
+  },
+  "aldot-rebuild-alabama-grant-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "AL"
+    }
+   ],
+   "jurisdiction": "Alabama Department of Transportation (ALDOT) \u2014 Rebuild Alabama Annual Grant Program",
+   "publishing_agency": "Alabama Department of Transportation (ALDOT) \u2014 Rebuild Alabama Annual Grant Program",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "allegheny-county-asbestos-permits": {
+   "connector": "ckan",
+   "coverage": [
+    {
+     "county": "Allegheny",
+     "state": "PA"
+    }
+   ],
+   "jurisdiction": "Allegheny County Health Department",
+   "publishing_agency": "Allegheny County Health Department",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "allentown-energov-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Lehigh",
+     "state": "PA"
+    }
+   ],
+   "jurisdiction": "City of Allentown, Pennsylvania",
+   "publishing_agency": "City of Allentown, Pennsylvania",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "anaheim-land-use-cases": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Orange",
+     "state": "CA"
+    }
+   ],
+   "jurisdiction": "City of Anaheim",
+   "publishing_agency": "City of Anaheim",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "ann-arbor-energov-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Washtenaw",
+     "state": "MI"
+    }
+   ],
+   "jurisdiction": "City of Ann Arbor",
+   "publishing_agency": "City of Ann Arbor",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "anne-arundel-commercial-site-plans": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Anne Arundel",
+     "state": "MD"
+    }
+   ],
+   "jurisdiction": "Anne Arundel County, Maryland \u2014 Office of Planning and Zoning",
+   "publishing_agency": "Anne Arundel County, Maryland \u2014 Office of Planning and Zoning",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "anne-arundel-subdivision-activity": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Anne Arundel",
+     "state": "MD"
+    }
+   ],
+   "jurisdiction": "Anne Arundel County, Maryland \u2014 Office of Planning and Zoning",
+   "publishing_agency": "Anne Arundel County, Maryland \u2014 Office of Planning and Zoning",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "ar-ardot-job-status-lines": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "AR"
+    }
+   ],
+   "jurisdiction": "Arkansas Department of Transportation",
+   "publishing_agency": "Arkansas Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "ar-ardot-job-status-points": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "AR"
+    }
+   ],
+   "jurisdiction": "Arkansas Department of Transportation",
+   "publishing_agency": "Arkansas Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "arlington-issued-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Tarrant",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "City of Arlington",
+   "publishing_agency": "City of Arlington",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "arlington-permit-applications": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Tarrant",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "City of Arlington",
+   "publishing_agency": "City of Arlington",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "arlington-planning-cases": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Tarrant",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "City of Arlington",
+   "publishing_agency": "City of Arlington",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "asheville-accela-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Buncombe",
+     "state": "NC"
+    }
+   ],
+   "jurisdiction": "City of Asheville",
+   "publishing_agency": "City of Asheville",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "aurora-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Adams",
+     "state": "CO"
+    },
+    {
+     "county": "Arapahoe",
+     "state": "CO"
+    },
+    {
+     "county": "Douglas",
+     "state": "CO"
+    }
+   ],
+   "jurisdiction": "City of Aurora, Colorado",
+   "publishing_agency": "City of Aurora, Colorado",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "austin-issued-construction-permits": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "county": "Travis",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "City of Austin",
+   "publishing_agency": "City of Austin",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "austin-site-plan-cases": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "county": "Travis",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "City of Austin",
+   "publishing_agency": "City of Austin",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "austin-subdivision-cases": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "county": "Travis",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "City of Austin",
+   "publishing_agency": "City of Austin",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "austin-zoning-cases": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "county": "Travis",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "City of Austin Planning Department",
+   "publishing_agency": "City of Austin Planning Department",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "baltimore-city-housing-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Baltimore",
+     "state": "MD"
+    },
+    {
+     "county": "Baltimore city",
+     "state": "MD"
+    }
+   ],
+   "jurisdiction": "City of Baltimore",
+   "publishing_agency": "City of Baltimore",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "baltimore-county-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Baltimore",
+     "state": "MD"
+    },
+    {
+     "county": "Howard",
+     "state": "MD"
+    },
+    {
+     "county": "Harford",
+     "state": "MD"
+    }
+   ],
+   "jurisdiction": "Baltimore County",
+   "publishing_agency": "Baltimore County",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "beaverton-or-site-development-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Washington",
+     "state": "OR"
+    }
+   ],
+   "jurisdiction": "City of Beaverton, Oregon",
+   "publishing_agency": "City of Beaverton, Oregon",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "bellevue-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "King",
+     "state": "WA"
+    }
+   ],
+   "jurisdiction": "City of Bellevue",
+   "publishing_agency": "City of Bellevue",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "bellingham-trakit-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Whatcom",
+     "state": "WA"
+    }
+   ],
+   "jurisdiction": "City of Bellingham",
+   "publishing_agency": "City of Bellingham",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "bend-or-permit-applications": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Deschutes",
+     "state": "OR"
+    }
+   ],
+   "jurisdiction": "City of Bend, Oregon",
+   "publishing_agency": "City of Bend, Oregon",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "bentonville-catalyst-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Benton",
+     "state": "AR"
+    }
+   ],
+   "jurisdiction": "City of Bentonville, Arkansas",
+   "publishing_agency": "City of Bentonville, Arkansas",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "bismarck-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Burleigh",
+     "state": "ND"
+    }
+   ],
+   "jurisdiction": "City of Bismarck",
+   "publishing_agency": "City of Bismarck",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "boone-county-ky-planning-board-actions": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Boone",
+     "state": "KY"
+    },
+    {
+     "county": "Hamilton",
+     "state": "OH"
+    }
+   ],
+   "jurisdiction": "Boone County Planning Commission",
+   "publishing_agency": "Boone County Planning Commission",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "boston-approved-building-permits": {
+   "connector": "ckan",
+   "coverage": [
+    {
+     "county": "Suffolk",
+     "state": "MA"
+    }
+   ],
+   "jurisdiction": "City of Boston",
+   "publishing_agency": "City of Boston",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "boulder-construction-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Boulder",
+     "state": "CO"
+    }
+   ],
+   "jurisdiction": "City of Boulder",
+   "publishing_agency": "City of Boulder",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "bozeman-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Gallatin",
+     "state": "MT"
+    }
+   ],
+   "jurisdiction": "City of Bozeman, Montana",
+   "publishing_agency": "City of Bozeman, Montana",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "brunswick-county-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Brunswick",
+     "state": "NC"
+    }
+   ],
+   "jurisdiction": "Brunswick County, North Carolina",
+   "publishing_agency": "Brunswick County, North Carolina",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "buffalo-building-permits": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "county": "Erie",
+     "state": "NY"
+    }
+   ],
+   "jurisdiction": "City of Buffalo",
+   "publishing_agency": "City of Buffalo",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "burlington-vt-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Chittenden",
+     "state": "VT"
+    }
+   ],
+   "jurisdiction": "City of Burlington, Vermont \u2014 Department of Permitting & Inspections",
+   "publishing_agency": "City of Burlington, Vermont \u2014 Department of Permitting & Inspections",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "burlington-vt-zoning-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Chittenden",
+     "state": "VT"
+    }
+   ],
+   "jurisdiction": "City of Burlington, Vermont \u2014 Department of Permitting & Inspections (Zoning)",
+   "publishing_agency": "City of Burlington, Vermont \u2014 Department of Permitting & Inspections (Zoning)",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "butler-county-ks-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Butler",
+     "state": "KS"
+    }
+   ],
+   "jurisdiction": "Butler County",
+   "publishing_agency": "Butler County",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "cabarrus-county-plan-reviews": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Cabarrus",
+     "state": "NC"
+    }
+   ],
+   "jurisdiction": "Cabarrus County",
+   "publishing_agency": "Cabarrus County",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "caltrans-sb1-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "CA"
+    }
+   ],
+   "jurisdiction": "California Department of Transportation (Caltrans)",
+   "publishing_agency": "California Department of Transportation (Caltrans)",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "stip"
+   }
+  },
+  "cambridge-building-permits-addition-alteration": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "county": "Middlesex",
+     "state": "MA"
+    }
+   ],
+   "jurisdiction": "City of Cambridge",
+   "publishing_agency": "City of Cambridge",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "cambridge-building-permits-new-construction": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "county": "Middlesex",
+     "state": "MA"
+    }
+   ],
+   "jurisdiction": "City of Cambridge",
+   "publishing_agency": "City of Cambridge",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "cambridge-demolition-permits": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "county": "Middlesex",
+     "state": "MA"
+    }
+   ],
+   "jurisdiction": "City of Cambridge",
+   "publishing_agency": "City of Cambridge",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "canyon-county-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Canyon",
+     "state": "ID"
+    },
+    {
+     "county": "Ada",
+     "state": "ID"
+    }
+   ],
+   "jurisdiction": "Canyon County, Idaho",
+   "publishing_agency": "Canyon County, Idaho",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "casa-grande-active-development-sites": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Pinal",
+     "state": "AZ"
+    }
+   ],
+   "jurisdiction": "City of Casa Grande",
+   "publishing_agency": "City of Casa Grande",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "centre-county-pa-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Centre",
+     "state": "PA"
+    }
+   ],
+   "jurisdiction": "Centre County, Pennsylvania",
+   "publishing_agency": "Centre County, Pennsylvania",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "champaign-il-special-use-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Champaign",
+     "state": "IL"
+    }
+   ],
+   "jurisdiction": "City of Champaign, Illinois",
+   "publishing_agency": "City of Champaign, Illinois",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "charleston-county-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Charleston",
+     "state": "SC"
+    },
+    {
+     "county": "Berkeley",
+     "state": "SC"
+    }
+   ],
+   "jurisdiction": "Charleston County, South Carolina",
+   "publishing_agency": "Charleston County, South Carolina",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "charlotte-land-dev-commercial-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Mecklenburg",
+     "state": "NC"
+    }
+   ],
+   "jurisdiction": "City of Charlotte",
+   "publishing_agency": "City of Charlotte",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "chattanooga-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Hamilton",
+     "state": "TN"
+    }
+   ],
+   "jurisdiction": "Chattanooga-Hamilton County Regional Planning Agency",
+   "publishing_agency": "Chattanooga-Hamilton County Regional Planning Agency",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "chattanooga-permits-archive": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Hamilton",
+     "state": "TN"
+    }
+   ],
+   "jurisdiction": "City of Chattanooga / Hamilton County, Tennessee",
+   "publishing_agency": "City of Chattanooga / Hamilton County, Tennessee",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "chester-county-pa-act247-plans": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Chester",
+     "state": "PA"
+    }
+   ],
+   "jurisdiction": "Chester County, Pennsylvania",
+   "publishing_agency": "Chester County, Pennsylvania",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "chicago-building-permits": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "county": "Cook",
+     "state": "IL"
+    },
+    {
+     "county": "DuPage",
+     "state": "IL"
+    },
+    {
+     "county": "Lake",
+     "state": "IN"
+    }
+   ],
+   "jurisdiction": "City of Chicago",
+   "publishing_agency": "City of Chicago",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "cincinnati-building-permits": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "county": "Hamilton",
+     "state": "OH"
+    }
+   ],
+   "jurisdiction": "City of Cincinnati",
+   "publishing_agency": "City of Cincinnati",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "city-of-orange-active-planning-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Orange",
+     "state": "CA"
+    }
+   ],
+   "jurisdiction": "City of Orange, California",
+   "publishing_agency": "City of Orange, California",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "clark-county-active-dev-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Clark",
+     "state": "WA"
+    }
+   ],
+   "jurisdiction": "Clark County",
+   "publishing_agency": "Clark County",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "clark-county-active-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Clark",
+     "state": "NV"
+    }
+   ],
+   "jurisdiction": "Clark County, Nevada \u2014 Public Works",
+   "publishing_agency": "Clark County, Nevada \u2014 Public Works",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "clarksville-montgomery-final-subdivisions": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Montgomery",
+     "state": "TN"
+    }
+   ],
+   "jurisdiction": "Clarksville-Montgomery County Regional Planning Commission",
+   "publishing_agency": "Clarksville-Montgomery County Regional Planning Commission",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "clarksville-montgomery-preliminary-subdivisions": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Montgomery",
+     "state": "TN"
+    }
+   ],
+   "jurisdiction": "Clarksville-Montgomery County Regional Planning Commission",
+   "publishing_agency": "Clarksville-Montgomery County Regional Planning Commission",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "cleveland-issued-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Cuyahoga",
+     "state": "OH"
+    }
+   ],
+   "jurisdiction": "City of Cleveland",
+   "publishing_agency": "City of Cleveland",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "clv-planning-cases": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Clark",
+     "state": "NV"
+    }
+   ],
+   "jurisdiction": "City of Las Vegas",
+   "publishing_agency": "City of Las Vegas",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "coconino-county-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Coconino",
+     "state": "AZ"
+    },
+    {
+     "county": "Yavapai",
+     "state": "AZ"
+    }
+   ],
+   "jurisdiction": "Coconino County, Arizona",
+   "publishing_agency": "Coconino County, Arizona",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "colorado-springs-planning-applications": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "El Paso",
+     "state": "CO"
+    }
+   ],
+   "jurisdiction": "City of Colorado Springs",
+   "publishing_agency": "City of Colorado Springs",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "columbia-mo-capital-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Boone",
+     "state": "MO"
+    }
+   ],
+   "jurisdiction": "City of Columbia, Missouri",
+   "publishing_agency": "City of Columbia, Missouri",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "columbia-mo-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Boone",
+     "state": "MO"
+    }
+   ],
+   "jurisdiction": "City of Columbia, Missouri",
+   "publishing_agency": "City of Columbia, Missouri",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "columbus-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Franklin",
+     "state": "OH"
+    },
+    {
+     "county": "Delaware",
+     "state": "OH"
+    }
+   ],
+   "jurisdiction": "City of Columbus",
+   "publishing_agency": "City of Columbus",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "cook-county-il-highway-construction-program": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Cook",
+     "state": "IL"
+    }
+   ],
+   "jurisdiction": "Cook County Department of Transportation and Highways",
+   "publishing_agency": "Cook County Department of Transportation and Highways",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "construction program"
+   }
+  },
+  "ctdot-project-work-areas": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "CT"
+    }
+   ],
+   "jurisdiction": "Connecticut Department of Transportation (CTDOT)",
+   "publishing_agency": "Connecticut Department of Transportation (CTDOT)",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "dallas-specific-use-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Dallas",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "City of Dallas",
+   "publishing_agency": "City of Dallas",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "dekalb-county-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "DeKalb",
+     "state": "GA"
+    },
+    {
+     "county": "Fulton",
+     "state": "GA"
+    },
+    {
+     "county": "Gwinnett",
+     "state": "GA"
+    },
+    {
+     "county": "Henry",
+     "state": "GA"
+    }
+   ],
+   "jurisdiction": "DeKalb County, Georgia",
+   "publishing_agency": "DeKalb County, Georgia",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "delaware-county-pa-subdivisions-land-developments": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Delaware",
+     "state": "PA"
+    }
+   ],
+   "jurisdiction": "Delaware County, Pennsylvania",
+   "publishing_agency": "Delaware County, Pennsylvania",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "denton-city-projects-annexation": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Denton",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "City of Denton",
+   "publishing_agency": "City of Denton",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "denton-city-projects-decided": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Denton",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "City of Denton",
+   "publishing_agency": "City of Denton",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "denton-city-projects-planned-development": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Denton",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "City of Denton",
+   "publishing_agency": "City of Denton",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "denton-city-projects-site-plan": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Denton",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "City of Denton",
+   "publishing_agency": "City of Denton",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "denton-city-projects-specific-use": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Denton",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "City of Denton",
+   "publishing_agency": "City of Denton",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "denton-city-projects-subdivision": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Denton",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "City of Denton",
+   "publishing_agency": "City of Denton",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "denton-city-projects-zoning": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Denton",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "City of Denton",
+   "publishing_agency": "City of Denton",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "denton-county-dev-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Denton",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "Denton County",
+   "publishing_agency": "Denton County",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "denver-commercial-construction-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Denver",
+     "state": "CO"
+    }
+   ],
+   "jurisdiction": "City and County of Denver",
+   "publishing_agency": "City and County of Denver",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "denver-residential-construction-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Denver",
+     "state": "CO"
+    },
+    {
+     "county": "Jefferson",
+     "state": "CO"
+    }
+   ],
+   "jurisdiction": "City and County of Denver",
+   "publishing_agency": "City and County of Denver",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "desoto-county-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "DeSoto",
+     "state": "MS"
+    }
+   ],
+   "jurisdiction": "DeSoto County, Mississippi",
+   "publishing_agency": "DeSoto County, Mississippi",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "detroit-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Wayne",
+     "state": "MI"
+    }
+   ],
+   "jurisdiction": "City of Detroit",
+   "publishing_agency": "City of Detroit",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "detroit-demolition-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Wayne",
+     "state": "MI"
+    }
+   ],
+   "jurisdiction": "City of Detroit",
+   "publishing_agency": "City of Detroit",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "detroit-trades-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Wayne",
+     "state": "MI"
+    }
+   ],
+   "jurisdiction": "City of Detroit",
+   "publishing_agency": "City of Detroit",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "douglas-county-co-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Douglas",
+     "state": "CO"
+    }
+   ],
+   "jurisdiction": "Douglas County",
+   "publishing_agency": "Douglas County",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "durham-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Durham",
+     "state": "NC"
+    },
+    {
+     "county": "Orange",
+     "state": "NC"
+    }
+   ],
+   "jurisdiction": "City & County of Durham",
+   "publishing_agency": "City & County of Durham",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "east-baton-rouge-building-permits": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "county": "East Baton Rouge",
+     "state": "LA"
+    }
+   ],
+   "jurisdiction": "City of Baton Rouge / Parish of East Baton Rouge",
+   "publishing_agency": "City of Baton Rouge / Parish of East Baton Rouge",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "el-paso-new-residential-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "El Paso",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "City of El Paso",
+   "publishing_agency": "City of El Paso",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "eugene-or-current-capital-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Lane",
+     "state": "OR"
+    }
+   ],
+   "jurisdiction": "City of Eugene, Oregon",
+   "publishing_agency": "City of Eugene, Oregon",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "fairfax-active-site-construction": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Fairfax",
+     "state": "VA"
+    }
+   ],
+   "jurisdiction": "Fairfax County Land Development Services",
+   "publishing_agency": "Fairfax County Land Development Services",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "fairfax-recent-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Fairfax",
+     "state": "VA"
+    },
+    {
+     "county": "Arlington",
+     "state": "VA"
+    },
+    {
+     "county": "Prince William",
+     "state": "VA"
+    }
+   ],
+   "jurisdiction": "Fairfax County Land Development Services",
+   "publishing_agency": "Fairfax County Land Development Services",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "fdot-active-construction-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "FL"
+    }
+   ],
+   "jurisdiction": "Florida Department of Transportation",
+   "publishing_agency": "Florida Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "flathead-county-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Flathead",
+     "state": "MT"
+    }
+   ],
+   "jurisdiction": "Flathead County, Montana",
+   "publishing_agency": "Flathead County, Montana",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "forsyth-county-ga-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Forsyth",
+     "state": "GA"
+    }
+   ],
+   "jurisdiction": "Forsyth County, Georgia",
+   "publishing_agency": "Forsyth County, Georgia",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "fort-collins-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Larimer",
+     "state": "CO"
+    }
+   ],
+   "jurisdiction": "City of Fort Collins",
+   "publishing_agency": "City of Fort Collins",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "fort-worth-development-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Tarrant",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "Fort Worth",
+   "publishing_agency": "Fort Worth",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "fort-worth-zoning-cases": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Tarrant",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "City of Fort Worth Development Services",
+   "publishing_agency": "City of Fort Worth Development Services",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "frisco-active-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Collin",
+     "state": "TX"
+    },
+    {
+     "county": "Denton",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "City of Frisco",
+   "publishing_agency": "City of Frisco",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "georgia-dot-gpas-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "GA"
+    }
+   ],
+   "jurisdiction": "Georgia Department of Transportation (GDOT)",
+   "publishing_agency": "Georgia Department of Transportation (GDOT)",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "stip"
+   }
+  },
+  "gilbert-energov-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Maricopa",
+     "state": "AZ"
+    }
+   ],
+   "jurisdiction": "Town of Gilbert",
+   "publishing_agency": "Town of Gilbert",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "harris-county-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Harris",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "Harris County Permits",
+   "publishing_agency": "Harris County Permits",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "harris-county-plats": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Harris",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "Harris County Permits (unincorporated / non-Houston)",
+   "publishing_agency": "Harris County Permits (unincorporated / non-Houston)",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "hartford-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Hartford",
+     "state": "CT"
+    }
+   ],
+   "jurisdiction": "City of Hartford",
+   "publishing_agency": "City of Hartford",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "hdot-active-design-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "HI"
+    }
+   ],
+   "jurisdiction": "Hawaii Department of Transportation (HDOT) \u2014 Active Design Projects",
+   "publishing_agency": "Hawaii Department of Transportation (HDOT) \u2014 Active Design Projects",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "henderson-commercial-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Clark",
+     "state": "NV"
+    }
+   ],
+   "jurisdiction": "City of Henderson, Nevada",
+   "publishing_agency": "City of Henderson, Nevada",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "henderson-residential-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Clark",
+     "state": "NV"
+    }
+   ],
+   "jurisdiction": "City of Henderson, Nevada",
+   "publishing_agency": "City of Henderson, Nevada",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "houston-plat-applications": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Harris",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "City of Houston Planning & Development Department",
+   "publishing_agency": "City of Houston Planning & Development Department",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "huntsville-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Madison",
+     "state": "AL"
+    },
+    {
+     "county": "Limestone",
+     "state": "AL"
+    }
+   ],
+   "jurisdiction": "City of Huntsville, Alabama",
+   "publishing_agency": "City of Huntsville, Alabama",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "idot-annual-program-bridges": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "IL"
+    }
+   ],
+   "jurisdiction": "Illinois Department of Transportation",
+   "publishing_agency": "Illinois Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "improvement program"
+   }
+  },
+  "idot-annual-program-construction": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "IL"
+    }
+   ],
+   "jurisdiction": "Illinois Department of Transportation",
+   "publishing_agency": "Illinois Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "improvement program"
+   }
+  },
+  "independence-twp-construction-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Oakland",
+     "state": "MI"
+    }
+   ],
+   "jurisdiction": "Independence Township (Oakland County)",
+   "publishing_agency": "Independence Township (Oakland County)",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "indot-spms-active-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "IN"
+    }
+   ],
+   "jurisdiction": "Indiana Department of Transportation (INDOT)",
+   "publishing_agency": "Indiana Department of Transportation (INDOT)",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "iowa-dot-bid-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "IA"
+    }
+   ],
+   "jurisdiction": "Iowa Department of Transportation",
+   "publishing_agency": "Iowa Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "stip"
+   }
+  },
+  "iowa-dot-bid-projects-lines": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "IA"
+    }
+   ],
+   "jurisdiction": "Iowa Department of Transportation",
+   "publishing_agency": "Iowa Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "iowa-dot-five-year-program": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "IA"
+    }
+   ],
+   "jurisdiction": "Iowa Department of Transportation",
+   "publishing_agency": "Iowa Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "stip"
+   }
+  },
+  "irving-development-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Dallas",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "City of Irving",
+   "publishing_agency": "City of Irving",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "itd-itip-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "ID"
+    }
+   ],
+   "jurisdiction": "Idaho Transportation Department (ITD) \u2014 Idaho Transportation Investment Program (ITIP), FY2027\u20132033",
+   "publishing_agency": "Idaho Transportation Department (ITD) \u2014 Idaho Transportation Investment Program (ITIP), FY2027\u20132033",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "itd-itip-projects-lines": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "ID"
+    }
+   ],
+   "jurisdiction": "Idaho Transportation Department (ITD) \u2014 Idaho Transportation Investment Program (ITIP), FY2027\u20132033",
+   "publishing_agency": "Idaho Transportation Department (ITD) \u2014 Idaho Transportation Investment Program (ITIP), FY2027\u20132033",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "jackson-county-or-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Jackson",
+     "state": "OR"
+    }
+   ],
+   "jurisdiction": "Jackson County, Oregon",
+   "publishing_agency": "Jackson County, Oregon",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "jackson-county-or-land-use-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Jackson",
+     "state": "OR"
+    }
+   ],
+   "jurisdiction": "Jackson County, Oregon",
+   "publishing_agency": "Jackson County, Oregon",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "johns-creek-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Fulton",
+     "state": "GA"
+    },
+    {
+     "county": "Gwinnett",
+     "state": "GA"
+    }
+   ],
+   "jurisdiction": "City of Johns Creek, Georgia",
+   "publishing_agency": "City of Johns Creek, Georgia",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "kcmo-building-permits": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "county": "Jackson",
+     "state": "MO"
+    },
+    {
+     "county": "Clay",
+     "state": "MO"
+    },
+    {
+     "county": "Platte",
+     "state": "MO"
+    }
+   ],
+   "jurisdiction": "City of Kansas City, Missouri",
+   "publishing_agency": "City of Kansas City, Missouri",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "kcmo-development-cases": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Jackson",
+     "state": "MO"
+    },
+    {
+     "county": "Clay",
+     "state": "MO"
+    },
+    {
+     "county": "Platte",
+     "state": "MO"
+    },
+    {
+     "county": "Cass",
+     "state": "MO"
+    }
+   ],
+   "jurisdiction": "City of Kansas City, Missouri",
+   "publishing_agency": "City of Kansas City, Missouri",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "kdot-wincpms-project-locations": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "KS"
+    }
+   ],
+   "jurisdiction": "Kansas Department of Transportation (KDOT)",
+   "publishing_agency": "Kansas Department of Transportation (KDOT)",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "kent-county-de-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Kent",
+     "state": "DE"
+    },
+    {
+     "county": "Queen Anne's",
+     "state": "MD"
+    }
+   ],
+   "jurisdiction": "Kent County, Delaware",
+   "publishing_agency": "Kent County, Delaware",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "kenton-county-devtracking-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Kenton",
+     "state": "KY"
+    },
+    {
+     "county": "Campbell",
+     "state": "KY"
+    }
+   ],
+   "jurisdiction": "Planning & Development Services of Kenton County",
+   "publishing_agency": "Planning & Development Services of Kenton County",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "knoxville-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Knox",
+     "state": "TN"
+    }
+   ],
+   "jurisdiction": "City of Knoxville / Knox County, Tennessee",
+   "publishing_agency": "City of Knoxville / Knox County, Tennessee",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "kytc-syp-highway-plan": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "KY"
+    }
+   ],
+   "jurisdiction": "Kentucky Transportation Cabinet (KYTC) \u2014 Six-Year Highway Plan (SYP), 2026 enacted plan. KENTUCKY: the agency is the Transportation CABINET, not a DOT; KDOT is KANSAS.",
+   "publishing_agency": "Kentucky Transportation Cabinet (KYTC) \u2014 Six-Year Highway Plan (SYP), 2026 enacted plan. KENTUCKY: the agency is the Transportation CABINET, not a DOT; KDOT is KANSAS.",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "six-year highway plan"
+   }
+  },
+  "lake-county-il-construction-program": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Lake",
+     "state": "IL"
+    }
+   ],
+   "jurisdiction": "Lake County, Illinois Division of Transportation",
+   "publishing_agency": "Lake County, Illinois Division of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "lee-county-fl-development-orders": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Lee",
+     "state": "FL"
+    }
+   ],
+   "jurisdiction": "Lee County, Florida",
+   "publishing_agency": "Lee County, Florida",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "lexington-row-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Fayette",
+     "state": "KY"
+    }
+   ],
+   "jurisdiction": "Lexington-Fayette Urban County Government",
+   "publishing_agency": "Lexington-Fayette Urban County Government",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "lincoln-residential-new-construction-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Lancaster",
+     "state": "NE"
+    }
+   ],
+   "jurisdiction": "City of Lincoln, Nebraska",
+   "publishing_agency": "City of Lincoln, Nebraska",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "little-rock-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Pulaski",
+     "state": "AR"
+    },
+    {
+     "county": "Saline",
+     "state": "AR"
+    }
+   ],
+   "jurisdiction": "City of Little Rock, Arkansas",
+   "publishing_agency": "City of Little Rock, Arkansas",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "loudoun-county-residential-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Loudoun",
+     "state": "VA"
+    }
+   ],
+   "jurisdiction": "Loudoun County, Virginia",
+   "publishing_agency": "Loudoun County, Virginia",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "louisville-active-construction-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Jefferson",
+     "state": "KY"
+    }
+   ],
+   "jurisdiction": "Louisville Metro, Kentucky",
+   "publishing_agency": "Louisville Metro, Kentucky",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "madison-planning-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Dane",
+     "state": "WI"
+    }
+   ],
+   "jurisdiction": "City of Madison",
+   "publishing_agency": "City of Madison",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "maine-dot-public-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "ME"
+    }
+   ],
+   "jurisdiction": "Maine Department of Transportation",
+   "publishing_agency": "Maine Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "maine-dot-public-projects-lines": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "ME"
+    }
+   ],
+   "jurisdiction": "Maine Department of Transportation",
+   "publishing_agency": "Maine Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "marin-county-building-permits": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "county": "Marin",
+     "state": "CA"
+    }
+   ],
+   "jurisdiction": "County of Marin",
+   "publishing_agency": "County of Marin",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "massdot-highway-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "MA"
+    }
+   ],
+   "jurisdiction": "Massachusetts Department of Transportation",
+   "publishing_agency": "Massachusetts Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "mdot-sha-project-portal": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "MD"
+    }
+   ],
+   "jurisdiction": "Maryland Department of Transportation State Highway Administration (MDOT SHA) \u2014 Project Portal",
+   "publishing_agency": "Maryland Department of Transportation State Highway Administration (MDOT SHA) \u2014 Project Portal",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "mdot-stip-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "MI"
+    }
+   ],
+   "jurisdiction": "Michigan Department of Transportation",
+   "publishing_agency": "Michigan Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "stip"
+   }
+  },
+  "memphis-dpd-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Shelby",
+     "state": "TN"
+    }
+   ],
+   "jurisdiction": "City of Memphis Division of Planning & Development",
+   "publishing_agency": "City of Memphis Division of Planning & Development",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "mesa-building-permits": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "county": "Maricopa",
+     "state": "AZ"
+    }
+   ],
+   "jurisdiction": "City of Mesa",
+   "publishing_agency": "City of Mesa",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "miami-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Miami-Dade",
+     "state": "FL"
+    }
+   ],
+   "jurisdiction": "City of Miami",
+   "publishing_agency": "City of Miami",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "minneapolis-ccs-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Hennepin",
+     "state": "MN"
+    },
+    {
+     "county": "Ramsey",
+     "state": "MN"
+    }
+   ],
+   "jurisdiction": "City of Minneapolis (CCS)",
+   "publishing_agency": "City of Minneapolis (CCS)",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "missoula-addresses-with-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Missoula",
+     "state": "MT"
+    }
+   ],
+   "jurisdiction": "City of Missoula, Montana",
+   "publishing_agency": "City of Missoula, Montana",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "mndot-chip-roadway-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "MN"
+    }
+   ],
+   "jurisdiction": "Minnesota Department of Transportation (MnDOT)",
+   "publishing_agency": "Minnesota Department of Transportation (MnDOT)",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "capital highway investment plan"
+   }
+  },
+  "mndot-stip-roadway-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "MN"
+    }
+   ],
+   "jurisdiction": "Minnesota Department of Transportation (MnDOT)",
+   "publishing_agency": "Minnesota Department of Transportation (MnDOT)",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "stip"
+   }
+  },
+  "modot-stip-locations-accepted": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "MO"
+    }
+   ],
+   "jurisdiction": "Missouri Department of Transportation (MoDOT)",
+   "publishing_agency": "Missouri Department of Transportation (MoDOT)",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "stip"
+   }
+  },
+  "montgomery-county-commercial-permits": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "county": "Montgomery",
+     "state": "MD"
+    }
+   ],
+   "jurisdiction": "Montgomery County",
+   "publishing_agency": "Montgomery County",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "montgomery-county-demolition-permits": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "county": "Montgomery",
+     "state": "MD"
+    }
+   ],
+   "jurisdiction": "Montgomery County",
+   "publishing_agency": "Montgomery County",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "montgomery-county-pa-act247-proposals": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Montgomery",
+     "state": "PA"
+    }
+   ],
+   "jurisdiction": "Montgomery County Planning Commission",
+   "publishing_agency": "Montgomery County Planning Commission",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "montgomery-county-residential-permits": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "county": "Montgomery",
+     "state": "MD"
+    }
+   ],
+   "jurisdiction": "Montgomery County",
+   "publishing_agency": "Montgomery County",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "mt-mdt-stip-lines": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "MT"
+    }
+   ],
+   "jurisdiction": "Montana Department of Transportation",
+   "publishing_agency": "Montana Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "stip"
+   }
+  },
+  "murfreesboro-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Rutherford",
+     "state": "TN"
+    }
+   ],
+   "jurisdiction": "City of Murfreesboro, Tennessee",
+   "publishing_agency": "City of Murfreesboro, Tennessee",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "naperville-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "DuPage",
+     "state": "IL"
+    },
+    {
+     "county": "Will",
+     "state": "IL"
+    }
+   ],
+   "jurisdiction": "City of Naperville, Illinois",
+   "publishing_agency": "City of Naperville, Illinois",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "nashville-building-permits-issued": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Davidson",
+     "state": "TN"
+    },
+    {
+     "county": "Williamson",
+     "state": "TN"
+    },
+    {
+     "county": "Wilson",
+     "state": "TN"
+    },
+    {
+     "county": "Rutherford",
+     "state": "TN"
+    }
+   ],
+   "jurisdiction": "Metro Nashville-Davidson County",
+   "publishing_agency": "Metro Nashville-Davidson County",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "ncdot-stip-projects-lines": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "NC"
+    }
+   ],
+   "jurisdiction": "North Carolina Department of Transportation (NCDOT) \u2014 2026-2035 State Transportation Improvement Program (STIP)",
+   "publishing_agency": "North Carolina Department of Transportation (NCDOT) \u2014 2026-2035 State Transportation Improvement Program (STIP)",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "transportation improvement program"
+   }
+  },
+  "ncdot-stip-projects-points": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "NC"
+    }
+   ],
+   "jurisdiction": "North Carolina Department of Transportation (NCDOT) \u2014 2026-2035 State Transportation Improvement Program (STIP)",
+   "publishing_agency": "North Carolina Department of Transportation (NCDOT) \u2014 2026-2035 State Transportation Improvement Program (STIP)",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "transportation improvement program"
+   }
+  },
+  "nddot-special-road-fund-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "ND"
+    }
+   ],
+   "jurisdiction": "North Dakota Department of Transportation (NDDOT)",
+   "publishing_agency": "North Dakota Department of Transportation (NDDOT)",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "stip"
+   }
+  },
+  "ndot-program-book-points": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "NE"
+    }
+   ],
+   "jurisdiction": "Nebraska Department of Transportation (NDOT) \u2014 NEBRASKA, not North Dakota (NDDOT) and not Nevada (NVDOT)",
+   "publishing_agency": "Nebraska Department of Transportation (NDOT) \u2014 NEBRASKA, not North Dakota (NDDOT) and not Nevada (NVDOT)",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "program book"
+   }
+  },
+  "ndot-program-book-segments": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "NE"
+    }
+   ],
+   "jurisdiction": "Nebraska Department of Transportation (NDOT) \u2014 NEBRASKA, not North Dakota (NDDOT) and not Nevada (NVDOT)",
+   "publishing_agency": "Nebraska Department of Transportation (NDOT) \u2014 NEBRASKA, not North Dakota (NDDOT) and not Nevada (NVDOT)",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "program book"
+   }
+  },
+  "new-castle-county-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "New Castle",
+     "state": "DE"
+    },
+    {
+     "county": "Delaware",
+     "state": "PA"
+    },
+    {
+     "county": "Chester",
+     "state": "PA"
+    }
+   ],
+   "jurisdiction": "New Castle County, Delaware",
+   "publishing_agency": "New Castle County, Delaware",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "new-hanover-county-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "New Hanover",
+     "state": "NC"
+    }
+   ],
+   "jurisdiction": "New Hanover County, North Carolina",
+   "publishing_agency": "New Hanover County, North Carolina",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "new-orleans-permits": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "county": "Orleans",
+     "state": "LA"
+    },
+    {
+     "county": "Jefferson",
+     "state": "LA"
+    }
+   ],
+   "jurisdiction": "City of New Orleans",
+   "publishing_agency": "City of New Orleans",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "nhdot-ten-year-plan-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "NH"
+    }
+   ],
+   "jurisdiction": "New Hampshire Department of Transportation",
+   "publishing_agency": "New Hampshire Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "ten year plan"
+   }
+  },
+  "nj-stip-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "NJ"
+    }
+   ],
+   "jurisdiction": "New Jersey Department of Transportation",
+   "publishing_agency": "New Jersey Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "stip"
+   }
+  },
+  "nvdot-project-boundaries": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "NV"
+    }
+   ],
+   "jurisdiction": "Nevada Department of Transportation (NVDOT; self-abbreviates \"NDOT\") \u2014 NEVADA, not Nebraska and not North Dakota",
+   "publishing_agency": "Nevada Department of Transportation (NVDOT; self-abbreviates \"NDOT\") \u2014 NEVADA, not Nebraska and not North Dakota",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "nyc-dob-permit-issuance": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "county": "New York",
+     "state": "NY"
+    },
+    {
+     "county": "Kings",
+     "state": "NY"
+    },
+    {
+     "county": "Queens",
+     "state": "NY"
+    },
+    {
+     "county": "Bronx",
+     "state": "NY"
+    },
+    {
+     "county": "Richmond",
+     "state": "NY"
+    }
+   ],
+   "jurisdiction": "New York City (DOB BIS legacy)",
+   "publishing_agency": "New York City (DOB BIS legacy)",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "nyc-dobnow-approved-permits": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "county": "New York",
+     "state": "NY"
+    },
+    {
+     "county": "Kings",
+     "state": "NY"
+    },
+    {
+     "county": "Queens",
+     "state": "NY"
+    },
+    {
+     "county": "Bronx",
+     "state": "NY"
+    },
+    {
+     "county": "Richmond",
+     "state": "NY"
+    },
+    {
+     "county": "Nassau",
+     "state": "NY"
+    }
+   ],
+   "jurisdiction": "New York City (DOB NOW)",
+   "publishing_agency": "New York City (DOB NOW)",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "nysdot-capital-program-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "NY"
+    }
+   ],
+   "jurisdiction": "New York State Department of Transportation",
+   "publishing_agency": "New York State Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "capital program"
+   }
+  },
+  "nysdot-capital-program-projects-2": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "NY"
+    }
+   ],
+   "jurisdiction": "New York State Department of Transportation",
+   "publishing_agency": "New York State Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "capital program"
+   }
+  },
+  "nysdot-capital-program-projects-3": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "NY"
+    }
+   ],
+   "jurisdiction": "New York State Department of Transportation",
+   "publishing_agency": "New York State Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "capital program"
+   }
+  },
+  "odot-current-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "OH"
+    }
+   ],
+   "jurisdiction": "Ohio Department of Transportation",
+   "publishing_agency": "Ohio Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "odot-current-projects-lines": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "OH"
+    }
+   ],
+   "jurisdiction": "Ohio Department of Transportation",
+   "publishing_agency": "Ohio Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "okdot-workplan-roadways": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "OK"
+    }
+   ],
+   "jurisdiction": "Oklahoma Department of Transportation",
+   "publishing_agency": "Oklahoma Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "workplan"
+   }
+  },
+  "oregon-dot-stip-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "OR"
+    }
+   ],
+   "jurisdiction": "Oregon Department of Transportation (ODOT)",
+   "publishing_agency": "Oregon Department of Transportation (ODOT)",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "statewide transportation improvement program"
+   }
+  },
+  "oregon-dot-stip-projects-lines": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "OR"
+    }
+   ],
+   "jurisdiction": "Oregon Department of Transportation (ODOT)",
+   "publishing_agency": "Oregon Department of Transportation (ODOT)",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "statewide transportation improvement program"
+   }
+  },
+  "overland-park-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Johnson",
+     "state": "KS"
+    },
+    {
+     "county": "Wyandotte",
+     "state": "KS"
+    }
+   ],
+   "jurisdiction": "City of Overland Park, Kansas",
+   "publishing_agency": "City of Overland Park, Kansas",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "penndot-transportation-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "PA"
+    }
+   ],
+   "jurisdiction": "Pennsylvania Department of Transportation",
+   "publishing_agency": "Pennsylvania Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "peoria-az-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Maricopa",
+     "state": "AZ"
+    }
+   ],
+   "jurisdiction": "City of Peoria, Arizona",
+   "publishing_agency": "City of Peoria, Arizona",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "philadelphia-li-permits": {
+   "connector": "carto",
+   "coverage": [
+    {
+     "county": "Philadelphia",
+     "state": "PA"
+    },
+    {
+     "county": "Montgomery",
+     "state": "PA"
+    },
+    {
+     "county": "Delaware",
+     "state": "PA"
+    }
+   ],
+   "jurisdiction": "City of Philadelphia",
+   "publishing_agency": "City of Philadelphia",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "phoenix-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Maricopa",
+     "state": "AZ"
+    }
+   ],
+   "jurisdiction": "City of Phoenix",
+   "publishing_agency": "City of Phoenix",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "pierce-county-pals-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Pierce",
+     "state": "WA"
+    }
+   ],
+   "jurisdiction": "Pierce County (PALS)",
+   "publishing_agency": "Pierce County (PALS)",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "pittsburgh-pli-permits": {
+   "connector": "ckan",
+   "coverage": [
+    {
+     "county": "Allegheny",
+     "state": "PA"
+    }
+   ],
+   "jurisdiction": "City of Pittsburgh",
+   "publishing_agency": "City of Pittsburgh",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "portland-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Multnomah",
+     "state": "OR"
+    },
+    {
+     "county": "Washington",
+     "state": "OR"
+    },
+    {
+     "county": "Clackamas",
+     "state": "OR"
+    }
+   ],
+   "jurisdiction": "City of Portland",
+   "publishing_agency": "City of Portland",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "portland-neighborhood-contact-applications": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Multnomah",
+     "state": "OR"
+    },
+    {
+     "county": "Washington",
+     "state": "OR"
+    },
+    {
+     "county": "Clackamas",
+     "state": "OR"
+    }
+   ],
+   "jurisdiction": "City of Portland",
+   "publishing_agency": "City of Portland",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "prince-georges-county-permits": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "county": "Prince George's",
+     "state": "MD"
+    }
+   ],
+   "jurisdiction": "Prince George's County",
+   "publishing_agency": "Prince George's County",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "provo-planning-applications": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Utah",
+     "state": "UT"
+    }
+   ],
+   "jurisdiction": "Provo",
+   "publishing_agency": "Provo",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "raleigh-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Wake",
+     "state": "NC"
+    }
+   ],
+   "jurisdiction": "City of Raleigh",
+   "publishing_agency": "City of Raleigh",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "reno-ldc-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Washoe",
+     "state": "NV"
+    }
+   ],
+   "jurisdiction": "City of Reno",
+   "publishing_agency": "City of Reno",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "ridot-rhode-restore-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "RI"
+    }
+   ],
+   "jurisdiction": "Rhode Island Department of Transportation",
+   "publishing_agency": "Rhode Island Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "round-rock-large-development-projects": {
+   "connector": null,
+   "coverage": null,
+   "jurisdiction": null,
+   "publishing_agency": null,
+   "registered": false,
+   "transportation_capital_program_evidence": null
+  },
+  "salem-structure-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Marion",
+     "state": "OR"
+    }
+   ],
+   "jurisdiction": "City of Salem, Oregon",
+   "publishing_agency": "City of Salem, Oregon",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "san-antonio-permits-issued": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Bexar",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "San Antonio",
+   "publishing_agency": "San Antonio",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "san-antonio-prelim-plan-review": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Bexar",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "City of San Antonio",
+   "publishing_agency": "City of San Antonio",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "san-diego-approved-permits": {
+   "connector": "csv",
+   "coverage": [
+    {
+     "county": "San Diego",
+     "state": "CA"
+    }
+   ],
+   "jurisdiction": "City of San Diego",
+   "publishing_agency": "City of San Diego",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "san-jose-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Santa Clara",
+     "state": "CA"
+    }
+   ],
+   "jurisdiction": "City of San Jose, California",
+   "publishing_agency": "City of San Jose, California",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "san-marcos-planning-cases": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Hays",
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "San Marcos",
+   "publishing_agency": "San Marcos",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "savannah-commercial-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Chatham",
+     "state": "GA"
+    }
+   ],
+   "jurisdiction": "City of Savannah / Chatham County",
+   "publishing_agency": "City of Savannah / Chatham County",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "scdot-project-viewer-lines": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "SC"
+    }
+   ],
+   "jurisdiction": "South Carolina Department of Transportation (SCDOT)",
+   "publishing_agency": "South Carolina Department of Transportation (SCDOT)",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "improvement program"
+   }
+  },
+  "scottsdale-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Maricopa",
+     "state": "AZ"
+    }
+   ],
+   "jurisdiction": "City of Scottsdale",
+   "publishing_agency": "City of Scottsdale",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "sd-stip-construction-reconstruction": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "SD"
+    }
+   ],
+   "jurisdiction": "South Dakota Department of Transportation",
+   "publishing_agency": "South Dakota Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "stip"
+   }
+  },
+  "sd-stip-pavement-preservation": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "SD"
+    }
+   ],
+   "jurisdiction": "South Dakota Department of Transportation",
+   "publishing_agency": "South Dakota Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "stip"
+   }
+  },
+  "sd-stip-railroad-crossings": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "SD"
+    }
+   ],
+   "jurisdiction": "South Dakota Department of Transportation",
+   "publishing_agency": "South Dakota Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "stip"
+   }
+  },
+  "sd-stip-resurfacing": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "SD"
+    }
+   ],
+   "jurisdiction": "South Dakota Department of Transportation",
+   "publishing_agency": "South Dakota Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "stip"
+   }
+  },
+  "sd-stip-safety-lines": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "SD"
+    }
+   ],
+   "jurisdiction": "South Dakota Department of Transportation",
+   "publishing_agency": "South Dakota Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "stip"
+   }
+  },
+  "sd-stip-safety-points": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "SD"
+    }
+   ],
+   "jurisdiction": "South Dakota Department of Transportation",
+   "publishing_agency": "South Dakota Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "stip"
+   }
+  },
+  "sd-stip-structures": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "SD"
+    }
+   ],
+   "jurisdiction": "South Dakota Department of Transportation",
+   "publishing_agency": "South Dakota Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "stip"
+   }
+  },
+  "seattle-building-permits": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "county": "King",
+     "state": "WA"
+    }
+   ],
+   "jurisdiction": "City of Seattle",
+   "publishing_agency": "City of Seattle",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "seattle-land-use-permits": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "county": "King",
+     "state": "WA"
+    }
+   ],
+   "jurisdiction": "City of Seattle",
+   "publishing_agency": "City of Seattle",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "shelby-county-building-permits": {
+   "connector": "opendatasoft",
+   "coverage": [
+    {
+     "county": "Shelby",
+     "state": "TN"
+    }
+   ],
+   "jurisdiction": "Shelby County, Tennessee",
+   "publishing_agency": "Shelby County, Tennessee",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "sheridan-county-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Sheridan",
+     "state": "WY"
+    }
+   ],
+   "jurisdiction": "Sheridan County, Wyoming",
+   "publishing_agency": "Sheridan County, Wyoming",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "sioux-falls-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Minnehaha",
+     "state": "SD"
+    }
+   ],
+   "jurisdiction": "City of Sioux Falls, South Dakota",
+   "publishing_agency": "City of Sioux Falls, South Dakota",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "skagit-county-active-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Skagit",
+     "state": "WA"
+    }
+   ],
+   "jurisdiction": "Skagit County, Washington",
+   "publishing_agency": "Skagit County, Washington",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "slc-planning-petitions": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Salt Lake",
+     "state": "UT"
+    }
+   ],
+   "jurisdiction": "Salt Lake City",
+   "publishing_agency": "Salt Lake City",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "slo-county-planning-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "San Luis Obispo",
+     "state": "CA"
+    }
+   ],
+   "jurisdiction": "San Luis Obispo County Department of Planning & Building",
+   "publishing_agency": "San Luis Obispo County Department of Planning & Building",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "sonoma-county-fire-rebuild-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Sonoma",
+     "state": "CA"
+    }
+   ],
+   "jurisdiction": "County of Sonoma \u2014 Permit Sonoma",
+   "publishing_agency": "County of Sonoma \u2014 Permit Sonoma",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "spokane-city-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Spokane",
+     "state": "WA"
+    }
+   ],
+   "jurisdiction": "City of Spokane, Washington",
+   "publishing_agency": "City of Spokane, Washington",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "spokane-county-building-planning-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Spokane",
+     "state": "WA"
+    },
+    {
+     "county": "Stevens",
+     "state": "WA"
+    }
+   ],
+   "jurisdiction": "Spokane County, Washington",
+   "publishing_agency": "Spokane County, Washington",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "stamford-major-developments": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Fairfield",
+     "state": "CT"
+    }
+   ],
+   "jurisdiction": "City of Stamford",
+   "publishing_agency": "City of Stamford",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "stlouis-county-mo-subdivisions": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "St. Louis",
+     "state": "MO"
+    }
+   ],
+   "jurisdiction": "St. Louis County, Missouri (unincorporated)",
+   "publishing_agency": "St. Louis County, Missouri (unincorporated)",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "summit-county-oh-planning-commission-items": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Summit",
+     "state": "OH"
+    }
+   ],
+   "jurisdiction": "Summit County Planning Commission",
+   "publishing_agency": "Summit County Planning Commission",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "sussex-county-de-conditional-use": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Sussex",
+     "state": "DE"
+    }
+   ],
+   "jurisdiction": "Sussex County, Delaware",
+   "publishing_agency": "Sussex County, Delaware",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "tacoma-accela-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Pierce",
+     "state": "WA"
+    }
+   ],
+   "jurisdiction": "City of Tacoma",
+   "publishing_agency": "City of Tacoma",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "tdlr-tabs": {
+   "connector": null,
+   "coverage": null,
+   "jurisdiction": null,
+   "publishing_agency": null,
+   "registered": false,
+   "transportation_capital_program_evidence": null
+  },
+  "tempe-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Maricopa",
+     "state": "AZ"
+    }
+   ],
+   "jurisdiction": "City of Tempe",
+   "publishing_agency": "City of Tempe",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "tennessee-dot-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "TN"
+    }
+   ],
+   "jurisdiction": "Tennessee Department of Transportation (TDOT)",
+   "publishing_agency": "Tennessee Department of Transportation (TDOT)",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "stip"
+   }
+  },
+  "thurston-county-residential-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Thurston",
+     "state": "WA"
+    }
+   ],
+   "jurisdiction": "Thurston County, Washington",
+   "publishing_agency": "Thurston County, Washington",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "tigard-or-active-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Washington",
+     "state": "OR"
+    }
+   ],
+   "jurisdiction": "City of Tigard, Oregon",
+   "publishing_agency": "City of Tigard, Oregon",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "tigard-or-active-planning-cases": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Washington",
+     "state": "OR"
+    }
+   ],
+   "jurisdiction": "City of Tigard, Oregon",
+   "publishing_agency": "City of Tigard, Oregon",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "tillamook-county-land-use-cases": {
+   "connector": "county_cases",
+   "coverage": [
+    {
+     "county": "Tillamook",
+     "state": "OR"
+    }
+   ],
+   "jurisdiction": "Tillamook County Community Development",
+   "publishing_agency": "Tillamook County Community Development",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "topeka-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Shawnee",
+     "state": "KS"
+    }
+   ],
+   "jurisdiction": "City of Topeka, Kansas",
+   "publishing_agency": "City of Topeka, Kansas",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "tucson-commercial-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Pima",
+     "state": "AZ"
+    }
+   ],
+   "jurisdiction": "City of Tucson",
+   "publishing_agency": "City of Tucson",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "tucson-residential-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Pima",
+     "state": "AZ"
+    }
+   ],
+   "jurisdiction": "City of Tucson",
+   "publishing_agency": "City of Tucson",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "txdot-projects-info-all": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "TX"
+    }
+   ],
+   "jurisdiction": "Texas Department of Transportation",
+   "publishing_agency": "Texas Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "udot-active-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "UT"
+    }
+   ],
+   "jurisdiction": "Utah Department of Transportation",
+   "publishing_agency": "Utah Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "stip"
+   }
+  },
+  "udot-active-projects-lines": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "UT"
+    }
+   ],
+   "jurisdiction": "Utah Department of Transportation",
+   "publishing_agency": "Utah Department of Transportation",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "stip"
+   }
+  },
+  "vdot-syip-approved-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "VA"
+    }
+   ],
+   "jurisdiction": "Virginia Department of Transportation (VDOT) \u2014 Six-Year Improvement Program (SYIP), approved projects",
+   "publishing_agency": "Virginia Department of Transportation (VDOT) \u2014 Six-Year Improvement Program (SYIP), approved projects",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "syip"
+   }
+  },
+  "vdot-syip-approved-projects-lines": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "VA"
+    }
+   ],
+   "jurisdiction": "Virginia Department of Transportation (VDOT) \u2014 Six-Year Improvement Program (SYIP), approved projects",
+   "publishing_agency": "Virginia Department of Transportation (VDOT) \u2014 Six-Year Improvement Program (SYIP), approved projects",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "syip"
+   }
+  },
+  "virginia-beach-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Virginia Beach",
+     "state": "VA"
+    }
+   ],
+   "jurisdiction": "City of Virginia Beach",
+   "publishing_agency": "City of Virginia Beach",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "vtrans-project-locations": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "VT"
+    }
+   ],
+   "jurisdiction": "Vermont Agency of Transportation (VTrans)",
+   "publishing_agency": "Vermont Agency of Transportation (VTrans)",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "vtrans-project-locations-lines": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "VT"
+    }
+   ],
+   "jurisdiction": "Vermont Agency of Transportation (VTrans)",
+   "publishing_agency": "Vermont Agency of Transportation (VTrans)",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "wa-ecology-sepa-register": {
+   "connector": "socrata",
+   "coverage": [
+    {
+     "state": "WA"
+    }
+   ],
+   "jurisdiction": "Washington State Department of Ecology (SEPA Register)",
+   "publishing_agency": "Washington State Department of Ecology (SEPA Register)",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "wake-county-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Wake",
+     "state": "NC"
+    }
+   ],
+   "jurisdiction": "Wake County",
+   "publishing_agency": "Wake County",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "weld-county-site-plan-review": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Weld",
+     "state": "CO"
+    }
+   ],
+   "jurisdiction": "Weld County, Colorado",
+   "publishing_agency": "Weld County, Colorado",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "wisdot-highway-program-6yr": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "WI"
+    }
+   ],
+   "jurisdiction": "Wisconsin Department of Transportation (WisDOT) \u2014 6-Year Highway Improvement Program",
+   "publishing_agency": "Wisconsin Department of Transportation (WisDOT) \u2014 6-Year Highway Improvement Program",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "improvement program"
+   }
+  },
+  "worcester-building-permits": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "Worcester",
+     "state": "MA"
+    }
+   ],
+   "jurisdiction": "City of Worcester, Massachusetts",
+   "publishing_agency": "City of Worcester, Massachusetts",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  },
+  "wsdot-project-delivery-plan-complete": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "WA"
+    }
+   ],
+   "jurisdiction": "Washington State Department of Transportation (WSDOT)",
+   "publishing_agency": "Washington State Department of Transportation (WSDOT)",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "delivery plan"
+   }
+  },
+  "wsdot-project-delivery-plan-proposed": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "WA"
+    }
+   ],
+   "jurisdiction": "Washington State Department of Transportation (WSDOT)",
+   "publishing_agency": "Washington State Department of Transportation (WSDOT)",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "delivery plan"
+   }
+  },
+  "wsdot-project-delivery-plan-under-construction": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "WA"
+    }
+   ],
+   "jurisdiction": "Washington State Department of Transportation (WSDOT)",
+   "publishing_agency": "Washington State Department of Transportation (WSDOT)",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "delivery plan"
+   }
+  },
+  "wvdoh-active-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "WV"
+    }
+   ],
+   "jurisdiction": "West Virginia Division of Highways (WVDOT)",
+   "publishing_agency": "West Virginia Division of Highways (WVDOT)",
+   "registered": true,
+   "transportation_capital_program_evidence": "UNVERIFIED"
+  },
+  "wydot-stip-projects": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "WY"
+    }
+   ],
+   "jurisdiction": "Wyoming Department of Transportation (WYDOT) \u2014 State Transportation Improvement Program (STIP)",
+   "publishing_agency": "Wyoming Department of Transportation (WYDOT) \u2014 State Transportation Improvement Program (STIP)",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "stip"
+   }
+  },
+  "wydot-stip-projects-lines": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "state": "WY"
+    }
+   ],
+   "jurisdiction": "Wyoming Department of Transportation (WYDOT) \u2014 State Transportation Improvement Program (STIP)",
+   "publishing_agency": "Wyoming Department of Transportation (WYDOT) \u2014 State Transportation Improvement Program (STIP)",
+   "registered": true,
+   "transportation_capital_program_evidence": {
+    "evidence_field": "_receipts",
+    "evidence_phrase": "stip"
+   }
+  },
+  "york-county-pa-planning-subdivisions": {
+   "connector": "arcgis",
+   "coverage": [
+    {
+     "county": "York",
+     "state": "PA"
+    }
+   ],
+   "jurisdiction": "York County, Pennsylvania",
+   "publishing_agency": "York County, Pennsylvania",
+   "registered": true,
+   "transportation_capital_program_evidence": null
+  }
+ }
+}

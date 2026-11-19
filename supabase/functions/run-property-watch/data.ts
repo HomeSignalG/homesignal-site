@@ -56,6 +56,7 @@ export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
     // the report's own reads, one definition
     radius: reportReads.radius,
     hydrate: reportReads.hydrate,
+    jurisdictions: reportReads.jurisdictions,
     ledger: changeReads.ledger,
     events: changeReads.events,
     health: changeReads.health,

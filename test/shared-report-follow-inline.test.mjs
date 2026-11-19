@@ -17,8 +17,10 @@ ok(/name="robots" content="noindex, nofollow"/.test(frame) && /class="hs-embed h
 ok(/HS\.startFollowEmbed\(address,/.test(frame) && /HS\.startFollowEmbed = function/.test(shell), '8 the frame runs the shell\'s own flow (openHome -> saveHome), not a copy of it');
 ok(!/\.insert\(|app_properties|\.rpc\(/.test(frame), '9 the frame writes nothing itself: the one writer stays savePlaceRow');
 ok(/if \(HS\.followEmbed\) \{[\s\S]*?onSaved[\s\S]*?return;\s*\}\s*HS\.announcePlaceSaved/.test(shell) && /!HS\.followEmbed\) \{\s*HS\.startOnboarding/.test(shell), '10 inline follow skips the place card, the reload and onboarding, and nothing else');
-ok(/aria-live="polite"/.test(page) && /textContent = 'Following this property\./.test(code), '11 the finished state is announced');
+ok(/aria-live="polite"/.test(page) && /'Following this property as ' \+ who \+ '\.' : 'Following this property\.'/.test(code), '11 the finished state is announced, naming the account when it is known');
 ok(!/Get notified when HomeSignal finds/.test(page) && /Email alerts are a separate choice/.test(page), '12 the page no longer promises notification from a follow alone');
-ok(/function followDone\(zip\)/.test(code) && /alerts\.html\?zip=' \+ zip/.test(code) && /\^\\d\{5\}\$\/\.test\(zip/.test(code), '13 after a follow the page links to the Alerts page, only for a 5-digit ZIP');
+ok(/function followDone\(zip, email\)/.test(code) && /alerts\.html\?zip=' \+ zip/.test(code) && /\^\\d\{5\}\$\/\.test\(zip/.test(code), '13 after a follow the page links to the Alerts page, only for a 5-digit ZIP');
 ok(/onSaved\(\{ existed: !!r\.existed, zip: m\.zip \}\)/.test(shell) && /zip: \(info && \/\^\\d\{5\}\$\/\.test/.test(frame), '14 the frame reports the ZIP only, never the address');
+ok(/email: sessionEmail/.test(frame) && !/email: *address|address: *address/.test(frame) && /\^\[\^\\s@\]\+@\[\^\\s@\]\+\$\/\.test\(email/.test(code), '15 the frame tells the page the signed-in account only (checked as an email, shown as text), never the address');
+ok(/Saving to /.test(frame) && /auth\.signOut\(\)/.test(frame), '16 before saving, the frame names the account the follow goes to and offers Sign out');
 console.log(fails ? fails + ' FAILED' : 'ALL PASS'); process.exit(fails ? 1 : 0);

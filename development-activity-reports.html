@@ -638,9 +638,9 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   </div>
 </div>
 <script src="lib/project-type.js?v=852af398"></script>
-<script src="lib/da-report-view.js?v=39cc47d8"></script>
+<script src="lib/da-report-view.js?v=e9db45a5"></script>
 <script src="lib/da-report-compare.js?v=a97e336e"></script>
-<script src="lib/share-modal.js?v=971e0041"></script>
+<script src="lib/share-modal.js?v=ca2cb5db"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script>
 // ============================================================================
@@ -1588,7 +1588,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       var until = dateWords(body.expires_at);
       shareSay('Client link made.', false);
       $('share-link').value = link;
-      $('share-note').textContent = 'Send this link to your client. Anyone who has it can read this report' + (until ? ', until ' + until : '') + '. HomeSignal shows this link only this once: if you lose it, withdraw it below and make a new one.';
+      $('share-note').textContent = 'Send this link to your client. Anyone who has it can read this report' + (until ? ', until ' + until : '') + '. Your client link is displayed only once. If you lose it, you can generate a new link by selecting Share with Client.';
       $('share-copy').textContent = 'Copy link';
       $('share-new').hidden = false;
       refreshShares();

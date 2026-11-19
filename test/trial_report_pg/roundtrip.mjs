@@ -214,7 +214,7 @@ function handlerFor(mode, userId) {
     geocode: async (a) => geocodeStandIn(a),
     zipSupported: async () => true,
     radius: async () => [{ source_key: 'k1', feature_id: 'pt:1', registry_id: mode.fam, provenance: 'proven_stored_point', distance_mi: 0.21, geometry_type: 'Point', has_more: false }],
-    hydrate: async () => [{ ...proj, registry_id: mode.fam }], ledger: async () => [], events: async () => [], health: async () => [],
+    hydrate: async () => [{ ...proj, registry_id: mode.fam }], ledger: async () => [], events: async () => [], health: async () => [], jurisdictions: async () => [],
   });
 }
 // This suite makes dozens of reports in seconds to test the ENTITLEMENT (the 10, the ledger, saved reports); the report rate limit has its own suites
