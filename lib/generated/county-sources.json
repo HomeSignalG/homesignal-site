@@ -2,7 +2,7 @@
   "_generated": "AUTO-GENERATED — do not edit. Source: supabase/functions/get-address-report/jurisdiction-registry.json",
   "_regenerate": "node scripts/gen-county-sources.mjs",
   "_contract": "label is the entry jurisdiction verbatim, truncated at the first em-dash. scope is read from the entry, never guessed. The ONLY derived subject-matter fact is `commercial`: the entry maps a value to Commercial (or use_type_const is Commercial) AND its commercial_work_evidence is not unresolved. Nothing else is inferred from an id, family or name.",
-  "registry_entries": 257,
+  "registry_entries": 259,
   "statewide": {
     "AK": [
       {
@@ -600,6 +600,12 @@
         "label": "City of Phoenix",
         "scope": "city",
         "commercial": true
+      },
+      {
+        "id": "phoenix-proposed-zoning",
+        "label": "City of Phoenix Planning & Development Department (Proposed Zoning layer)",
+        "scope": "city",
+        "commercial": false
       },
       {
         "id": "scottsdale-building-permits",
@@ -1268,6 +1274,12 @@
     ],
     "MO|Cass": [
       {
+        "id": "kcmo-capital-projects",
+        "label": "City of Kansas City, Missouri (Capital Projects)",
+        "scope": "city",
+        "commercial": false
+      },
+      {
         "id": "kcmo-development-cases",
         "label": "City of Kansas City, Missouri",
         "scope": "city",
@@ -1278,6 +1290,12 @@
       {
         "id": "kcmo-building-permits",
         "label": "City of Kansas City, Missouri",
+        "scope": "city",
+        "commercial": false
+      },
+      {
+        "id": "kcmo-capital-projects",
+        "label": "City of Kansas City, Missouri (Capital Projects)",
         "scope": "city",
         "commercial": false
       },
@@ -1296,6 +1314,12 @@
         "commercial": false
       },
       {
+        "id": "kcmo-capital-projects",
+        "label": "City of Kansas City, Missouri (Capital Projects)",
+        "scope": "city",
+        "commercial": false
+      },
+      {
         "id": "kcmo-development-cases",
         "label": "City of Kansas City, Missouri",
         "scope": "city",
@@ -1306,6 +1330,12 @@
       {
         "id": "kcmo-building-permits",
         "label": "City of Kansas City, Missouri",
+        "scope": "city",
+        "commercial": false
+      },
+      {
+        "id": "kcmo-capital-projects",
+        "label": "City of Kansas City, Missouri (Capital Projects)",
         "scope": "city",
         "commercial": false
       },
