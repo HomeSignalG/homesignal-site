@@ -31,7 +31,7 @@ const ADDRESS = '20 N Main St, Brigham City, UT 84302';
 const USER = '0f0e4d2c-1b3a-4c5d-8e9f-a1b2c3d4e5f6';
 const KEY = '3b2c1d4e-5f60-4718-8a9b-0c1d2e3f4a5b';
 const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
-const FAM = 'fixture-family-not-a-real-source';
+const FAM = 'austin-site-plan-cases';
 const CREDITS = { version: 1, attribution: { [FAM]: 'Data: fixture' } };
 const proj = { source_key: 'k1', registry_id: FAM, record_kind: 'development', name: 'Fixture Bridge', type: 'Utility', type_raw: null, status: 'Approved', stage: 'Advertised',
   developer: null, size: null, investment: null, submitted_at: '2026-09-24', date_kind: 'issued', address: '005 King', source_ref: 'https://example.test/record' };
@@ -50,7 +50,7 @@ function build(over = {}) {
     geocode: async () => ({ matchedAddress: '20 N MAIN ST, BRIGHAM CITY, UT, 84302', lat: 41.5109, lng: -112.0156, zip: '84302' }),
     zipSupported: async () => true,
     radius: async () => [{ source_key: 'k1', feature_id: 'pt:1', registry_id: FAM, provenance: 'proven_stored_point', distance_mi: 0.21, geometry_type: 'Point', has_more: false }],
-    hydrate: async () => [proj], ledger: async () => [], events: async () => [], health: async () => [], jurisdictions: async () => [],
+    hydrate: async () => [proj], ledger: async () => [], events: async () => [], health: async (f) => (f || []).map((x) => ({ registry_id: x, fetch_failures_24h: 0, blocked_24h: 0, truncated_24h: 0, last_success_at: '2026-10-04T09:00:00Z' })), jurisdictions: async () => [],
     trialOf: async () => ({ status: 'active', credits_used: 3, credits_remaining: 7, expired: false }),
     planOf: async () => PLAN(),
     rateClaim: ALLOW,
@@ -179,7 +179,7 @@ const didWork = (calls) => WORK.filter((w) => calls.includes(w));
   ok(cr?.uses_report === true && r.json?.allotment === 'trial' && r.json?.trial?.credits_used === 4 && r.json?.trial?.credits_remaining === 6, '5a an allowed request is charged exactly as before: the free allotment, one used', r.json?.trial);
   const none = build({ radius: async () => [{ source_key: 'k1', feature_id: 'pt:1', registry_id: null, provenance: 'proven_stored_point', distance_mi: 0.21, geometry_type: 'Point', has_more: false }], hydrate: async () => [{ ...proj, registry_id: null }] });
   const rn = await ask(none.deps, REQ);
-  ok(rn.status === 200 && rn.json?.report?.activity?.outcome === 'NO_DATA_INGESTED' && rn.json?.charged === false && !none.calls.includes('issue') && none.calls.filter((c) => c === 'rateClaim').length === 1,
+  ok(rn.status === 200 && rn.json?.report?.activity?.outcome === 'NO_VERIFIED_COVERAGE' && rn.json?.charged === false && !none.calls.includes('issue') && none.calls.filter((c) => c === 'rateClaim').length === 1,
     '5b a "No data ingested" request is free of charge and NOT free of the limiter: it is exactly the unlimited work the limit exists for', [rn.status, rn.json?.report?.activity?.outcome, none.calls]);
   const twice = build();
   await ask(twice.deps, REQ); await ask(twice.deps, REQ);

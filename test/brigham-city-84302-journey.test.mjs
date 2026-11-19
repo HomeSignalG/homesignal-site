@@ -128,10 +128,13 @@ ok(stored().projects.length === 2 && stored().rows.every((r) => r.registry_id ==
   const names = (rep.projects || []).map((p) => p.name).sort();
   ok(names.length === 2 && JSON.stringify(names) === JSON.stringify([...STORED_NAMES].sort()), '2.2 and it carries the two stored records, by name', names);
   ok(rep.projects.every((p) => p.source && /^https:\/\//.test(p.source.url) && p.source_family === UDOT_LINES), '2.3 each record carries its official link and its source family', rep.projects.map((p) => p.source));
-  ok(r.json.charged === true && r.json.stored === true && typeof r.json.report_id === 'string' && t.calls.issue === 1 && r.json.credit.uses_report === true && r.json.credit.reason === 'DEVELOPMENT_SHOWN',
-    '2.4 it is charged as one free report and stored: the issuing function is called once and the credit decision says a report is used', [r.json.charged, r.json.stored, r.json.credit]);
-  ok(r.json.trial.credits_used === 4 && r.json.trial.credits_remaining === 6, '2.5 the trial now reads 4 used / 6 left', r.json.trial);
-  ok(rep.projects.every((p) => p.source.attribution === null) && rep.coverage && rep.coverage.state !== 'LIMITED_COVERAGE', '2.6 these sources require no credit line, and the report is not marked limited coverage', rep.coverage);
+  // coverage-rule-1 (2026-11-19): 84302 is covered only by UDOT road programs (local_transportation). Those are SHOWN and disclosed, never charged on their own.
+  ok(r.json.charged === false && t.calls.issue === 0 && r.json.credit.uses_report === false && r.json.credit.reason === 'COVERAGE_NOT_VERIFIED',
+    '2.4 a transportation-only report is shown but uses no credit: the issuing function is never called and the decision says coverage is not verified', [r.json.charged, r.json.stored, r.json.credit]);
+  ok(r.json.trial.credits_used === 3 && r.json.trial.credits_remaining === 7, '2.5 the trial still reads 3 used / 7 left', r.json.trial);
+  const cd = rep.coverage.coverage_disclosure;
+  ok(rep.projects.every((p) => p.source.attribution === null) && r.json.coverage_state === 'LIMITED_COVERAGE' && cd && cd.verified_for_credit === false && cd.limitations.some((l) => l.code === 'PARTIAL_COVERAGE_TRANSPORT_ONLY'),
+    '2.6 these sources require no credit line, and the report is marked limited coverage with the engine\'s one disclosure', rep.coverage);
 }
 
 // ---- 2b. NO source family: the provenance rule, accurate, plain, and not an error -----------------------------------------------------------------
@@ -140,13 +143,13 @@ ok(stored().projects.length === 2 && stored().rows.every((r) => r.registry_id ==
   const r = await t.go();
   const rep = r.json.report;
   ok(r.status === 200 && r.json.status === 'OK' && r.json.error === undefined, '2a the answer is a normal 200 OK with no error field: "No data ingested" is a report, not a failure', [r.status, r.json.status, r.json.error]);
-  ok(rep.activity.outcome === 'NO_DATA_INGESTED' && rep.activity.label === 'No data ingested', '2b the report says "No data ingested", in the founder\'s words, from the engine\'s outcome code', rep.activity);
+  ok(rep.activity.outcome === 'NO_VERIFIED_COVERAGE' && rep.activity.label === 'No records found — coverage here is limited', '2b the report says so in the founder\'s words, from the engine\'s outcome code', rep.activity);
   ok(Array.isArray(rep.projects) && rep.projects.length === 0, '2c it carries no project record');
   const blob = JSON.stringify(r.json);
   ok(STORED_NAMES.every((nm) => !blob.includes(nm)) && !blob.includes('SR-13'),
     '2d and none of the stored records leaks into the answer by name or address: a record that cannot be traced shows nothing at all', blob.length);
   ok(r.json.charged === false && r.json.stored === false && r.json.report_id === null && t.calls.issue === 0, '2e it is not charged, not stored and the issuing function is never called');
-  ok(r.json.credit.uses_report === false && r.json.credit.reason === 'NO_DATA_INGESTED' && r.json.trial.credits_used === 3 && r.json.trial.credits_remaining === 7,
+  ok(r.json.credit.uses_report === false && r.json.credit.reason === 'NO_VERIFIED_COVERAGE' && r.json.trial.credits_used === 3 && r.json.trial.credits_remaining === 7,
     '2f the credit decision says no free report is used, and the trial still reads 3 used / 7 left', [r.json.credit, r.json.trial]);
   ok(r.json.coverage_state !== 'OUTSIDE_COVERAGE' && rep.coverage.limitations.some((l) => l.code === 'RECORDS_NOT_TRACEABLE'), '2g the place IS covered; the report says records could not be traced', rep.coverage);
 }
@@ -162,8 +165,8 @@ ok(stored().projects.length === 2 && stored().rows.every((r) => r.registry_id ==
   const FIXTURE = 'launch-test-fixture-family-not-a-real-source';
   const t = ask({ net: world({ rows: stored(FIXTURE) }) });
   const r = await t.go();
-  ok(r.status === 200 && r.json.report.activity.outcome === 'DEVELOPMENT_SHOWN' && r.json.report.projects.length === 2 && r.json.charged === true && t.calls.issue === 1,
-    '4a (control) a family no list has ever named, at the same location with the same routing and rows, shows 2 projects and uses one free report', [r.json.report.activity, r.json.charged]);
+  ok(r.status === 200 && r.json.report.activity.outcome === 'DEVELOPMENT_SHOWN' && r.json.report.projects.length === 2 && r.json.charged === false && t.calls.issue === 0,
+    '4a (control) a family no list has ever named still SHOWS its 2 projects (nothing is dropped) but, being unclassified, can never be charged', [r.json.report.activity, r.json.charged]);
 }
 
 // ---- 5. places that are not covered, and addresses that cannot be found ----------------------------------------------------------------------------

@@ -19,7 +19,8 @@ const mk = (key, reg, name, status, type, extra = {}) => ({ source_key: key, reg
   developer: null, size: null, investment: null, submitted_at: OLD, date_kind: 'filed', address: null, source_ref: 'https://example.gov/' + key, ...extra });
 const row = (key, reg, d, gt, more = {}) => ({ source_key: key, feature_id: 'f:1', registry_id: reg, provenance: 'recovered_authoritative', distance_mi: d, geometry_type: gt, has_more: false, marker_lat: 40.02, marker_lng: -105.28, ...more });
 const SUBJECT = { address: '1777 Broadway, Boulder, CO 80302', matched_address: null, lat: 40.0177, lng: -105.28, zip: '80302' };
-const run = (rows, projects, health = []) => M.assemble({ now: NOW, subject: SUBJECT, radius_mi: 0.5, view: 'internal', zip_supported: true, attribution, rows, projects, ledger: [], events: [], health });
+const run = (rows, projects, health = [], applicable_families = []) => M.assemble({ now: NOW, subject: SUBJECT, radius_mi: 0.5, view: 'internal', zip_supported: true, attribution, rows, projects, ledger: [], events: [], health, applicable_families });
+const fresh = (...f) => f.map((registry_id) => ({ registry_id, fetch_failures_24h: 0, blocked_24h: 0, truncated_24h: 0, last_success_at: new Date(NOW.getTime() - 3600e3).toISOString() }));
 const ex = (a) => a.renderOnly?.internal?.excluded ?? {};
 const lims = (a) => (a.intelligence?.coverage?.limitations ?? []).map((l) => l.code);
 const ids = (a) => new Set((a.intelligence?.projects ?? []).map((p) => p.project_id));
@@ -32,7 +33,7 @@ const cases = [
   ['WA', 'ST_MultiPolygon', 'wsdot-project-delivery-plan-under-construction', 'wa:1', 'Construct new bridge and widen roadway'],
   ['CO', 'ST_Point', 'boulder-construction-permits', 'co:1', 'New 120-unit apartment building'],
 ];
-const base = run(cases.map(([, gt, reg, key], i) => row(key, reg, 0.1 + i * 0.1, gt)), cases.map(([, , reg, key, name]) => mk(key, reg, name, 'Approved', 'Development')));
+const base = run(cases.map(([, gt, reg, key], i) => row(key, reg, 0.1 + i * 0.1, gt)), cases.map(([, , reg, key, name]) => mk(key, reg, name, 'Approved', 'Development')), fresh(...cases.map((c) => c[2])), ['boulder-construction-permits']);
 for (const [st, gt, , key] of cases) ok(ids(base).has(key), `${st} ${gt} active project filed >90 days ago reaches the report`, ex(base));
 ok(!('filing_age' in ex(base)), 'no filing-age exclusion exists in the report');
 ok(lims(base).length === 0 && base.coverage_state !== 'LIMITED_COVERAGE', 'positive control: a complete retrieval carries no limitation', lims(base));
@@ -67,7 +68,7 @@ const zeroLimited = run([row('z:1', 'boulder-construction-permits', 0.1, 'ST_Poi
 ok((zeroLimited.intelligence?.projects ?? []).length === 0 && lims(zeroLimited).includes('AREA_TRUNCATED') && zeroLimited.coverage_state === 'LIMITED_COVERAGE', 'zero qualifying records with a known retrieval limitation stays LIMITED_COVERAGE', { l: lims(zeroLimited), s: zeroLimited.coverage_state });
 ok(zeroLimited.intelligence?.activity?.outcome !== 'NO_DEVELOPMENT_ACTIVITY', 'a limited empty report never claims confirmed absence');
 const zeroClean = run([], []);
-ok((zeroClean.intelligence?.projects ?? []).length === 0 && lims(zeroClean).length === 0 && zeroClean.coverage_state !== 'LIMITED_COVERAGE', 'control: zero records and no limitation reads as an ordinary empty report', { s: zeroClean.coverage_state, l: lims(zeroClean) });
+ok((zeroClean.intelligence?.projects ?? []).length === 0 && zeroClean.coverage_state === 'LIMITED_COVERAGE' && zeroClean.intelligence?.activity?.outcome === 'NO_VERIFIED_COVERAGE', 'control (coverage-rule-1): zero records with no verified source is a limited-coverage report, never an ordinary empty one', { s: zeroClean.coverage_state, l: lims(zeroClean) });
 
 // ── the EPA plane is not development activity ──
 const epa = run([row('frs:1', '110000', 0.1, 'ST_Point')], [{ ...mk('frs:1', '110000', 'ACME PLANT', 'Operating', 'industrial'), record_kind: 'facility' }]);

@@ -193,8 +193,8 @@ const all = Object.values(src).map(code).join('\n');
   const CR = 'supabase/functions/_shared/credit-rule.ts';
   const cr = read(CR), crc = code(cr);
   ok(!/\bDeno\b|process\.env|\brequire\(|\bfetch\(/.test(crc), '9a the credit rule is pure: no environment, no runtime global, no network');
-  ok(/^import \{ ACTIVITY_OUTCOMES, ACTIVITY_RULE_VERSION \} from '\.\/national-report\.ts';$/m.test(cr) && (crc.match(/^import /gm) || []).length === 1,
-    '9b it imports only the outcome vocabulary and its version from the engine (it judges the engine\'s answer, it does not re-derive it)');
+  ok(/^import \{ ACTIVITY_OUTCOMES, ACTIVITY_RULE_VERSION \} from '\.\/national-report\.ts';$/m.test(cr) && /^import \{ COVERAGE_RULE_VERSION \} from '\.\/coverage-assess\.ts';$/m.test(cr) && (crc.match(/^import /gm) || []).length === 2,
+    '9b it imports only the outcome vocabulary and its version from the engine, and the coverage rule version (it judges the engine\'s answer, it does not re-derive it)');
   ok(/const CHARGED: ReadonlySet<string> = new Set\(\['DEVELOPMENT_SHOWN', 'NO_DEVELOPMENT_ACTIVITY'\]\);/.test(crc) && !/NO_DATA_INGESTED/.test(crc.replace(/export const CREDIT_REASONS[\s\S]*?\] as const;/, '')),
     '9c the charged outcomes are exactly the two that answer the question about the area; "No data ingested" is never in the charged set');
   const fnFiles = [];
@@ -210,7 +210,7 @@ const all = Object.values(src).map(code).join('\n');
     '9g the engine asks activityOutcome once, with the number of projects in THIS report (after the provenance rule) and the number it read and left out (relevance_review), never the spatial answer');
   const fnBody = /export function activityOutcome\([\s\S]*?\n\}/.exec(mod);
   ok(!!fnBody && !/NO_DEVELOPMENT_ACTIVITY/.test(fnBody[0]), '9h today\'s outcome rule cannot return "No development activity": that needs the VERIFIED ZERO proof, which has no inputs yet');
-  ok(/const credit = creditDecision\(\{ status: 'OK', view, activity: out\.intelligence\?\.activity, storable \}\);/.test(code(src.handler))
+  ok(/const credit = creditDecision\(\{ status: 'OK', view, activity: out\.intelligence\?\.activity, coverage: out\.intelligence\?\.coverage, storable \}\);/.test(code(src.handler))
     && (code(src.handler).match(/creditDecision\(/g) || []).length === 3, '9i the handler asks the rule for every report and every no-report answer, and decides nothing itself');
   ok(!/evaluation_report_issue|evaluation_usage|report_credit/.test(code(src.handler)) && !/evaluation_report_issue|evaluation_credit/.test(code(src.data))
     && /if \(!trial \|\| !credit\.uses_report\)/.test(code(src.handler)),

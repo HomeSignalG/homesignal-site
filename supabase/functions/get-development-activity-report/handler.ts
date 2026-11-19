@@ -261,7 +261,7 @@ export function makeHandler(deps: Deps) {
       const storable = out.storage_blockers.length === 0;
       // whether this report uses one of the free reports: the ONE rule (founder ruling R5). An admin is never charged and nothing is stored
       // for one; a trial report that the rule does not charge ("No data ingested", a report that cannot be stored) is also stored nowhere
-      const credit = creditDecision({ status: 'OK', view, activity: out.intelligence?.activity, storable });
+      const credit = creditDecision({ status: 'OK', view, activity: out.intelligence?.activity, coverage: out.intelligence?.coverage, storable });
       if (!trial || !credit.uses_report) {
         return reply(req, {
           status: 'OK',

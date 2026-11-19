@@ -42,7 +42,7 @@ const rel = (name, type_raw = null, typeKey = null, registry_id = null) => M.rel
 {
   let okGen = true; try { execFileSync(process.execPath, [join(root, 'scripts/gen-residential-qualify-module.mjs'), '--check'], { stdio: 'pipe' }); } catch { okGen = false; }
   ok(okGen, '0a supabase/functions/_shared/residential-qualify.generated.js is lib/residential-qualify.js under its header (no second copy of the residential rules)');
-  ok(M.REPORT_VERSION === 'development-activity-national-7' && rep.relevance_rule_version === M.RELEVANCE_RULE_VERSION, '0b the report says which version and which relevance rule built it');
+  ok(M.REPORT_VERSION === 'development-activity-national-8' && rep.relevance_rule_version === M.RELEVANCE_RULE_VERSION, '0b the report says which version and which relevance rule built it');
 }
 
 // ---- A. relevance: the founder's acceptance cases ---------------------------------------------------------------------------------------------------

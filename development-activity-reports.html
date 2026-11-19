@@ -811,8 +811,8 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       // usage reads as "7 of 100 reports used"; only when the allowance is not yet known does it fall back to the count left
       count.textContent = freeLimit !== null && left !== null ? (freeLimit - left) + ' of ' + freeLimit + ' reports used' : (left === 1 ? '1 free report left' : left + ' free reports left');
       sub.textContent = mine()
-        ? 'A report with no development data (“No data ingested”) does not use one.'
-        : "Shared by everyone on your brokerage. A report with no development data (“No data ingested”) does not use one.";
+        ? 'A report with no records found, or with coverage Jody cannot verify, does not use one.'
+        : "Shared by everyone on your brokerage. A report with no records found, or with coverage Jody cannot verify, does not use one.";
     } else if (a === 'admin') {
       count.textContent = 'Signed in as a HomeSignal admin';
       sub.textContent = 'Reports you make here show what a customer sees, and never use a free report.';
@@ -1945,6 +1945,8 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     if (body.replayed === true) return 'This is the report you already made for this address. It did not use another ' + (paid ? 'report' : 'free report') + '.';
     if (body.charged === true) return paid ? 'This report used 1 of your brokerage’s 100 reports this month.' : 'This report used 1 of your brokerage’s free reports.';
     var c = body.credit;
+    if (c && c.reason === 'NO_VERIFIED_COVERAGE') return 'This report did not use ' + oneOf() + ': no records found, and coverage here is limited.';
+    if (c && c.reason === 'COVERAGE_NOT_VERIFIED') return 'This report did not use ' + oneOf() + ': Jody could not verify full coverage of this area, so the records shown may be incomplete.';
     if (c && c.reason === 'NO_DATA_INGESTED') return 'This report did not use ' + oneOf() + ': No data ingested.';
     if (c && c.reason === 'NO_SIGNIFICANT_CHANGES') return 'This report did not use ' + oneOf() + ': no significant nearby changes found.';
     return 'This report did not use ' + oneOf() + '.';
@@ -1990,7 +1992,8 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     // The status line follows the ENGINE's outcome code, never the count: a report with "No data ingested" has zero records because HomeSignal cannot yet confirm it
     // receives official records for the address, so "0 official records within 0.5 miles" would read as a measured zero (founder ruling R5, 2026-10-02).
     var outcome = body.report && body.report.activity ? body.report.activity.outcome : null;
-    if (outcome === 'NO_DATA_INGESTED') say('Report ready: No data ingested for this address. It is not a finding that there is no development nearby.', false);
+    if (outcome === 'NO_VERIFIED_COVERAGE') say('Report ready: no records found, and coverage here is limited. It is not a finding that there is no development nearby.', false);
+    else if (outcome === 'NO_DATA_INGESTED') say('Report ready: No data ingested for this address. It is not a finding that there is no development nearby.', false);
     else if (outcome === 'NO_SIGNIFICANT_CHANGES') say('Report ready: no significant nearby changes found. Jody read the official records near this address and all of them describe routine work, do not say what the work is, or have ended.', false);
     else say('Report ready: ' + n + (n === 1 ? ' official record' : ' official records') + ' within 0.5 miles.', false);
     $('creditnote').textContent = chargeLine(body); $('creditnote').hidden = false;

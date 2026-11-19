@@ -57,9 +57,26 @@ export function makeChangeReads(rest: Rest) {
      * with no failure record has no row, and `sourcesNotFullyRead` treats an absent row and an all-zero row alike.
      */
     async health(families: string[]): Promise<SourceHealth[]> {
-      return await inBatches<SourceHealth>(families, (b) =>
+      const fails = await inBatches<SourceHealth>(families, (b) =>
         rest('dev_change_source_fetch_health?select=registry_id,fetch_failures_24h,blocked_24h,truncated_24h&registry_id=in.'
           + encodeURIComponent(quoteIn(b))));
+      // D2 (2026-11-19): the last SUCCESSFUL read of each source, from public.dev_source_freshness. A failed or malformed read of it is NOT a failed report:
+      // every source then has no last_success_at, which coverage-assess.ts reads as UNKNOWN, so the report is disclosed as limited and never charged.
+      let fresh: Array<{ registry_id: string; last_success_at: string | null }> = [];
+      try {
+        fresh = await inBatches<{ registry_id: string; last_success_at: string | null }>(families, (b) =>
+          rest('dev_source_freshness?select=registry_id,last_success_at&registry_id=in.' + encodeURIComponent(quoteIn(b))));
+      } catch { fresh = []; }
+      const lastOk = new Map(fresh.map((r) => [r.registry_id, typeof r.last_success_at === 'string' ? r.last_success_at : null] as const));
+      const byId = new Map(fails.map((r) => [r.registry_id, r] as const));
+      // one row for EVERY requested family: no failure record means zero failures; no freshness row means no known successful read
+      return [...new Set(families)].sort().map((id) => ({
+        registry_id: id,
+        fetch_failures_24h: byId.get(id)?.fetch_failures_24h ?? 0,
+        blocked_24h: byId.get(id)?.blocked_24h ?? 0,
+        truncated_24h: byId.get(id)?.truncated_24h ?? 0,
+        last_success_at: lastOk.get(id) ?? null,
+      }));
     },
   };
 }

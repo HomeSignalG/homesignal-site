@@ -377,7 +377,7 @@ const CHANGES = { action: 'changes', report_id: REPORT_ID };
   d = mk([]);
   await d.authenticate('t'); await d.isAdmin('a@b.com'); await d.report(REPORT_ID); await d.reportContext(REPORT_ID); await d.ledger(['k']); await d.eventsWrittenSince(['k'], '2026-01-01T00:00:00Z'); await d.health(['f']);
   await d.openFollow(CONTEXT_ID, FOLLOW_ID); await d.closeFollow(CONTEXT_ID, FOLLOW_ID);
-  ok(reqs.length === 9 && reqs.every((r) => r.url.startsWith(BASE + '/')), '5i the service key is sent only to the project\'s own URL: every request went there', reqs.map((r) => r.url));
+  ok(reqs.length === 10 && reqs.every((r) => r.url.startsWith(BASE + '/')), '5i the service key is sent only to the project\'s own URL: every request went there', reqs.map((r) => r.url));
   ok(!reqs.some((r) => /report_private_context_read|report_private_context\?|report_private_context_purge|report_private_context_create/.test(r.url)), '5j and not one request touches the private context other than the need open and close: never the read, the table, the purge or the writer');
   ok(!('newId' in d) && !('newId' in D.makeDeps({ url: BASE, serviceKey: KEY, attribution: CREDITS, newId: () => 'x' }, async () => new Response('[]'))), '5k the function mints no follow id: the data layer has none to give, even if one is offered');
 
