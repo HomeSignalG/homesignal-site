@@ -225,7 +225,7 @@ const C = code(SRC);
     // national-7 (2026-11-02): the universal report corrections suite renders the view on the Seattle sample
     'test/report-quality-national7.test.mjs', 'test/report-overview-scale.test.mjs',
     // 2026-11-03: the partner-sample review and the temporary-installation rule render the view on the Seattle sample
-    'test/report-partner-review.test.mjs', 'test/temporary-installation.test.mjs']);
+    'test/report-partner-review.test.mjs', 'test/temporary-installation.test.mjs', 'test/report-quality-national8.test.mjs']);
   const stray = hits.filter((f) => !ALLOWED.has(f));
   ok(hits.includes(MOD) && hits.includes('test/da-report-view.test.mjs'), '6a (control) the walk sees the module and its own tests (' + hits.length + ' files name it)');
   ok(stray.length === 0, '6b no page, lib, script, workflow or edge function names the view except its three callers (the private review page, build step 4; the customer page, 5c; the client\'s page for a share link, 8) and the side-by-side comparison module that reads its functions (build step 10)', stray);

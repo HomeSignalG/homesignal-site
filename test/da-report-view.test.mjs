@@ -269,7 +269,7 @@ try {
 try {
   const links = [...html.matchAll(/<table[\s\S]*?<\/table>/g)][0][0];
   ok(!/https?:\/\//.test(textOf(links)) && !/example\.gov/.test(textOf(links)) && (links.match(/class="da-rv-link"/g) || []).length === 8, '5b-a the table shows a short "Official source" label, never a raw address (8 links, 0 visible URLs)');
-  ok(/Official source/.test(textOf(links)) && [...links.matchAll(/class="da-rv-link" href="([^"]*)"/g)].every((m) => /^https:\/\/example\.gov\/records\/k-/.test(m[1])), '5b-b each link still points at that record\'s own address');
+  ok(/Official (source|record|agency database)/.test(textOf(links)) && [...links.matchAll(/class="da-rv-link" href="([^"]*)"/g)].every((m) => /^https:\/\/example\.gov\/records\/k-/.test(m[1])), '5b-b each link still points at that record\'s own address');
   ok(!/da-rv-url/.test(html + V.CSS) && !/example\.gov/.test(textOf(html)), '5b-c no raw web address is printed anywhere: every record shows only the short "Official source" link, which stays clickable in a saved PDF');
   const longName = 'The Extraordinarily Long Named Mixed-Use Redevelopment Of The Former Downtown Industrial Warehouse District And Adjacent Waterfront Parcels Along The River Phase 2B';
   const ln = clone(W); ln.report.projects.find((p) => p.project_id === 'k-approved').name = longName;
@@ -425,7 +425,7 @@ try {
   const linkCells = rowsOf(html).map((r) => r.cells.map((c) => (c.match(/<a\b/g) || []).length));
   ok(real.length === nLinks && inTable === 8 && real.length === inTable && real.every((m) => /^https?:\/\//.test(m[1])), '6f every link on a normal report is http(s), opens in a new tab, with noopener noreferrer, and there is exactly one per record (8 records, 8 links, none outside the table)', [real.length, inTable]);
   ok(linkCells.length === 8 && linkCells.every((c) => c.join() === '0,0,0,1'), '6f2 each record\'s one source link is in its FOURTH cell (Supporting Evidence) and in none of the other three', linkCells);
-  ok(/Official source <span aria-hidden="true">→<\/span><span class="da-rv-sr"> for Menchaca Apartments \(opens in a new tab\)<\/span>/.test(html), '6g a link\'s accessible name carries the record it belongs to');
+  ok(/Official (?:source|record|agency database) <span aria-hidden="true">→<\/span><span class="da-rv-sr"> for Menchaca Apartments \(opens in a new tab\)<\/span>/.test(html), '6g a link\'s accessible name carries the record it belongs to');
   const subj = '742 Evergreen Terrace, Springfield, OR 97477';
   const hs = V.html(W, { subject: subj });
   ok(hs.split(subj).length - 1 === 1 && /<p class="da-rv-addr">742 Evergreen Terrace, Springfield, OR 97477<\/p>/.test(hs), '6h the caller\'s address appears exactly once, as the header text');
