@@ -948,9 +948,7 @@ export function assemble(input: AssembleInput): Assembled {
       source_family: family || null,
       name: p.name,
       address: p.address,
-      // a transportation capital-project record whose own title says nothing is filed under Roads & infrastructure, so the category filter finds it
-      type: rel.basis === 'infrastructure' && (!t || t.typeKey === 'other') ? { key: 'infrastructure', label: 'Roads & infrastructure' }
-        : t ? { key: t.typeKey, label: t.label, ...(t.facilityKind ? { kind: t.facilityKind } : {}) } : null,
+      type: t ? { key: t.typeKey, label: t.label, ...(t.facilityKind ? { kind: t.facilityKind } : {}) } : null,
       lifecycle: { key: lc.key, label: lc.label },
       stage: stage ? { key: stage, label: stageLabel(stage, evidence, p.stage), ...(evidence ? { evidence: evidence.label } : occLabel ? { evidence: occLabel } : {}) } : null,
       publisher_status: p.status,
@@ -969,6 +967,8 @@ export function assemble(input: AssembleInput): Assembled {
         ? { first_observed_at: led.first_observed_at, last_observed_at: led.last_observed_at, observation_count: led.observation_count, change_ready: led.change_ready }
         : null,
     };
+    // a transportation capital-project record whose own title says nothing is filed under Roads & infrastructure, so the category filter finds it
+    if (rel.basis === 'infrastructure' && (!t || t.typeKey === 'other')) entry.type = { key: 'infrastructure', label: 'Roads & infrastructure' };
     projects.push(entry);
     distances[p.source_key] = distance.get(p.source_key)!;
     const near = nearest.get(p.source_key);
