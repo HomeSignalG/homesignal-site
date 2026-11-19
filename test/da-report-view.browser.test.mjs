@@ -267,7 +267,7 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     return {
       rows: vis('.da-rv-table tbody tr'), marks: vis('.da-rv-mk'), noMatch: [...document.querySelectorAll('.da-rv-nomatch')].filter((e) => !e.hasAttribute('hidden')).length,
       pressed: [...document.querySelectorAll('.da-rv-chip[aria-pressed="true"]')].map((b) => b.dataset.daFilter + ':' + b.dataset.daValue).sort().join(),
-      briefing: document.querySelector('[data-da-briefing]').textContent,
+      briefing: (document.querySelector('[data-da-briefhost]') || {}).textContent || '',
     };
   });
   const s0 = await state();
@@ -278,7 +278,7 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
   await page.click('.da-rv-chip[data-da-filter="type"][data-da-value="residential"]');
   const s2 = await state();
   ok(s2.rows === 1 && s2.marks === 1 && s2.pressed === 'stage:proposed,type:residential', '7c Type and Stage combine: Residential + Proposed leaves the one proposed residential record, in the table and on the map', s2);
-  ok(s2.briefing === s0.briefing, '7d filtering changes what is shown, never the report: the briefing is unchanged', [s2.briefing.length, s0.briefing.length]);
+  ok(s2.briefing !== s0.briefing && /Filters on: this briefing counts the 1 record the filters show, of 8 in the report\./.test(s2.briefing), '7d filtering changes the briefing to the records the filters show, and says so (national-8); the saved report is unchanged', [s2.briefing.length, s0.briefing.length]);
   // 2026-11-03: an issued permit and work under way are separate chips; the first of them is pressed
   await page.click('.da-rv-chip[data-da-filter="stage"][data-da-value="permit_issued"], .da-rv-chip[data-da-filter="stage"][data-da-value="under_construction"]');
   const s2b = await state();
@@ -533,7 +533,7 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     const all = await shown();
     await page.click('.da-rv-chip[data-da-filter="stage"][data-da-value="proposed"]');
     const f = await shown();
-    ok(all.rows.length === 8 && f.rows.length === 4 && f.links === 4 && f.evCells === 4 && f.marks === 4 && f.brief === all.brief && f.count === all.count, `14d (${label}) a Stage filter removes whole records: 4 rows, 4 evidence cells and 4 links remain (none orphaned), the map follows, the briefing and totals do not change`, { all, f });
+    ok(all.rows.length === 8 && f.rows.length === 4 && f.links === 4 && f.evCells === 4 && f.marks === 4 && f.brief !== all.brief && f.count === all.count, `14d (${label}) a Stage filter removes whole records: 4 rows, 4 evidence cells and 4 links remain (none orphaned), the map follows, the briefing is rebuilt for the 4 records shown (national-8)`, { all, f });
     await page.click('.da-rv-chip[data-da-filter="type"][data-da-value="commercial"]');
     const t = await shown();
     ok(t.rows.length === 2 && t.evCells === 2 && t.links === 2, `14d2 (${label}) Type and Stage filters combine on whole rows (2 commercial proposed records, 2 evidence cells)`, t);
