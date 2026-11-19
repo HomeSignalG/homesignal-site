@@ -13,10 +13,13 @@
 --   RECORDS (Proposed/Approved, filed <= 120 days, with coordinates) and says where they are drawn; it never calls them
 --   "eligible". The generator's own per-ZIP verdicts live in its run log.
 --
--- MAP COUNTS (corrected 2026-11-19): distinct source keys, not rows. A key the ACTIVE N5 generation recorded as unresolved
--- (e.g. POINT_REJECTED / MULTI_COORD_UNRESOLVED) is WITHHELD BY DESIGN and counted apart from 'not_in_serving_generation',
--- which now means only: in no membership AND not recorded unresolved (unexplained). Records drawn on a neighbouring ZIP's
--- polygon are correct N5 behaviour (membership is point-in-polygon, not the 3-mile source scope) and are counted as drawn elsewhere.
+-- MAP COUNTS (corrected 2026-11-19): distinct source keys, not rows. recent_live_records = drawn_on_map1 + drawn_on_other_zip +
+-- n5_unresolved + not_in_serving_generation (a non-overlapping partition: membership here / membership only elsewhere / no membership
+-- but recorded unresolved by the ACTIVE N5 generation / no membership and not recorded). n5_unresolved_by_reason carries the N5 reason
+-- codes (REGISTRY_IDENT_UNRESOLVED, GEOMETRY_INVALID, POINT_REJECTED, NO_INTERSECTION_WITH_GENERATION_ZCTAS, ...): these are mostly DATA-QUALITY
+-- or placement problems, not benign exclusions; only SOURCE_EXCLUDED is an intentional exclusion. The N5 unresolved table holds one row per
+-- (generation, source_key): the entry is generation-wide for the key, not ZIP-specific. Records drawn on a neighbouring ZIP's polygon are
+-- correct N5 behaviour (membership is point-in-polygon, not the 3-mile source scope) and are counted as drawn elsewhere.
 --
 -- VERDICT: decided ONCE, in lib/acq-subscriber-zip-health.js (HS.subscriberZipVerdict), from the facts this reader returns.
 -- The worst applicable wins, and nothing is healthy by default:
@@ -58,6 +61,11 @@ begin
                 select 1 from geo.n5_serving_membership m where m.source_key = l.source_key)
                 and exists (select 1 from geo.n5_generation_unresolved u
                   join geo.n5_generation g on g.generation_id = u.generation_id and g.state = 'ACTIVE' where u.source_key = l.source_key)),
+      unres_r as (select u.reason_code, count(*) n from live l
+                join geo.n5_generation_unresolved u on u.source_key = l.source_key
+                join geo.n5_generation g on g.generation_id = u.generation_id and g.state = 'ACTIVE'
+                where not exists (select 1 from geo.n5_serving_membership m where m.source_key = l.source_key)
+                group by u.reason_code),
       absent as (select count(*) n from live l where not exists (
                 select 1 from geo.n5_serving_membership m where m.source_key = l.source_key)
                 and not exists (select 1 from geo.n5_generation_unresolved u
@@ -90,7 +98,8 @@ begin
         'drawn_on_map1', (select n from drawn_here),
         'drawn_on_other_zip', (select n from drawn_else),
         'not_in_serving_generation', (select n from absent),
-        'withheld_by_n5_rule', (select n from unres),
+        'n5_unresolved', (select n from unres),
+        'n5_unresolved_by_reason', coalesce((select jsonb_object_agg(reason_code, n) from unres_r), '{}'::jsonb),
         'posts', coalesce((select jsonb_object_agg(status, jsonb_build_object('n', n, 'newest', newest)) from posts), '{}'::jsonb),
         'government', jsonb_build_object('feeds_active', (select active from feeds), 'feeds_total', (select total from feeds), 'newest_item', (select newest from govnew)),
         'email', jsonb_build_object('published_posts', (select count(*) from pub), 'deliveries', (select delivered from mail),

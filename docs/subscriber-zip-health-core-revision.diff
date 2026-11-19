@@ -1,20 +1,23 @@
 diff --git a/docs/subscriber-zip-health.sql b/docs/subscriber-zip-health.sql
-index 6c61e15..28ed5e3 100644
+index 6c61e15..f43327c 100644
 --- a/docs/subscriber-zip-health.sql
 +++ b/docs/subscriber-zip-health.sql
-@@ -13,6 +13,11 @@
+@@ -13,6 +13,14 @@
  --   RECORDS (Proposed/Approved, filed <= 120 days, with coordinates) and says where they are drawn; it never calls them
  --   "eligible". The generator's own per-ZIP verdicts live in its run log.
  --
-+-- MAP COUNTS (corrected 2026-11-19): distinct source keys, not rows. A key the ACTIVE N5 generation recorded as unresolved
-+-- (e.g. POINT_REJECTED / MULTI_COORD_UNRESOLVED) is WITHHELD BY DESIGN and counted apart from 'not_in_serving_generation',
-+-- which now means only: in no membership AND not recorded unresolved (unexplained). Records drawn on a neighbouring ZIP's
-+-- polygon are correct N5 behaviour (membership is point-in-polygon, not the 3-mile source scope) and are counted as drawn elsewhere.
++-- MAP COUNTS (corrected 2026-11-19): distinct source keys, not rows. recent_live_records = drawn_on_map1 + drawn_on_other_zip +
++-- n5_unresolved + not_in_serving_generation (a non-overlapping partition: membership here / membership only elsewhere / no membership
++-- but recorded unresolved by the ACTIVE N5 generation / no membership and not recorded). n5_unresolved_by_reason carries the N5 reason
++-- codes (REGISTRY_IDENT_UNRESOLVED, GEOMETRY_INVALID, POINT_REJECTED, NO_INTERSECTION_WITH_GENERATION_ZCTAS, ...): these are mostly DATA-QUALITY
++-- or placement problems, not benign exclusions; only SOURCE_EXCLUDED is an intentional exclusion. The N5 unresolved table holds one row per
++-- (generation, source_key): the entry is generation-wide for the key, not ZIP-specific. Records drawn on a neighbouring ZIP's polygon are
++-- correct N5 behaviour (membership is point-in-polygon, not the 3-mile source scope) and are counted as drawn elsewhere.
 +--
  -- VERDICT: decided ONCE, in lib/acq-subscriber-zip-health.js (HS.subscriberZipVerdict), from the facts this reader returns.
  -- The worst applicable wins, and nothing is healthy by default:
  --   FAILED_INGESTION            a source failed in the last 48h, or the ZIP's report is older than 72h
-@@ -41,7 +46,7 @@ begin
+@@ -41,7 +49,7 @@ begin
        fail as (select f.registry_id, count(*) n, max(f.seen_at) last_failed, (array_agg(f.reason order by f.seen_at desc))[1] reason
                   from public.dev_refresh_source_failures f where f.zip = zz.zip and f.seen_at > now() - interval '48 hours'
                  group by f.registry_id),
@@ -23,7 +26,7 @@ index 6c61e15..28ed5e3 100644
                  where p.zip = zz.zip and p.record_kind = 'development' and p.status in ('Proposed','Approved')
                    and p.submitted_at >= current_date - 120 and p.lat is not null and p.lng is not null),
        drawn_here as (select count(*) n from live l where exists (
-@@ -49,8 +54,14 @@ begin
+@@ -49,8 +57,19 @@ begin
        drawn_else as (select count(*) n from live l where not exists (
                  select 1 from geo.n5_serving_membership m where m.zcta5 = zz.zip::bpchar and m.source_key = l.source_key)
                  and exists (select 1 from geo.n5_serving_membership m where m.source_key = l.source_key)),
@@ -31,6 +34,11 @@ index 6c61e15..28ed5e3 100644
 +                select 1 from geo.n5_serving_membership m where m.source_key = l.source_key)
 +                and exists (select 1 from geo.n5_generation_unresolved u
 +                  join geo.n5_generation g on g.generation_id = u.generation_id and g.state = 'ACTIVE' where u.source_key = l.source_key)),
++      unres_r as (select u.reason_code, count(*) n from live l
++                join geo.n5_generation_unresolved u on u.source_key = l.source_key
++                join geo.n5_generation g on g.generation_id = u.generation_id and g.state = 'ACTIVE'
++                where not exists (select 1 from geo.n5_serving_membership m where m.source_key = l.source_key)
++                group by u.reason_code),
        absent as (select count(*) n from live l where not exists (
 -                select 1 from geo.n5_serving_membership m where m.source_key = l.source_key)),
 +                select 1 from geo.n5_serving_membership m where m.source_key = l.source_key)
@@ -39,11 +47,12 @@ index 6c61e15..28ed5e3 100644
        posts as (select status, count(*) n, max(created_at) newest from public.social_posts
                   where zip = zz.zip and content_family = 'MAPS' group by status),
        gov as (select cm.id from public.communities cm where cm.zip_codes @> array[zz.zip]),
-@@ -79,6 +90,7 @@ begin
+@@ -79,6 +98,8 @@ begin
          'drawn_on_map1', (select n from drawn_here),
          'drawn_on_other_zip', (select n from drawn_else),
          'not_in_serving_generation', (select n from absent),
-+        'withheld_by_n5_rule', (select n from unres),
++        'n5_unresolved', (select n from unres),
++        'n5_unresolved_by_reason', coalesce((select jsonb_object_agg(reason_code, n) from unres_r), '{}'::jsonb),
          'posts', coalesce((select jsonb_object_agg(status, jsonb_build_object('n', n, 'newest', newest)) from posts), '{}'::jsonb),
          'government', jsonb_build_object('feeds_active', (select active from feeds), 'feeds_total', (select total from feeds), 'newest_item', (select newest from govnew)),
          'email', jsonb_build_object('published_posts', (select count(*) from pub), 'deliveries', (select delivered from mail),

@@ -1,9 +1,9 @@
 -- ROLLBACK for change group A2. GENERATED from git commit 77fdd06 (PR #3054), the text production ran. NOT APPLIED.
--- Fail-closed: refuses unless the live body is the A2 body (md5 b4edac02bea49df601ca06fbfc1b547f); restores the prior body (md5 3998bbf2cff02ea15f16e0ac80c03935).
+-- Fail-closed: refuses unless the live body is the A2 body (md5 1d95b0de88a20c343a06d395fa723bef); restores the prior body (md5 3998bbf2cff02ea15f16e0ac80c03935).
 -- Reversible without data loss: the function holds no state. The A1 lifecycle objects (if applied) keep working with either version.
 do $g$ begin
-  if (select md5(prosrc) from pg_proc where oid = 'public._hs_subscriber_zip_health_core()'::regprocedure) <> 'b4edac02bea49df601ca06fbfc1b547f' then
-    raise exception 'A2 rollback precondition: live body md5 is not b4edac02bea49df601ca06fbfc1b547f; refusing';
+  if (select md5(prosrc) from pg_proc where oid = 'public._hs_subscriber_zip_health_core()'::regprocedure) <> '1d95b0de88a20c343a06d395fa723bef' then
+    raise exception 'A2 rollback precondition: live body md5 is not 1d95b0de88a20c343a06d395fa723bef; refusing';
   end if;
 end $g$;
 

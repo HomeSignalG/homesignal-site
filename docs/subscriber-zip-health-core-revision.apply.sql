@@ -2,9 +2,9 @@
 -- scripts/build-subscriber-zip-health-revision.py from docs/subscriber-zip-health.sql. NOT APPLIED.
 -- Fail-closed: refuses unless the live body is the PR #3054 body (md5 3998bbf2cff02ea15f16e0ac80c03935). create or replace keeps owner,
 -- SECURITY DEFINER, search_path and ACL ({postgres=X, service_role=X}); the post-condition asserts the ACL is unchanged.
--- Changes: distinct source keys (not rows); N5-recorded-unresolved keys counted apart ('withheld_by_n5_rule'); 'not_in_serving_generation'
--- now means unexplained only. No table, grant or other function is touched. The reader hs_subscriber_zip_health() is unchanged.
--- New body md5 (after apply): b4edac02bea49df601ca06fbfc1b547f
+-- Changes: distinct source keys (not rows); N5-recorded-unresolved keys counted apart ('n5_unresolved' + 'n5_unresolved_by_reason', NOT presented as benign); 'not_in_serving_generation'
+-- now means unexplained only; recent_live_records = drawn_on_map1 + drawn_on_other_zip + n5_unresolved + not_in_serving_generation. No table, grant or other function is touched. The reader hs_subscriber_zip_health() is unchanged.
+-- New body md5 (after apply): 1d95b0de88a20c343a06d395fa723bef
 -- (apply as ONE transaction by apply_migration; do not add begin/commit)
 do $g$ begin
   if (select md5(prosrc) from pg_proc where oid = 'public._hs_subscriber_zip_health_core()'::regprocedure) <> '3998bbf2cff02ea15f16e0ac80c03935' then
@@ -41,6 +41,11 @@ begin
                 select 1 from geo.n5_serving_membership m where m.source_key = l.source_key)
                 and exists (select 1 from geo.n5_generation_unresolved u
                   join geo.n5_generation g on g.generation_id = u.generation_id and g.state = 'ACTIVE' where u.source_key = l.source_key)),
+      unres_r as (select u.reason_code, count(*) n from live l
+                join geo.n5_generation_unresolved u on u.source_key = l.source_key
+                join geo.n5_generation g on g.generation_id = u.generation_id and g.state = 'ACTIVE'
+                where not exists (select 1 from geo.n5_serving_membership m where m.source_key = l.source_key)
+                group by u.reason_code),
       absent as (select count(*) n from live l where not exists (
                 select 1 from geo.n5_serving_membership m where m.source_key = l.source_key)
                 and not exists (select 1 from geo.n5_generation_unresolved u
@@ -73,7 +78,8 @@ begin
         'drawn_on_map1', (select n from drawn_here),
         'drawn_on_other_zip', (select n from drawn_else),
         'not_in_serving_generation', (select n from absent),
-        'withheld_by_n5_rule', (select n from unres),
+        'n5_unresolved', (select n from unres),
+        'n5_unresolved_by_reason', coalesce((select jsonb_object_agg(reason_code, n) from unres_r), '{}'::jsonb),
         'posts', coalesce((select jsonb_object_agg(status, jsonb_build_object('n', n, 'newest', newest)) from posts), '{}'::jsonb),
         'government', jsonb_build_object('feeds_active', (select active from feeds), 'feeds_total', (select total from feeds), 'newest_item', (select newest from govnew)),
         'email', jsonb_build_object('published_posts', (select count(*) from pub), 'deliveries', (select delivered from mail),
@@ -85,8 +91,8 @@ begin
   return out;
 end $$;
 do $g$ begin
-  if (select md5(prosrc) from pg_proc where oid = 'public._hs_subscriber_zip_health_core()'::regprocedure) <> 'b4edac02bea49df601ca06fbfc1b547f' then
-    raise exception 'post-condition failed: body md5 is not b4edac02bea49df601ca06fbfc1b547f';
+  if (select md5(prosrc) from pg_proc where oid = 'public._hs_subscriber_zip_health_core()'::regprocedure) <> '1d95b0de88a20c343a06d395fa723bef' then
+    raise exception 'post-condition failed: body md5 is not 1d95b0de88a20c343a06d395fa723bef';
   end if;
   if (select proacl::text from pg_proc where oid = 'public._hs_subscriber_zip_health_core()'::regprocedure) is distinct from '{postgres=X/postgres,service_role=X/postgres}' then
     raise exception 'post-condition failed: ACL changed';

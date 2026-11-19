@@ -54,6 +54,19 @@ const onesrc = rec(full(z85083())); onesrc.applicable_sources.push('another-appl
 ok(verdict(onesrc, NOW).key === 'UNVERIFIED' && verdict(onesrc, NOW).reasons.some((r) => /another-applicable-source/.test(r)), 'one source verified while another applicable source is unreconciled -> ZIP not verified');
 const badkind = rec(full(z85083())); badkind.reconciliations[0].kind = 'discrepancy_missing_from_jody';
 ok(verdict(badkind, NOW).key === 'UNVERIFIED', 'a discrepancy kind is not verification');
+// N5-unresolved records are never benign: a partition (here + elsewhere + unresolved + unexplained = live) with reason codes
+const part5 = (o) => Object.assign(rec(full(z85083())), { recent_live_records: 100, drawn_on_map1: 40, drawn_on_other_zip: 50, n5_unresolved: 10, n5_unresolved_by_reason: { POINT_REJECTED: 6, GEOMETRY_INVALID: 4 }, not_in_serving_generation: 0 }, o);
+const pz = part5();
+ok(pz.drawn_on_map1 + pz.drawn_on_other_zip + pz.n5_unresolved + pz.not_in_serving_generation === pz.recent_live_records, 'fixture is a non-overlapping partition of the live denominator');
+ok(verdict(pz, NOW).key === 'RECORDS_MISSING_FROM_MAP' && verdict(pz, NOW).reasons.some((r) => /UNRESOLVED.*POINT_REJECTED 6.*GEOMETRY_INVALID 4.*not an exclusion rule/.test(r)), 'unresolved coordinate/placement records are NOT healthy and carry their reason codes');
+const srcx = part5({ n5_unresolved: 3, n5_unresolved_by_reason: { SOURCE_EXCLUDED: 3 }, drawn_on_other_zip: 57 });
+ok(verdict(srcx, NOW).key === 'PARTIAL_COVERAGE' && !verdict(srcx, NOW).reasons.some((r) => /not an exclusion rule/.test(r)), 'an intentional SOURCE_EXCLUDED exclusion is named as such (partial coverage), not as a data-quality failure');
+const other = part5({ n5_unresolved: 0, n5_unresolved_by_reason: {}, drawn_on_other_zip: 60 });
+ok(verdict(other, NOW).key !== 'RECORDS_MISSING_FROM_MAP', 'records served in a neighbouring ZIP are not a failure');
+const unexpl = part5({ n5_unresolved: 0, n5_unresolved_by_reason: {}, drawn_on_other_zip: 57, not_in_serving_generation: 3 });
+ok(verdict(unexpl, NOW).key === 'RECORDS_MISSING_FROM_MAP' && verdict(unexpl, NOW).reasons.some((r) => /unexplained/.test(r)), 'unexplained records are a failure');
+const nobreak = part5({ n5_unresolved_by_reason: {} });
+ok(verdict(nobreak, NOW).key === 'RECORDS_MISSING_FROM_MAP', 'an unresolved total with no reason breakdown is still not healthy');
 // 3 · failure-ish states stay distinct, simultaneous, and outrank the quiet ones
 const f = rec(full(z85083())); f.sources[0].failures_48h = 2; f.sources[0].failure_reason = '57014';
 ok(verdict(f, NOW).key === 'INGESTION_FAILURE', 'a failed read in 48 h -> ingestion failure');
@@ -81,6 +94,8 @@ const ss = rec(full(z85083())); ss.sources[0].last_seen = '2026-11-10T00:00:00Z'
 ok(has(verdict(ss, NOW), 'STALE_DATA'), 'a source last read over 72 h ago -> stale');
 
 // 4 · rendering
+const htmlU = H.renderZips({ zips: [part5()] }, NOW);
+ok(/UNRESOLVED by N5 \(POINT_REJECTED 6, GEOMETRY_INVALID 4\)/.test(htmlU) && !/withheld/i.test(htmlU), 'the card names unresolved records with their reason codes and never calls them withheld/benign');
 const html = H.renderZips({ zips: [z85083(), z64166()] }, NOW);
 ok(/85083/.test(html) && /64166/.test(html) && /Partial coverage/.test(html), 'both ZIPs render with their verdict');
 ok(/expected schedule not recorded/.test(html), 'the missing schedule is shown, not hidden');

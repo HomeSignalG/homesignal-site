@@ -38,8 +38,8 @@ apply_sql = f"""-- CHANGE GROUP A2 — replaces ONE existing function: public._h
 -- scripts/build-subscriber-zip-health-revision.py from docs/subscriber-zip-health.sql. NOT APPLIED.
 -- Fail-closed: refuses unless the live body is the PR #3054 body (md5 {PRIOR_LIVE_MD5}). create or replace keeps owner,
 -- SECURITY DEFINER, search_path and ACL ({{postgres=X, service_role=X}}); the post-condition asserts the ACL is unchanged.
--- Changes: distinct source keys (not rows); N5-recorded-unresolved keys counted apart ('withheld_by_n5_rule'); 'not_in_serving_generation'
--- now means unexplained only. No table, grant or other function is touched. The reader hs_subscriber_zip_health() is unchanged.
+-- Changes: distinct source keys (not rows); N5-recorded-unresolved keys counted apart ('n5_unresolved' + 'n5_unresolved_by_reason', NOT presented as benign); 'not_in_serving_generation'
+-- now means unexplained only; recent_live_records = drawn_on_map1 + drawn_on_other_zip + n5_unresolved + not_in_serving_generation. No table, grant or other function is touched. The reader hs_subscriber_zip_health() is unchanged.
 -- New body md5 (after apply): {NEW_MD5}
 -- (apply as ONE transaction by apply_migration; do not add begin/commit)
 {guard(PRIOR_LIVE_MD5, 'A2 precondition')}
