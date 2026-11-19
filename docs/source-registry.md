@@ -13483,3 +13483,45 @@ section / tax lots its own request text names to the county's public Taxlots Fea
   its map disclaimer says the data is for context only and may not reflect the latest information. No written prohibition on commercial use of the
   service was found. The connector reads only the lot key and centroid for the few lots a case names (no owner or mailing fields, no bulk copy).
   robots.txt: the `*` group sets Crawl-delay 10 and does not disallow the case pages, so requests to the county host are spaced 10 s apart.
+
+## BOULDER COUNTY ACCELA APPLICATIONS (2026-11-19) — `boulder-county-accela-applications` prepared (NOT deployed)
+
+Boulder County's own ArcGIS Server, `PLANNING/OP_Accela_Point` MapServer layer 0 (point, WGS84): 277,404 rows, newest ApplicationDate 2026-11,
+Planning 81,301 + Building 146,438 rows. **UNINCORPORATED Boulder County only. It is not a municipal feed** for Longmont, Lafayette, Louisville,
+Superior, Broomfield or the City of Boulder, and the registry label says so. Whether the layer holds any municipal-jurisdiction rows is unverified
+(sampled rows were unincorporated addresses).
+- **Scope:** a 28-value `DocketType` whitelist (new residences and commercial buildings, additions, ADUs, deconstruction, site-plan, special-use,
+  subdivision, variance, floodplain and grading cases, small-cell wireless). Roofing, mechanical, electrical, plumbing and window permits are out.
+- **Vocabulary:** `DocketType` and `ApplicationStatus` are verbatim live groupBy output (pg_net, Planning + Building rows since 2025-11-19). 71 statuses
+  are bucketed; those whose meaning the county does not state (Mapped, Final Balance Due, Post Approval, Transfer to Building) are `exclude`.
+- **Record link:** `Link` (Accela CapDetail) per record; planning cases also carry `DocketLink`. Not HTTP-fetched.
+- **Not yet done:** a dry run through the deployed engine; the county's terms of use / copyright text for the service (the read was not completed); an
+  Accela-portal check of the status meanings. Test: `test/boulder-county-accela-connector.test.mjs` (real captured rows in `fixtures/boulder-county/`).
+
+**Other Colorado sources probed 2026-11-19 (none wired):**
+- **CDOT:** `dtdapps.coloradodot.info` answered HTTP 522 from Postgres (pg_net); an ArcGIS Hub search found no CDOT project layer. Needs a runner probe.
+- **Louisville:** `Planning/Current_Case_Tracking` (26 cases) is stale, newest hearing 2018. `Energov/Energov_View` is address points only.
+- **Lafayette:** the city's ArcGIS org lists no permit or planning layer. **Superior:** only zoning and future-land-use layers (Willdan org).
+- **Longmont, Broomfield:** no official permit layer found in a Hub search; the guessed GIS hosts did not resolve or timed out. Needs a rendered-portal probe.
+
+### Boulder County Accela: dry run, report path and the 365-day window (2026-11-19)
+- **Dry run:** the connector's own query for the ZIP 80501 envelope (pg_net against the live layer, 9-docket subset) returned 7 features, every one with a geometry and a per-record `Link`; newest ApplicationDate 2026-09-21; the dockets and statuses in the sample all map. Source terms: the service publishes an empty `copyrightText`, no written restriction was found on the service; the county's GIS disclaimer page was not read.
+- **Path to the Development Activity Report:** registry entry → `get-address-report` ZIP refresh (needs a deploy) → `development_reports.sites` → `app_refresh_zip` → `app_projects` (`registry_id`, `record_url` becomes `source_ref`, both required by the report) → N5 generation (daily) → `n5_projects_within_radius` → report. The generated publisher file was stale and is regenerated here, or the report would print no agency for this source.
+- **Window finding:** the report keeps an approved or proposed record of any age, but acquisition keeps `ApplicationDate` within 365 days. Measured on the live layer: 364 `New Residence` applications older than a year still read "Permit Issued", and 5,337 whitelisted applications older than a year sit in a proposed- or approved-type status (many are old approvals that are not active). The window needs a founder decision before deploy.
+- **Longmont (city's own server):** `pwnrmaps.ci.longmont.co.us/arcgis_public/rest/services/PLANNING/Planning_Map_2025/FeatureServer/10` "Active Developments", 212 polygons, last edited 2026-11-13. Statuses are opaque codes (A, DR, PH, R, UC, W) with no published legend found; `Submittal_Date` is a string; `Website_URL` is mostly null. Not wired until the city's legend is verified.
+- **CDOT `open_data_sde` layers 24 (18,625 lines) and 25 (1,315 points):** reachable and standard ArcGIS, but 1,289 of 1,315 points have a blank `SAPPROJECTSTATUS` (the rest "X"), no per-record link, and only edit dates. A lifecycle would have to come from the `CURR_STIP` flag (the KDOT STIP precedent). Not wired; needs a ruling.
+- **Louisville:** the "current developments" page links an ArcGIS Experience titled "Louisville Timeline", not an application layer. **Broomfield:** the Planning page links a Google My Map and a Bang-the-Table-style hub, no data service. **Lafayette:** the portal page links only to permit forms. **Superior:** the page answers HTTP 403 to automated requests (not worked around).
+
+### Boulder County Accela: status-based window, rights, and sibling findings (2026-11-19)
+- **Window (founder decision, 2026-11-19):** `recency_expr` keeps applications from the last 365 days OR older ones (back to 2021-01-01) whose status is still open or pending (under review, incomplete, public review, BOCC hearing, issued/approved). Withdrawn, void, denied, held, expired and superseded statuses are excluded by `status_to_bucket`. An old "Permit Issued" is Approved, never read as construction under way. The report's 90-day change rule is unchanged.
+- **Rights:** Boulder County's Open Data Terms of Use allow copying and adapting with attribution and disclaim warranty; the Map Disclaimer is an accuracy disclaimer. Neither forbids commercial or automated use. Under the national source policy no approval is needed; the dataset is labelled "Boulder County, Colorado (unincorporated areas only; not municipal)".
+- **Longmont Active Development Log (layer 10, not yet wired):** the layer's coded-value domain gives DR Development Review, NM Neighborhood Meeting, PH Public Hearing, A Approved, UC Under Construction, W Withdrawn, D Denial, R Resubmittal. Polygon geometry, string `Submittal_Date`; integration is next.
+- **CDOT STIP layers 24/25 (not wired):** the meaning of `CURR_STIP` is not documented (no domain, blank descriptions, values only "X" or blank) and the line dataset is listed CC BY-SA 4.0. Not wired until CDOT states the field meaning.
+
+### Update 2026-11-19 (later): no date floor, POST proof, attribution, Longmont wired
+- **Boulder County window:** the fixed 2021-01-01 floor is removed. `recency_expr` is "filed in the last 365 days OR status is open/pending"; acquisition is bounded by the ZIP envelope, the verified status list and 1,000-row pagination. The 28-docket query is sent by the connector as a form POST (`arcgis.ts` switches past 1,900 characters); `test/boulder-county-accela-connector.test.mjs` asserts the POST body carries all 28 dockets and the window. The earlier GET failure was only the probe's, not the connector's.
+- **Attribution and terms applicability:** `source-attribution.json` + `docs/corporate-output-boulder-county-accela-2026-11-19.md`.
+- **Longmont `longmont-active-development` (layer 10):** wired. Codes from the layer's domain: DR/NM/PH/R proposed, A/UC approved, W/D excluded; polygon centroid pins; `Website_URL` is empty on all 212 rows, so the link is the City's Active Development Map page at dataset precision. Test: `test/longmont-active-development-connector.test.mjs`.
+- **CDOT:** held (CURR_STIP undefined; CC BY-SA 4.0 ShareAlike unresolved).
+- **EPA retrieval failures:** handed to homesignal-ingest#1148.
+- **Verification status:** offline (shipped connector, fixtures, registry tests). Production verification needs the `get-address-report` deploy, a ZIP refresh and the next N5 generation; not done, and not deployed.
