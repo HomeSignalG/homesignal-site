@@ -357,7 +357,7 @@
   .linkbox .url{flex:1;font-size:12.5px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .linkbox button{background:var(--green);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer}
   .sharegrid{display:grid;grid-template-columns:repeat(4,1fr);gap:15px 6px;margin:8px 0 6px}
-  .sopt{display:flex;flex-direction:column;align-items:center;gap:7px;font-size:11px;font-weight:600;color:var(--ink-2);background:none;border:none;cursor:pointer;text-decoration:none}
+  .sopt{display:flex;flex-direction:column;align-items:center;gap:7px;font-family:inherit;line-height:1.2;padding:0;margin:0;font-size:11px;font-weight:600;color:var(--ink-2);background:none;border:none;cursor:pointer;text-decoration:none}
   .sopt .si{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:19px;font-weight:700}
   .sopt:hover .si{filter:brightness(.93)}
   .sopt:hover{color:var(--ink)}
