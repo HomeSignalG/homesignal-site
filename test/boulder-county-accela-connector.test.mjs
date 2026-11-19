@@ -34,6 +34,11 @@ ok(E.status_to_bucket.approved.includes('Permit Issued') && E.status_to_bucket.o
 ok(['PAC Held','On Hold','Zoning Hold','Hold'].every((s) => E.status_to_bucket.exclude.includes(s)), 'hold statuses are excluded, never proposed');
 ok(E.status_to_bucket.exclude.includes('Final Balance Due') && E.status_to_bucket.exclude.includes('Mapped'), 'statuses with no stated meaning are excluded, not guessed');
 
+const W = E.recency_expr || '';
+ok(/ApplicationDate >= DATE '\{cutoff\}'/.test(W) && /ApplicationDate >= DATE '2021-01-01'/.test(W), 'window = recent applications OR older ones that are still in an open/pending status (bounded at 2021)');
+const inList = (W.match(/ApplicationStatus IN \(([^)]*)\)/) || [,''])[1].match(/'([^']+)'/g)?.map((x) => x.slice(1, -1)) || [];
+ok(inList.length > 0 && inList.every((st) => !E.status_to_bucket.exclude.includes(st) && all.includes(st)), 'older-record statuses are bucketed and none is an excluded status');
+ok(!inList.some((st) => /withdr|void|denied|hold|expired|extinguish|combined|redirect/i.test(st)), 'window never keeps old withdrawn/void/denied/held/superseded records');
 const FIX = JSON.parse(readFileSync(join(root, 'fixtures/boulder-county/accela-point-sample.json'), 'utf8'));
 const calls = [];
 const stub = async (url) => { calls.push(String(url)); return { ok: true, status: 200, json: async () => (calls.length === 1 ? FIX : { features: [] }) }; };
