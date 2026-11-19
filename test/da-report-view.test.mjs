@@ -28,6 +28,7 @@ const V = sandbox.window.HS.daReportView;
 
 // ---- the engine: every response comes from its real handler (test/lib/da-report-view-world.mjs), and assemble() is called directly once, to compare
 const M = await import('../supabase/functions/_shared/national-report.ts');
+import { categoryCoverage } from '../supabase/functions/_shared/coverage-categories.ts';
 import { NOW, FAM_A, FAM_B, NO_FAMILY, ATTRIBUTION_AB, ADDRESS, row, proj, RICH, COLD, wire, clone } from './lib/da-report-view-world.mjs';
 /** The view of a response. A throw is returned as a marker so the check that looked at it fails BY NAME instead of the whole suite crashing. */
 let threw = 0;
@@ -59,7 +60,7 @@ try {
   ok(W.status === 'OK' && W.report.product === 'HOMESIGNAL DEVELOPMENT ACTIVITY' && Array.isArray(W.report.projects), '0a the response is the real handler\'s: status OK, the engine\'s product name, a projects array');
   const direct = M.assemble({ now: NOW, view: 'customer', zip_supported: true, radius_mi: 0.5, attribution: ATTRIBUTION_AB,
     subject: { address: ADDRESS, matched_address: '742 EVERGREEN TER, SPRINGFIELD, OR, 97477', lat: 44.04612, lng: -122.98123, zip: '97477' },
-    rows: RICH.rows, projects: RICH.projects, ledger: RICH.ledger, events: RICH.events, health: [] });
+    rows: RICH.rows, projects: RICH.projects, ledger: RICH.ledger, events: RICH.events, health: [], category_coverage: categoryCoverage([], []) });
   ok(JSON.stringify(W.report) === JSON.stringify(direct.intelligence), '0b the wire report equals assemble() called directly on the same inputs, byte for byte');
   const asObject = { status: 'OK', coverage_state: direct.coverage_state, report: direct.intelligence, render: direct.renderOnly, stored: false, report_id: null, storable: false, storage_blockers: [] };
   ok(view(asObject) === html, '0c the view of the wire response equals the view of assemble()\'s own object');
@@ -222,7 +223,7 @@ try {
     const base = stale(W);
     ok(base.has && /over a year old/.test(base.c) && /records? carr(?:y|ies) (?:an )?official dates?/.test(base.brief), '3d2a the fixture\'s old record is flagged in its row AND counted in the briefing (the baseline, and the positive control, for the checks below)', base.brief);
     const fo = stale(withRd((e) => { e.verify = { rule: 'freshness-1', reason: 'filing_only', latest_official_date: e.date }; }));
-    ok(fo.has && /Verify: Issued Jan 10, 2025\. No later official date is on record\. Confirm it is still active\./.test(fo.c) && !/over a year old/.test(fo.c), '3d2b a filing_only verdict says the date is the only one on record, and does not call the project old', fo.c);
+    ok(fo.has && /Verify: Issued Jan 10, 2025\. Jody holds no later official date for this record\. Confirm it is still active\./.test(fo.c) && !/over a year old/.test(fo.c), '3d2b a filing_only verdict says Jody holds no later official date, and does not call the project old', fo.c);
     const cleared = stale(withRd((e) => { e.verify = null; }));
     ok(!cleared.has && !/over a year old/.test(cleared.c) && !/records? carr(?:y|ies) (?:an )?official dates?/.test(cleared.brief), '3d2c verify: null (a later official date exists) clears the Verify line AND the briefing count, though the date is still over a year old', cleared);
     const plain = stale(withRd((e) => { e.verify = { rule: 'freshness-1', reason: 'old_date', latest_official_date: e.date }; }));
@@ -359,12 +360,12 @@ try {
   }
   const proven = clone(WNONE); proven.report.activity = { outcome: 'NO_DEVELOPMENT_ACTIVITY', label: 'No development activity', rule_version: 'activity-outcome-1' };
   const hp = view(proven), op = sec(hp, 'outcome');
-  ok(op && op.label === 'No development activity' && textOf(op.html) === 'No development activity Jody\'s official development records for this address are coming in, and they show no development within 0.5 miles of this property.',
+  ok(op && op.label === 'No development activity' && textOf(op.html).startsWith('No development activity Jody\'s official development records for this address are coming in, and they show no development within 0.5 miles of this property.'),
     '5m once the engine can prove it, the empty report says "No development activity" and the radius it covers', op && textOf(op.html));
   const p1 = clone(proven); p1.report.radius_mi = 1;
-  ok(/within 1 mile of this property\.$/.test(textOf(sec(view(p1), 'outcome').html)), '5n one mile is "1 mile"');
+  ok(/within 1 mile of this property\./.test(textOf(sec(view(p1), 'outcome').html)), '5n one mile is "1 mile"');
   const p2 = clone(proven); delete p2.report.radius_mi;
-  ok(/show no development near this property\.$/.test(textOf(sec(view(p2), 'outcome').html)), '5n with no radius stated it says "near this property" and invents none');
+  ok(/show no development near this property\./.test(textOf(sec(view(p2), 'outcome').html)), '5n with no radius stated it says "near this property" and invents none');
   const labelLies = clone(WNONE); labelLies.report.activity = { outcome: 'NO_DATA_INGESTED', label: 'No development activity', rule_version: 'activity-outcome-1' };
   ok(sec(view(labelLies), 'outcome').label === 'No data ingested', '5o the words come from the outcome CODE, never the label text: a label that disagrees with its code cannot become a claim');
   const shownButSaysEmpty = clone(W); shownButSaysEmpty.report.activity = { outcome: 'NO_DEVELOPMENT_ACTIVITY', label: 'No development activity', rule_version: 'activity-outcome-1' };

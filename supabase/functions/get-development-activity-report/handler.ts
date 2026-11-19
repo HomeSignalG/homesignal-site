@@ -250,13 +250,13 @@ export function makeHandler(deps: Deps) {
       const headerInfo = trial ? { header: await deps.headerOf(trial.userId) } : {};
 
       // 4. the canonical reads: the ONE ordering of them, shared with the Watch (_shared/report-run.ts)
-      const { rows, projects, ledger, events, health, applicable_families } = await readReportInputs(deps, { lat: g.lat, lng: g.lng, radiusMi: radius, now: deps.now(), zip: g.zip });
+      const { rows, projects, ledger, events, health, applicable_families, category_coverage } = await readReportInputs(deps, { lat: g.lat, lng: g.lng, radiusMi: radius, now: deps.now(), zip: g.zip });
 
       // 5. compose
       const out = assemble({
         now: deps.now(), view, zip_supported: true, radius_mi: radius, attribution,
         subject: { address, matched_address: g.matchedAddress, lat: g.lat, lng: g.lng, zip: g.zip, ...(label ? { label } : {}) },
-        rows, projects, ledger, events, health, applicable_families,
+        rows, projects, ledger, events, health, applicable_families, category_coverage,
       });
       const storable = out.storage_blockers.length === 0;
       // whether this report uses one of the free reports: the ONE rule (founder ruling R5). An admin is never charged and nothing is stored

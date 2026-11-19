@@ -11,6 +11,8 @@
 // orders the reads. Everything external arrives through `reads`, so it is as pure as its callers' fakes.
 import { addDays, dayOf, RECENT_DAYS } from './national-report.ts';
 import { applicableFamilies } from './source-applicability.ts';
+import { categoryCoverage } from './coverage-categories.ts';
+import type { CategoryCoverage } from './coverage-categories.ts';
 import type { Jurisdiction } from './source-applicability.ts';
 import type { LedgerProject, ProjectRow, RadiusRow, ReportableEvent, SourceHealth } from './national-report.ts';
 
@@ -29,6 +31,8 @@ export type ReportInputs = {
   rows: RadiusRow[]; projects: ProjectRow[]; ledger: LedgerProject[]; events: ReportableEvent[]; health: SourceHealth[];
   /** registry families geographically applicable to the subject (verified geography only); the report discloses a failed read of any of them */
   applicable_families: string[];
+  /** which kinds of record the applicable sources declare for the subject's verified place, and which have none (coverage-categories.ts) */
+  category_coverage: CategoryCoverage;
 };
 
 /**
@@ -53,5 +57,5 @@ export async function readReportInputs(
     ...projects.map((p) => p.registry_id), ...rows.map((r) => r.registry_id), ...applicable,
   ].filter((f): f is string => !!f))].sort();
   const health = families.length ? await reads.health(families) : [];
-  return { rows, projects, ledger, events, health, applicable_families: applicable };
+  return { rows, projects, ledger, events, health, applicable_families: applicable, category_coverage: categoryCoverage(places, applicable) };
 }

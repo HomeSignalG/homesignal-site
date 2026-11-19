@@ -29,6 +29,10 @@
 import './project-type.generated.js';
 import './residential-qualify.generated.js';
 import publishersFile from './source-publishers.generated.json' with { type: 'json' };
+import { BASIS_LABELS, dateBasisOf, sourceDatesOf } from './record-dates.ts';
+import type { DateBasis } from './record-dates.ts';
+import { categoryCoverageOf } from './coverage-categories.ts';
+import type { CategoryCoverage } from './coverage-categories.ts';
 import capitalProgramsFile from './capital-program-sources.generated.json' with { type: 'json' };
 import retiredFile from './retired-sources.json' with { type: 'json' };
 import { snapshotBodyOf, subjectRelativeKeys } from './report-snapshot.ts';
@@ -294,6 +298,10 @@ export type AssembleInput = {
   events: ReportableEvent[]; health: SourceHealth[];
   /** registry families geographically applicable to the subject by verified state and county (report-run.ts); their failure record counts even with no record in the report */
   applicable_families?: string[];
+  /** which kinds of record the applicable sources declare for this place, and which have none (report-run.ts, coverage-categories.ts); carried into the report's coverage */
+  category_coverage?: CategoryCoverage | null;
+  /** the publisher table (agency, dataset, date basis ...) by source family; absent = the generated registry file. A replay / test seam: nothing in production passes it */
+  publishers?: Record<string, Publisher>;
 };
 export type Assembled = {
   coverage_state: CoverageState;
@@ -397,17 +405,21 @@ export function recordDate(p: Pick<ProjectRow, 'date_kind' | 'submitted_at'>, to
  * `record_date` at all, so no date is invented and no warning is made (unchanged).
  * Pure: reads no clock (`today` is passed), no stage vocabulary of its own (the stage key comes from presentationStage), and no place or source.
  */
-export const FRESHNESS_RULE = 'freshness-1';
-export type Verification = { rule: string; reason: 'old_date' | 'filing_only'; latest_official_date: string } | null;
+export const FRESHNESS_RULE = 'freshness-2';
+export type Verification = { rule: string; reason: 'old_date' | 'filing_only' | 'creation_only'; latest_official_date: string } | null;
 export function verification(
   rd: { kind: string; date: string } | null, stage: Stage | null, later: Array<string | null | undefined>, today: string,
+  ctx: { basis?: DateBasis; statusUpdated?: string | null } = {},
 ): Verification {
   if (!rd) return null;
-  const real = later.filter((d): d is string => validDay(d) && d <= today && d >= RECORD_DATE_FLOOR);
+  // A later OFFICIAL date is one the source stated for a ledger-proven change, or the day the agency says the record's STATUS changed (only where the source's mapping names a column
+  // that says so). The day the agency merely MODIFIED the record is not one: an edit is not a project milestone and does not show the work is active (record-dates.ts).
+  const real = [...later, ctx.statusUpdated].filter((d): d is string => validDay(d) && d <= today && d >= RECORD_DATE_FLOOR);
   const latest = [rd.date, ...real].reduce((a, b) => (a >= b ? a : b));
   if (latest >= addDays(today, -OLD_RECORD_DAYS)) return null;
-  const filingOnly = stage === 'permitted' && rd.kind === 'filed' && real.length === 0;
-  return { rule: FRESHNESS_RULE, reason: filingOnly ? 'filing_only' : 'old_date', latest_official_date: latest };
+  const filingOnly = stage === 'permitted' && rd.kind === 'filed' && real.length === 0 && ctx.basis !== 'record_created';
+  const creationOnly = ctx.basis === 'record_created' && real.length === 0;
+  return { rule: FRESHNESS_RULE, reason: creationOnly ? 'creation_only' : filingOnly ? 'filing_only' : 'old_date', latest_official_date: latest };
 }
 
 // ── the boundary ─────────────────────────────────────────────────────────────────────────────────────────
@@ -532,12 +544,12 @@ export function detectedChangeEntries(events: ReportableEvent[]) {
 //
 // THE PUBLISHER. source-publishers.generated.json is derived mechanically from the development source registry (the one place a
 // source's agency is written down) by scripts/gen-source-publishers.mjs. A record whose source is not in the registry names no agency.
-type Publisher = { agency: string | null; dataset: string | null; status_const?: string | null; date_label?: string | null };
+type Publisher = { agency: string | null; dataset: string | null; status_const?: string | null; date_label?: string | null; date_basis?: DateBasis };
 const PUBLISHERS: Record<string, Publisher> = ((publishersFile as unknown as { publishers?: Record<string, Publisher> }).publishers) ?? {};
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
-export function publisherOf(family: string | null): Publisher {
-  const p = family ? PUBLISHERS[family] : undefined;
-  return { agency: str(p?.agency), dataset: str(p?.dataset), status_const: str(p?.status_const), date_label: str(p?.date_label) };
+export function publisherOf(family: string | null, table: Record<string, Publisher> = PUBLISHERS): Publisher {
+  const p = family ? table[family] : undefined;
+  return { agency: str(p?.agency), dataset: str(p?.dataset), status_const: str(p?.status_const), date_label: str(p?.date_label), date_basis: dateBasisOf((p as { date_basis?: unknown } | undefined)?.date_basis) };
 }
 /**
  * Whether the record's stored stage is a word the AGENCY published. A source with no status column stores its connector's constant
@@ -549,8 +561,12 @@ export function agencyStage(stage: string | null, pub: Publisher): string | null
   return pub.status_const && stage.trim() === pub.status_const ? null : stage;
 }
 /** A date's label: the source's own words for what its one date means when the registry states them (`file_date_label`), else the kind's label. */
-function withDateLabel<T extends { label: string } | null>(d: T, pub: Publisher): T {
-  return d && pub.date_label ? { ...d, label: pub.date_label } : d;
+function withDateLabel<T extends { label: string; kind?: string } | null>(d: T, pub: Publisher): T {
+  if (!d) return d;
+  // The source's own words win. Otherwise a date the source establishes as the day the record was CREATED is never called a filing: only a `filed` kind is relabelled,
+  // and only on a declared basis (an undeclared one keeps the legacy label and is listed as a follow-up, never guessed).
+  const label = pub.date_label ?? (pub.date_basis === 'record_created' && d.kind === 'filed' ? BASIS_LABELS.record_created : d.label);
+  return { ...d, label, ...(d.kind === 'filed' && pub.date_basis && pub.date_basis !== 'unstated' ? { basis: pub.date_basis } : {}) } as T;
 }
 /**
  * The agency's own record number, from the provenance the ingest stored (`case_number`), ONLY when the record's official link carries that
@@ -890,7 +906,7 @@ export function assemble(input: AssembleInput): Assembled {
 
     const t = HS().canonicalProjectType({ type: p.type, name: p.name });
     const lc = HS().canonicalLifecycle({ status: p.status });
-    const pub = publisherOf(family || null);
+    const pub = publisherOf(family || null, input.publishers);
     const ev = withDateLabel(recentPublisherEvent(p, today), pub);
     const led = ledger.get(p.source_key);
     const material = selectDetectedChanges(led, eventsByKey.get(p.source_key) ?? [],
@@ -944,6 +960,7 @@ export function assemble(input: AssembleInput): Assembled {
       ? { start: timing.start, end: timing.end, ended: timing.status === 'ended', status: timing.status, from: timing.source }
       : activityWindow(p, today);
     const description = typeof p.scope_text === 'string' && p.scope_text.trim() && p.scope_text.trim() !== (p.name ?? '').trim() ? p.scope_text.trim() : null;
+    const srcDates = sourceDatesOf(p.provenance, today);
     const entry: Entry = {
       project_id: p.source_key,
       source_family: family || null,
@@ -956,7 +973,11 @@ export function assemble(input: AssembleInput): Assembled {
       publisher_stage: agencyStage(p.stage, pub),
       ...(pub.status_const && agencyStage(p.stage, pub) === null && p.stage ? { publisher_stage_unpublished: true } : {}),
       publisher_event: ev,
-      record_date: ((rd: ReturnType<typeof recordDate>) => (rd ? { ...rd, verify: verification(rd, stage, [ev?.date, ...material.map((e) => e.publisher_event_date)], today) } : null))(withDateLabel(recordDate(p, today), pub)),
+      record_date: ((rd: ReturnType<typeof recordDate>) => (rd ? { ...rd, verify: verification(rd, stage, [ev?.date, ...material.map((e) => e.publisher_event_date)], today, { basis: pub.date_basis, statusUpdated: srcDates?.status_updated ?? null }) } : null))(withDateLabel(recordDate(p, today), pub)),
+      // The record's other dates, each kept apart (record-dates.ts): created, last modified by the agency, status updated, milestones, and when HomeSignal last read it. None is the record date.
+      ...(srcDates ? { record_dates: { ...srcDates, ...(led?.last_observed_at ? { last_read: String(led.last_observed_at).slice(0, 10) } : {}) } } : {}),
+      // Every status here is the SOURCE's own word. Jody verifies no project's current activity; a status date is stated only when the source gives one that says what it is.
+      ...(agencyStage(p.stage, pub) ? { status_attribution: { basis: 'source_reported', verified_by_jody: false, status_date: srcDates?.status_updated ? { date: srcDates.status_updated, kind: 'status_updated' } : null } } : {}),
       developer: p.developer, size: p.size, investment: p.investment,
       ...(titleCut(p.name) ? { title_cut: true } : {}),
       relevance: { basis: rel.basis, evidence: rel.evidence, ...(rel.use ? { use: rel.use } : {}), ...(rel.proposes ? { proposes: rel.proposes } : {}), ...(rel.scale ? { scale: rel.scale } : {}), rule_version: rel.rule_version },
@@ -1043,8 +1064,10 @@ export function assemble(input: AssembleInput): Assembled {
       source_families_in_report: [...familiesIncluded].filter(Boolean).sort(),
       source_feed_count: [...familiesIncluded].filter(Boolean).length,
       // the publishing agency and dataset of each source in the report, in the families' order: the coverage note names all of them
-      source_agencies: [...familiesIncluded].filter(Boolean).sort().map((f) => ({ source_family: f, agency: publisherOf(f).agency, feed_ref: publisherOf(f).dataset })),
+      source_agencies: [...familiesIncluded].filter(Boolean).sort().map((f) => ({ source_family: f, agency: publisherOf(f, input.publishers).agency, feed_ref: publisherOf(f, input.publishers).dataset })),
       assessment_basis: 'records_returned_for_this_radius',
+      // which kinds of record the connected sources cover for this place, and which have no connected source (a fact apart from source failures and from the outcome)
+      categories: categoryCoverageOf(input.category_coverage ?? null),
       // when Jody last read the records in this report (the ledger's last observation of each): a retrieval time, never a project date
       records_checked: checked.length ? { earliest: checked.reduce((a, b) => (a <= b ? a : b)), latest: checked.reduce((a, b) => (a >= b ? a : b)) } : null,
       // some nearby records did not describe their work, so Jody cannot tell whether they are a meaningful change: the report says so, without a count

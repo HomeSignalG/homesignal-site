@@ -5034,6 +5034,7 @@
         "status_raw": "pin_stat_nm",
         "type_source": "proj_typ_nm",
         "file_date": "created_dt",
+        "source_updated": "current_mod_date",
         "address": "proj_loc",
         "lat": "__lat",
         "lng": "__lng",
@@ -5105,6 +5106,8 @@
           "Hold"
         ]
       },
+      "file_date_basis": "record_created",
+      "coverage_categories": ["transportation_capital"],
       "extra_where": "pin_stat_nm NOT IN ('Closed', 'Abandoned')",
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
@@ -15790,6 +15793,7 @@
         "status_raw": "pin_stat_nm",
         "type_source": "proj_typ_nm",
         "file_date": "created_dt",
+        "source_updated": "current_mod_date",
         "address": "proj_loc",
         "lat": "__lat",
         "lng": "__lng",
@@ -15861,6 +15865,8 @@
           "Hold"
         ]
       },
+      "file_date_basis": "record_created",
+      "coverage_categories": ["transportation_capital"],
       "extra_where": "pin_stat_nm NOT IN ('Closed', 'Abandoned')",
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",

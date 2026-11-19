@@ -468,7 +468,7 @@ const FIELD = {
   const v = (kind, day, stage, later = []) => M.verification(rdf(kind, day), stage, later, T);
   // (a) the Brigham City shape: permitted, the only date is a filing from 2024, no later official date
   const a = v('filed', '2024-08-26', 'permitted');
-  ok(a && a.reason === 'filing_only' && a.latest_official_date === '2024-08-26' && a.rule === 'freshness-1', '13a a permitted record whose only date is an old filing is flagged as filing_only, naming that date and the rule', a);
+  ok(a && a.reason === 'filing_only' && a.latest_official_date === '2024-08-26' && a.rule === 'freshness-2', '13a a permitted record whose only date is an old filing is flagged as filing_only, naming that date and the rule', a);
   ok(Object.keys(a).sort().join() === 'latest_official_date,reason,rule', '13a2 the verdict carries exactly the rule, the reason and the date: no place, source, stage word or coordinate');
   // (b) an old filing with RECENT source-stated activity is not stale
   ok(v('filed', '2024-08-26', 'permitted', ['2026-08-20']) === null, '13b old filing + a later official date within a year: no warning');

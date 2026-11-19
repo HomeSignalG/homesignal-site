@@ -32,3 +32,16 @@ export function applicableFamilies(places: Jurisdiction[], coverage: Record<stri
   return Object.keys(coverage).filter((id) => coverage[id].some((c) => ps.some((p) =>
     p.st === c.state && (!c.county || (p.ck !== '' && p.ck === countyKey(c.county)))))).sort();
 }
+
+/** How a source's declared coverage reaches this subject: `county` when it declares the subject's own county, `statewide` when it declares the state alone, null when it
+ *  does not apply. A statewide declaration never establishes coverage of a local category (coverage-categories.ts). */
+export function familyScope(id: string, places: Jurisdiction[], coverage: Record<string, Array<{ state: string; county?: string }>> = COVERAGE): 'statewide' | 'county' | null {
+  const ps = places.map((p) => ({ st: stateCode(p.state), ck: countyKey(p.county) })).filter((p) => p.st);
+  let scope: 'statewide' | 'county' | null = null;
+  for (const c of coverage[id] ?? []) for (const p of ps) {
+    if (p.st !== c.state) continue;
+    if (!c.county) scope = scope ?? 'statewide';
+    else if (p.ck !== '' && p.ck === countyKey(c.county)) return 'county';
+  }
+  return scope;
+}

@@ -27,6 +27,7 @@ import { http1Client } from "./http1.ts";
 import { attemptFetch } from "./fetch-retry.ts";
 import { dropNullIsland } from "./null-island.ts";
 import { scopeField } from "./scope-text.ts";
+import { sourceDatesField } from "./source-dates.ts";
 import { cleanApplicantTitle, isMinorRepairNoise } from "./record-hygiene.ts";
 import { centroidSquare, scopeBox, widensLegacy, type ZipBounds } from "./scope-box.ts";
 import { buildScopeReceipt, receiptVersion, type ScopeReceipt } from "./scope-receipt.ts";
@@ -94,6 +95,12 @@ export interface ArcgisRegistryEntry {
    *  "filed" | "issued" | "scheduled" | "estimated" | "decided". Absent ⇒ "filed".
    *  Declared, never inferred; it is what the page labels the date with. */
   file_date_kind?: FileDateKind;
+  /** Optional: what `column_map.file_date` IS, as the SOURCE establishes it — "filing" (the filing / application date) or "record_created" (the day the agency
+   *  created the record in its own system). Absent ⇒ unstated: the legacy label stays and the mapping is a follow-up (scripts/audit-date-basis.mjs). Declared,
+   *  never inferred. Read by the report engine through the generated publisher file, never by the connector. */
+  file_date_basis?: "filing" | "record_created";
+  /** Optional: the kinds of record this source covers (the closed vocabulary in scripts/gen-source-categories.mjs). Read only by the report's coverage disclosure. */
+  coverage_categories?: string[];
   recency_days?: number;
   /** hard cap on rows pulled per dataset. Default 20000. */
   max_rows?: number;
@@ -704,6 +711,7 @@ async function normalizeRow(
     record_url: recordUrl,
     record_url_precision: precision,
     ...scopeField(readCol(row, cm.scope_text), title),
+    ...sourceDatesField(row, cm, readCol, isoDay),
     ...geoQuality,
   };
   if (row[SCOPE_ORIGIN_KEY] === SCOPE_ORIGIN_MEMBER) rec.scope_origin = SCOPE_ORIGIN_MEMBER;
