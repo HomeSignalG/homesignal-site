@@ -139,7 +139,8 @@
   },
   "boulder-construction-permits": {
    "agency": "City of Boulder",
-   "dataset": "services.arcgis.com, service Construction_Permits"
+   "dataset": "services.arcgis.com, service Construction_Permits",
+   "scope_note": "This source contains City of Boulder permits only. It does not establish permit coverage for Lafayette, Louisville, Superior, or unincorporated Boulder County. Coverage for those areas, if available, depends on separate sources."
   },
   "boulder-county-accela-applications": {
    "agency": "Boulder County, Colorado (unincorporated areas only; not municipal)",
