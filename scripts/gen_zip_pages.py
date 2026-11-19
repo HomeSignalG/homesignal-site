@@ -1314,8 +1314,8 @@ def render(p, built):
         # both hosts run ONE runtime, so a dependency added to community.html alone breaks
         # this one. Fails CLOSED if absent (outcome 'unavailable', no absence claim).
         '<script src="/lib/zip-authoritative.js?v=20261029a"></script>\n'
-        '<script src="/lib/data.js?v=4033ae3a"></script>\n<script src="/lib/topic-prefs.js?v=fe87d99b"></script>\n'
-        '<script src="/lib/templates.js?v=7373e258"></script>\n<script src="/lib/impact.js"></script>\n'
+        '<script src="/lib/data.js?v=16efebc5"></script>\n<script src="/lib/topic-prefs.js?v=fe87d99b"></script>\n'
+        '<script src="/lib/templates.js?v=c67c3792"></script>\n<script src="/lib/impact.js"></script>\n'
         # lib/project-type.js: the canonical Development Type (pure — no DOM, no map runtime).
         # The Development & Growth Type badge reads HS.canonicalProjectType from it. Same parity
         # rule as the files around it: both hosts run ONE runtime. lib/map.js stays OFF (§5a).
@@ -1333,7 +1333,7 @@ def render(p, built):
         '<script src="/shell.js?v=4fa4fbd4"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
         '<script src="/lib/water-rights.js?v=add4200a"></script>\n'
-        '<script src="/lib/community-page.js?v=97633cae"></script>\n'
+        '<script src="/lib/community-page.js?v=382abcf8"></script>\n'
         "</body>\n</html>\n")
 
 
