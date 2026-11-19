@@ -72,8 +72,10 @@ const entries = [];
 // gate was armed, so the gate fires on what appears LATER. It must never influence a fetch — if a
 // connector ever read it, the baseline would start widening what we ingest, which is the opposite
 // of its purpose.
+// `scope_note` (2026-11-19) is a customer-facing statement of what a source does NOT establish. It is read by scripts/gen-source-publishers.mjs (into the
+// report's coverage note) and by NO connector, so it can never change what is fetched.
 const ANNOTATION_KEYS = new Set(['_receipts', '_notes', '_comment', '_zip_mode_note',
-  'status_unresolved', 'vocab_terminal', 'observed_types_unreviewed']);
+  'status_unresolved', 'vocab_terminal', 'observed_types_unreviewed', 'scope_note']);
 
 // KNOWN, MEASURED, GATED — entries carrying an option their connector ignores. This list may only
 // ever SHRINK.
