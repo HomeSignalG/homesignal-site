@@ -2697,7 +2697,7 @@
   // -------------------------------------------------- share -------------------
   // The share targets and the grid live in lib/share-modal.js, shared with the static
   // development pages, so the Share box is the same everywhere. It is loaded here on demand.
-  const SHARE_MODAL_SRC = '/lib/share-modal.js?v=68211f85';
+  const SHARE_MODAL_SRC = '/lib/share-modal.js?v=ca2cb5db';
   function shareUrl() { return HS.shareUrlOverride || location.href; }
   function loadShareModalLib() {
     if (HS.fillShareBox) return Promise.resolve();
