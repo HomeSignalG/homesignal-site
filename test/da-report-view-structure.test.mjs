@@ -42,7 +42,7 @@ const C = code(SRC);
   ok(/innerHTML = html\(response, opts\)/.test(C) && (C.match(/innerHTML/g) || []).length === 1, '1e the only markup write is mount() setting innerHTML to its own html() output, once');
   const enh = (C.match(/function enhance\(el\) \{[\s\S]*?\n  \}\n/) || [''])[0];
   const attrWrites = [...C.matchAll(/(setAttribute|removeAttribute)\('([^']+)'/g)].map((m) => m[2]);
-  ok(enh.length > 200 && attrWrites.length === 7 && attrWrites.every((a) => a === 'hidden' || a === 'aria-pressed') && [...C.matchAll(/setAttribute|removeAttribute/g)].length === 7
+  ok(enh.length > 200 && attrWrites.length === 9 && attrWrites.every((a) => a === 'hidden' || a === 'aria-pressed') && [...C.matchAll(/setAttribute|removeAttribute/g)].length === 9
     && attrWrites.every((a, i) => enh.includes(a)), '1e2 the filters (enhance) change only two attributes, hidden and aria-pressed, and nothing else on the page', attrWrites);
   // national-6 (2026-11-02): the report carries the brand URL https://jodytracks.com (the brand line and the print footer); that one URL, exactly twice, is the only web address
   // written into the module: with it removed, no http(s):// remains (the validating pattern is written with escaped slashes, so it does not count)
@@ -91,9 +91,9 @@ const C = code(SRC);
   ok((C.match(/publisher_status/g) || []).length === 1 && !/line\(\w+, status\)/.test(C)
     && /function isDecided\(p\) \{ return txt\(p\.publisher_status\)\.toLowerCase\(\) === 'decided'; \}/.test(C),
     '2e the engine\'s publisher_status (HomeSignal\'s lifecycle bucket, measured on production) is read in ONE function, isDecided, that only asks whether it is Decided; it is never printed as a line of its own');
-  ok((C.match(/\.type\.key/g) || []).length === 1 && /function typeKeyOf\(p\) \{ var k = isObj\(p\.type\) \? p\.type\.key : ''/.test(C) && [...C.matchAll(/typeKeyOf\(/g)].length === 6
+  ok((C.match(/\.type\.key/g) || []).length === 1 && /function typeKeyOf\(p\) \{ var k = isObj\(p\.type\) \? p\.type\.key : ''/.test(C) && [...C.matchAll(/typeKeyOf\(/g)].length === 8
     && /p\.type\.label/.test(C) && /p\.lifecycle\.key/.test(C) && /p\.lifecycle\.label/.test(C),
-    '2f it reads Type as the engine\'s label, and its key in ONE function (typeKeyOf) used only to match a record to a Type filter (the card, the filter chip count, the map marker, the table row and the heavy-facility kind check; since 2026-11-03 the impact note no longer reads the Type); lifecycle only as the engine\'s key and label');
+    '2f it reads Type as the engine\'s label, and its key in ONE function (typeKeyOf) used only to match a record to a Type filter (the card, the filter chip count, the map marker, the overview line, the history entry, the table row and the heavy-facility kind check; since 2026-11-03 the impact note no longer reads the Type); lifecycle only as the engine\'s key and label');
 }
 
 // ---- 3. no Type rule, no lifecycle rule, no change rule, no rights rule -----------------------------------------------------------------
@@ -160,7 +160,7 @@ const C = code(SRC);
      && (C.match(/opts\.showLifecycle/g) || []).length === 1 && /opts\.showLifecycle === true/.test(C) && !head.includes('opts.showLifecycle') && !bar.includes('opts.showLifecycle'),
     '4g opts carries the address, the client label, the brokerage and the agent, read in header() only; and, from build step 8, the live and hidden report actions, read in actionsBar() only', optReads);
   const dataNames = [...new Set([...C.matchAll(/data-([a-z-]+)=/g)].map((m) => m[1]))].sort();
-  ok(!/\bid="|dataset/.test(C) && JSON.stringify(dataNames) === JSON.stringify(['da-action', 'da-filter', 'da-qol', 'da-stage', 'da-sub', 'da-type', 'da-value', 'lifecycle', 'stage']),
+  ok(!/\bid="|dataset/.test(C) && JSON.stringify(dataNames) === JSON.stringify(['da-action', 'da-filter', 'da-overview', 'da-qol', 'da-stage', 'da-sub', 'da-type', 'da-value', 'lifecycle', 'stage']),
     '4h the markup writes no id (two reports may share a page) and only these data-* names: the lifecycle, the stage, the filter keys and (build step 8) the action a live button stands for', dataNames);
   ok(/data-lifecycle="' \+ k \+ '"/.test(C) && /var k = lifeKey\(p\);/.test(C) && /has\(SHAPES, k\)/.test(C), '4i the one data-* value, and the one class suffix, come from a key that must be one of the four in the shape table');
 }
@@ -225,7 +225,7 @@ const C = code(SRC);
     // national-7 (2026-11-02): the universal report corrections suite renders the view on the Seattle sample
     'test/report-quality-national7.test.mjs', 'test/report-overview-scale.test.mjs',
     // 2026-11-03: the partner-sample review and the temporary-installation rule render the view on the Seattle sample
-    'test/report-partner-review.test.mjs', 'test/temporary-installation.test.mjs']);
+    'test/report-partner-review.test.mjs', 'test/temporary-installation.test.mjs', 'test/report-quality-national8.test.mjs']);
   const stray = hits.filter((f) => !ALLOWED.has(f));
   ok(hits.includes(MOD) && hits.includes('test/da-report-view.test.mjs'), '6a (control) the walk sees the module and its own tests (' + hits.length + ' files name it)');
   ok(stray.length === 0, '6b no page, lib, script, workflow or edge function names the view except its three callers (the private review page, build step 4; the customer page, 5c; the client\'s page for a share link, 8) and the side-by-side comparison module that reads its functions (build step 10)', stray);

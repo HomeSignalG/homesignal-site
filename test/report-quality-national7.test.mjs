@@ -165,8 +165,8 @@ const rel = (name, type_raw = null, typeKey = null, registry_id = null) => M.rel
     infrastructure: 'Potential construction noise and traffic/access disruption.', datacenter: 'Potential cooling noise, backup-generator operation, light pollution, construction traffic and water-demand considerations.' };
   const missing = rep.projects.filter((p) => TYPE_Q[p.type.key] && !html.includes(TYPE_Q[p.type.key]));
   // founder (2026-11-03, partner-sample review; supersedes the 2026-11-02 rule above): the Type sentence is no longer appended to any note
-  ok(missing.length === rep.projects.filter((p) => TYPE_Q[p.type.key]).length && qol.every((t) => !Object.values(TYPE_Q).some((q) => t.includes(q))) && qol.every((t) => /Not site-verified|Effects not verified|not stated|does not st|states no|does not say/.test(t)),
-    'E2 each note is the record\'s own scope: no category Type sentence is appended, and every note says what it does not establish', [missing.length, qol.filter((t) => !/Not site-verified|Effects not verified|not stated|does not st|states no|does not say/.test(t))]);
+  ok(missing.length === rep.projects.filter((p) => TYPE_Q[p.type.key]).length && qol.every((t) => !Object.values(TYPE_Q).some((q) => t.includes(q))) && qol.every((t) => /Not site-verified|Effects not verified|not stated|does not st|does not specify|states no|does not say/.test(t)),
+    'E2 each note is the record\'s own scope: no category Type sentence is appended, and every note says what it does not establish', [missing.length, qol.filter((t) => !/Not site-verified|Effects not verified|not stated|does not st|does not specify|states no|does not say/.test(t))]);
   const titles = [...html.matchAll(/<span class="da-rv-name">([^<]*)</g)].map((x) => x[1]);
   // a title cut with an ellipsis ends where a whole word of the record's own text ends (the next character in the full text is not a letter or digit)
   const full = fx.projects.map((p) => String(p.name).replace(/\s+/g, ' '));

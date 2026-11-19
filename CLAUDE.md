@@ -7082,3 +7082,13 @@ Tests: `test/county-cases-fixture.test.ts`. County-wide notices stay separate (h
   - **Single-lot amendments are routine only when they state no scale** (`single_lot_minor_if` / `scale_if` in the registry). A large project on one lot stays in.
   - **A pin needs a working county case page** that carries its own case id; a 404, or a "not found" screen served as HTTP 200 (`page_gone_if`), is quarantined `record_page_gone`.
 - **Held cases (2026-11-17):** registry `hold_cases` [{case_id, reason}] quarantines a case as `held_pending_verification` whatever status the county list shows. Used for Sahhali South (851-25-000549/548-PLNG): the county's CivicPlus list page still reads Planning Commission Hearing (newest status text Jan 2026) while a decision is reported elsewhere that could not be retrieved. Remove the hold only with the verified decision on file. Test: `test/county-cases-fixture.test.ts`.
+
+## DEVELOPMENT ACTIVITY REPORT, national-8 (2026-11-19): BOULDER AUDIT, UNIVERSAL CLASSIFICATION FIXES (`relevance-4`)
+
+Found on a Boulder CO report; fixed in the shared decision (`relevance()` in `_shared/national-report.ts`), never per record. Test: `test/report-quality-national8.test.mjs`.
+- **Size words are not construction.** story/stories, dwelling units, townhouses/homes, high/mid rise count as new construction only beside an affirmative word (new, construct, build, erect, proposed, allow). An addition wins over them.
+- **A negated change of use is not a change of use** ("no change of use / in use / of occupancy", "existing use remains unchanged"), removed clause by clause. A permit "revision" is judged by its underlying scope.
+- **Demolition names a building or structure.** Interior partitions, finishes and storefronts are routine tenant work. Strong routine phrases (water damage, like-for-like, window replacements, tenant finish/buildout) outrank the residential answer and building-wide exterior.
+- **Impact wording** (online, PDF, shared): "The official record does not specify a construction schedule or potential impacts on nearby properties." Coverage paragraph is the fixed customer wording; no feed counts. Links read "Official record" only when the agency's own number is in the link, else "Official agency database".
+- **Category filters reach the overview and Change History** (`data-da-type`/`data-da-stage`; the overview ranks within what the filter shows). The Share box's Copy link icon is an SVG; mailto:/sms: links open no new tab.
+- Ranking method unchanged. Not done: Client Briefing counts under a filter, PDF whitespace, the "Change History shows addresses" item.

@@ -398,8 +398,8 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
       const tOpen = tClosed;
       ok(n(tClosed, /Official record:/g) >= 7 && !/Supporting evidence for each record/.test(tClosed) && HDR4.test(tClosed),
         '12k the printed report carries every record\'s Supporting Evidence in the table (no toggle, no second list, nothing to open first)', { records: n(tClosed, /Official record:/g) });
-      ok(n(tClosed, /Official source/g) === 8 && n(tClosed, /The record documents|Denied or withdrawn:/g) >= 7 /* national-6 (2026-11-02): record-specific impact sentences */ && n(tClosed, /https:\/\/example\.gov\/records\//g) === 0,
-        '12l the printed report carries the four-column table and exactly one "Official source" link per record (8 of 8), with no raw web address printed', { src: n(tClosed, /Official source/g), urls: n(tClosed, /https:\/\/example\.gov\/records\//g) });
+      ok(n(tClosed, /Official (?:source|agency database|record) →/g) === 8 && n(tClosed, /The record documents|Denied or withdrawn:/g) >= 7 /* national-6 (2026-11-02): record-specific impact sentences */ && n(tClosed, /https:\/\/example\.gov\/records\//g) === 0,
+        '12l the printed report carries the four-column table and exactly one "Official source" link per record (8 of 8), with no raw web address printed', { src: n(tClosed, /Official (?:source|agency database|record) →/g), urls: n(tClosed, /https:\/\/example\.gov\/records\//g) });
       const ann = links(fReport);
       if (ann === null) console.log('SKIP — 12l2 PDF link annotations: python3 with pypdf is not available on this machine');
       else ok(ann.length === 8 && new Set(ann.map((a) => a[1])).size === 8 && ann.every((a) => /^https:\/\/example\.gov\/records\/k-/.test(a[1])), '12l1 the saved PDF holds eight real link annotations, one per record, each to that record\'s own official address', ann);
@@ -432,9 +432,9 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
         '12p a 40-record report paginates (' + pcl + ' pages) and the table header repeats on every page that carries rows', { pcl, withRows: withRows.length });
       let split = 0;
       for (let i = 0; i < 40; i++) { const nm = 'Project ' + String(i).padStart(2, '0') + ' Long'; /* national-6 (2026-11-02): the overview and Change History also name records; the table's own row is the occurrence that carries its link */
-        const inRow = tl.some((t) => { const lines = t.split('\n'); return lines.some((l, li) => l.includes(nm) && /Official source/.test(lines.slice(li, li + 8).join(' '))); }); if (!inRow) split++; }
+        const inRow = tl.some((t) => { const lines = t.split('\n'); return lines.some((l, li) => l.includes(nm) && /Official (?:source|agency database|record) →/.test(lines.slice(li, li + 8).join(' '))); }); if (!inRow) split++; }
       ok(split === 0, '12q in a 40-record report no row is stranded: each record\'s name has its "Official source" link on the same page', split);
-      ok(n(tl.join('\f'), /Official source/g) === 40 && (annL === null || (annL.length === 40 && annL.every((a) => /^https:\/\//.test(a[1])))), '12q2 in a 40-record report every one of the 40 records keeps its own clickable "Official source" link in the PDF', { text: n(tl.join('\f'), /Official source/g), annotations: annL && annL.length });
+      ok(n(tl.join('\f'), /Official (?:source|agency database|record) →/g) === 40 && (annL === null || (annL.length === 40 && annL.every((a) => /^https:\/\//.test(a[1])))), '12q2 in a 40-record report every one of the 40 records keeps its own clickable "Official source" link in the PDF', { text: n(tl.join('\f'), /Official (?:source|agency database|record) →/g), annotations: annL && annL.length });
     }
     await ctx.close();
   }

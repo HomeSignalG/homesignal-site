@@ -28,7 +28,7 @@ const keep = { 'Construct a residential high rise building occupy per plan': 'ne
 const got = Object.fromEntries(Object.keys(keep).map((t) => { const r = R(t); return [t, r.include ? r.basis : null]; }));
 ok(Object.keys(keep).every((t) => keep[t] === null ? got[t] !== 'temporary_event' : got[t] === keep[t]),
   '1c construction support ("temporary shoring", "temporary power", "temporary hoist") and real buildings are not read as temporary activity', got);
-ok(M.RELEVANCE_RULE_VERSION === 'relevance-3', '1d the rule version moved to relevance-3');
+ok(M.RELEVANCE_RULE_VERSION === 'relevance-4', '1d the rule version moved to relevance-3');
 
 // ---- 2. the Seattle report: the market is judged on its dates and leaves the new-building lead ---------------------------------------------------
 {
@@ -46,7 +46,7 @@ ok(M.RELEVANCE_RULE_VERSION === 'relevance-3', '1d the rule version moved to rel
   const m = a.intelligence.projects.find((p) => p.source_key === market.source_key || p.project_id === market.source_key || /Christmas Market/.test(p.name ?? ''));
   ok(!!rowOf && !!(m && m.relevance.basis === 'temporary_event' && m.activity_window), '2a the market is in the report as temporary activity with its documented window (Nov 20 to Dec 27)', m && { r: m.relevance, w: m.activity_window });
   const html = V.html({ status: 'OK', coverage_state: a.coverage_state, report: a.intelligence, render: a.renderOnly }, { subject: SUBJECT.address });
-  const lines = [...((html.match(/data-da-overview>([\s\S]*?)<\/ol>/) || ['', ''])[1]).matchAll(/<li>([\s\S]*?)<\/li>/g)].map((x) => x[1].replace(/<[^>]+>/g, ''));
+  const lines = [...((html.match(/data-da-overview="\d+">([\s\S]*?)<\/ol>/) || ['', ''])[1]).matchAll(/<li[^>]*>([\s\S]*?)<\/li>/g)].map((x) => x[1].replace(/<[^>]+>/g, ''));
   ok(!lines.some((l) => /^New construction:.*Christmas/.test(l)) && lines.some((l) => /83 stacked dwelling units/.test(l)),
     '2b page 1 never calls the market new construction, and the 83-unit supportive housing is back on it', lines);
 }

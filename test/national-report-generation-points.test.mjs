@@ -85,9 +85,9 @@ const p = after.rep.projects.find((x) => x.project_id === LIGHTSEY);
 ok(p && p.lifecycle.key === 'proposed' && p.stage && p.stage.key === 'proposed' && p.stage.label === 'Proposed / Under review', '2d the report places it in Proposed / Under review (national-6 wording) (the existing Stage authority, no new vocabulary)', p && p.stage);
 ok(p && p.type.key === 'residential' && p.publisher_stage === 'In Review' && p.source.url === real.find((r) => r.source_key === LIGHTSEY).source_ref, '2e verified Type, the publisher\'s own stage, and the official record link are carried');
 const row = after.rowOf('Lightsey Residences');
-ok(row && /Residential/.test(row) && /Stage: Proposed \/ Under review/.test(row) && /Source agency status: In Review/.test(row) && /Official source/.test(row), '2f the rendered row shows project, Type, Stage and source', row);
+ok(row && /Residential/.test(row) && /Stage: Proposed \/ Under review/.test(row) && /Source agency status: In Review/.test(row) && /Official (source|record|agency database)/.test(row), '2f the rendered row shows project, Type, Stage and source', row);
 // 2026-11-03 (founder, partner-sample review; supersedes 2026-11-02): the note states only what THIS record documents, and claims no established effect
-ok(row && /Quality-of-Life Impact: The record documents new residential development\. .*The record states no schedule and no effect on nearby properties\./.test(row) && !/added neighborhood activity/.test(row), '2g the Quality-of-Life wording is the record-specific note only (no category sentence), and claims no established effect', row);
+ok(row && /Quality-of-Life Impact: The record documents new residential development\. .*The official record does not specify a construction schedule or potential impacts on nearby properties\./.test(row) && !/added neighborhood activity/.test(row), '2g the Quality-of-Life wording is the record-specific note only (no category sentence), and claims no established effect', row);
 
 // ---- 3. the half-mile edge ----
 ok(!keys(rpc.new_055).includes(LIGHTSEY), '3a ~0.55 mi: excluded');

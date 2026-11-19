@@ -46,7 +46,7 @@ const P = (id) => rep.projects.find((p) => p.project_id.endsWith(id) || (p.sourc
 {
   const h = P('7118487-CN');
   ok(h && h.relevance.basis === 'new_construction' && h.relevance.scale && h.relevance.scale.units === 83, '4a "Establish use ... Construct new mixed-use building" is new construction with 83 units', h && h.relevance);
-  const ov = [...((html.match(/data-da-overview>([\s\S]*?)<\/ol>/) || ['', ''])[1]).matchAll(/<li>([\s\S]*?)<\/li>/g)].map((m) => plain(m[1]));
+  const ov = [...((html.match(/data-da-overview="\d+">([\s\S]*?)<\/ol>/) || ['', ''])[1]).matchAll(/<li[^>]*>([\s\S]*?)<\/li>/g)].map((m) => plain(m[1]));
   ok(/254-unit/.test(ov[0]) && /83 stacked dwelling units/.test(ov[1]) && /^New construction/.test(ov[1].trim()), '4b page 1: the 254-unit building, then the 83-unit building, as new construction', ov);
   const addrs = ov.map((l) => (/\(([^,]+),/.exec(l) || [])[1]);
   ok(new Set(addrs).size === addrs.length, '4c page 1 lists each street address once', addrs);
