@@ -390,6 +390,12 @@ The engine half and the full rule text: homesignal-ingest CLAUDE.md, same title.
   official sources continues for confirmation, cancellation or rescheduling.
 - **A hearing needs no Map 1 pin to appear on a ZIP page** where its geographic relevance is verified (government reach, or a named
   place resolved by the canonical ZIP boundary).
+- **Final direction, 2026-11-19:** committee suspension needs at least 20 independently resolved outcomes and accuracy below 80%
+  (5 outcomes start an assessment only; missing confirmation, cancellations and reschedules are not inaccuracy; reinstatement by a
+  rolling 20-outcome window at 80% or a verified root-cause fix plus 10 validations). Reminders go 7 and 2 days before a verified
+  comment deadline, with catch-up, no duplicates, none expired, independent of the hearing date. The posting-date placeholder in
+  `meeting_date` is gated by `date_basis` and never shown: surfaces say "Hearing date not announced". Hearing identity never rests
+  on dates or a bare case number. Decisions: homesignal-ingest `hearings.py`.
 - Comment deadlines and upcoming hearings are listed first. **A hearing date is never inferred from a publication date.**
 - Subscriber notifications for hearings, reschedules, cancellations and comment deadlines go through the Delivery session's
   `digest.py`, once per event per person; this work proposes the interface and does not edit that file (Rule #0a).

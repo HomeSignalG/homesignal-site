@@ -1,6 +1,6 @@
 # Public hearing visibility — audit and implementation plan (2026-11-17)
 
-Status: **PLAN v2 (2026-11-19), for founder approval.** Direction approved 2026-11-19 with the modifications in section 4; the section 6
+Status: **PLAN v3 (2026-11-19), FOUNDER-APPROVED; implementation in draft PRs, nothing applied.** Direction approved 2026-11-19 with the modifications in section 4; the section 6
 measurements are taken and reported in section 5. **PLAN ONLY:** nothing here is built, applied or deployed. No production database change and no
 deployment happens without founder approval. Policy text of record: CLAUDE.md, section "PUBLIC HEARINGS ARE
 VISIBLE BEFORE THEY ARE DECIDED" in both repos.
@@ -186,10 +186,14 @@ may write `provisional` rows only while **all** hold:
 - **E3 first-party publication.** The announcement is on the committee's or government's own domain, or on a meeting system the
   government's own site links to. Never an aggregator, a newspaper-association notice site, a social post, a private group or an
   individual (wiring rule 0).
-- **E4 dated and specific.** The announcement states a date and names the body, place or case.
-- **E5 track record, evaluated continuously.** After at least 5 reconciled outcomes, at least 80% must be confirmed or
-  rescheduled by an official notice and not contradicted. Below that the committee is **suspended automatically**; its old rows
-  stay. **These two numbers (5, 80%) are proposals for you to confirm or change.**
+- **E4 dated or specific.** The announcement names the body and a place or case, and either states a date or is a legitimate
+  undated provisional announcement (`undated_but_specific`). An undated one shows "Hearing date not announced".
+- **E5 track record, continuing.** Five reconciled outcomes start an accuracy *assessment*, never a suspension. Automatic
+  suspension needs at least **20 independently resolved outcomes** and accuracy **below 80%**. Only an official notice that
+  contradicts an announcement counts against a committee; missing confirmation, legitimate cancellations and reschedules do
+  not. Suspended committees are still monitored passively. Reinstatement: a rolling window of at least 20 independently
+  resolved outcomes at 80% or better, or a verified root-cause correction followed by 10 successful independent validations.
+  Code: `hearings.committee_status`.
 E1 to E4 are the entry test; E5 is the continuing test. A failed criterion is a logged row, not a silent skip.
 
 ### 7.3 D3: reconciliation and expiry
@@ -199,6 +203,8 @@ E1 to E4 are the entry test; E5 is the continuing test. A failed criterion is a 
   window), then marks them `unresolved` and keeps them.
 - A late official notice that confirms a past provisional hearing records it as held, not upcoming. One that carries a **future**
   date (a reschedule) creates or updates the official row, which is upcoming; the provisional row is marked `rescheduled_to`.
+- With no hearing date, reconciliation is anchored to the announcement date for the same 365 days. A passed date never
+  implies the hearing occurred (`past_unconfirmed` until an official notice says `held`).
 - Every transition is an appended `meeting_reconciliation` row. Source evidence is never overwritten.
 
 ### 7.4 Ingest (homesignal-ingest)
@@ -219,19 +225,14 @@ E1 to E4 are the entry test; E5 is the continuing test. A failed criterion is a 
   prints the same text from the same stored data.
 - `scripts/development_pages.py` and `lib/map1-project-panel.js`: show linked hearings on a project with no pin.
 
-### 7.6 Delivery coordination (Rule #0a: `digest.py` and the notification path belong to the Delivery session)
-This work proposes the interface and does not edit `digest.py`. A message to that session is ready to send once you approve the
-direction. Proposed contract:
-- **No new stream or topic.** Hearing events ride the existing Upcoming Meetings stream and its 5 PM Central daily email.
-- **Four event types:** `hearing_announced`, `hearing_rescheduled`, `hearing_cancelled`, `comment_deadline_approaching`
-  (proposed reminders at 7 days and 2 days, once each; **these two numbers are for you to confirm**).
-- **No duplicates:** an event is unique per (person, `hearing_key`, event type, effective value). A reschedule is ONE
-  `hearing_rescheduled` event; the new-date row must not also read as a new `hearing_announced` for the same `hearing_key`. A
-  cancellation is one item, with no participation prompt. The existing `event_key` rule keeps a notice twin from sending a second
-  copy; hearing rows carry an `event_key` as every hearing row does today.
-- **A new subscriber's first email** never includes expired provisional rows or hearings with `date_not_stated`.
-- Delivery ledger stays `email_deliveries`; the `hearing_notification_event` table is the read-only source the Delivery session
-  consumes.
+### 7.6 Delivery coordination (final; Rule #0a: `digest.py` and the notification path belong to the Delivery session)
+The interface is written in homesignal-ingest `docs/hearing-delivery-handoff-2026-11-19.md` and implemented as pure decisions in
+`hearings.py` (`reminder_events`, `lifecycle_events`, `event_hash`). Summary: existing Upcoming Meetings stream, no parallel
+system; four event types; reminders at 7 and 2 days before a verified comment deadline, with catch-up and no expired reminders,
+independent of the hearing date; one event per (person, `hearing_key`, type, effective value); a reschedule is one event.
+Identity uses jurisdiction, body, stage, normalized details and a vendor id when present; dates and a bare case number never
+establish identity; ambiguous or low-confidence matches suppress nothing; sequential hearings for one project stay distinct.
+`digest.py` is not edited by this work.
 
 ### 7.7 Tests
 `test/public_hearings_pg` (SQL), `test/public-hearings.test.mjs` (presentation, one function), a browser test on a generated ZIP
@@ -246,11 +247,20 @@ with duplicate, reschedule and cancel cases against the Delivery session's contr
 4. Site presentation. 5. Project association and the dossier / Map 1 panel. 6. Delivery coordination and notifications.
 7. Neskowin / ZIP 97149 only as a test case, after the Tillamook work lands.
 
-## 8. Needs your decision
-- Confirm or change: E5 thresholds (5 outcomes, 80%); reminder days (7 and 2).
-- Confirm that an undated hearing keeps a posting-date placeholder in `meeting_date` flagged by `date_basis`, rather than relaxing
-  NOT NULL (recommended).
-- Confirm that hearing notices ride the existing meetings email rather than a new stream (recommended).
+## 8. Six-topic gate audit (recorded, not re-run)
+The targeted audit of actual gate rejections was completed on 2026-11-19. The available ingest run-log evidence is insufficient
+to claim validated hearing recall: a rejected row is never stored, so logs are the only trace and they do not identify
+hearing-shaped candidates reliably. **No recall claim is made.** The six canonical topics stay; a separate `hearing_subject`
+attribute is added so relevant development hearings are preserved whatever topic they file under. The audit mechanism is
+`ingest_rejected_candidates` (homesignal-ingest migration `20261119180000`, prepared and NOT applied): truncated title, url,
+feed, reason code only; RLS on, no visitor grants, 180-day purge.
+
+## 9a. Build status (2026-11-19)
+Built, offline-tested, nothing applied or merged: `hearings.py` + `tests/test_hearings.py` (25 checks), `docs/public-hearings.sql`
++ `test/public-hearings-sql.test.mjs`, the rejected-candidates migration, the Delivery handoff. Not built yet (each needs the SQL
+applied first): wiring `date_basis` and fields into `ingest.py`, parsers for comment deadlines, `reconcile_hearings.py`,
+site presentation, project-link panel, and the CI gate `check_hearing_policy.py`. Ingest is not wired on purpose: writing columns
+that do not exist would fail every meetings insert.
 
 ## 9. Do not touch (active Tillamook session)
 `supabase/functions/get-address-report/sources/county-cases.ts`, the `county_cases` entries of `jurisdiction-registry.json`,
