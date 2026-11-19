@@ -235,9 +235,9 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     return { sections: [...document.querySelectorAll('.da-rv-sec')].map((s) => s.getAttribute('aria-label')), text: li.textContent, size: parseFloat(cs.fontSize), weight: Number(cs.fontWeight), hasCards: document.querySelectorAll('.da-rv-card').length,
       outcome: h ? h.textContent : null, outcomeSize: ocs ? parseFloat(ocs.fontSize) : 0, outcomeVisible: !!(op && op.getBoundingClientRect().height > 0) };
   });
-  ok(e.sections.join() === 'No data ingested,Official evidence & coverage' && e.hasCards === 0 && e.text === 'Some records near this address are not included because their official source is not identified.',
+  ok(e.sections.join() === 'No records found — coverage here is limited,Official evidence & coverage' && e.hasCards === 0 && /cannot say anything about nearby development|not identified/.test(e.text),
     '5b with no traceable record says "No data ingested" over the engine\'s limitation text, with no card (founder ruling R5)', e);
-  ok(e.outcome === 'No data ingested' && e.outcomeVisible && e.outcomeSize >= 16, '5b2 the outcome is a visible heading and a readable sentence (16px or more)', [e.outcome, e.outcomeSize]);
+  ok(e.outcome === 'No records found — coverage here is limited' && e.outcomeVisible && e.outcomeSize >= 16, '5b2 the outcome is a visible heading and a readable sentence (16px or more)', [e.outcome, e.outcomeSize]);
   ok(e.size >= 16 && e.weight >= 600, '5c and that text is drawn prominently (16px or more, semibold), because it is all the page says', [e.size, e.weight]);
   const cold = await mount(page, WCOLD, undefined);
   const c = await page.evaluate(() => ({ addr: document.querySelector('.da-rv-addr').textContent, brief: [...document.querySelectorAll('[data-da-briefing] li')].map((l) => l.textContent).join(' ') }));

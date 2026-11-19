@@ -213,7 +213,7 @@ const html3 = cmp(E3);
   const noas = cmp([entry(2, WNOAS), entry(1, W)]);
   ok(rowOf(noas, 'Report as of (UTC day)').join('|') === 'Not stated|Sep 29, 2026' && rowOf(noas, 'What "recent" means').join('|') === 'Not stated|The last 90 days', '8b2 a report that does not state its day or its window says "Not stated", never a blank or a guess');
   const lims = rowOf(html3, 'Limits the report states');
-  ok(/transportation|could not confirm|record/i.test(lims[0]) && lims[0] !== 'None stated. Which agencies are covered is not measured.' && /their official source is not identified/.test(lims[2]), '8c each report\'s own limitation text is shown verbatim, and "None stated" where it has none', lims);
+  ok(lims[0] === 'None stated. Which agencies are covered is not measured.' && /their official source is not identified/.test(lims[2]), '8c each report\'s own limitation text is shown verbatim, and "None stated" where it has none', lims);
   ok(rowOf(html3, 'Most recent official record')[0].startsWith('Roads & infrastructure — Highway 99 Widening') && rowOf(html3, 'Most recent change HomeSignal detected')[0].startsWith('Menchaca Apartments · Agency status change, detected Sep 27, 2026'), // national-6 (2026-11-02): the ledger's status_changed reads "Agency status change"
     '8d the timeline rows describe the engine\'s first record the way the report does', [rowOf(html3, 'Most recent official record')[0], rowOf(html3, 'Most recent change HomeSignal detected')[0]]);
   ok(textOf(html3).includes(V.DISCLOSURE) && textOf(html3).includes('Counted as official records: a record is a source record, not a proven separate project.'), '8e the standard disclosure and the unit of counting are on every comparison');

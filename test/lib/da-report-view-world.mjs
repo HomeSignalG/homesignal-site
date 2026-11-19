@@ -63,7 +63,8 @@ export const RICH = {
     evt('k-approved'),
     evt('k-first', { event_type: 'first_detected', observed_at: '2026-09-26T08:00:00Z', prev_facts: null, new_facts: { status: 'Proposed' }, changed_fields: ['status'], publisher_event_type: null, publisher_event_date: null }),
   ],
-  health: [],
+  // coverage-rule-1 (2026-11-19): both sources were read successfully three hours before NOW, so the local permit source (FAM_B) verifies coverage
+  health: [FAM_A, FAM_B].map((registry_id) => ({ registry_id, fetch_failures_24h: 0, blocked_24h: 0, truncated_24h: 0, last_success_at: '2026-09-29T09:00:00Z' })),
 };
 /** Same world, no ledger: the cold start (nothing is change-ready yet). */
 export const COLD = { ...RICH, ledger: [], events: [] };

@@ -184,12 +184,12 @@ const settle = (page) => page.waitForFunction(() => !document.getElementById('go
   await make(page);
   await settle(page);
   ok(calls[0].body.view === 'customer', '3a choosing the customer view asks the function for it', calls[0].body);
-  ok(JSON.stringify(await sections(page)) === JSON.stringify(['No data ingested', 'Official evidence & coverage']) && /Customer view/.test(await page.textContent('#viewnote')),
+  ok(JSON.stringify(await sections(page)) === JSON.stringify(['No records found — coverage here is limited', 'Official evidence & coverage']) && /Customer view/.test(await page.textContent('#viewnote')),
     '3b with no traceable record, the customer view says "No data ingested" over the coverage notice, and the page says which view it is', await sections(page));
-  ok(W_CUSTOMER.credit.uses_report === false && (await page.textContent('#creditnote')) === 'For a trial customer, this report would not use a free report: No data ingested.',
+  ok(W_CUSTOMER.credit.uses_report === false && (await page.textContent('#creditnote')) === 'For a trial customer, this report would not use a free report: no records found, and coverage here is limited.',
     '3c the founder sees that today\'s customer report would not use a free report, and why (ruling R5)', await page.textContent('#creditnote'));
   const st3 = await status(page);
-  ok(!st3.error && st3.text.startsWith('Report ready: No data ingested for this address.') && !/\b0 official records?\b/.test(st3.text),
+  ok(!st3.error && st3.text.startsWith('Report ready: no records found, and coverage here is limited.') && !/\b0 official records?\b/.test(st3.text),
     '3c2 the status line for an empty-source report says "No data ingested" (ruling R5), not "0 official records within 0.5 miles", and is not an error', st3);
   await ctx.close();
 }
@@ -199,7 +199,7 @@ const settle = (page) => page.waitForFunction(() => !document.getElementById('go
   await make(page);
   await settle(page);
   ok(W_CLEARED.credit.uses_report === true && (await page.textContent('#creditnote')) === 'For a trial customer, this report would use one of the free reports (development shown).'
-    && !(await sections(page)).includes('No data ingested'), '3d once a source is cleared, a report that shows development would use one free report, and has no outcome notice', await page.textContent('#creditnote'));
+    && !(await sections(page)).includes('No records found — coverage here is limited'), '3d once a source is cleared, a report that shows development would use one free report, and has no outcome notice', await page.textContent('#creditnote'));
   await ctx.close();
 }
 

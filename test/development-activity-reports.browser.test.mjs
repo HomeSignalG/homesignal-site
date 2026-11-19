@@ -207,7 +207,7 @@ function world({ trial = 'active', used = 0, admin = false, untraceable = false,
     // the report rate limit (docs/report-rate-limit.sql): the database's answer, a refusal when the test sets `w.rate`
     rateClaim: async () => (w.rate ? { allowed: false, ...w.rate } : { allowed: true }),
     zipSupported: async () => true,
-    radius: async () => (w.untraceable ? NO_FAMILY(RICH) : RICH).rows, hydrate: async () => (w.untraceable ? NO_FAMILY(RICH) : RICH).projects, ledger: async () => RICH.ledger ?? [], events: async () => RICH.events ?? [], health: async () => [], jurisdictions: async () => [],
+    radius: async () => (w.untraceable ? NO_FAMILY(RICH) : RICH).rows, hydrate: async () => (w.untraceable ? NO_FAMILY(RICH) : RICH).projects, ledger: async () => RICH.ledger ?? [], events: async () => RICH.events ?? [], health: async () => RICH.health ?? [], jurisdictions: async () => [],
     trialOf: async () => state(),
     planOf: async () => { if (w.billingFails) throw new RH.DataUnavailable('x'); return usage(); },
     issue: async (_u, key, intelligence, privateContext) => {
@@ -399,14 +399,14 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   const o2 = await open({ w: w2 });
   await waitCount(o2.page, /^4 of 10 reports used$/);
   await make(o2.page);
-  ok(w2.used === 4 && /did not use a free report: No data ingested/.test(await text(o2.page, '#creditnote')) && /^4 of 10 reports used$/.test(await text(o2.page, '#trial-count')),
+  ok(w2.used === 4 && /did not use a free report: no records found, and coverage here is limited/.test(await text(o2.page, '#creditnote')) && /^4 of 10 reports used$/.test(await text(o2.page, '#trial-count')),
     '2e a "No data ingested" report says it used nothing, and the count stays', [await text(o2.page, '#creditnote'), await text(o2.page, '#trial-count')]);
   // the empty-source state on the launch test location (Brigham City, UT 84302), read off the page the way a person sees it: a plain answer, not a failure
   const hero = await o2.page.$eval('#report .da-rv-sec--outcome', (e) => ({ title: e.querySelector('.da-rv-h2').textContent.trim(), body: e.querySelector('.da-rv-outcome-p').textContent.trim() })).catch(() => null);
-  ok(hero && hero.title === 'No data ingested' && /It is not a finding that there is no development\./.test(hero.body) && (await o2.page.$$('#report .da-rv-card')).length === 0,
+  ok(hero && hero.title === 'No records found — coverage here is limited' && /cannot say anything about nearby development|not a finding/.test(hero.body) && (await o2.page.$$('#report .da-rv-card')).length === 0,
     '2e2 the report page leads with "No data ingested" and the founder\'s sentence that it is not a finding of no development, and draws no project', hero);
   const st2 = await o2.page.$eval('#status', (e) => ({ text: e.textContent.trim(), cls: e.className }));
-  ok(/^Report ready: No data ingested for this address\./.test(st2.text) && !/\b0 official records?\b/.test(st2.text) && st2.cls === '',
+  ok(/^Report ready: no records found, and coverage here is limited\./.test(st2.text) && !/\b0 official records?\b/.test(st2.text) && st2.cls === '',
     '2e3 the status line says "No data ingested", never "0 official records within 0.5 miles", and is not styled as an error', st2);
   ok(await o2.page.$eval('#report', (e) => !e.hidden) && (await o2.page.$$('#status.err')).length === 0 && !/\b(error|could not|try again|something went wrong)\b/i.test(await text(o2.page, '#report')),
     '2e4 nothing on the page reads or looks like an error: the report is shown, the status is not red, no failure wording', await text(o2.page, '#report'));
@@ -1454,10 +1454,10 @@ const WNONE_REPORT = (await wire(NO_FAMILY(RICH))).report;   // the engine's rep
   await waitCompared(page);
   const t = await tableOf(page);
   // national-6 (2026-11-02): the stage row labels
-  ok(['Records with a recent official event', 'Permit issued / Under construction', 'Approved', 'Proposed / Under review'].every((l) => rowCells(t, l)[1] === 'No data ingested' && rowCells(t, l)[0] !== 'No data ingested'),
+  ok(['Records with a recent official event', 'Permit issued / Under construction', 'Approved', 'Proposed / Under review'].every((l) => rowCells(t, l)[1] === 'No records found — coverage here is limited' && rowCells(t, l)[0] !== 'No records found — coverage here is limited'),
     '11r the report with "No data ingested" says so in every count cell and is not a zero; the report beside it still has its numbers', t.rows.map((r) => r.label + '=' + r.cells.join('/')));
   const notes = await page.$eval('#compare-result', (e) => e.textContent.replace(/\s+/g, ' '));
-  ok(/No data ingested\. Jody cannot yet confirm it receives official development records for this address/ /* national-6 (2026-11-02): Jody branding */.test(notes), '11s the engine\'s own words for it appear under the table');
+  ok(/No records found — coverage here is limited/ /* national-6 (2026-11-02): Jody branding */.test(notes), '11s the engine\'s own words for it appear under the table');
   await ctx.close();
 }
 {

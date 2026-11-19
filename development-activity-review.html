@@ -273,6 +273,8 @@ fieldset label{display:flex;gap:6px;align-items:center;font-weight:500;color:var
       return 'For a trial customer, this report would use one of the free reports (' + (c.reason === 'NO_DEVELOPMENT_ACTIVITY' ? 'No development activity' : 'development shown') + ').';
     }
     if (c.reason === 'INTERNAL_VIEW') return 'The internal view is never charged. Choose \u201cWhat a paying customer sees today\u201d to see whether a client\u2019s report would use a free report.';
+    if (c.reason === 'NO_VERIFIED_COVERAGE') return 'For a trial customer, this report would not use a free report: no records found, and coverage here is limited.';
+    if (c.reason === 'COVERAGE_NOT_VERIFIED') return 'For a trial customer, this report would not use a free report: Jody could not verify full coverage of this area.';
     if (c.reason === 'NO_DATA_INGESTED') return 'For a trial customer, this report would not use a free report: No data ingested.';
     if (c.reason === 'NO_SIGNIFICANT_CHANGES') return 'For a trial customer, this report would not use a free report: no significant nearby changes found.';
     if (c.reason === 'NOT_STORABLE') return 'For a trial customer, this report would not use a free report: it could not be saved.';
@@ -315,7 +317,8 @@ fieldset label{display:flex;gap:6px;align-items:center;font-weight:500;color:var
     // The status line follows the ENGINE's outcome code, never the count: a report with "No data ingested" has zero records because HomeSignal cannot yet confirm it
     // receives official records for the address, so "0 official records within 0.5 miles" would read as a measured zero (founder ruling R5, 2026-10-02).
     var outcome = body.report && body.report.activity ? body.report.activity.outcome : null;
-    if (outcome === 'NO_DATA_INGESTED') say('Report ready: No data ingested for this address. It is not a finding that there is no development nearby.', false);
+    if (outcome === 'NO_VERIFIED_COVERAGE') say('Report ready: no records found, and coverage here is limited. It is not a finding that there is no development nearby.', false);
+    else if (outcome === 'NO_DATA_INGESTED') say('Report ready: No data ingested for this address. It is not a finding that there is no development nearby.', false);
     else if (outcome === 'NO_SIGNIFICANT_CHANGES') say('Report ready: no significant nearby changes found. Jody read the official records near this address and all of them describe routine work, do not say what the work is, or have ended.', false);
     else say('Report ready: ' + n + (n === 1 ? ' official record' : ' official records') + ' within 0.5 miles.', false);
     $('viewnote').textContent = view === 'internal'

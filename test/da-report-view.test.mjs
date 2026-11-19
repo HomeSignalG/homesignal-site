@@ -59,7 +59,7 @@ try {
   ok(W.status === 'OK' && W.report.product === 'HOMESIGNAL DEVELOPMENT ACTIVITY' && Array.isArray(W.report.projects), '0a the response is the real handler\'s: status OK, the engine\'s product name, a projects array');
   const direct = M.assemble({ now: NOW, view: 'customer', zip_supported: true, radius_mi: 0.5, attribution: ATTRIBUTION_AB,
     subject: { address: ADDRESS, matched_address: '742 EVERGREEN TER, SPRINGFIELD, OR, 97477', lat: 44.04612, lng: -122.98123, zip: '97477' },
-    rows: RICH.rows, projects: RICH.projects, ledger: RICH.ledger, events: RICH.events, health: [] });
+    rows: RICH.rows, projects: RICH.projects, ledger: RICH.ledger, events: RICH.events, health: RICH.health, applicable_families: [] });
   ok(JSON.stringify(W.report) === JSON.stringify(direct.intelligence), '0b the wire report equals assemble() called directly on the same inputs, byte for byte');
   const asObject = { status: 'OK', coverage_state: direct.coverage_state, report: direct.intelligence, render: direct.renderOnly, stored: false, report_id: null, storable: false, storage_blockers: [] };
   ok(view(asObject) === html, '0c the view of the wire response equals the view of assemble()\'s own object');
