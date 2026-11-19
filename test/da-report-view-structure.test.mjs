@@ -39,10 +39,10 @@ const C = code(SRC);
   ok(!/\b(Date|Intl|Math\.random|performance)\b|toLocale/.test(C), '1b it reads no clock and no locale: the same input gives the same output anywhere');
   ok(!/\bimport\b|\bexport\b|\brequire\b/.test(C), '1c it imports nothing: it needs only `window`');
   ok(!/\.sort\(|\.reverse\(|\.splice\(/.test(C) && /\.filter\(/.test(C) && /\.map\(/.test(C), '1d it sorts and reorders nothing (a view that sorts is a view that ranks), and it does filter and map (control)');
-  ok(/innerHTML = html\(response, opts\)/.test(C) && (C.match(/innerHTML/g) || []).length === 1, '1e the only markup write is mount() setting innerHTML to its own html() output, once');
-  const enh = (C.match(/function enhance\(el\) \{[\s\S]*?\n  \}\n/) || [''])[0];
+  ok(/innerHTML = html\(response, opts\)/.test(C) && (C.match(/innerHTML/g) || []).length === 3 && /oh\.innerHTML = f\.total \? overviewSection\(f, ctx\.response\)/.test(C) && /bh\.innerHTML = briefing\(/.test(C), '1e the markup writes are mount() setting innerHTML to its own html() output, and the filters rebuilding the overview and the briefing from this module\'s own functions (the only two other writes)');
+  const enh = (C.match(/function enhance\(el(?:, ctx)?\) \{[\s\S]*?\n  \}\n/) || [''])[0];
   const attrWrites = [...C.matchAll(/(setAttribute|removeAttribute)\('([^']+)'/g)].map((m) => m[2]);
-  ok(enh.length > 200 && attrWrites.length === 9 && attrWrites.every((a) => a === 'hidden' || a === 'aria-pressed') && [...C.matchAll(/setAttribute|removeAttribute/g)].length === 9
+  ok(enh.length > 200 && attrWrites.length === 7 && attrWrites.every((a) => a === 'hidden' || a === 'aria-pressed') && [...C.matchAll(/setAttribute|removeAttribute/g)].length === 7
     && attrWrites.every((a, i) => enh.includes(a)), '1e2 the filters (enhance) change only two attributes, hidden and aria-pressed, and nothing else on the page', attrWrites);
   // national-6 (2026-11-02): the report carries the brand URL https://jodytracks.com (the brand line and the print footer); that one URL, exactly twice, is the only web address
   // written into the module: with it removed, no http(s):// remains (the validating pattern is written with escaped slashes, so it does not count)
@@ -58,7 +58,7 @@ const C = code(SRC);
   // national-6 (2026-11-02): adds activity_window, publisher_type, records_checked and undescribed_records (the record's activity dates, the agency's own class, source freshness, the
   // undescribed-records note); `relevance`, `description` and `address` are read as plain keys (relField / p.description / p.address)
   const EXPECT = ['activity_window', 'publisher_type', 'records_checked', 'records_judged', 'temporary_ended', 'undescribed_records', 'routine_records', 'as_of', 'bearings_deg', 'by_lifecycle', 'by_stage', 'change_ready', 'detected_at', 'distances_mi', 'event_type', 'first_observed_at', 'homesignal_detected_changes', 'homesignal_observation', 'older_than_a_year', 'project_id',
-    'publisher_event', 'publisher_stage', 'publisher_status', 'radius_mi', 'recent_days', 'recent_official_activity', 'record_date', 'record_id', 'source_feed_count', 'title_cut', 'what_changed_recently'].concat(['feed_ref', 'publisher_stage_unpublished']).sort();
+    'publisher_event', 'publisher_stage', 'publisher_status', 'radius_mi', 'recent_days', 'recent_official_activity', 'record_date', 'record_id', 'source_feed_count', 'title_cut', 'what_changed_recently'].concat(['feed_ref', 'link_kind', 'publisher_stage_unpublished']).sort();
   // national-5 (2026-11-02) adds one, on purpose: publisher_stage_unpublished (the source publishes no status, so none is printed as the agency's)
   // national-4 (2026-11-01) adds three, on purpose: feed_ref (where the agency publishes the data), record_id (the agency's record number) and title_cut (the source feed shortened the title)
   ok(JSON.stringify(snake) === JSON.stringify(EXPECT), '2a the snake_case response keys it reads are exactly these thirty-three (a new one must be added here on purpose)', snake);
@@ -160,7 +160,7 @@ const C = code(SRC);
      && (C.match(/opts\.showLifecycle/g) || []).length === 1 && /opts\.showLifecycle === true/.test(C) && !head.includes('opts.showLifecycle') && !bar.includes('opts.showLifecycle'),
     '4g opts carries the address, the client label, the brokerage and the agent, read in header() only; and, from build step 8, the live and hidden report actions, read in actionsBar() only', optReads);
   const dataNames = [...new Set([...C.matchAll(/data-([a-z-]+)=/g)].map((m) => m[1]))].sort();
-  ok(!/\bid="|dataset/.test(C) && JSON.stringify(dataNames) === JSON.stringify(['da-action', 'da-filter', 'da-overview', 'da-qol', 'da-stage', 'da-sub', 'da-type', 'da-value', 'lifecycle', 'stage']),
+  ok(!/\bid="|dataset/.test(C) && JSON.stringify(dataNames) === JSON.stringify(['da-action', 'da-briefhost', 'da-filter', 'da-ovhost', 'da-qol', 'da-stage', 'da-sub', 'da-type', 'da-value', 'lifecycle', 'stage']),
     '4h the markup writes no id (two reports may share a page) and only these data-* names: the lifecycle, the stage, the filter keys and (build step 8) the action a live button stands for', dataNames);
   ok(/data-lifecycle="' \+ k \+ '"/.test(C) && /var k = lifeKey\(p\);/.test(C) && /has\(SHAPES, k\)/.test(C), '4i the one data-* value, and the one class suffix, come from a key that must be one of the four in the shape table');
 }
@@ -225,7 +225,7 @@ const C = code(SRC);
     // national-7 (2026-11-02): the universal report corrections suite renders the view on the Seattle sample
     'test/report-quality-national7.test.mjs', 'test/report-overview-scale.test.mjs',
     // 2026-11-03: the partner-sample review and the temporary-installation rule render the view on the Seattle sample
-    'test/report-partner-review.test.mjs', 'test/temporary-installation.test.mjs', 'test/report-quality-national8.test.mjs']);
+    'test/report-partner-review.test.mjs', 'test/temporary-installation.test.mjs', 'test/report-quality-national8.test.mjs', 'test/da-report-filter-rebuild.browser.test.mjs']);
   const stray = hits.filter((f) => !ALLOWED.has(f));
   ok(hits.includes(MOD) && hits.includes('test/da-report-view.test.mjs'), '6a (control) the walk sees the module and its own tests (' + hits.length + ' files name it)');
   ok(stray.length === 0, '6b no page, lib, script, workflow or edge function names the view except its three callers (the private review page, build step 4; the customer page, 5c; the client\'s page for a share link, 8) and the side-by-side comparison module that reads its functions (build step 10)', stray);

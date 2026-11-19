@@ -527,12 +527,12 @@ export function detectedChangeEntries(events: ReportableEvent[]) {
 //
 // THE PUBLISHER. source-publishers.generated.json is derived mechanically from the development source registry (the one place a
 // source's agency is written down) by scripts/gen-source-publishers.mjs. A record whose source is not in the registry names no agency.
-type Publisher = { agency: string | null; dataset: string | null; status_const?: string | null; date_label?: string | null };
+type Publisher = { agency: string | null; dataset: string | null; status_const?: string | null; date_label?: string | null; link_kind?: 'record' | 'database' | null };
 const PUBLISHERS: Record<string, Publisher> = ((publishersFile as unknown as { publishers?: Record<string, Publisher> }).publishers) ?? {};
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
 export function publisherOf(family: string | null): Publisher {
   const p = family ? PUBLISHERS[family] : undefined;
-  return { agency: str(p?.agency), dataset: str(p?.dataset), status_const: str(p?.status_const), date_label: str(p?.date_label) };
+  return { agency: str(p?.agency), dataset: str(p?.dataset), status_const: str(p?.status_const), date_label: str(p?.date_label), link_kind: p?.link_kind === 'record' ? 'record' : p?.link_kind === 'database' ? 'database' : null };
 }
 /**
  * Whether the record's stored stage is a word the AGENCY published. A source with no status column stores its connector's constant
@@ -615,14 +615,20 @@ const TEMPORARY_EVENT = [' event ', ' events ', ' stage ', ' festival ', ' conce
 /** "temporary" followed closely by what is put up for a while: the thing named is the temporary object, so "erect" or "new construction" around it
  *  is not a new building. Adjacent only, so "temporary shoring", "temporary power" or "temporary hoist" for a real building is not read as an event. */
 const TEMPORARY_INSTALLATION_RE = / temporary( [a-z0-9]+){0,3}? (structure|structures|market|markets|booth|booths|kiosk|kiosks|canopy|canopies|exhibit|exhibits|exhibition|platform|platforms|display|displays|seating|grandstand|grandstands|inflated) /;
-const CHANGE_OF_USE = [' change of use ', ' change in use ', ' change use ', ' establish use ', ' change of occupancy ', ' convert ', ' conversion ', ' converting '];
+const CHANGE_OF_USE = [' change of use ', ' change in use ', ' change use ', ' establish use ', ' change of occupancy '];
+/** "convert" is a change of use only when it names a use; "convert the kitchen to a bedroom" is interior work. */
+const CONVERT_USE_RE = / (convert|converts|converting|conversion|converted)( [a-z0-9]+){0,8}? (to|into) ( [a-z0-9]+){0,2}? ?(office|offices|restaurant|retail|residential|apartment|apartments|dwelling|dwellings|lodging|hotel|housing|commercial|warehouse|school|church|clinic|laboratory|lab|storage|bar|cafe|brewery|dispensary|use|condominium|condominiums|multifamily|mixed use|industrial|daycare|gym|studio) /;
 const DEMOLITION = [' demolish ', ' demolition ', ' demo of ', ' raze '];
 const SITE_WORK = [' shoring ', ' excavation ', ' excavate ', ' grading ', ' clearing and grading ', ' mass grading ', ' earthwork '];
 const NEW_CONSTRUCTION = [' new construction ', ' new single family ', ' new multifamily ', ' erect ', ' construct a residential ', ' construct a commercial ', ' construct a mixed use '];
 /** Size and shape words describe a building but do not say one is being built ("two story amenity addition", "repairs to the 5 story garage"): they count as
  *  new construction only beside an affirmative construction word (relevance-4, 2026-11-19). */
 const NEW_SIZE_WORDS = [' high rise ', ' mid rise ', ' story ', ' stories ', ' dwelling units ', ' townhouses ', ' townhomes '];
-const AFFIRM_RE = / (allow|new|construct|constructs|constructing|construction of|build|building a|erect|proposed|propose) /;
+const AFFIRM_RE = / (new|construct|constructs|constructing|construction of|build|building a|erect) /;
+/** "allow" / "proposed" / "propose" affirm a building only when the same record states no repair, replacement, renovation or maintenance work on one that
+ *  stands ("Proposed repairs to a five-story garage" builds nothing; "to allow an 8-story, 254-unit apartment building" does). */
+const AFFIRM_WEAK_RE = / (allow|proposed|propose) /;
+const WORK_ON_EXISTING_RE = / (repair|repairs|repairing|replace|replaces|replacing|replacement|replacements|restore|restoration|rehabilitation|rehabilitate|renovation|renovations|renovate|maintenance|remodel|remodeling|resurfacing|recoat|recoating|patching|crack|cracks) /;
 /** An explicit statement that something does NOT change; removed before the change-of-use words are read (clause-level, so the rest of the record still counts). */
 const NEGATED_USE_RE = / (no|without|not a|not any) (change|changes) (of|in) (use|occupancy|uses) | existing use (will )?(remains?|stays?|is) (unchanged|the same) | use (remains?|stays?) (unchanged|the same) | no change to (the )?(use|occupancy) /g;
 /** Demolition of a building or structure, as opposed to removal of interior partitions, finishes or storefronts. */
@@ -697,6 +703,7 @@ export function relevance(
   const inc = (basis: RelevanceBasis, evidence: string, use?: string): Relevance =>
     ({ include: true, basis, evidence: evidence.trim(), ...(use ? { use } : {}), ...(scale ? { scale } : {}), rule_version: V });
   let w = normalizeWords(raw);
+  const w0 = w;
   // the Type itself is the documented use: a road, bridge or utility project; a data center; a heavy facility (landfill, quarry, burning, transfer)
   if (typeKey === 'infrastructure') return inc('infrastructure', 'road, utility or public-works project');
   if (typeKey === 'datacenter') return inc('facility_use', 'data center');
@@ -704,6 +711,7 @@ export function relevance(
   for (const x of INTERIOR_DEMOLITION) w = w.split(x).join(' interior work ');
   w = w.replace(EXISTING_RE, ' existing building ');
   w = w.replace(NEGATED_USE_RE, ' ');
+  w = w.replace(/ addition of an? new( [a-z]+)? (bath|bathroom|closet|laundry|powder room|powder bath) /g, ' interior ');
   w = w.replace(/ permit revisions? | revision /g, ' ');
   let hit: string | null;
   if (any(w, TEMPORARY) && (hit = any(w, TEMPORARY_EVENT))) return inc('temporary_event', 'temporary' + hit.trimEnd());
@@ -711,7 +719,7 @@ export function relevance(
   if (tmp) return inc('temporary_event', 'temporary ' + tmp[2]);
   // a change of use that also builds a new building ("Establish use as permanent supportive housing for 83 stacked dwelling units ... Construct new
   // mixed-use building") is new construction of that use; a conversion of an existing building stays a change of use
-  if ((hit = any(w, CHANGE_OF_USE))) {
+  if ((hit = any(w, CHANGE_OF_USE) ?? (CONVERT_USE_RE.exec(w)?.[0] ?? null))) {
     const nb = any(w, [' new construction ', ' erect ', ' construct a residential ', ' construct a commercial ', ' construct a mixed use ']) ?? (NEW_BUILDING_RE.exec(w)?.[0] ?? null);
     return nb ? inc('new_construction', nb.trim(), documentedUse(raw)) : inc('change_of_use', hit, documentedUse(raw));
   }
@@ -719,9 +727,10 @@ export function relevance(
   const wl = w.split(' land use code ').join(' code ');
   const rawDemo = any(w, DEMOLITION);
   // demolition names a building or structure; interior context without such a target is routine tenant work, never demolition
-  const demo = rawDemo && (DEMO_TARGET_RE.test(w) || !any(w, INTERIOR_CONTEXT)) ? rawDemo : null;
+  const demo = rawDemo && (DEMO_TARGET_RE.test(w) || !(any(w0, INTERIOR_CONTEXT) ?? any(w0, [' demised ', ' suite ', ' space ', ' lobby ']))) ? rawDemo : null;
   const site = any(w, SITE_WORK);
-  const sizeBuild = AFFIRM_RE.test(w) && !any(w, ADDITION) ? any(w, NEW_SIZE_WORDS) : null;
+  const affirmed = AFFIRM_RE.test(w) || (AFFIRM_WEAK_RE.test(w) && !WORK_ON_EXISTING_RE.test(w));
+  const sizeBuild = affirmed && !any(w, ADDITION) ? any(w, NEW_SIZE_WORDS) : null;
   const build = any(w, NEW_CONSTRUCTION) ?? (NEW_BUILDING_RE.exec(w)?.[0] ?? null) ?? sizeBuild;
   if ((hit = any(wl, LAND_USE))) {
     const r = inc('land_use', hit);
@@ -734,8 +743,11 @@ export function relevance(
   if ((hit = any(w, ADDITION))) return inc('addition', hit);
   if ((hit = any(w, SUBSTANTIAL))) return inc('substantial_alteration', hit);
   const ext = any(w, EXTERIOR);
-  if (ext && !any(w, STRONG_ROUTINE)) {
-    const wide = any(w, BUILDING_WIDE) ?? (BUILDING_WIDE_RE.exec(w)?.[0] ?? null);
+  if (ext) {
+    // an explicit building-wide statement or a floor range qualifies even beside replacement wording; a bare count ("40 windows") does not when the record
+    // calls the work like-for-like or a replacement (routine), so a number of windows alone never makes development
+    const explicit = any(w, BUILDING_WIDE) ?? (/ floors? \d+ (to |through |thru )?\d+ /.exec(w)?.[0] ?? null);
+    const wide = explicit ?? (any(w, STRONG_ROUTINE) ? null : (BUILDING_WIDE_RE.exec(w)?.[0] ?? null));
     if (wide) return inc('exterior_building_wide', (ext.trim() + ',' + wide).replace(/\s+/g, ' '));
   }
   if ((hit = any(w, PUBLIC_ACCESS))) return inc('public_access', hit);
@@ -962,7 +974,7 @@ export function assemble(input: AssembleInput): Assembled {
       publisher_type: typeof p.type_raw === 'string' && p.type_raw.trim() ? p.type_raw.trim() : null,
       ...(description ? { description } : {}),
       ...(actWin ? { activity_window: actWin } : {}),
-      source: { url: p.source_ref, attribution: credits[family] ?? null, agency: pub.agency, feed_ref: pub.dataset, record_id: recordIdOf(p) },
+      source: { url: p.source_ref, attribution: credits[family] ?? null, agency: pub.agency, feed_ref: pub.dataset, record_id: recordIdOf(p), link_kind: pub.link_kind ?? null },
       homesignal_observation: led
         ? { first_observed_at: led.first_observed_at, last_observed_at: led.last_observed_at, observation_count: led.observation_count, change_ready: led.change_ready }
         : null,

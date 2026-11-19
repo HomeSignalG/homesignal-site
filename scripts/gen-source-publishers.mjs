@@ -41,6 +41,8 @@ export function build(registry) {
       const agency = typeof e.jurisdiction === 'string' && e.jurisdiction.trim() ? e.jurisdiction.trim() : null;
       if (out[e.registry_id]) throw new Error('duplicate registry_id ' + e.registry_id);
       const rec = { agency, dataset: datasetRef(conn, e) };
+      // What the record link opens: `record` only where the registry states the source links each record to its own page; every other source links the agency's database.
+      rec.link_kind = e.record_url_precision === 'record' ? 'record' : 'database';
       // A source with no status column stores its connector's CONSTANT (status_const) as the record's stage. That word is ours, not the
       // agency's, so the report must not print it as the agency's status: it needs to know the constant.
       if (typeof e.status_const === 'string' && e.status_const) rec.status_const = e.status_const;

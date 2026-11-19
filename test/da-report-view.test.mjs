@@ -309,7 +309,7 @@ try {
   ok(attrs(html).length > 40, '4e (control) there were attributes to scan (' + attrs(html).length + ')');
   const ALLOWED_ATTRS = new Set(['class', 'aria-label', 'aria-hidden', 'data-lifecycle', 'data-da-qol', 'href', 'target', 'rel', 'viewBox', 'width', 'height', 'focusable', 'fill', 'stroke', 'stroke-width', 'stroke-dasharray', 'cx', 'cy', 'r', 'x', 'y', 'rx', 'd',
     // the 100526 layout: stage badges, the filters, the map, the action bar
-    'data-stage', 'data-da-type', 'data-da-stage', 'data-da-filter', 'data-da-overview', 'data-da-value', 'aria-pressed', 'type', 'role', 'scope', 'transform', 'text-anchor', 'dy', 'aria-disabled', 'hidden']);
+    'data-stage', 'data-da-type', 'data-da-stage', 'data-da-filter', 'data-da-ovhost', 'data-da-briefhost', 'data-da-value', 'aria-pressed', 'type', 'role', 'scope', 'transform', 'text-anchor', 'dy', 'aria-disabled', 'hidden']);
   const seen = new Set(Object.values(outputs).flatMap((o) => attrs(o).map(([k]) => k)));
   ok([...seen].every((k) => ALLOWED_ATTRS.has(k)) && seen.has('data-lifecycle') && seen.has('href'), '4e2 the only attribute NAMES that ever appear are the closed set of presentation ones: no id, no data-id, no title, no style, no other data-*', [...seen].filter((k) => !ALLOWED_ATTRS.has(k)));
   ok(!/<(script|iframe|object|embed|form|input|img|select|textarea)\b/i.test(html) && !/\son[a-z]+=/i.test(html), '4f the output has no script, frame, form, input or event-handler attribute');

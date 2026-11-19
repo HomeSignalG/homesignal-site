@@ -29,10 +29,10 @@ const read = (f) => readFileSync(join(root, f), 'utf8');
   const pubs = JSON.parse(read('supabase/functions/_shared/source-publishers.generated.json')).publishers;
   const ids = ['socrata', 'arcgis', 'ckan', 'csv', 'carto'].flatMap((c) => (reg[c] || []).map((e) => e.registry_id));
   ok(ids.length > 200 && ids.every((id) => pubs[id] && pubs[id].agency && pubs[id].dataset), '1b every registry source has an agency and a dataset reference (' + ids.length + ')');
-  ok(JSON.stringify(M.publisherOf('seattle-land-use-permits')) === JSON.stringify({ agency: 'City of Seattle', dataset: 'data.seattle.gov, dataset ht3q-kdvx', status_const: null, date_label: null })
+  ok(JSON.stringify(M.publisherOf('seattle-land-use-permits')) === JSON.stringify({ agency: 'City of Seattle', dataset: 'data.seattle.gov, dataset ht3q-kdvx', status_const: null, date_label: null, link_kind: 'database' })
     && M.publisherOf('wa-ecology-sepa-register').agency === 'Washington State Department of Ecology (SEPA Register)'
     && M.publisherOf('wa-ecology-sepa-register').dataset === 'data.wa.gov, dataset mmcb-z6jf', '1c the two sources the Seattle sample named nobody for now name their agency and dataset');
-  ok(JSON.stringify(M.publisherOf('no-such-source')) === JSON.stringify({ agency: null, dataset: null, status_const: null, date_label: null }) && M.publisherOf(null).agency === null, '1d a source the registry does not know names no agency (never a guess)');
+  ok(JSON.stringify(M.publisherOf('no-such-source')) === JSON.stringify({ agency: null, dataset: null, status_const: null, date_label: null, link_kind: null }) && M.publisherOf(null).agency === null, '1d a source the registry does not know names no agency (never a guess)');
   // the agency names are the publishers' own: each Socrata dataset's `attribution` metadata (views API, read 2026-11-01) is
   // "City of Seattle" for ht3q-kdvx and 76t5-zqzr and "Washington State Department of Ecology" for mmcb-z6jf
   ok(M.publisherOf('seattle-land-use-permits').agency === 'City of Seattle' && M.publisherOf('seattle-building-permits').agency === 'City of Seattle'
@@ -142,7 +142,7 @@ const read = (f) => readFileSync(join(root, f), 'utf8');
   // national-6 (2026-11-02): the view shortens long titles at a word (TITLE_MAX) and the note says "description"
   ok(/<span class="da-rv-name">Xx+y?…<\/span>/.test(devSec) && /The source feed shortens this description\. The full description is in the official record\./.test(devSec), '4e a shortened title ends in an ellipsis and says the full description is in the official record');
   ok((devSec.match(/City of Example \(data\.example\.gov, dataset abcd-1234\)\./g) || []).length === 4 && /Agency record number:<\/span> A1/.test(devSec), '4f every row names its agency and dataset, and its agency record number');
-  ok(/Official agency data in this report:<\/span> City of Example \(data\.example\.gov, dataset abcd-1234\)\./.test(h), '4g the coverage note names the agency');
+  ok(!/Official agency data in this report/.test(h) && /<span class="da-rv-k">Coverage:<\/span> This report reflects/.test(h) && (h.match(/Coverage:/g) || []).length === 1, '4g the method notes carry no agency inventory and one Coverage label (each row still names its agency, 4f)');
   // an older saved report (no national-4 fields) reads exactly as before: no minor section, no record numbers, no shortened-title note
   const old = JSON.parse(JSON.stringify(response));
   old.report.projects.forEach((p) => { delete p.scope; delete p.title_cut; p.source = { url: p.source.url, attribution: 'Old credit.' }; });

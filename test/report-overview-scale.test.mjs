@@ -53,7 +53,7 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
   // ---- 3. the view: the largest new buildings lead the overview ---------------------------------------------------------------------------------------
   const html = V.html({ status: 'OK', coverage_state: a.coverage_state, report: a.intelligence, render: a.renderOnly }, { subject: SUBJECT.address });
-  const ov = (html.match(/data-da-overview="\d+">([\s\S]*?)<\/ol>/) || ['', ''])[1];
+  const ov = (html.match(/data-da-overview>([\s\S]*?)<\/ol>/) || ['', ''])[1];
   const lines = [...ov.matchAll(/<li(?![^>]*hidden)[^>]*>([\s\S]*?)<\/li>/g)].map((m) => m[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&'));
   ok(lines.length === 6 && /254-unit apartment building/.test(lines[0]) && /10-story/.test(lines[1]) && /83 stacked dwelling units/.test(lines[2]) && /Shoreline/.test(lines[3])
     && !lines.some((l) => /residential high rise/.test(l)),
@@ -80,7 +80,7 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
       p.relevance = { basis: s[1], evidence: s[1], ...(s[2] ? { scale: s[2] } : {}), ...(s[3] || {}), rule_version: 'relevance-2' };
     });
     const h = V.html({ status: 'OK', coverage_state: a.coverage_state, report: rep, render: a.renderOnly }, { subject: SUBJECT.address });
-    return [...[...((h.match(/data-da-overview="\d+">([\s\S]*?)<\/ol>/) || ['', ''])[1]).matchAll(/<li(?![^>]*hidden)[^>]*>([\s\S]*?)<\/li>/g)].map((x) => x[1]).join(' ').matchAll(/Record (\S+) with/g)].map((m) => m[1]);
+    return [...[...((h.match(/data-da-overview>([\s\S]*?)<\/ol>/) || ['', ''])[1]).matchAll(/<li(?![^>]*hidden)[^>]*>([\s\S]*?)<\/li>/g)].map((x) => x[1]).join(' ').matchAll(/Record (\S+) with/g)].map((m) => m[1]);
   };
   const o = ovOf([['demo', 'demolition'], ['house', 'new_construction', { sqft: 1800 }], ['tower', 'new_construction', { units: 300, stories: 30 }],
     ['mid', 'land_use', { stories: 12 }, { proposes: 'new_construction' }], ['nosize', 'new_construction'], ['hotel', 'change_of_use', { units: 120 }],

@@ -30,12 +30,20 @@ const cases = [
 ];
 for (const [t, tr, tk, f] of cases) { const r = R(t, tr, tk); ok(f(r), t.slice(0, 70) + ' -> ' + out(r), r); }
 ok(M.RELEVANCE_RULE_VERSION === 'relevance-4', 'rule version');
+const more = [
+  ['Proposed repairs to a five-story parking garage', 'Non-Residential', 'commercial', (r) => !r.include],
+  ['Proposed apartment building, 5 stories, 40 units', 'Building Permit', 'residential', (r) => r.include && r.basis === 'new_construction'],
+  ['Replace siding and windows on all floors of the entire building, 55 balconies', 'Building Permit', 'commercial', (r) => r.include && r.basis === 'exterior_building_wide'],
+  ['Replace windows like for like, 40 windows', 'Residential Building Permit', 'residential', (r) => !r.include],
+  ['New 12 unit building plus window replacement at existing building', 'Building Permit', 'residential', (r) => r.include && r.basis === 'new_construction'],
+];
+for (const [t, tr, tk, f] of more) { const r = R(t, tr, tk); ok(f(r), t.slice(0, 70) + ' -> ' + out(r), r); }
 // wording and share-box pins (the view and share-modal are read as source)
 import { readFileSync } from 'node:fs';
 const view = readFileSync(new URL('../lib/da-report-view.js', import.meta.url), 'utf8');
 const share = readFileSync(new URL('../lib/share-modal.js', import.meta.url), 'utf8');
 ok(/The official record does not specify a construction schedule or potential impacts on nearby properties\./.test(view) && !/states no schedule and no effect/.test(view), 'QoL wording replaced');
-ok(/Coverage: This report reflects development activity identified within the property\\'s search radius/.test(view) && !/official source feed/.test(view), 'coverage wording replaced, no feed count');
-ok(/data-da-overview="' \+ firstN/.test(view) && /data-da-type="' \+ esc\(typeKeyOf\(p\)\) \+ '" data-da-stage="' \+ \(stageKey\(p\)/.test(view), 'overview and history carry the Type and Stage filter hooks');
+ok(/This report reflects development activity identified within the property\\'s search radius/.test(view) && !/official source feed|Official agency data in this report/.test(view), 'coverage wording replaced, no feed count, no agency inventory');
+ok(/function filterModel/.test(view) && /overviewSection\(f, ctx\.response\)/.test(view) && /briefing\(ctx\.m\.report, f/.test(view), 'filters rebuild the overview and briefing from the filtered records');
 ok(/svg: 'M10\.6/.test(share) && /appLink\(h\) \? ''/.test(share), 'Copy link icon is an SVG; mailto/sms links open no new tab');
 process.exit(fails ? 1 : 0);
