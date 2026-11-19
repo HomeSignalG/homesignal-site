@@ -74,28 +74,44 @@ ok(created.p?.status_attribution?.status_date === null, 'with no status-update d
 
 // ── 3. coverage categories ────────────────────────────────────────────────────────────────
 const PL = [{ state: 'CO', county: 'Boulder' }];
-const reg = { 'dot-state': ['transportation_capital'], 'city-permits': ['building_permits'], 'cnty-plan': ['planning_zoning'], 'no-meta': [] };
-const scope = (id) => ({ 'dot-state': 'statewide', 'city-permits': 'county', 'cnty-plan': 'county', 'no-meta': 'county' })[id] ?? null;
+const reg = { 'dot-state': ['transportation_capital'], 'city-permits': ['building_permits'], 'cnty-plan': ['planning_zoning'], 'state-permits': ['building_permits', 'planning_zoning'], 'no-meta': [] };
+const complete = { 'city-permits': ['building_permits'] };
+const scope = (id) => ({ 'dot-state': 'statewide', 'city-permits': 'county', 'cnty-plan': 'county', 'state-permits': 'statewide', 'no-meta': 'county' })[id] ?? null;
+const cov = (apps, r = reg, c = complete) => C.categoryCoverage(PL, apps, r, scope, c);
 const keys = (l) => l.map((e) => e.category).sort();
-const t1 = C.categoryCoverage(PL, ['dot-state'], reg, scope);
+const find = (t, k) => t.connected.find((e) => e.category === k);
+const t1 = cov(['dot-state']);
 ok(keys(t1.connected).join() === 'transportation_capital' && keys(t1.not_connected).join() === 'building_permits,planning_zoning,subdivision_land_division', 'transportation-only: the other categories are NOT connected', t1);
-const t2 = C.categoryCoverage(PL, ['dot-state', 'city-permits', 'cnty-plan'], reg, scope);
+const t2 = cov(['dot-state', 'city-permits', 'cnty-plan']);
 ok(keys(t2.connected).join() === 'building_permits,planning_zoning,transportation_capital' && keys(t2.not_connected).join() === 'subdivision_land_division', 'mixed transportation, permit and planning coverage', t2);
-const t3 = C.categoryCoverage(PL, ['dot-state', 'no-meta'], reg, scope);
-ok(t3.not_connected.length === 0 && t3.not_established.length === 3, 'incomplete metadata: nothing is called missing, it is "not established"', t3);
-const t4 = C.categoryCoverage([], ['dot-state'], reg, scope);
+// scope and category are separate: a STATEWIDE source that declares local categories IS connected for them (scope statewide), never ruled out by its scope
+const t6 = cov(['state-permits']);
+ok(find(t6, 'building_permits')?.scope === 'statewide' && find(t6, 'planning_zoning')?.scope === 'statewide', 'a statewide source that declares local categories is connected for them, scope statewide', t6);
+ok(find(t6, 'building_permits')?.completeness === 'not_established', 'a statewide source never implies comprehensive local coverage (completeness not established)', find(t6, 'building_permits'));
+ok(find(cov(['city-permits']), 'building_permits')?.completeness === 'declared_complete', 'completeness is "declared complete" only when the registry declared it', cov(['city-permits']));
+ok(find(cov(['cnty-plan']), 'planning_zoning')?.completeness === 'not_established', 'a county-scope source is not complete either unless it declared it', cov(['cnty-plan']));
+ok(find(cov(['state-permits', 'city-permits']), 'building_permits')?.scope === 'county' && find(cov(['state-permits', 'city-permits']), 'building_permits')?.completeness === 'declared_complete', 'a statewide and a county source together: county scope, declared complete by the one that declared it');
+// mixed sources: known coverage is not erased by another applicable source that lacks metadata, but absence claims stop
+const t3 = cov(['dot-state', 'no-meta']);
+ok(keys(t3.connected).join() === 'transportation_capital', 'known coverage survives another source that declares nothing', t3);
+ok(t3.not_connected.length === 0 && keys(t3.not_established).join() === 'building_permits,planning_zoning,subdivision_land_division', 'unknown metadata prevents an absence claim: the rest is "not established", never "not connected"', t3);
+const t4 = C.categoryCoverage([], ['dot-state'], reg, scope, complete);
 ok(t4.not_connected.length === 0 && t4.geography_verified === false, 'unverified geography never produces a missing claim', t4);
-const t5 = C.categoryCoverage(PL, ['dot-state'], { 'dot-state': ['transportation_capital', 'building_permits'] }, scope);
-ok(keys(t5.statewide_only).join() === 'building_permits' && keys(t5.connected).join() === 'transportation_capital', 'a statewide source never establishes a LOCAL category', t5);
-ok(C.categoryCoverage(PL, [], reg, scope).connected.length === 0, 'no applicable source: nothing connected');
-ok(C.categoryCoverageOf(null) === null && C.categoryCoverageOf({ rule: 'x' }) === null && C.categoryCoverageOf(t1) === t1, 'a stored value is read back only when it is a category coverage');
+ok(cov([]).connected.length === 0 && cov([]).not_connected.length === 0, 'no applicable source: nothing connected and nothing claimed missing (geography cannot be tied to a source)');
+ok(C.categoryCoverageOf(null) === null && C.categoryCoverageOf({ rule: 'coverage-categories-1', connected: [], not_connected: [], not_established: [] }) === null && C.categoryCoverageOf(t1) === t1, 'a stored value is read back only when it is a rule-2 category coverage');
+// a typo in the registry cannot silently drop a source's coverage
+const G = await import('../scripts/gen-source-categories.mjs');
+let threw = false; try { G.build({ arcgis: [{ registry_id: 'x', coverage_categories: ['building_permit'] }] }); } catch { threw = true; }
+ok(threw, 'an unknown category word fails the generator');
+threw = false; try { G.build({ arcgis: [{ registry_id: 'x', coverage_categories: ['building_permits'], coverage_complete_for: ['planning_zoning'] }] }); } catch { threw = true; }
+ok(threw, 'completeness cannot be declared for a category the source does not declare');
 
 // coverage rides on the report and is separate from outcome, limitations and credit
 const noCov = run([], []);
-const cov = run([], [], { category_coverage: t1 });
-ok(cov.intelligence?.coverage?.categories?.not_connected?.length === 3 && !noCov.intelligence?.coverage?.categories, 'the report carries the category coverage and only when given', cov.intelligence?.coverage?.categories);
-ok(cov.activity?.outcome === noCov.activity?.outcome && cov.coverage_state === noCov.coverage_state && JSON.stringify(cov.intelligence?.coverage?.limitations) === JSON.stringify(noCov.intelligence?.coverage?.limitations),
-  'coverage disclosure changes neither the outcome, the coverage state nor the limitations (so no credit decision moves)', { a: cov.activity?.outcome, b: noCov.activity?.outcome });
+const covRun = run([], [], { category_coverage: t1 });
+ok(covRun.intelligence?.coverage?.categories?.not_connected?.length === 3 && !noCov.intelligence?.coverage?.categories, 'the report carries the category coverage and only when given', covRun.intelligence?.coverage?.categories);
+ok(covRun.activity?.outcome === noCov.activity?.outcome && covRun.coverage_state === noCov.coverage_state && JSON.stringify(covRun.intelligence?.coverage?.limitations) === JSON.stringify(noCov.intelligence?.coverage?.limitations),
+  'coverage disclosure changes neither the outcome, the coverage state nor the limitations (so no credit decision moves)', { a: covRun.activity?.outcome, b: noCov.activity?.outcome });
 const failing = run([row('x1', 'fam-filing')], [mk('x1', 'fam-filing', 'New 40-unit apartment building', 'Approved')], { category_coverage: t1, health: [{ registry_id: 'fam-filing', fetch_failures_24h: 2, blocked_24h: 0, truncated_24h: 0 }] });
 ok((failing.intelligence?.coverage?.limitations ?? []).some((l) => l.code === 'SOURCE_NOT_FULLY_READ') && failing.intelligence.coverage.categories.not_connected.length === 3, 'a failing applicable source is SOURCE_NOT_FULLY_READ, kept apart from the missing-category list', (failing.intelligence?.coverage?.limitations ?? []).map((l) => l.code));
 
@@ -134,6 +150,16 @@ respEmpty.intelligence ? (respEmpty.intelligence.coverage ??= {}, respEmpty.inte
 const vEmpty = txt(V.html(respEmpty, { subject: W.ADDRESS }));
 ok(/only the sources Jody has connected/i.test(vEmpty) && /Transportation capital projects|building permits/i.test(vEmpty), 'an empty report names what the connected sources cover and what no source covers', vEmpty.slice(0, 400));
 ok(!/nothing is happening|no development is|no activity/i.test(vEmpty.replace(/No (significant )?development activity[^.]*\./i, '')), 'the caveat makes no absence claim');
+
+// ── 7. the date-basis audit: names are leads, declared mappings are not re-listed as candidates ──
+const AU = await import('../scripts/audit-date-basis.mjs');
+const au = AU.audit({ arcgis: [
+  { registry_id: 'a', column_map: { file_date: 'CreatedDate' } }, { registry_id: 'b', column_map: { file_date: 'CreatedDate' }, file_date_basis: 'record_created' },
+  { registry_id: 'c', column_map: { file_date: 'ApplicationDate' } }, { registry_id: 'd', column_map: { file_date: 'D1' } },
+  { registry_id: 'e', column_map: { file_date: 'LastEditDate' }, file_date_label: 'Published' }, { registry_id: 'f', column_map: {} }] });
+const st = Object.fromEntries(au.map((r) => [r.registry_id, r.status]));
+ok(st.a === 'candidate_review' && st.b === 'declared' && st.c === 'name_suggests_filing' && st.d === 'unclassified_name' && st.e === 'own_label' && !('f' in st), 'the audit separates candidates, declared, own-label, unproven and unclassified mappings', st);
+ok(AU.audit(AU.REGISTRY).filter((r) => r.file_date_basis).every((r) => r.status === 'declared'), 'every real declared mapping is listed as declared, never as a candidate');
 
 console.log(`\n${n - fails}/${n} passed`);
 process.exit(fails ? 1 : 0);

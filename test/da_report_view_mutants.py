@@ -194,7 +194,7 @@ m('creation_only_wording_dropped', ": rd.creationOnly ? '. Jody holds no later p
 m('modification_shown_without_its_meaning', "a modification is not a project milestone and does not confirm the status.", "a modification confirms the status.")
 m('status_date_note_dropped', "return sd ? 'Agency status updated ' + sd + '.' : '';", "return '';")
 m('empty_answer_caveat_dropped', "var cav = key === 'NO_SIGNIFICANT_CHANGES' || key === 'NO_DATA_INGESTED' || key === 'NO_DEVELOPMENT_ACTIVITY' ? emptyCaveat(report) : '';", "var cav = '';")
-m('statewide_read_as_local_coverage', "if (c.statewide.length) out.push('Only statewide sources are connected for '", "if (false) out.push('Only statewide sources are connected for '")
+m('completeness_overclaimed', "'declared complete within its own area' : 'completeness not established'", "'declared complete within its own area' : 'declared complete within its own area'")
 m('unknown_reason_read_as_filing_only', "filingOnly: isObj(v) && v.reason === 'filing_only'", "filingOnly: isObj(v) && v.reason !== 'old_date'")
 m('words_match_substring', "return !!x && x === wordsOf(b); }", "return !!x && wordsOf(b).indexOf(x) >= 0; }")
 m('unstaged_row_not_filterable', "'<tr role=\"row\" data-da-type=\"' + esc(typeKeyOf(p)) + '\" data-da-stage=\"' + (k || (lifeKey(p) === 'operating' ? 'operating' : 'none')) + '\"' + subAttr(p, k) + '>'", "'<tr role=\"row\"' + (k ? ' data-da-type=\"' + esc(typeKeyOf(p)) + '\" data-da-stage=\"' + k + '\"' : '') + '>'", [BROWSER])

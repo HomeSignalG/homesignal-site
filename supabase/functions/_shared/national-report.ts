@@ -549,7 +549,7 @@ const PUBLISHERS: Record<string, Publisher> = ((publishersFile as unknown as { p
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
 export function publisherOf(family: string | null, table: Record<string, Publisher> = PUBLISHERS): Publisher {
   const p = family ? table[family] : undefined;
-  return { agency: str(p?.agency), dataset: str(p?.dataset), status_const: str(p?.status_const), date_label: str(p?.date_label), date_basis: dateBasisOf((p as { date_basis?: unknown } | undefined)?.date_basis) };
+  return { agency: str(p?.agency), dataset: str(p?.dataset), status_const: str(p?.status_const), date_label: str(p?.date_label), ...(dateBasisOf((p as { date_basis?: unknown } | undefined)?.date_basis) !== 'unstated' ? { date_basis: dateBasisOf((p as { date_basis?: unknown } | undefined)?.date_basis) } : {}) };
 }
 /**
  * Whether the record's stored stage is a word the AGENCY published. A source with no status column stores its connector's constant
