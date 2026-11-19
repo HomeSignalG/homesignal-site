@@ -6,7 +6,7 @@ import vm from 'node:vm';
 let fails = 0;
 const ok = (c, n) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + n); if (!c) fails++; };
 const win = {};
-vm.runInNewContext(readFileSync(new URL('../lib/share-modal.js', import.meta.url), 'utf8'), { window: win, document: {} });
+vm.runInNewContext(readFileSync(new URL('../lib/share-modal.js', import.meta.url), 'utf8'), { window: win, document: { addEventListener() {} } });
 const html = win.HS.shareGridHTML('https://jodytracks.com/r/abc', 'A private development activity report prepared for you');
 const tags = html.match(/<a [^>]*>/g) || [];
 const by = (p) => tags.filter((t) => t.includes('href="' + p));
