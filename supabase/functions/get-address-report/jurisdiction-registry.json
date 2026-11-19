@@ -2548,9 +2548,61 @@
       },
       "incremental_field": "ApplicationDate",
       "recency_days": 365,
-      "recency_expr": "(ApplicationDate >= DATE '{cutoff}' OR (ApplicationDate >= DATE '2021-01-01' AND ApplicationStatus IN ('Under Review','In Process','Payment Pending','Additional Information Request','Permit Specialist to Review','PAC Scheduled','Pre-Check Complete','Application Deposit Due','Outstanding Requirements','Incomplete','Ready to Issue','Plans Examiner to Review','Planning Process Required','Application Received','Application Accepted','Received','Accepted','Public Review','Public Review of Director Appr','BOCC Packet Available','BOCC Hearing','BOCC Tabled to Date Certain','HPAB Hearing Scheduled','Permit Issued','Issued','Approved','Approved with Conditions','BOCC Approved','BOA Approved','Determination Final')))",
+      "recency_expr": "(ApplicationDate >= DATE '{cutoff}' OR ApplicationStatus IN ('Under Review','In Process','Payment Pending','Additional Information Request','Permit Specialist to Review','PAC Scheduled','Pre-Check Complete','Application Deposit Due','Outstanding Requirements','Incomplete','Ready to Issue','Plans Examiner to Review','Planning Process Required','Application Received','Application Accepted','Received','Accepted','Public Review','Public Review of Director Appr','BOCC Packet Available','BOCC Hearing','BOCC Tabled to Date Certain','HPAB Hearing Scheduled','Permit Issued','Issued','Approved','Approved with Conditions','BOCC Approved','BOA Approved','Determination Final'))",
       "record_url_precision": "record",
-      "_receipts": "2026-11-19 Boulder County's own ArcGIS Server, PLANNING/OP_Accela_Point layer 0 (MapServer, point, WGS84; 277,404 rows, newest ApplicationDate 2026-11). Boulder County's Accela records for UNINCORPORATED Boulder County only: it is the county's land-use and building jurisdiction and is NOT a municipal feed for Longmont, Lafayette, Louisville, Superior or Boulder city (whether it holds any municipal-jurisdiction rows is unverified; sampled rows were unincorporated addresses). DocketType and ApplicationStatus vocabularies are VERBATIM live groupBy output over Planning+Building rows since 2025-11-19 (pg_net), never guessed; the whitelist keeps only development-relevant dockets (new buildings, additions, ADUs, deconstruction, site-plan / special-use / subdivision / variance / floodplain / grading cases) and drops roofing, mechanical, electrical, plumbing, window and similar routine permits. Statuses whose meaning the county does not state (Mapped, Final Balance Due, Post Approval, Transfer to Building) are bucketed exclude, not guessed. Per-record Accela link in Link (observed on sampled rows as a boco.org CapDetail URL; not HTTP-fetched). StatusDate is mapped as decision_date only as the date of the latest status change and is not a decision date for in-review records. ACQUISITION WINDOW (founder decision 2026-11-19): status-based, bounded. An application filed in the last 365 days is read whatever its status; an older one is read only while its status is a proposed- or approved-type status (never held, withdrawn, void, denied or complete), and only if filed on or after 2021-01-01 (a fixed floor that bounds history; review it each January). An old Permit Issued record is shown with the agency's own stage word and is never read as construction under way. use_type_const 'Development' is paired with type_map only as the generic fallback for a row whose DocketType is empty (the publisher stated nothing about the kind of work); the DocketType whitelist selects no empty value today. Dry run: the connector query for the ZIP 80501 envelope was run against the live layer (7 records, all with a point and a record link); not yet run through the deployed engine."
+      "_receipts": "2026-11-19 Boulder County's own ArcGIS Server, PLANNING/OP_Accela_Point layer 0 (MapServer, point, WGS84; 277,404 rows, newest ApplicationDate 2026-11). Boulder County's Accela records for UNINCORPORATED Boulder County only: it is the county's land-use and building jurisdiction and is NOT a municipal feed for Longmont, Lafayette, Louisville, Superior or Boulder city (whether it holds any municipal-jurisdiction rows is unverified; sampled rows were unincorporated addresses). DocketType and ApplicationStatus vocabularies are VERBATIM live groupBy output over Planning+Building rows since 2025-11-19 (pg_net), never guessed; the whitelist keeps only development-relevant dockets (new buildings, additions, ADUs, deconstruction, site-plan / special-use / subdivision / variance / floodplain / grading cases) and drops roofing, mechanical, electrical, plumbing, window and similar routine permits. Statuses whose meaning the county does not state (Mapped, Final Balance Due, Post Approval, Transfer to Building) are bucketed exclude, not guessed. Per-record Accela link in Link (observed on sampled rows as a boco.org CapDetail URL; not HTTP-fetched). StatusDate is mapped as decision_date only as the date of the latest status change and is not a decision date for in-review records. ACQUISITION WINDOW (founder decision 2026-11-19): status-based, bounded. An application filed in the last 365 days is read whatever its status; an older one is read only while its status is a proposed- or approved-type status (never held, withdrawn, void, denied or complete) (no filing-date floor: the founder removed the 2021 cutoff on 2026-11-19; acquisition is bounded by the ZIP envelope, the verified status list and 1,000-row pagination, and the connector sends this long query as a form POST). An old Permit Issued record is shown with the agency's own stage word and is never read as construction under way. use_type_const 'Development' is paired with type_map only as the generic fallback for a row whose DocketType is empty (the publisher stated nothing about the kind of work); the DocketType whitelist selects no empty value today. Dry run: the connector query for the ZIP 80501 envelope was run against the live layer (7 records, all with a point and a record link); not yet run through the deployed engine."
+    },
+    {
+      "registry_id": "longmont-active-development",
+      "platform": "arcgis",
+      "service_url": "https://pwnrmaps.ci.longmont.co.us/arcgis_public/rest/services/PLANNING/Planning_Map_2025/FeatureServer/10",
+      "dataset_url": "https://longmontcolorado.gov/news/active-development-map-updated-weekly/",
+      "jurisdiction": "City of Longmont, Colorado",
+      "coverage": [
+        {
+          "state": "CO",
+          "county": "Boulder"
+        },
+        {
+          "state": "CO",
+          "county": "Weld"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "Project_Name",
+          "Project_Type_1"
+        ],
+        "status_raw": "Project_Status",
+        "file_date": "Submittal_Date",
+        "address": "Location",
+        "case_number": "File_No",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "file_date_kind": "filed",
+      "use_type_const": "Development",
+      "status_to_bucket": {
+        "proposed": [
+          "DR",
+          "NM",
+          "PH",
+          "R"
+        ],
+        "approved": [
+          "A",
+          "UC"
+        ],
+        "operating": [],
+        "exclude": [
+          "W",
+          "D"
+        ]
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "incremental_field": "last_edited_date",
+      "_receipts": "2026-11-19 City of Longmont's own ArcGIS Server, PLANNING/Planning_Map_2025 layer 10 (Active Development; polygon, wkid 102100, 212 rows; pg_net). Its Project_Status values are coded and are read from the layer's own coded-value domain, never guessed: DR Development Review (25 rows), NM Neighborhood Meeting, PH Public Hearing (16), R Resubmittal (63), A Approved (44), UC Under Construction (58), W Withdrawn (6), D Denial. DR, NM, PH and R are proposed (an application in review or hearing); A and UC are approved, and the agency's own stage word is kept on the record; W and D are excluded. The stored status is the agency's code, so the page and report say what the agency published. There is no filing-date floor: every row that is not withdrawn or denied is an active development. Submittal_Date is a string (M/D/YYYY), so no date literal is sent. Website_URL is empty on all 212 rows (count 0), so no per-record link exists and record_url is the City's own Active Development Map page, labelled dataset precision, never a made-up per-record URL. Polygon geometry is kept: the connector pins each record at its polygon centroid. Several polygons share one File_No, so identical records collapse under the engine's exact-identity dedupe. This is a city layer on the City's own server, so it carries the City jurisdiction label."
     },
     {
       "registry_id": "fort-collins-building-permits",

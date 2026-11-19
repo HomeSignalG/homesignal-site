@@ -578,6 +578,10 @@
    "agency": "City of Little Rock, Arkansas",
    "dataset": "maps.littlerock.gov, service Permits_All"
   },
+  "longmont-active-development": {
+   "agency": "City of Longmont, Colorado",
+   "dataset": "pwnrmaps.ci.longmont.co.us, service PLANNING/Planning_Map_2025"
+  },
   "loudoun-county-residential-permits": {
    "agency": "Loudoun County, Virginia",
    "dataset": "logis.loudoun.gov, service Projects/ResBuildingPermits",
