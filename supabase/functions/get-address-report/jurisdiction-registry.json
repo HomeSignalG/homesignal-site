@@ -18053,6 +18053,16 @@
       "page_gone_if": [
         "not a web page matching your entry"
       ],
+      "hold_cases": [
+        {
+          "case_id": "851-25-000549-PLNG",
+          "reason": "Sahhali South: the county list page still reads Planning Commission Hearing (last update Jan 2026) but a decision is reported; outcome not verified"
+        },
+        {
+          "case_id": "851-25-000548-PLNG",
+          "reason": "Sahhali South conditional use: same case as 851-25-000549-PLNG; outcome not verified"
+        }
+      ],
       "status_to_bucket": {
         "proposed": [
           "Planning Commission Hearing",

@@ -23,6 +23,7 @@
 // response). The point lives in memory for the length of one watch's check. The response is counts.
 import { assemble, parseRadius, REPORT_RADIUS_MI, validateAttribution } from '../_shared/national-report.ts';
 import type { LedgerProject, ProjectRow, RadiusRow, ReportableEvent, SourceHealth, WrittenEvent } from '../_shared/national-report.ts';
+import type { Jurisdiction } from '../_shared/source-applicability.ts';
 import { readReportInputs } from '../_shared/report-run.ts';
 import { ReportUnreadable } from '../_shared/changes-since-report.ts';
 import { checkWatch, lookBackInstant, selectForEmail } from '../_shared/property-watch.ts';
@@ -60,6 +61,7 @@ export type Deps = {
   // the report's own reads, and the ledger's written-since read
   radius: (lat: number, lng: number, radiusMi: number) => Promise<RadiusRow[]>;
   hydrate: (keys: string[]) => Promise<ProjectRow[]>;
+  jurisdictions?: (zip: string) => Promise<Jurisdiction[]>;
   ledger: (keys: string[]) => Promise<LedgerProject[]>;
   events: (keys: string[], sinceDay: string) => Promise<ReportableEvent[]>;
   health: (families: string[]) => Promise<SourceHealth[]>;
@@ -121,7 +123,7 @@ export async function processWatch(deps: Deps, w: Claimed): Promise<Outcome> {
     const radiusMi = parseRadius(stored.radius_mi) ?? REPORT_RADIUS_MI;
     const attribution = validateAttribution(deps.attribution); // a malformed file fails the check: a required credit is never dropped
     const now = deps.now();
-    const inputs = await readReportInputs(deps, { lat: point.lat, lng: point.lng, radiusMi, now });
+    const inputs = await readReportInputs(deps, { lat: point.lat, lng: point.lng, radiusMi, now, zip: stored.zip });
     // What a NEW report for this point would show a customer. The subject's address is a placeholder the assembly needs and nothing uses: the
     // result is read for its project list only and is never stored, returned or logged.
     const out = assemble({
