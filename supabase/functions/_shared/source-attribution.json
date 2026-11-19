@@ -4,11 +4,13 @@
   "attribution": {
     "nyc-dob-permit-issuance": "New York City Department of Buildings, via NYC Open Data (dataset ipu4-2q9a). HomeSignal selected and renamed fields.",
     "nyc-dobnow-approved-permits": "New York City Department of Buildings, via NYC Open Data (dataset rbx6-tga4). HomeSignal selected and renamed fields.",
-    "seattle-building-permits": "City of Seattle, Seattle Department of Construction & Inspections (data.seattle.gov, dataset 76t5-zqzr)."
+    "seattle-building-permits": "City of Seattle, Seattle Department of Construction & Inspections (data.seattle.gov, dataset 76t5-zqzr).",
+    "boulder-county-accela-applications": "Boulder County, Colorado (unincorporated areas only), via Boulder County Open Data (PLANNING/OP_Accela_Point). HomeSignal selected and renamed fields."
   },
   "_evidence": {
     "nyc-dob-permit-issuance": { "file": "docs/corporate-output-nyc-dob-permits-2026-09-27.md", "dataset": "ipu4-2q9a" },
     "nyc-dobnow-approved-permits": { "file": "docs/corporate-output-nyc-dob-permits-2026-09-27.md", "dataset": "rbx6-tga4" },
-    "seattle-building-permits": { "file": "docs/corporate-output-seattle-building-permits-2026-09-27.md", "dataset": "76t5-zqzr" }
+    "seattle-building-permits": { "file": "docs/corporate-output-seattle-building-permits-2026-09-27.md", "dataset": "76t5-zqzr" },
+    "boulder-county-accela-applications": { "file": "docs/corporate-output-boulder-county-accela-2026-11-19.md", "dataset": "OP_Accela_Point" }
   }
 }

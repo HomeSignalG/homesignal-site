@@ -35,7 +35,7 @@ ok(['PAC Held','On Hold','Zoning Hold','Hold'].every((s) => E.status_to_bucket.e
 ok(E.status_to_bucket.exclude.includes('Final Balance Due') && E.status_to_bucket.exclude.includes('Mapped'), 'statuses with no stated meaning are excluded, not guessed');
 
 const W = E.recency_expr || '';
-ok(/ApplicationDate >= DATE '\{cutoff\}'/.test(W) && /ApplicationDate >= DATE '2021-01-01'/.test(W), 'window = recent applications OR older ones that are still in an open/pending status (bounded at 2021)');
+ok(/ApplicationDate >= DATE '\{cutoff\}'/.test(W) && !/20[0-2][0-9]-01-01/.test(W), 'window = recent applications OR open/pending status; no fixed historical cutoff');
 const inList = (W.match(/ApplicationStatus IN \(([^)]*)\)/) || [,''])[1].match(/'([^']+)'/g)?.map((x) => x.slice(1, -1)) || [];
 ok(inList.length > 0 && inList.every((st) => !E.status_to_bucket.exclude.includes(st) && all.includes(st)), 'older-record statuses are bucketed and none is an excluded status');
 ok(!inList.some((st) => /withdr|void|denied|hold|expired|extinguish|combined|redirect/i.test(st)), 'window never keeps old withdrawn/void/denied/held/superseded records');
@@ -52,6 +52,13 @@ if (spr) {
   ok(typeof spr.lat === 'number' && spr.scope === 'point', 'pinned from its own geometry');
 }
 ok(sites.every((s) => s.record_url), 'every record has a record_url (anti-fabrication gate)');
+const reqs = [];
+await arcgisForZip('80302', [{ state: 'CO', county: 'Boulder' }], [E], { fetch: async (u, init) => { reqs.push({ u: String(u), init }); return { ok: true, status: 200, json: async () => ({ features: [] }) }; }, zipCentroid: { lat: 40.0407, lng: -105.3167 } });
+const post = reqs.find((r) => r.init && r.init.method === 'POST');
+ok(!!post, 'the connector sends the long 28-docket query as a form POST (a GET would be refused by IIS at 2,048 characters)');
+const body = decodeURIComponent(String(post?.init?.body || '').replace(/\+/g, ' '));
+ok(dockets.every((d) => body.includes("'" + d + "'")) && body.includes('ApplicationStatus IN') && body.includes('resultRecordCount'), 'the POST body carries all 28 dockets, the status window and paging');
+ok(reqs.every((r) => !(r.init?.method !== 'POST' && r.u.length > 2048)), 'no GET exceeds the 2,048-character IIS limit');
 ok(coverageMatches(E.coverage, [{ state: 'CO', county: 'Boulder' }]) && !coverageMatches(E.coverage, [{ state: 'CO', county: 'Weld' }]) && !coverageMatches(E.coverage, [{ state: 'CO', county: 'Broomfield' }]), 'gate allows Boulder County, blocks Weld and Broomfield');
 const c2 = []; const r2 = await arcgisForZip('80020', [{ state: 'CO', county: 'Broomfield' }], [E], { fetch: async (u) => { c2.push(u); return { ok: true, status: 200, json: async () => FIX }; }, zipCentroid: { lat: 39.9, lng: -105.1 } });
 ok(r2.sites.length === 0 && c2.length === 0, 'a Broomfield ZIP never fetches the layer');
