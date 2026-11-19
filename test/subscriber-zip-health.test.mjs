@@ -31,16 +31,29 @@ ok(verdict(z64166(), NOW).reasons.some((r) => /EPA facility layer unavailable/.t
 // 2 · VERIFIED_* is unreachable without a complete official reconciliation, however clean the database facts are
 const full = (z) => { z.sources.forEach((s) => { s.cadence = 'daily'; }); z.report.facilities_unavailable = false; z.government.feeds_active = z.government.feeds_total; return z; };
 ok(verdict(full(z85083()), NOW).key === 'UNVERIFIED', 'clean database facts but no reconciliation -> UNVERIFIED, never verified');
-const rec = (z) => { z.reconciliation = { at: '2026-11-19T12:00:00Z', complete: true, missing: 0 }; return z; };
+const RE = (id) => ({ registry_id: id, at: '2026-11-19T12:00:00Z', complete: true, missing: 0, undecidable: 0, run_id: '1', kind: 'verified_matched' });
+const rec = (z) => { z.applicable_sources = z.sources.map((s) => s.registry_id); z.coverage_declared_complete = true; z.reconciliations = z.applicable_sources.map(RE); return z; };
 ok(verdict(rec(full(z85083())), NOW).key === 'VERIFIED_CURRENT', 'reconciled + filed within 30 days -> verified current');
 const quiet = rec(full(z85083())); quiet.sources.forEach((s) => { s.newest_filed = '2026-09-01'; });
 ok(verdict(quiet, NOW).key === 'VERIFIED_NO_NEW_ACTIVITY', 'reconciled + nothing in 30 days -> verified no new activity');
-const part = rec(full(z85083())); part.reconciliation.complete = false;
+const part = rec(full(z85083())); part.reconciliations[0].complete = false;
 ok(verdict(part, NOW).key === 'UNVERIFIED', 'an incomplete reconciliation (partial pagination) is not verification');
-const oldrec = rec(full(z85083())); oldrec.reconciliation.at = '2026-11-01T00:00:00Z';
+const oldrec = rec(full(z85083())); oldrec.reconciliations[0].at = '2026-11-01T00:00:00Z';
 ok(verdict(oldrec, NOW).key === 'UNVERIFIED', 'an expired reconciliation is not verification');
-const gap = rec(full(z85083())); gap.reconciliation.missing = 2;
+const gap = rec(full(z85083())); gap.reconciliations[0].missing = 2;
 ok(verdict(gap, NOW).key === 'UNVERIFIED', 'a reconciliation that found missing records is not verification');
+const undec = rec(full(z85083())); undec.reconciliations[0].undecidable = 1;
+ok(verdict(undec, NOW).key === 'UNVERIFIED', 'undecidable records are not verification');
+const zero = rec(full(z85083())); zero.reconciliations[0].kind = 'verified_zero_activity';
+ok(verdict(zero, NOW).key !== 'UNVERIFIED', 'a valid verified-zero-activity reconciliation can verify (empty is not always unverified)');
+const nonrun = rec(full(z85083())); delete nonrun.reconciliations[0].run_id;
+ok(verdict(nonrun, NOW).key === 'UNVERIFIED', 'a reconciliation with no run id is not verification');
+const undeclared = rec(full(z85083())); undeclared.coverage_declared_complete = false;
+ok(verdict(undeclared, NOW).key === 'UNVERIFIED', 'every listed source reconciled but discovery not declared complete -> still UNVERIFIED');
+const onesrc = rec(full(z85083())); onesrc.applicable_sources.push('another-applicable-source');
+ok(verdict(onesrc, NOW).key === 'UNVERIFIED' && verdict(onesrc, NOW).reasons.some((r) => /another-applicable-source/.test(r)), 'one source verified while another applicable source is unreconciled -> ZIP not verified');
+const badkind = rec(full(z85083())); badkind.reconciliations[0].kind = 'discrepancy_missing_from_jody';
+ok(verdict(badkind, NOW).key === 'UNVERIFIED', 'a discrepancy kind is not verification');
 // 3 · failure-ish states stay distinct, simultaneous, and outrank the quiet ones
 const f = rec(full(z85083())); f.sources[0].failures_48h = 2; f.sources[0].failure_reason = '57014';
 ok(verdict(f, NOW).key === 'INGESTION_FAILURE', 'a failed read in 48 h -> ingestion failure');
