@@ -676,7 +676,7 @@ export function documentedScale(text: string): DocumentedScale | undefined {
 
 /** THE one relevance decision. Pure: reads the record's own words, its canonical Type key and facility kind; no source name, place, clock or value. */
 export function relevance(
-  p: { name: string | null; type_raw: string | null; scope_text?: string | null; registry_id?: string | null }, typeKey?: string | null, facilityKind?: string | null,
+  p: { name: string | null; type_raw: string | null; scope_text?: string | null; registry_id?: string | null; publisher_agency?: string | null }, typeKey?: string | null, facilityKind?: string | null,
 ): Relevance {
   const V = RELEVANCE_RULE_VERSION;
   const raw = [p.type_raw ?? '', p.name ?? '', p.scope_text ?? ''].join(' ');
@@ -735,8 +735,13 @@ export function relevance(
   // routine work: positive evidence of interior, single-unit, like-for-like or small-fixture work, or a tenant improvement that states no change of use
   const routine = any(w, ROUTINE) ?? (ONE_UNIT_RE.exec(w)?.[0] ?? null) ?? ti;
   if (routine) return { include: false, reason: 'routine_work', evidence: routine.trim(), rule_version: V };
+  // P0 2026-11-19: a record published by a transportation agency from its own project program IS a road, bridge or transit project, whatever its
+  // title says ("SH 119 safety improvements", "Add lanes"): the agency's identity is the evidence, the Type classifier reads titles only. Routine
+  // maintenance wording was already excluded above, so this only rescues records whose words establish nothing.
+  if ((!typeKey || typeKey === 'other') && p.publisher_agency && TRANSPORT_AGENCY_RE.test(p.publisher_agency)) return inc('infrastructure', 'transportation agency project program');
   return { include: false, reason: 'not_established', evidence: null, rule_version: V };
 }
+const TRANSPORT_AGENCY_RE = /department of transportation|\bdot\b|highway|transportation (?:authority|commission|agency)|turnpike/i;
 
 /**
  * Activity dates the SOURCE stated (app_projects.start_date / end_date). Only real calendar days are kept; an end before today says the activity is over, so a
@@ -841,7 +846,7 @@ export function assemble(input: AssembleInput): Assembled {
   }
   const windowStart = addDays(today, -RECENT_DAYS);
 
-  const excluded = { development_only: 0, no_source_family: 0, no_source_url: 0, standing_inventory: 0, no_distance: 0, routine_work: 0, relevance_not_established: 0, temporary_ended: 0 };
+  const excluded = { development_only: 0, no_source_family: 0, no_source_url: 0, standing_inventory: 0, no_distance: 0, not_hydrated: 0, routine_work: 0, relevance_not_established: 0, temporary_ended: 0 };
   // national-6: what relevance() left out, kept in the permanent body for traceability and internal review. No customer surface reads it.
   const relevanceReview: Array<{ project_id: string; source_family: string; reason: string; evidence: string | null; rule_version: string }> = [];
   const checked: string[] = [];
@@ -856,6 +861,8 @@ export function assemble(input: AssembleInput): Assembled {
   const distances: Record<string, number> = {};
   let anyChangeReady = false;
 
+  // a key the canonical radius returned that hydrate could not read (the serving generation can lead app_projects) is counted, never silently lost
+  { const hydrated = new Set(input.projects.map((p) => p.source_key)); for (const k of distance.keys()) if (!hydrated.has(k)) excluded.not_hydrated++; }
   for (const p of [...input.projects].sort((a, b) => (a.source_key < b.source_key ? -1 : 1))) {
     if (!distance.has(p.source_key)) { excluded.no_distance++; continue; }
     if (p.record_kind !== 'development') { excluded.development_only++; continue; }
@@ -878,7 +885,7 @@ export function assemble(input: AssembleInput): Assembled {
     if (lc.key === 'operating' && !ev && !changeCounts) { excluded.standing_inventory++; continue; }
 
     // RELEVANCE, before the record reaches any section, count, map, history, alert or export (national-7)
-    let rel = relevance(p, t ? t.typeKey : null, t && t.facilityKind ? t.facilityKind : null);
+    let rel = relevance({ ...p, publisher_agency: pub.agency }, t ? t.typeKey : null, t && t.facilityKind ? t.facilityKind : null);
     let timing: TemporaryTiming | null = null;
     if (rel.include && rel.basis === 'temporary_event') {
       timing = temporaryTiming(p, today, titleCut(p.name));
