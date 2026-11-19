@@ -59,7 +59,7 @@ ok(await vis('#shareModal'), 'Share opens the site Share box');
 ok(await p.evaluate(() => window.__nativeShare) === 0, 'the device share sheet is not used');
 ok((await p.textContent('#shareTitle')).trim() === 'Share HomeSignal', 'the box has the site heading', await p.textContent('#shareTitle'));
 const names = await p.$$eval('#shareGrid .sopt', (els) => els.map((e) => e.lastChild.textContent.trim()));
-ok(names.length === 12 && names.includes('Copy link') && names.includes('Bluesky') && names.includes('Nextdoor'), 'the box has the site 12 share targets', names);
+ok(names.length === 14 && names.includes('Gmail') && names.includes('Outlook') && names.includes('Copy link') && names.includes('Bluesky') && names.includes('Nextdoor'), 'the box has the site 14 share targets', names);
 ok((await p.textContent('#shareUrl')).trim() === 'jodytracks.com/development/ut/x/', 'the box shows this page link', await p.textContent('#shareUrl'));
 const fb = await p.getAttribute('#shareGrid a.sopt[href*="facebook"]', 'href');
 ok(fb === 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent('https://jodytracks.com/development/ut/x/'), 'Facebook shares this page', fb);
