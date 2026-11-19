@@ -59,7 +59,7 @@ create or replace function public._hs_subscriber_zip_stage(p_zip text, p_core js
 returns table(stage text, reason text) language plpgsql stable security definer set search_path = public, geo as $$
 declare
   has_community boolean := exists (select 1 from public.communities c where c.zip_codes @> array[p_zip]);
-  has_boundary  boolean := exists (select 1 from geo.zcta_boundary b where b.zcta5 = p_zip::bpchar);
+  has_boundary  boolean := exists (select 1 from geo.zcta_boundary b where b.zcta5 = p_zip);
   n_src int  := coalesce(jsonb_array_length(p_core->'sources'), 0);
   n_fail int := coalesce(jsonb_array_length(p_core->'failures_without_records'), 0)
                 + coalesce((select count(*) from jsonb_array_elements(p_core->'sources') s where (s->>'failures_48h')::int > 0), 0);

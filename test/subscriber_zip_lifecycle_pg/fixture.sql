@@ -2,7 +2,7 @@ create role anon nologin; create role authenticated nologin;
 create schema geo; create extension if not exists pgcrypto;
 create table public.bsky_maps_priority_classification(zip text, class text);
 create table public.communities(id uuid default gen_random_uuid(), zip_codes text[]);
-create table geo.zcta_boundary(zcta5 bpchar);
+create table geo.zcta_boundary(zcta5 text);
 create table public.dashboard_admins(email text);
 create or replace function auth_jwt_stub() returns jsonb language sql as $$ select '{}'::jsonb $$;
 create schema if not exists auth; create or replace function auth.jwt() returns jsonb language sql as $$ select '{}'::jsonb $$;
