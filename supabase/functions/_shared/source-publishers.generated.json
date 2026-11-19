@@ -141,6 +141,10 @@
    "agency": "City of Boulder",
    "dataset": "services.arcgis.com, service Construction_Permits"
   },
+  "boulder-county-accela-applications": {
+   "agency": "Boulder County, Colorado (unincorporated areas only; not municipal)",
+   "dataset": "maps.bouldercounty.org, service PLANNING/OP_Accela_Point"
+  },
   "bozeman-building-permits": {
    "agency": "City of Bozeman, Montana",
    "dataset": "gisweb.bozeman.net, service Internal/Building_Permits"
@@ -577,6 +581,10 @@
   "little-rock-permits": {
    "agency": "City of Little Rock, Arkansas",
    "dataset": "maps.littlerock.gov, service Permits_All"
+  },
+  "longmont-active-development": {
+   "agency": "City of Longmont, Colorado",
+   "dataset": "pwnrmaps.ci.longmont.co.us, service PLANNING/Planning_Map_2025"
   },
   "loudoun-county-residential-permits": {
    "agency": "Loudoun County, Virginia",

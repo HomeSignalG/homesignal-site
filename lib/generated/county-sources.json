@@ -732,6 +732,18 @@
         "label": "City of Boulder",
         "scope": "city",
         "commercial": true
+      },
+      {
+        "id": "boulder-county-accela-applications",
+        "label": "Boulder County, Colorado (unincorporated areas only; not municipal)",
+        "scope": "local",
+        "commercial": true
+      },
+      {
+        "id": "longmont-active-development",
+        "label": "City of Longmont, Colorado",
+        "scope": "city",
+        "commercial": false
       }
     ],
     "CO|Denver": [
@@ -787,6 +799,12 @@
       }
     ],
     "CO|Weld": [
+      {
+        "id": "longmont-active-development",
+        "label": "City of Longmont, Colorado",
+        "scope": "city",
+        "commercial": false
+      },
       {
         "id": "weld-county-site-plan-review",
         "label": "Weld County, Colorado",

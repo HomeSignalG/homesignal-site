@@ -227,6 +227,12 @@
         "county": "Boulder"
       }
     ],
+    "boulder-county-accela-applications": [
+      {
+        "state": "CO",
+        "county": "Boulder"
+      }
+    ],
     "bozeman-building-permits": [
       {
         "state": "MT",
@@ -936,6 +942,16 @@
       {
         "state": "AR",
         "county": "Saline"
+      }
+    ],
+    "longmont-active-development": [
+      {
+        "state": "CO",
+        "county": "Boulder"
+      },
+      {
+        "state": "CO",
+        "county": "Weld"
       }
     ],
     "loudoun-county-residential-permits": [
