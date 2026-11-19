@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 const sql = readFileSync(new URL('../docs/public-hearings.sql', import.meta.url), 'utf8');
 const code = sql.replace(/--.*$/gm, '');
-assert.match(sql, /NOT APPLIED/);
+assert.match(sql, /Applied to production 2026-11-19/);
 assert.doesNotMatch(code, /\bdrop (table|column)\b|\balter column\b.*\bdrop not null\b|\bdelete from\b/i);
 assert.match(code, /announced_on < current_date - 365 then 'unresolved'/);
 assert.match(code, /announced_on < current_date - 30 then 'provisional_expired'/);

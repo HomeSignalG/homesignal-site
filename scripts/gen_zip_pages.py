@@ -186,7 +186,7 @@ def fetch_data(key, now_iso):
     # record homesignal-ingest supabase/migrations/20261019190000_meetings_is_cancelled.sql) -
     # the ONE cancelled decision. A cancelled meeting stays listed, marked "Cancelled".
     d["meetings"] = fetch_all("meetings", key,
-                              "id,community_id,title,meeting_date,category,source_url,is_cancelled",
+                              "id,community_id,title,meeting_date,category,source_url,is_cancelled,date_basis,confirmation_state,comment_deadline,comment_deadline_verified",
                               f"&meeting_date=gte.{urllib.parse.quote(meeting_cutoff(now_iso))}")
     d["dc_listings"] = fetch_dc_listings(key)
     return d
@@ -1031,7 +1031,16 @@ def _items(items, heading, empty, kind, zip_code=""):
         when = esc(it.get("date") or "")
         inner = f'<a href="{esc(u)}" rel="nofollow noopener">{t}</a>{note}' if u else t
         badge = ' <span class="mtg-cancelled">Cancelled</span>' if it.get("cancelled") is True else ""
-        li.append(f'<li>{inner}{badge}{f" <time>{when}</time>" if when else ""}</li>')
+        # Public hearings (founder policy 2026-11-17): a posting-date placeholder is never shown as a hearing
+        # date, a provisional announcement says so, and a verified open comment deadline is listed.
+        extra = ""
+        if it.get("provisional") and it.get("cancelled") is not True:
+            extra += ' <span class="quiet">Official confirmation pending</span>'
+        if it.get("deadline"):
+            extra += f' <span class="quiet">Comments due <time>{esc(it["deadline"])}</time></span>'
+        if it.get("undated"):
+            extra += ' <span class="quiet">Hearing date not announced</span>'
+        li.append(f'<li>{inner}{badge}{f" <time>{when}</time>" if when else ""}{extra}</li>')
     return (f'<section class="zsec"><h2>{esc(heading)}</h2><ul>' + "".join(li) + "</ul></section>")
 
 
@@ -1144,7 +1153,10 @@ def render(p, built):
     um_show = p["um"][:UM_CAP]
     um_items = [{"title": ((m.get("government") + ": ") if m.get("government") else "") + (m.get("title") or ""),
                  "url": m.get("source_url"),
-                 "date": (m.get("meeting_date") or "")[:10],
+                 "date": ("" if m.get("date_basis") == "posting_date_fallback" else (m.get("meeting_date") or "")[:10]),
+                 "undated": m.get("date_basis") == "posting_date_fallback",
+                 "provisional": m.get("confirmation_state") == "provisional",
+                 "deadline": ((m.get("comment_deadline") or "")[:10] if m.get("comment_deadline_verified") is True else ""),
                  "cancelled": m.get("is_cancelled") is True} for m in um_show]
 
     county_bit = f" in {esc(p['county_label'])}" if p.get("county_label") else ""

@@ -1,9 +1,10 @@
 -- PUBLIC HEARING VISIBILITY: SQL of record (founder policy 2026-11-17; final direction 2026-11-19).
--- ⛔ NOT APPLIED. Parked. Applying it needs the founder's explicit authorization.
+-- Applied to production 2026-11-19 on the founder's explicit authorization.
 -- Additive only: nullable columns and new append-only tables. Nothing is dropped, rewritten or backfilled.
 -- The decisions live in homesignal-ingest hearings.py (one authority). This file is storage and the read
 -- derivation; its constants are pinned to hearings.py by test/public-hearings-sql.test.mjs.
 
+set local lock_timeout = '5s';
 alter table public.meetings
   add column if not exists confirmation_state text check (confirmation_state in ('official','provisional')),
   add column if not exists source_tier        text check (source_tier in ('government_body','advisory_committee')),
@@ -77,7 +78,7 @@ do $$ declare t text; begin
     execute format('alter table public.%I enable row level security', t);
     execute format('revoke all on public.%I from public, anon, authenticated', t);
     execute format('grant select, insert on public.%I to service_role', t);
-    execute format('create or replace function public.%I() returns trigger language plpgsql as $f$ begin raise exception ''%% is append-only''; end $f$', t||'_ro');
+    execute format('create or replace function public.%I() returns trigger language plpgsql as $f$ begin raise exception ''%% is append-only'', TG_TABLE_NAME; end $f$', t||'_ro');
     execute format('drop trigger if exists %I on public.%I', t||'_ro_trg', t);
     execute format('create trigger %I before update or delete on public.%I for each row execute function public.%I()', t||'_ro_trg', t, t||'_ro');
   end loop; end $$;
