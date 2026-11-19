@@ -1,6 +1,7 @@
 # Public hearing visibility — audit and implementation plan (2026-11-17)
 
-Status: **PLAN ONLY.** Nothing here is built, applied or deployed. No production database change and no
+Status: **PLAN v2 (2026-11-19), for founder approval.** Direction approved 2026-11-19 with the modifications in section 4; the section 6
+measurements are taken and reported in section 5. **PLAN ONLY:** nothing here is built, applied or deployed. No production database change and no
 deployment happens without founder approval. Policy text of record: CLAUDE.md, section "PUBLIC HEARINGS ARE
 VISIBLE BEFORE THEY ARE DECIDED" in both repos.
 
@@ -77,79 +78,187 @@ Anything about production DATA is marked UNVERIFIED and has a measurement listed
 8. **Rule #0b (design closed).** This is a later founder ruling and governs; it adds no second source of truth.
 9. **No Zaps, no Google News, no per-community code.** Unchanged. Advisory-committee sources are data rows.
 
-## 4. Implementation plan
+## 4. Founder decisions of 2026-11-19 (these replace the earlier defaults)
 
-Design principle: **one hearing record, one reconciliation decision, one presentation function.** Extend
-`public.meetings`; do not add a parallel hearings table or a second page-side classifier.
+- **D1 cancelled:** approved. Visible, badged "Cancelled", never listed as upcoming or actionable, no participation prompt.
+- **D2 recognized committees:** nationwide, evidence-based criteria; no individual approval of each committee (criteria in 7.2).
+- **D3 provisional expiry:** an expired provisional hearing leaves the upcoming list and stays in historical intelligence;
+  reconciliation against official sources continues for confirmation, cancellation or rescheduling (7.3).
+- **D4 contact details:** approved. Official government details on the source page may be shown verbatim; a private person's never.
+- **Additional requirements.** Each is answered in section 7:
+  1. no Map 1 pin is needed where geographic relevance is verified;
+  2. comment deadlines and upcoming hearings come first;
+  3. confirm the six-topic gate does not exclude relevant development hearings;
+  4. coordinate with the Delivery session so subscribers get hearing, reschedule, cancellation and comment-deadline notices
+     with no duplicates;
+  5. never infer a hearing date from a publication date;
+  6. permanent historical intelligence and source evidence are preserved.
 
-### 4.1 Database (SQL of record, parked in `docs/public-hearings.sql`, NOT applied)
+## 5. Measurements taken 2026-11-19 (read only, through `db-read.yml`, runs 44593999235 and 44594265859)
+
+Each number sits beside its control. A "lead" is a number that points at something but is not proof of it.
+
+| Question | Result | Control / what it means |
+|---|---|---|
+| Stored meetings | 27,387 (newest row created 2026-11-19 17:06Z) | the query read the live table |
+| Rows with `is_public_hearing` | **1,384 true**, 26,003 false (5.1%) | the flag is the only hearing marker |
+| Hearings by time | **107 upcoming**, 658 in the last 90 days, 1,384 in all; upcoming ones sit in 42 communities | the national upcoming list is small |
+| Hearings cancelled by title | 11 in all, **0 upcoming** | `is_cancelled` is title-based, as designed |
+| Hearings whose title says "hearing" but flag is not true | 0 | the flag follows the title; a hearing described another way (for example "public notice") is not measured |
+| Hearings with a stated start time | 29 of 1,384 (`meeting_time` null on 1,355) | times are almost never captured |
+| Hearings with `comment_period_open` true | **1** | the column exists and is almost never filled |
+| Recent (90 days) government notices whose title says "hearing" | 693; **0 carry `alerts.comment_deadline`** | comment deadlines are not captured as data anywhere |
+| Upcoming hearings whose summary mentions comment / submit / testimony | 15 of 107 | deadline text exists in prose for about 14% |
+| Of those 693 notices, no matching `meetings` row (same url) | **183 (26%)**: 109 county business, 56 planning and zoning, 10 water, 6 taxes, 2 safety | a quarter of hearing-titled notices never became a meeting. Lead: not every one is a future public hearing |
+| Hearings linked to a notice (`alert_id`) | 0 of 1,384 | no meeting-to-notice link exists |
+| Hearings with `geo_scope` set | 9 of 1,384 (6 address, 3 countywide); `zip` set on 6 | geographic relevance today is the community chain only |
+| Same community, same title, different dates | 105 groups, 47 within 60 days; sample titles are recurring bodies ("hearing examiner meeting", "boe hearing") | **lead only**: titles cannot find reschedules |
+| Same community and case number in the title, different dates | 3 groups | case numbers are rarely in titles |
+| Meetings created in the last 60 days whose date is the same UTC day as creation | 527 of 13,860 (3.8%); hearings 22 | **lead only**: same-day meetings are also normal. Top feeds: Marion IN 51, Nye NV 36, Hennepin 36, Miami-Dade 19 |
+| `meeting_date` | `timestamptz`, **NOT NULL** | an undated hearing cannot be stored as null today |
+| Hearings by topic | county business 898, planning and zoning 324, taxes 150, elections 6, safety 4, water 2 | all six canonical; none outside |
+| Upcoming meetings per community | 239 communities; **51 have more than 24**, maximum 155 | the page reads 24 rows, so routine agendas can push a hearing out in those 51 |
+| Hearing rows with no `feed_id` | 180 | older rows cannot be traced to a source |
+| `event_key` | set on all 1,384 hearings | already the Delivery session's key for pairing a notice with its meeting twin, per community |
+
+**Not measured, and why.** (a) The six-topic gate's rejections: a rejected row is never stored, so only the ingest run logs show
+it. I did not read those logs here. (b) Which adapters set a real event date: the table has no column for it; that is an ingest
+code audit (done in the next phase). (c) Whether the 183 unmatched notices are upcoming public hearings: needs the notice text.
+
+## 6. What the measurements change in the plan
+
+1. **Date handling (requirement 5).** `meeting_date` is NOT NULL, so an undated hearing is stored today with its posting date.
+   Recommended, additive: a `date_basis` column (`vendor_event`, `stated_in_notice`, `stated_in_title`, `posting_date_fallback`,
+   `unknown_legacy`). A row on `posting_date_fallback` is never listed as upcoming, never sorted by that date, never notified, and
+   reads "Hearing date not stated". The alternative (drop NOT NULL) is non-additive and needs your approval; I recommend against it.
+   The 1,384 existing hearings start as `unknown_legacy` and are classified by the adapter audit.
+2. **Comment deadlines (requirement 2).** No structured source exists today (0 of 693; 1 of 1,384). The priority order can only use
+   deadlines the parsers extract, so the first release will rank mostly by hearing date. Extraction is new parser work and is
+   stated as such, not assumed.
+3. **Reschedule and cancellation detection.** Titles cannot do it (leads above). Matching keys, in priority: a vendor event id,
+   then a case or file number from the notice body, then body plus date window plus normalized title. The third is low confidence
+   and may only flag, never supersede.
+4. **Hearings published only as notices.** About a quarter of hearing-titled notices have no meeting row. They need a hearing row
+   (or a link to one) so they appear; `alert_id` is the link column and is unused today.
+5. **The 24-row read.** 51 communities exceed it. Hearings are read first and outside the cap.
+6. **Geography (requirement 1).** 9 of 1,384 hearings carry any geography. Verified relevance has two levels, neither needing a pin:
+   government reach (the county or city covers the ZIP, the existing `zip_government_bodies` rule) and a named place resolved to a ZIP
+   by the canonical ZCTA boundary test. A hearing with only government reach reads as county-wide and says so.
+7. **Six-topic gate (requirement 3).** From stored data the gate excludes nothing it could be measured to exclude: all 1,384
+   hearings carry a canonical topic, and 324 are under Planning, zoning and development. But topic is a weak development signal:
+   898 (65%) sit under County business, where a commission hearing on a rezone files. So: keep the six topics unchanged; add a
+   separate `hearing_subject` attribute (development and land use, budget and tax, other) derived from title and notice text,
+   used for prioritization and notices. Verify rejections by counting `[REJECT]` lines for hearing-shaped titles in recent
+   ingest run logs before approval of the build; I have not done that.
+8. **Delivery (requirement 4).** `event_key` and `email_deliveries` already prevent the same event reaching one person twice across
+   notices and meetings. Hearing events reuse them (7.6).
+
+## 7. Revised implementation plan
+
+Design principle unchanged: **one hearing record, one reconciliation decision, one presentation function.** Extend
+`public.meetings`; no parallel hearings table, no second page-side classifier.
+
+### 7.1 Database (SQL of record parked in `docs/public-hearings.sql`; NOT applied; apply needs your approval)
 Additive and nullable, on `public.meetings`:
-- `confirmation_state` (`official` default, `provisional`) and `source_tier` (`government_body`, `advisory_committee`).
-- `hearing_status` (`scheduled` default, `cancelled`, `postponed`, `superseded`, `held`).
-- `announced_on`, `notice_published_on`, `decision_date`, `decision_outcome`. `meeting_date` stays the hearing date.
-- `comment_deadline`, `comment_instructions`, `participation_url`, `participation_note` (verbatim from the source).
-- `public.is_cancelled` stays the one cancelled decision, now `hearing_status = 'cancelled'` OR the existing title test.
+- `confirmation_state` (`official` default, `provisional`), `source_tier` (`government_body`, `advisory_committee`),
+  `hearing_status` (`scheduled` default, `cancelled`, `postponed`, `superseded`, `held`), `hearing_key` (stable identity across
+  reschedules: community, body and a vendor id or case number when present, else null), `hearing_subject`.
+- `date_basis` (6.1), `announced_on`, `notice_published_on`, `decision_date`, `decision_outcome`, `comment_deadline`,
+  `comment_instructions`, `participation_url`, `participation_note`.
+- Expiry is **derived, never stored**: a function `hearing_display_state(meeting)` returns `upcoming`, `provisional_expired`,
+  `held`, `cancelled`, `superseded` or `date_not_stated`. Nothing is deleted when a row expires.
+- `public.is_cancelled` stays the one cancelled decision: `hearing_status = 'cancelled'` or the existing title test.
+Append-only tables (no update or delete, RLS on, no visitor writes):
+- `meeting_reconciliation`: provisional row, official row, kind (`confirmed_by`, `rescheduled_to`, `cancelled_by`, `duplicate_of`),
+  match key used, rule version, evidence quote and url, time.
+- `meeting_project_link`: meeting, project key, basis (case number, named parcel, named project, reviewer), evidence, grade.
+- `hearing_source_evidence`: for each recognized committee, each criterion in 7.2, pass or fail, evidence url and quote, rule version,
+  checked time. Suspensions and re-admissions are rows too.
+- `hearing_notification_event` (the interface to Delivery, 7.6): `hearing_key`, event type, effective value, a unique event hash.
+A disposable-Postgres suite proves the rules; at least 10 deliberate breaks must fail it.
 
-New append-only tables:
-- `meeting_reconciliation` (provisional row, official row, kind: `confirmed_by`, `rescheduled_to`, `cancelled_by`,
-  `duplicate_of`; rule version; evidence quote and URL; time).
-- `meeting_project_link` (meeting, project key such as `source_key|seq` or a dossier key, basis: case number, parcel,
-  named in notice, reviewer; evidence; grade).
-Display views exclude `superseded` and `duplicate_of` rows. RLS on, no visitor writes. A disposable-Postgres suite
-proves the rules and 10 or more deliberate breaks fail it.
+### 7.2 D2: nationwide, evidence-based recognition of advisory committees
+Evaluated by code, per `jurisdiction_slug`, stored in `data/hearing_sources.json` with the evidence, re-checked monthly. A committee
+may write `provisional` rows only while **all** hold:
+- **E1 government-created.** The jurisdiction's own site names the instrument that created it (ordinance, charter, resolution or
+  statute). Evidence: that page and the quoted line.
+- **E2 land-use remit.** Its own published remit covers development, land use, zoning, permits or comparable review.
+- **E3 first-party publication.** The announcement is on the committee's or government's own domain, or on a meeting system the
+  government's own site links to. Never an aggregator, a newspaper-association notice site, a social post, a private group or an
+  individual (wiring rule 0).
+- **E4 dated and specific.** The announcement states a date and names the body, place or case.
+- **E5 track record, evaluated continuously.** After at least 5 reconciled outcomes, at least 80% must be confirmed or
+  rescheduled by an official notice and not contradicted. Below that the committee is **suspended automatically**; its old rows
+  stay. **These two numbers (5, 80%) are proposals for you to confirm or change.**
+E1 to E4 are the entry test; E5 is the continuing test. A failed criterion is a logged row, not a silent skip.
 
-### 4.2 Ingest (homesignal-ingest)
-- `build_payload`: fill the new date and participation fields where the source states them; never default a date from
-  a posting date (an undated hearing stays undated).
-- Parsers: extract comment deadline, instructions and participation link in `adapters/notice_list.py` shared helpers.
-- `data/hearing_sources.json`: the recognized advisory committees, per `jurisdiction_slug`, each with a reason and
-  its own-site URL. Data, not code. Only these may write `provisional`.
-- `scripts/reconcile_hearings.py` (set-based, runs after each ingest and daily): match provisional to official by
-  body, hearing date and case number or normalized title; record the decision; detect reschedules (same case number,
-  new date) and cancellations. Unmatched provisional rows expire per section 5, never silently.
-- CI gate `scripts/check_hearing_policy.py`: no provisional row without a source link and label, none from an
-  unlisted source, none after expiry; no hearing with a decision date equal to a notice date by construction.
-- Health check `hearing_reconciliation` in `pipeline_health_tick()` (same splice discipline as earlier checks).
+### 7.3 D3: reconciliation and expiry
+- A provisional row stays on the upcoming list until the day after its hearing date, or 30 days after its announcement when no date
+  is stated. Then `provisional_expired`: it leaves the upcoming list, stays in history, and reads "Not found in official notices".
+- Reconciliation keeps running on unresolved provisional rows for 365 days after the hearing date (the Government Notices past
+  window), then marks them `unresolved` and keeps them.
+- A late official notice that confirms a past provisional hearing records it as held, not upcoming. One that carries a **future**
+  date (a reschedule) creates or updates the official row, which is upcoming; the provisional row is marked `rescheduled_to`.
+- Every transition is an appended `meeting_reconciliation` row. Source evidence is never overwritten.
 
-### 4.3 Site (homesignal-site)
-- `lib/templates.js`: ONE presentation function for a hearing (status chip, "Official confirmation pending", the
-  four dates by their own names, comment instructions, participation link, deadline countdown).
-- `lib/data.js`: read hearings first, outside the 24-row cap; drop superseded and duplicate rows.
-- `lib/community-page.js`: a "Public hearings" block above routine meetings; the same text prints in the build-time
-  document (`scripts/gen_zip_pages.py`), reading the same stored data, so crawlers see it.
+### 7.4 Ingest (homesignal-ingest)
+- `build_payload`: set `date_basis`; never turn a posting date into a hearing date; fill the new fields where the source states
+  them. The existing generic dating of non-hearing meetings is unchanged.
+- Parsers: extract comment deadline, instructions and participation link, and case or file number, in shared `notice_list` helpers.
+- `scripts/reconcile_hearings.py` (set-based, after each ingest and daily) and `scripts/evaluate_hearing_sources.py` (E1 to E5).
+- CI gate `scripts/check_hearing_policy.py`: no provisional row without a source link and label; none from a source not passing
+  E1 to E4; none past expiry on the upcoming list; no hearing date equal to its posting date unless `date_basis` says it was stated.
+- Health check `hearing_reconciliation` in `pipeline_health_tick()`, same splice discipline as earlier checks.
+
+### 7.5 Site (homesignal-site)
+- `lib/templates.js`: ONE hearing presentation function: status chip, "Official confirmation pending", the four dates by name,
+  comment instructions, participation link, deadline countdown.
+- `lib/data.js`: read hearings first, outside the 24-row cap, drop superseded and duplicate rows. Order: open comment deadline
+  soonest, then upcoming hearing date ascending, then everything else.
+- `lib/community-page.js` and `scripts/gen_zip_pages.py`: a "Public hearings" block above routine meetings; the build-time document
+  prints the same text from the same stored data.
 - `scripts/development_pages.py` and `lib/map1-project-panel.js`: show linked hearings on a project with no pin.
-- Email: `digest.py` (ingest) lists hearings with their deadlines; the Delivery session owns that file (Rule #0a).
 
-### 4.4 Tests
-`test/public_hearings_pg` (SQL), `test/public-hearings.test.mjs` (presentation, one function), a browser test on a
-real generated ZIP document with a provisional, an official, a cancelled and a rescheduled hearing, and the CI gate.
+### 7.6 Delivery coordination (Rule #0a: `digest.py` and the notification path belong to the Delivery session)
+This work proposes the interface and does not edit `digest.py`. A message to that session is ready to send once you approve the
+direction. Proposed contract:
+- **No new stream or topic.** Hearing events ride the existing Upcoming Meetings stream and its 5 PM Central daily email.
+- **Four event types:** `hearing_announced`, `hearing_rescheduled`, `hearing_cancelled`, `comment_deadline_approaching`
+  (proposed reminders at 7 days and 2 days, once each; **these two numbers are for you to confirm**).
+- **No duplicates:** an event is unique per (person, `hearing_key`, event type, effective value). A reschedule is ONE
+  `hearing_rescheduled` event; the new-date row must not also read as a new `hearing_announced` for the same `hearing_key`. A
+  cancellation is one item, with no participation prompt. The existing `event_key` rule keeps a notice twin from sending a second
+  copy; hearing rows carry an `event_key` as every hearing row does today.
+- **A new subscriber's first email** never includes expired provisional rows or hearings with `date_not_stated`.
+- Delivery ledger stays `email_deliveries`; the `hearing_notification_event` table is the read-only source the Delivery session
+  consumes.
 
-### 4.5 Order of work
-0. This plan and the CLAUDE.md policy (docs only).
-1. Read-only measurements (section 6). Founder reviews them.
-2. SQL file and its disposable-Postgres suite. **Apply needs founder approval.**
-3. Ingest changes, gated by the new check.
-4. Site presentation.
-5. Association (project link) and dossier / Map 1 panel.
-6. Neskowin / ZIP 97149 only as a test case, after the Tillamook work lands.
+### 7.7 Tests
+`test/public_hearings_pg` (SQL), `test/public-hearings.test.mjs` (presentation, one function), a browser test on a generated ZIP
+document with a provisional, an official, a cancelled, a rescheduled and an undated hearing, the CI gate, and a notification test
+with duplicate, reschedule and cancel cases against the Delivery session's contract.
 
-## 5. Decisions where I have set a default (founder may change)
-- **D1 Cancelled:** keep the 2026-10-19 ruling (visible, badged, not actionable).
-- **D2 Recognized advisory committee:** a registry the founder approves entry by entry; none assumed.
-- **D3 Provisional expiry:** shown until the day after the hearing date; if the hearing date is unknown, 30 days
-  from the announcement. Afterwards it reads "Not found in official notices" and leaves the upcoming list.
-- **D4 Comment contact details:** official government addresses stated on the source page may be shown verbatim;
-  a private person's details never.
+### 7.8 Order of work (each apply or merge step waits for your approval)
+0. This plan and the policy text (docs only; the PRs stay drafts).
+1. Your approval of section 5 and the numbers marked as proposals (E5 thresholds, reminder days).
+2. SQL file and its disposable-Postgres suite. **Apply needs your approval.**
+3. Ingest adapter audit for `date_basis`, then ingest changes behind the new CI gate.
+4. Site presentation. 5. Project association and the dossier / Map 1 panel. 6. Delivery coordination and notifications.
+7. Neskowin / ZIP 97149 only as a test case, after the Tillamook work lands.
 
-## 6. Measurements to take before any apply (UNVERIFIED today)
-Through `db-read.yml` (read only), each beside its control: stored meetings with `is_public_hearing` (total, upcoming,
-cancelled by title); pairs of rows with the same body and case number but different dates; hearing notices in `alerts`
-with no matching `meetings` row; sources that set no event date.
+## 8. Needs your decision
+- Confirm or change: E5 thresholds (5 outcomes, 80%); reminder days (7 and 2).
+- Confirm that an undated hearing keeps a posting-date placeholder in `meeting_date` flagged by `date_basis`, rather than relaxing
+  NOT NULL (recommended).
+- Confirm that hearing notices ride the existing meetings email rather than a new stream (recommended).
 
-## 7. Do not touch (active Tillamook session)
-`supabase/functions/get-address-report/sources/county-cases.ts`, the `county_cases` entries of
-`jurisdiction-registry.json`, `test/county-cases-fixture.test.ts`, the County Land-Use Cases section of CLAUDE.md,
-and in ingest the `civicplus_land_use_cases` parser, `gov-tillamook-*` feeds and the `claude/tillamook-*` branches.
-Origin branches checked 2026-11-17: site `tillamook-case-fixes`, `tillamook-hold-cases`, `tillamook-validate`,
-`tillamook-source-audit` (scratch); ingest `tillamook-hearings`, `tillamook-planning-feed`, `tillamook-permits`.
-No change in this plan edits those files.
+## 9. Do not touch (active Tillamook session)
+`supabase/functions/get-address-report/sources/county-cases.ts`, the `county_cases` entries of `jurisdiction-registry.json`,
+`test/county-cases-fixture.test.ts`, the County Land-Use Cases section of CLAUDE.md, and in ingest the `civicplus_land_use_cases`
+parser, `gov-tillamook-*` feeds and the `claude/tillamook-*` branches. No change in this plan edits those files.
+
+## 10. Step-2A isolation check (separate issue, referred)
+The red `step2a-isolation-db` check on homesignal-ingest PR #1142 is live-database drift from `docs/official-documents-map-gate.sql`
+(site PR #2893): four unclassified `dc_*` objects, and `dc_current_observation` recreated at line 137 without
+`security_invoker = true` (line 305 of the same file uses it). Referred to the Official Document Development Ingestion session on
+that PR with the required classification, access rules and a regression test. The check is not bypassed or weakened.
