@@ -50,7 +50,7 @@ function build(over = {}) {
     geocode: async () => ({ matchedAddress: '20 N MAIN ST, BRIGHAM CITY, UT, 84302', lat: 41.5109, lng: -112.0156, zip: '84302' }),
     zipSupported: async () => true,
     radius: async () => [{ source_key: 'k1', feature_id: 'pt:1', registry_id: FAM, provenance: 'proven_stored_point', distance_mi: 0.21, geometry_type: 'Point', has_more: false }],
-    hydrate: async () => [proj], ledger: async () => [], events: async () => [], health: async () => [],
+    hydrate: async () => [proj], ledger: async () => [], events: async () => [], health: async () => [], jurisdictions: async () => [],
     trialOf: async () => ({ status: 'active', credits_used: 3, credits_remaining: 7, expired: false }),
     planOf: async () => PLAN(),
     rateClaim: ALLOW,

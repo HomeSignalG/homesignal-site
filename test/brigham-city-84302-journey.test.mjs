@@ -56,6 +56,7 @@ function world({ geocode = (a) => ({ match: { ...geocodeStandIn(a) } }), registr
     if (u.pathname === '/rest/v1/canonical_zip_registry') return json(registry.includes(u.searchParams.get('zip').replace(/^eq\./, '')) ? [{ zip: u.searchParams.get('zip').replace(/^eq\./, '') }] : []);
     if (u.pathname === '/rest/v1/rpc/n5_projects_within_radius') return json(rows.rows);
     if (u.pathname === '/rest/v1/app_projects') return json(rows.projects);
+    if (u.pathname === '/rest/v1/communities') return json([{ state: 'UT', county: 'Box Elder' }]);   // the ZIP's own community rows: which sources apply to it
     if (/^\/rest\/v1\/(dev_change_project|dev_change_event_reportable|dev_change_source_fetch_health)$/.test(u.pathname)) return json([]);
     throw new Error('unexpected request ' + key);
   };

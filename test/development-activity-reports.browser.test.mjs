@@ -207,7 +207,7 @@ function world({ trial = 'active', used = 0, admin = false, untraceable = false,
     // the report rate limit (docs/report-rate-limit.sql): the database's answer, a refusal when the test sets `w.rate`
     rateClaim: async () => (w.rate ? { allowed: false, ...w.rate } : { allowed: true }),
     zipSupported: async () => true,
-    radius: async () => (w.untraceable ? NO_FAMILY(RICH) : RICH).rows, hydrate: async () => (w.untraceable ? NO_FAMILY(RICH) : RICH).projects, ledger: async () => RICH.ledger ?? [], events: async () => RICH.events ?? [], health: async () => [],
+    radius: async () => (w.untraceable ? NO_FAMILY(RICH) : RICH).rows, hydrate: async () => (w.untraceable ? NO_FAMILY(RICH) : RICH).projects, ledger: async () => RICH.ledger ?? [], events: async () => RICH.events ?? [], health: async () => [], jurisdictions: async () => [],
     trialOf: async () => state(),
     planOf: async () => { if (w.billingFails) throw new RH.DataUnavailable('x'); return usage(); },
     issue: async (_u, key, intelligence, privateContext) => {
