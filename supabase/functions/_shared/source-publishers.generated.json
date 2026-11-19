@@ -529,6 +529,10 @@
    "agency": "City of Kansas City, Missouri",
    "dataset": "data.kcmo.org, dataset w8jz-wjgn"
   },
+  "kcmo-capital-projects": {
+   "agency": "City of Kansas City, Missouri (Capital Projects)",
+   "dataset": "mapd.kcmo.org, service AGOL"
+  },
   "kcmo-development-cases": {
    "agency": "City of Kansas City, Missouri",
    "dataset": "mapd.kcmo.org, service AGOL"
@@ -801,6 +805,11 @@
   "phoenix-building-permits": {
    "agency": "City of Phoenix",
    "dataset": "maps.phoenix.gov, service Public/Planning_Permit"
+  },
+  "phoenix-proposed-zoning": {
+   "agency": "City of Phoenix Planning & Development Department (Proposed Zoning layer)",
+   "dataset": "maps.phoenix.gov, service Public/Planning_Permit",
+   "status_const": "Proposed Zoning"
   },
   "pierce-county-pals-permits": {
    "agency": "Pierce County (PALS)",
