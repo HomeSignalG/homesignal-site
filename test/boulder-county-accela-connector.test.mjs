@@ -31,6 +31,7 @@ const all = Object.values(E.status_to_bucket).flat();
 ok(new Set(all).size === all.length, 'no status is in two buckets');
 ok(LIVE.every((s) => all.includes(s)), 'every live status is bucketed', LIVE.filter((s) => !all.includes(s)).join(' | '));
 ok(E.status_to_bucket.approved.includes('Permit Issued') && E.status_to_bucket.operating.includes('Permit Complete'), 'Permit Issued -> approved, Permit Complete -> operating');
+ok(['PAC Held','On Hold','Zoning Hold','Hold'].every((s) => E.status_to_bucket.exclude.includes(s)), 'hold statuses are excluded, never proposed');
 ok(E.status_to_bucket.exclude.includes('Final Balance Due') && E.status_to_bucket.exclude.includes('Mapped'), 'statuses with no stated meaning are excluded, not guessed');
 
 const FIX = JSON.parse(readFileSync(join(root, 'fixtures/boulder-county/accela-point-sample.json'), 'utf8'));

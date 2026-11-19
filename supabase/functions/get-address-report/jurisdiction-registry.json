@@ -2468,14 +2468,11 @@
           "Payment Pending",
           "Additional Information Request",
           "Permit Specialist to Review",
-          "PAC Held",
           "PAC Scheduled",
-          "PAC Not Held",
           "Pre-Check Complete",
           "Application Deposit Due",
           "Outstanding Requirements",
           "Incomplete",
-          "Zoning Hold",
           "Ready to Issue",
           "Plans Examiner to Review",
           "Planning Process Required",
@@ -2488,10 +2485,7 @@
           "BOCC Packet Available",
           "BOCC Hearing",
           "BOCC Tabled to Date Certain",
-          "HPAB Hearing Scheduled",
-          "Access and Engineering Hold",
-          "On Hold",
-          "Hold"
+          "HPAB Hearing Scheduled"
         ],
         "approved": [
           "Permit Issued",
@@ -2543,7 +2537,13 @@
           "CLOMR FEMA Review",
           "LOMR FEMA Review",
           "TDC Sold",
-          "TDC Extinguished"
+          "TDC Extinguished",
+          "PAC Held",
+          "PAC Not Held",
+          "Zoning Hold",
+          "Access and Engineering Hold",
+          "On Hold",
+          "Hold"
         ]
       },
       "incremental_field": "ApplicationDate",
