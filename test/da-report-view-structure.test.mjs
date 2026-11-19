@@ -57,11 +57,11 @@ const C = code(SRC);
   const snake = [...new Set([...C.matchAll(/\.([a-z]+_[a-z_]+)\b/g)].map((m) => m[1]))].sort();
   // national-6 (2026-11-02): adds activity_window, publisher_type, records_checked and undescribed_records (the record's activity dates, the agency's own class, source freshness, the
   // undescribed-records note); `relevance`, `description` and `address` are read as plain keys (relField / p.description / p.address)
-  const EXPECT = ['activity_window', 'publisher_type', 'records_checked', 'records_judged', 'temporary_ended', 'undescribed_records', 'routine_records', 'as_of', 'bearings_deg', 'by_lifecycle', 'by_stage', 'change_ready', 'detected_at', 'distances_mi', 'event_type', 'first_observed_at', 'homesignal_detected_changes', 'homesignal_observation', 'older_than_a_year', 'project_id',
+  const EXPECT = ['coverage_disclosure', 'activity_window', 'publisher_type', 'records_checked', 'records_judged', 'temporary_ended', 'undescribed_records', 'routine_records', 'as_of', 'bearings_deg', 'by_lifecycle', 'by_stage', 'change_ready', 'detected_at', 'distances_mi', 'event_type', 'first_observed_at', 'homesignal_detected_changes', 'homesignal_observation', 'older_than_a_year', 'project_id',
     'publisher_event', 'publisher_stage', 'publisher_status', 'radius_mi', 'recent_days', 'recent_official_activity', 'record_date', 'record_id', 'title_cut', 'what_changed_recently'].concat(['feed_ref', 'publisher_stage_unpublished']).sort();
   // national-5 (2026-11-02) adds one, on purpose: publisher_stage_unpublished (the source publishes no status, so none is printed as the agency's)
   // national-4 (2026-11-01) adds three, on purpose: feed_ref (where the agency publishes the data), record_id (the agency's record number) and title_cut (the source feed shortened the title)
-  ok(JSON.stringify(snake) === JSON.stringify(EXPECT), '2a the snake_case response keys it reads are exactly these thirty-two (a new one must be added here on purpose)', snake);
+  ok(JSON.stringify(snake) === JSON.stringify(EXPECT), '2a the snake_case response keys it reads are exactly these thirty-three (a new one must be added here on purpose)', snake);
   // The ledger's first observation is NOT printed as "First detected" (for a baseline read it is a refresh sweep's time before the ledger existed).
   // The per-record observation is read in ONE function, changeBasis, only to say WHEN the history behind a "no status change" sentence starts and how
   // many records it covers; the engine's coverage flag is read once, in changeReady; and noChangeMessage joins them.
@@ -196,7 +196,7 @@ const C = code(SRC);
   };
   walk('.');
   const REVIEW_PAGE = 'development-activity-review.html', CUSTOMER_PAGE = 'development-activity-reports.html', CLIENT_PAGE = 'shared-report.html', LANDING_PAGE = 'development-activity.html';
-  const ALLOWED = new Set([MOD, 'test/da-report-view.test.mjs', 'test/da-report-view-structure.test.mjs', 'test/heavy-facility-type.test.mjs', 'test/da-report-view.browser.test.mjs', 'test/da_report_view_mutants.py', 'test/lib/da-report-view-world.mjs',
+  const ALLOWED = new Set([MOD, 'test/coverage-phase1.test.mjs', 'test/da-report-view.test.mjs', 'test/da-report-view-structure.test.mjs', 'test/heavy-facility-type.test.mjs', 'test/da-report-view.browser.test.mjs', 'test/da_report_view_mutants.py', 'test/lib/da-report-view-world.mjs',
     'docs/development-activity-report-view-2026-10-02.md', 'docs/development-activity-status-2026-09-30.md', 'docs/development-activity-build-steps-100526.md',
     // build step 4: its one caller, the admin-only review page, and that page's tests; lib-cache-keys keys the file now a page loads it
     // 2026-10-17: the public landing page draws its SAMPLE report through the view, replacing a hand-built copy of an older layout
