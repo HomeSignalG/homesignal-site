@@ -29,6 +29,8 @@
 import './project-type.generated.js';
 import './residential-qualify.generated.js';
 import publishersFile from './source-publishers.generated.json' with { type: 'json' };
+import capitalProgramsFile from './capital-program-sources.generated.json' with { type: 'json' };
+import retiredFile from './retired-sources.json' with { type: 'json' };
 import { snapshotBodyOf, subjectRelativeKeys } from './report-snapshot.ts';
 import type { PrivateContext } from './report-snapshot.ts';
 
@@ -742,16 +744,14 @@ export function relevance(
   if ((!typeKey || typeKey === 'other') && p.publisher_program) return inc('infrastructure', 'transportation agency capital-project program');
   return { include: false, reason: 'not_established', evidence: null, rule_version: V };
 }
-const TRANSPORT_AGENCY_RE = /department of transportation|\bdot\b|highway|transportation (?:authority|commission|agency)|turnpike/i;
-/** A transportation agency alone is not enough: the registry family itself must be a capital-project or improvement program (STIP, work plan, active projects,
- *  construction program), never a permit, right-of-way or inspection feed that merely comes from the same agency. */
-const CAPITAL_PROGRAM_RE = /stip|\btip\b|improvement program|capital|work ?plan|work areas|active (?:construction|design|projects)|construction (?:program|projects)|projects?\b|program book|six.?year|ten.?year|five.?year|rebuild|delivery plan|syip|itip|gpas|spms|wincpms/i;
-const NOT_A_PROGRAM_RE = /permit|license|inspection|row\b|right.of.way/i;
-export function isCapitalProgramSource(family: string | null, pub: { agency: string | null; dataset: string | null }): boolean {
-  if (!family || !pub.agency || !TRANSPORT_AGENCY_RE.test(pub.agency)) return false;
-  if (NOT_A_PROGRAM_RE.test(family)) return false;
-  return CAPITAL_PROGRAM_RE.test(family) || CAPITAL_PROGRAM_RE.test(pub.dataset ?? '') || CAPITAL_PROGRAM_RE.test(pub.agency);
-}
+/** A transportation record is filed as infrastructure by provenance ONLY when the registry's own text documents the dataset as a development or capital-project
+ *  program (capital-program-sources.generated.json, built by scripts/gen-capital-program-sources.mjs). An agency name or a generic word such as "project" is never
+ *  evidence, and a permit, right-of-way or inspection feed is never listed. */
+const CAPITAL_PROGRAMS: Record<string, unknown> = ((capitalProgramsFile as unknown as { families?: Record<string, unknown> }).families) ?? {};
+export function isCapitalProgramSource(family: string | null): boolean { return !!family && Object.prototype.hasOwnProperty.call(CAPITAL_PROGRAMS, family); }
+/** Families whose retirement is a documented decision (retired-sources.json). Nothing else is ever treated as retired. */
+const RETIRED_SOURCES: Record<string, unknown> = ((retiredFile as unknown as { retired?: Record<string, unknown> }).retired) ?? {};
+export function isRetiredSource(family: string | null): boolean { return !!family && Object.prototype.hasOwnProperty.call(RETIRED_SOURCES, family); }
 
 /**
  * Activity dates the SOURCE stated (app_projects.start_date / end_date). Only real calendar days are kept; an end before today says the activity is over, so a
@@ -856,7 +856,7 @@ export function assemble(input: AssembleInput): Assembled {
   }
   const windowStart = addDays(today, -RECENT_DAYS);
 
-  const excluded = { development_only: 0, no_source_family: 0, no_source_url: 0, standing_inventory: 0, no_distance: 0, not_hydrated: 0, routine_work: 0, relevance_not_established: 0, temporary_ended: 0 };
+  const excluded = { retired_source: 0, development_only: 0, no_source_family: 0, no_source_url: 0, standing_inventory: 0, no_distance: 0, not_hydrated: 0, routine_work: 0, relevance_not_established: 0, temporary_ended: 0 };
   // national-6: what relevance() left out, kept in the permanent body for traceability and internal review. No customer surface reads it.
   const relevanceReview: Array<{ project_id: string; source_family: string; reason: string; evidence: string | null; rule_version: string }> = [];
   const checked: string[] = [];
@@ -872,12 +872,11 @@ export function assemble(input: AssembleInput): Assembled {
   let anyChangeReady = false;
 
   // a key the canonical radius returned that hydrate could not read (the serving generation can lead app_projects) is counted, never silently lost
-  // A radius key with no hydrated development row is a LOSS when its source still hydrates other records here (or nothing hydrated at all). A whole family
-  // with no development rows left in the store is a retired source (frozen or stalled upstream), counted apart so it does not mark every nearby report incomplete.
+  // A radius key with no hydrated development row is a LOST record, whatever else hydrated and even when the report ends up empty. Only a family whose retirement
+  // is a documented decision (retired-sources.json) is counted apart; absence of rows is never evidence of retirement.
   let retiredKeys = 0;
-  { const hydrated = new Set(input.projects.map((p) => p.source_key)); const live = new Set(input.projects.map((p) => p.registry_id));
-    const famOf = new Map(input.rows.map((r) => [r.source_key, r.registry_id]));
-    for (const k of distance.keys()) if (!hydrated.has(k)) { if (input.projects.length === 0 || live.has(famOf.get(k) ?? null)) excluded.not_hydrated++; else retiredKeys++; } }
+  { const hydrated = new Set(input.projects.map((p) => p.source_key)); const famOf = new Map(input.rows.map((r) => [r.source_key, r.registry_id]));
+    for (const k of distance.keys()) if (!hydrated.has(k)) { if (isRetiredSource(famOf.get(k) ?? null)) { retiredKeys++; excluded.retired_source++; } else excluded.not_hydrated++; } }
   for (const p of [...input.projects].sort((a, b) => (a.source_key < b.source_key ? -1 : 1))) {
     if (!distance.has(p.source_key)) { excluded.no_distance++; continue; }
     if (p.record_kind !== 'development') { excluded.development_only++; continue; }
@@ -900,7 +899,7 @@ export function assemble(input: AssembleInput): Assembled {
     if (lc.key === 'operating' && !ev && !changeCounts) { excluded.standing_inventory++; continue; }
 
     // RELEVANCE, before the record reaches any section, count, map, history, alert or export (national-7)
-    let rel = relevance({ ...p, publisher_program: isCapitalProgramSource(family, pub) }, t ? t.typeKey : null, t && t.facilityKind ? t.facilityKind : null);
+    let rel = relevance({ ...p, publisher_program: isCapitalProgramSource(family) }, t ? t.typeKey : null, t && t.facilityKind ? t.facilityKind : null);
     let timing: TemporaryTiming | null = null;
     if (rel.include && rel.basis === 'temporary_event') {
       timing = temporaryTiming(p, today, titleCut(p.name));

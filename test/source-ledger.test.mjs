@@ -1,0 +1,24 @@
+// The source accountability ledger is generated, reconciles to the audit snapshot, and never claims more than the evidence shows.
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+let fails = 0;
+const ok = (c, n, d) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + n); if (!c) { fails++; if (d !== undefined) console.log('   ' + JSON.stringify(d).slice(0, 400)); } };
+const L = JSON.parse(readFileSync(join(root, 'docs/source-ledger/source-integration-ledger.json'), 'utf8'));
+const reg = JSON.parse(readFileSync(join(root, 'supabase/functions/get-address-report/jurisdiction-registry.json'), 'utf8'));
+const regIds = Object.values(reg).filter(Array.isArray).flat().filter((e) => e && e.registry_id).map((e) => e.registry_id);
+const gen = spawnSync('python3', ['scripts/build-source-ledger.py', '--check'], { cwd: root, encoding: 'utf8' });
+ok(gen.status === 0, 'the ledger on disk is exactly what the generator produces', gen.stderr);
+ok(regIds.length === 257 && new Set(regIds).size === 257, 'the registry has 257 distinct families');
+ok(L.sources.filter((s) => s.registered).length === 257 && regIds.every((id) => L.sources.some((s) => s.registry_id === id)), 'every registered family has a ledger row');
+ok(L.sources.length === 259 && L.snapshot.unregistered_with_data.length === 2, 'two unregistered sources with data are separately identified');
+ok(Object.values(L.counts).reduce((a, b) => a + b, 0) === L.sources.length, 'class counts sum to the ledger size', L.counts);
+ok(L.snapshot.stored_development_records === 2925395 && L.sources.reduce((a, s) => a + s.stored_development_records, 0) === 2925395, 'stored records reconcile to the audit snapshot total');
+const dis = L.sources.filter((s) => s.classification === 'disconnected');
+ok(dis.length === 8 && dis.reduce((a, s) => a + s.stored_development_records, 0) === 73580, 'eight disconnected families hold 73,580 stored records');
+ok(L.counts.fully_verified === undefined && L.sources.every((s) => s.hydration_verification === 'UNVERIFIED' && s.report_eligibility_verification === 'UNVERIFIED'), 'no source is marked verified end to end; hydration and eligibility are UNVERIFIED everywhere');
+ok(L.sources.filter((s) => s.classification === 'retired').every((s) => s.retirement_or_exclusion_evidence), 'a retired source always carries its retirement evidence');
+ok(L.sources.every((s) => s.verification_date === '2026-11-19' && Array.isArray(s.outstanding_defects)), 'every row is dated and lists its defects');
+console.log(fails ? `\n${fails} FAILED` : '\nall passed'); process.exit(fails ? 1 : 0);
