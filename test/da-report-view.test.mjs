@@ -118,7 +118,7 @@ try {
   ok(/Stage: Approved Source agency status: Advertised Approval is not a construction permit or a start of work\./.test(textOf(men.cells[1])), '2e the Stage cell: HomeSignal\'s stage, then the publisher\'s own stage under its own label', textOf(men.cells[1]));
   // national-6 (2026-11-02): the impact note says what THIS record documents (relevance basis new construction) and what it does not state; no generic warning
   // founder (2026-11-03, partner-sample review; supersedes 2026-11-02): the note is the record's own scope only, with no Type sentence after it
-  ok(/The record documents new construction\. Construction activity at the site is possible once work starts\. The record states no schedule and no effect on nearby properties\.$/.test(textOf(men.cells[2])), '2f the impact cell is the record-specific note only, qualified (no Type sentence)', textOf(men.cells[2]));
+  ok(/The record documents new construction\. Construction activity at the site is possible once work starts\. The official record does not specify a construction schedule or potential impacts on nearby properties\.$/.test(textOf(men.cells[2])), '2f the impact cell is the record-specific note only, qualified (no Type sentence)', textOf(men.cells[2]));
   // the evidence is the fourth cell of the record's own row: one per record, no second list, no details block, no evidence card anywhere else
   ok(evOf(html).length === 8 && new Set(evOf(html).map((e) => e.name)).size === 8 && evOf(html).every((e) => e.html.length > 0), '2g one supporting-evidence cell per record, in that record\'s own row');
   ok(!/<details|<summary|da-rv-evrec|da-rv-evlist|da-rv-evtitle|Supporting evidence for each record/.test(html) && /Supporting Evidence/.test(html), '2g2 the separate expandable evidence section is gone: no details, no summary, no evidence cards or list, no duplicate evidence in the markup');
@@ -254,7 +254,7 @@ try {
   const kinds = Object.fromEntries(rowsOf(html).map((r) => [r.name, (/data-da-qol="([^"]*)"/.exec(r.html) || [])[1]]));
   // national-6 (2026-11-02): a note is "documented" when it states what the record documents (the engine's relevance basis)
   ok(kinds['Menchaca Apartments'] === 'documented' && kinds['Oak Grove Townhomes'] === 'denied_or_withdrawn' && Object.values(kinds).every(Boolean), '4a every row carries one impact kind, and a Decided record is "denied or withdrawn"', kinds);
-  ok(rowsOf(html).every((r) => /states no schedule and no effect on nearby properties|states no dates|not stated|does not state|Confirm the outcome|not site-verified|no effect is established/i.test(textOf(r.cells[2]))), '4b every impact text is qualified (says what the record does not state, or asks to confirm)', rowsOf(html).map((r) => textOf(r.cells[2])));
+  ok(rowsOf(html).every((r) => /does not specify a construction schedule or potential impacts on nearby properties|states no dates|not stated|does not state|Confirm the outcome|not site-verified|no effect is established/i.test(textOf(r.cells[2]))), '4b every impact text is qualified (says what the record does not state, or asks to confirm)', rowsOf(html).map((r) => textOf(r.cells[2])));
   const joined = rowsOf(html).map((r) => textOf(r.cells[2])).join(' ');
   ok(!/\d/.test(joined) && !/property value|home value|price|appreciat|increase in value|score|rating|decibel|minutes|percent|%/i.test(joined), '4c no number, score, rating, measurement or property-value prediction appears in any impact cell', joined.match(/.{15}(\d|value|price|score).{15}/i));
   // national-6 (2026-11-02): the note is keyed by what the record documents (relevance basis), never by stage; a record with no basis gets the scope-only sentence, never a Type warning
@@ -309,7 +309,7 @@ try {
   ok(attrs(html).length > 40, '4e (control) there were attributes to scan (' + attrs(html).length + ')');
   const ALLOWED_ATTRS = new Set(['class', 'aria-label', 'aria-hidden', 'data-lifecycle', 'data-da-qol', 'href', 'target', 'rel', 'viewBox', 'width', 'height', 'focusable', 'fill', 'stroke', 'stroke-width', 'stroke-dasharray', 'cx', 'cy', 'r', 'x', 'y', 'rx', 'd',
     // the 100526 layout: stage badges, the filters, the map, the action bar
-    'data-stage', 'data-da-type', 'data-da-stage', 'data-da-filter', 'data-da-value', 'aria-pressed', 'type', 'role', 'scope', 'transform', 'text-anchor', 'dy', 'aria-disabled', 'hidden']);
+    'data-stage', 'data-da-type', 'data-da-stage', 'data-da-filter', 'data-da-overview', 'data-da-value', 'aria-pressed', 'type', 'role', 'scope', 'transform', 'text-anchor', 'dy', 'aria-disabled', 'hidden']);
   const seen = new Set(Object.values(outputs).flatMap((o) => attrs(o).map(([k]) => k)));
   ok([...seen].every((k) => ALLOWED_ATTRS.has(k)) && seen.has('data-lifecycle') && seen.has('href'), '4e2 the only attribute NAMES that ever appear are the closed set of presentation ones: no id, no data-id, no title, no style, no other data-*', [...seen].filter((k) => !ALLOWED_ATTRS.has(k)));
   ok(!/<(script|iframe|object|embed|form|input|img|select|textarea)\b/i.test(html) && !/\son[a-z]+=/i.test(html), '4f the output has no script, frame, form, input or event-handler attribute');
@@ -456,7 +456,7 @@ try {
   ghost.report.sections.by_stage.approved.push('no-such-project', 'k-approved');
   ok(rowsOf(view(ghost)).filter((r) => /data-da-stage="approved"/.test(r.attrs)).length === 2, '7d an id the report does not carry is skipped, and a repeated id is shown once');
   const hist = sec(html, 'history').html;
-  const items = hist.split('<li class="da-rv-hist">').slice(1);
+  const items = hist.split(/<li class="da-rv-hist"[^>]*>/).slice(1);
   ok(items.length === 6 && items.map((i) => decode(/<h3 class="da-rv-title">([\s\S]*?)<\/h3>/.exec(i)[1])).join() === 'Menchaca Apartments,Lakeline Medical Office,Highway 99 Widening,Oak Grove Townhomes,Fire Station 12,Riverside Retail Center',
     '7e Change History lists the records that have a detected change or a publisher event, in the engine\'s order', items.length);
   const men = items[0];

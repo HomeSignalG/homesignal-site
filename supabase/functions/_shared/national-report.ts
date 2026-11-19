@@ -592,7 +592,9 @@ export function titleCut(name: string | null): boolean { return typeof name === 
 // relevance-2 (2026-11-02): "change in use" (Sioux Falls WORKCLASS) is the same fact as "change of use".
 // relevance-3 (2026-11-03): a change of use that also builds a new building is new construction (Seattle 7118487-CN, 83 units). A temporary structure, market, booth, kiosk, canopy, exhibit, platform, seating or inflated structure is temporary
 //   activity, judged on its documented dates, never new construction ("Erect (6) temporary structures for 2026 Christmas Market", Seattle).
-export const RELEVANCE_RULE_VERSION = 'relevance-3';
+// relevance-4 (2026-11-19, Boulder audit): size words need an affirmative construction word; negated change of use is not a change of use; interior
+//   partition/finish removal is not demolition; strong routine phrases outrank the residential answer; a permit revision is judged by its underlying scope.
+export const RELEVANCE_RULE_VERSION = 'relevance-4';
 export function normalizeWords(s: string): string {
   return ' ' + String(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
 }
@@ -607,7 +609,7 @@ export type Relevance =
 
 const any = (w: string, list: string[]) => list.find((x) => w.includes(x)) ?? null;
 /** Phrases that mean the demolition or work is INSIDE a building; removed before the significance phrases are looked for. */
-const INTERIOR_DEMOLITION = [' interior demolition ', ' interior demo ', ' selective demolition ', ' non structural demolition ', ' demolition of interior '];
+const INTERIOR_DEMOLITION = [' interior demolition ', ' interior demo ', ' selective demolition ', ' non structural demolition ', ' demolition of interior ', ' partition demolition ', ' demolition of partition ', ' demolition of partitions ', ' demolition of existing partition ', ' demolition of existing partitions ', ' demolition of non bearing ', ' demolition of storefront ', ' demolish interior ', ' demolish existing partition ', ' demolish partition ', ' demolish partitions '];
 const TEMPORARY = [' temporary '];
 const TEMPORARY_EVENT = [' event ', ' events ', ' stage ', ' festival ', ' concert ', ' fair ', ' tent ', ' tents ', ' bleachers ', ' outdoor '];
 /** "temporary" followed closely by what is put up for a while: the thing named is the temporary object, so "erect" or "new construction" around it
@@ -616,12 +618,23 @@ const TEMPORARY_INSTALLATION_RE = / temporary( [a-z0-9]+){0,3}? (structure|struc
 const CHANGE_OF_USE = [' change of use ', ' change in use ', ' change use ', ' establish use ', ' change of occupancy ', ' convert ', ' conversion ', ' converting '];
 const DEMOLITION = [' demolish ', ' demolition ', ' demo of ', ' raze '];
 const SITE_WORK = [' shoring ', ' excavation ', ' excavate ', ' grading ', ' clearing and grading ', ' mass grading ', ' earthwork '];
-const NEW_CONSTRUCTION = [' new construction ', ' new single family ', ' new multifamily ', ' erect ', ' high rise ', ' mid rise ',
-  ' story ', ' stories ', ' dwelling units ', ' townhouses ', ' townhomes ', ' construct a residential ', ' construct a commercial ', ' construct a mixed use '];
+const NEW_CONSTRUCTION = [' new construction ', ' new single family ', ' new multifamily ', ' erect ', ' construct a residential ', ' construct a commercial ', ' construct a mixed use '];
+/** Size and shape words describe a building but do not say one is being built ("two story amenity addition", "repairs to the 5 story garage"): they count as
+ *  new construction only beside an affirmative construction word (relevance-4, 2026-11-19). */
+const NEW_SIZE_WORDS = [' high rise ', ' mid rise ', ' story ', ' stories ', ' dwelling units ', ' townhouses ', ' townhomes '];
+const AFFIRM_RE = / (allow|new|construct|constructs|constructing|construction of|build|building a|erect|proposed|propose) /;
+/** An explicit statement that something does NOT change; removed before the change-of-use words are read (clause-level, so the rest of the record still counts). */
+const NEGATED_USE_RE = / (no|without|not a|not any) (change|changes) (of|in) (use|occupancy|uses) | existing use (will )?(remains?|stays?|is) (unchanged|the same) | use (remains?|stays?) (unchanged|the same) | no change to (the )?(use|occupancy) /g;
+/** Demolition of a building or structure, as opposed to removal of interior partitions, finishes or storefronts. */
+const DEMO_TARGET_RE = / (demolish|demolition of|demo of|raze|razing|demolishing)( the| an?| existing| entire| all)*( [a-z0-9]+){0,2}? (building|buildings|structure|structures|house|houses|home|garage|warehouse|residence|barn|dwelling|dwellings|duplex|hotel|school|church) /;
+const INTERIOR_CONTEXT = [' interior ', ' tenant ', ' partition ', ' partitions ', ' storefront ', ' office ', ' studio ', ' finish ', ' finishes ', ' buildout ', ' build out ', ' remodel ', ' no structural '];
+/** Routine phrases strong enough to outrank the residential answer (a bathroom water-damage repair is not development). */
+const STRONG_ROUTINE = [' water damage ', ' damage repair ', ' like for like ', ' in kind ', ' window replacement ', ' window replacements ', ' replace windows ', ' replacing windows ',
+  ' tenant finish ', ' tenant finishes ', ' tenant buildout ', ' tenant build out ', ' bathroom remodel ', ' bath remodel ', ' kitchen remodel '];
 /** "new" counts only before a building noun ("new 4-unit townhouse building"), so "new curb cut" or "new tenant" is not new construction. */
 const NEW_BUILDING_RE = / new( [a-z0-9]+){0,3}? (building|buildings|structure|structures|residence|residences|dwelling|dwellings|duplex|triplex|fourplex|house|houses|home|homes|warehouse|hotel|school|tower) /;
 /** "existing 3-story apartment building" describes what is there, not what is proposed: collapsed before the size and building words are read. */
-const EXISTING_RE = / existing( [a-z0-9]+){0,8}? (building|buildings|structure|residence|house|home|facility|condominium) /g;
+const EXISTING_RE = / existing( [a-z0-9]+){0,8}? (building|buildings|structure|structures|residence|houses|house|home|homes|facility|condominium|warehouse|space|spaces|office|offices|garage) /g;
 const LAND_USE = [' land use ', ' master use permit ', ' shoreline ', ' subdivision ', ' short plat ', ' preliminary plat ', ' final plat ', ' rezone ',
   ' rezoning ', ' zoning change ', ' zone change ', ' variance ', ' conditional use ', ' special use ', ' site plan ', ' site development ',
   ' planned unit development ', ' design review ', ' annexation ', ' comprehensive plan ', ' sepa '];
@@ -638,7 +651,7 @@ const ROUTE_RE = / (sr|us|hwy|hwys|i|state route) \d{1,3} /;
 const PUBLIC_ACCESS = [' curb cut ', ' street use ', ' use of street ', ' street improvement ', ' street improvements ', ' street vacation ', ' right of way ', ' sidewalk '];
 const RENOVATION = [' renovate ', ' renovation ', ' renovations ', ' expansion ', ' expand '];
 const NIGHTLIFE = [' nightclub ', ' night club ', ' bar ', ' tavern ', ' brewery ', ' brewpub ', ' distillery ', ' taproom ', ' lounge ', ' event venue ', ' music venue '];
-const TENANT_IMPROVEMENT = [' tenant improvement ', ' tenant improvements ', ' ti '];
+const TENANT_IMPROVEMENT = [' tenant improvement ', ' tenant improvements ', ' ti ', ' tenant buildout ', ' tenant build out ', ' tenant finish ', ' tenant finishes ', ' buildout ', ' build out '];
 /** The routine-work phrases. Each needs nothing above it to have matched. A bare "repair", "remodel" or "alteration" is NOT here: alone it establishes nothing. */
 const ROUTINE = [' stfi ', ' subject to field inspection ', ' interior alteration ', ' interior alterations ', ' interior remodel ', ' interior remodeling ',
   ' interior repairs ', ' finishes ', ' bathroom remodel ', ' bath remodel ', ' kitchen remodel ', ' in kind ', ' like for like ', ' repairs to unit ',
@@ -690,6 +703,8 @@ export function relevance(
   if (facilityKind) return inc('facility_use', facilityKind);
   for (const x of INTERIOR_DEMOLITION) w = w.split(x).join(' interior work ');
   w = w.replace(EXISTING_RE, ' existing building ');
+  w = w.replace(NEGATED_USE_RE, ' ');
+  w = w.replace(/ permit revisions? | revision /g, ' ');
   let hit: string | null;
   if (any(w, TEMPORARY) && (hit = any(w, TEMPORARY_EVENT))) return inc('temporary_event', 'temporary' + hit.trimEnd());
   const tmp = TEMPORARY_INSTALLATION_RE.exec(w);
@@ -702,7 +717,12 @@ export function relevance(
   }
   // a land-use application or decision is framed as one, never as construction: what it would allow is carried as `proposes`
   const wl = w.split(' land use code ').join(' code ');
-  const demo = any(w, DEMOLITION), site = any(w, SITE_WORK), build = any(w, NEW_CONSTRUCTION) ?? (NEW_BUILDING_RE.exec(w)?.[0] ?? null);
+  const rawDemo = any(w, DEMOLITION);
+  // demolition names a building or structure; interior context without such a target is routine tenant work, never demolition
+  const demo = rawDemo && (DEMO_TARGET_RE.test(w) || !any(w, INTERIOR_CONTEXT)) ? rawDemo : null;
+  const site = any(w, SITE_WORK);
+  const sizeBuild = AFFIRM_RE.test(w) && !any(w, ADDITION) ? any(w, NEW_SIZE_WORDS) : null;
+  const build = any(w, NEW_CONSTRUCTION) ?? (NEW_BUILDING_RE.exec(w)?.[0] ?? null) ?? sizeBuild;
   if ((hit = any(wl, LAND_USE))) {
     const r = inc('land_use', hit);
     const proposes = build ? 'new_construction' : demo ? 'demolition' : site ? 'site_work' : null;
@@ -714,7 +734,7 @@ export function relevance(
   if ((hit = any(w, ADDITION))) return inc('addition', hit);
   if ((hit = any(w, SUBSTANTIAL))) return inc('substantial_alteration', hit);
   const ext = any(w, EXTERIOR);
-  if (ext) {
+  if (ext && !any(w, STRONG_ROUTINE)) {
     const wide = any(w, BUILDING_WIDE) ?? (BUILDING_WIDE_RE.exec(w)?.[0] ?? null);
     if (wide) return inc('exterior_building_wide', (ext.trim() + ',' + wide).replace(/\s+/g, ' '));
   }
@@ -727,6 +747,8 @@ export function relevance(
   // THE CANONICAL RESIDENTIAL ANSWER (lib/residential-qualify.js, through its generated copy): Map 1's own rule for whether a record is new residential
   // development or routine work on an existing home, including the founder's bounded development-class source families (2026-09-06). It is asked, never
   // restated. For a record of another Type only its source-class answers are taken (a bounded development corpus; a subdivision, plat or site-plan record).
+  const strongRoutine = any(w, STRONG_ROUTINE);
+  if (strongRoutine) return { include: false, reason: 'routine_work', evidence: strongRoutine.trim(), rule_version: V };
   const ra = HS().residentialActivity ? HS().residentialActivity({ name: p.name, type_raw: p.type_raw, registry_id: p.registry_id ?? null }) : null;
   if (ra && ra.verdict === 'DEVELOPMENT' && (typeKey === 'residential' || ra.rule === 'DEV_PROVENANCE' || ra.rule === 'DEV_ANYWHERE')) {
     return inc(typeKey === 'residential' ? 'residential_development' : 'development_record', String(ra.evidence ?? ra.rule));

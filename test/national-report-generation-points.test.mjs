@@ -87,7 +87,7 @@ ok(p && p.type.key === 'residential' && p.publisher_stage === 'In Review' && p.s
 const row = after.rowOf('Lightsey Residences');
 ok(row && /Residential/.test(row) && /Stage: Proposed \/ Under review/.test(row) && /Source agency status: In Review/.test(row) && /Official source/.test(row), '2f the rendered row shows project, Type, Stage and source', row);
 // 2026-11-03 (founder, partner-sample review; supersedes 2026-11-02): the note states only what THIS record documents, and claims no established effect
-ok(row && /Quality-of-Life Impact: The record documents new residential development\. .*The record states no schedule and no effect on nearby properties\./.test(row) && !/added neighborhood activity/.test(row), '2g the Quality-of-Life wording is the record-specific note only (no category sentence), and claims no established effect', row);
+ok(row && /Quality-of-Life Impact: The record documents new residential development\. .*The official record does not specify a construction schedule or potential impacts on nearby properties\./.test(row) && !/added neighborhood activity/.test(row), '2g the Quality-of-Life wording is the record-specific note only (no category sentence), and claims no established effect', row);
 
 // ---- 3. the half-mile edge ----
 ok(!keys(rpc.new_055).includes(LIGHTSEY), '3a ~0.55 mi: excluded');

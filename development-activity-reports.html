@@ -1588,7 +1588,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       var until = dateWords(body.expires_at);
       shareSay('Client link made.', false);
       $('share-link').value = link;
-      $('share-note').textContent = 'Send this link to your client. Anyone who has it can read this report' + (until ? ', until ' + until : '') + '. HomeSignal shows this link only this once: if you lose it, withdraw it below and make a new one.';
+      $('share-note').textContent = 'Send this link to your client. Anyone who has it can read this report' + (until ? ', until ' + until : '') + '. Your client link is displayed only once. If you lose it, select Share with Client to generate a new link.';
       $('share-copy').textContent = 'Copy link';
       $('share-new').hidden = false;
       refreshShares();

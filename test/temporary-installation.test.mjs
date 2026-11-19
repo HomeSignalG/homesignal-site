@@ -28,7 +28,7 @@ const keep = { 'Construct a residential high rise building occupy per plan': 'ne
 const got = Object.fromEntries(Object.keys(keep).map((t) => { const r = R(t); return [t, r.include ? r.basis : null]; }));
 ok(Object.keys(keep).every((t) => keep[t] === null ? got[t] !== 'temporary_event' : got[t] === keep[t]),
   '1c construction support ("temporary shoring", "temporary power", "temporary hoist") and real buildings are not read as temporary activity', got);
-ok(M.RELEVANCE_RULE_VERSION === 'relevance-3', '1d the rule version moved to relevance-3');
+ok(M.RELEVANCE_RULE_VERSION === 'relevance-4', '1d the rule version moved to relevance-3');
 
 // ---- 2. the Seattle report: the market is judged on its dates and leaves the new-building lead ---------------------------------------------------
 {
