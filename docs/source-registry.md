@@ -13483,3 +13483,23 @@ section / tax lots its own request text names to the county's public Taxlots Fea
   its map disclaimer says the data is for context only and may not reflect the latest information. No written prohibition on commercial use of the
   service was found. The connector reads only the lot key and centroid for the few lots a case names (no owner or mailing fields, no bulk copy).
   robots.txt: the `*` group sets Crawl-delay 10 and does not disallow the case pages, so requests to the county host are spaced 10 s apart.
+
+## BOULDER COUNTY ACCELA APPLICATIONS (2026-11-19) — `boulder-county-accela-applications` prepared (NOT deployed)
+
+Boulder County's own ArcGIS Server, `PLANNING/OP_Accela_Point` MapServer layer 0 (point, WGS84): 277,404 rows, newest ApplicationDate 2026-11,
+Planning 81,301 + Building 146,438 rows. **UNINCORPORATED Boulder County only. It is not a municipal feed** for Longmont, Lafayette, Louisville,
+Superior, Broomfield or the City of Boulder, and the registry label says so. Whether the layer holds any municipal-jurisdiction rows is unverified
+(sampled rows were unincorporated addresses).
+- **Scope:** a 28-value `DocketType` whitelist (new residences and commercial buildings, additions, ADUs, deconstruction, site-plan, special-use,
+  subdivision, variance, floodplain and grading cases, small-cell wireless). Roofing, mechanical, electrical, plumbing and window permits are out.
+- **Vocabulary:** `DocketType` and `ApplicationStatus` are verbatim live groupBy output (pg_net, Planning + Building rows since 2025-11-19). 71 statuses
+  are bucketed; those whose meaning the county does not state (Mapped, Final Balance Due, Post Approval, Transfer to Building) are `exclude`.
+- **Record link:** `Link` (Accela CapDetail) per record; planning cases also carry `DocketLink`. Not HTTP-fetched.
+- **Not yet done:** a dry run through the deployed engine; the county's terms of use / copyright text for the service (the read was not completed); an
+  Accela-portal check of the status meanings. Test: `test/boulder-county-accela-connector.test.mjs` (real captured rows in `fixtures/boulder-county/`).
+
+**Other Colorado sources probed 2026-11-19 (none wired):**
+- **CDOT:** `dtdapps.coloradodot.info` answered HTTP 522 from Postgres (pg_net); an ArcGIS Hub search found no CDOT project layer. Needs a runner probe.
+- **Louisville:** `Planning/Current_Case_Tracking` (26 cases) is stale, newest hearing 2018. `Energov/Energov_View` is address points only.
+- **Lafayette:** the city's ArcGIS org lists no permit or planning layer. **Superior:** only zoning and future-land-use layers (Willdan org).
+- **Longmont, Broomfield:** no official permit layer found in a Hub search; the guessed GIS hosts did not resolve or timed out. Needs a rendered-portal probe.
