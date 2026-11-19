@@ -292,6 +292,8 @@ export type AssembleInput = {
   now: Date; subject: Subject; radius_mi: number; view: View; zip_supported: boolean;
   attribution: SourceAttribution; rows: RadiusRow[]; projects: ProjectRow[]; ledger: LedgerProject[];
   events: ReportableEvent[]; health: SourceHealth[];
+  /** registry families geographically applicable to the subject by verified state and county (report-run.ts); their failure record counts even with no record in the report */
+  applicable_families?: string[];
 };
 export type Assembled = {
   coverage_state: CoverageState;
@@ -1010,7 +1012,10 @@ export function assemble(input: AssembleInput): Assembled {
   if (truncated) {
     limitations.push({ code: 'AREA_TRUNCATED', text: 'This area holds more records than one report can carry; the list is incomplete.' });
   }
-  if (sourcesNotFullyRead(input.health, familiesIncluded)) limitations.push({ ...SOURCE_NOT_FULLY_READ });
+  // a failed read counts for every source the report can be judged on: one that returned a record, one whose key the spatial read found (loaded or not),
+  // and one whose declared coverage names the subject's verified state and county, even when it contributed nothing
+  const judgedFamilies = new Set<string>([...familiesIncluded, ...input.rows.map((r) => r.registry_id).filter((f): f is string => !!f), ...(input.applicable_families ?? [])]);
+  if (sourcesNotFullyRead(input.health, judgedFamilies)) limitations.push({ ...SOURCE_NOT_FULLY_READ });
   const state: CoverageState = limitations.length > 0 ? 'LIMITED_COVERAGE' : anyChangeReady ? 'CHANGE_READY' : 'REPORT_READY';
   const outcome = activityOutcome(projects.length, relevanceReview.length);
 

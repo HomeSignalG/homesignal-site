@@ -1,22 +1,18 @@
 #!/usr/bin/env python3
-"""Builds docs/source-ledger/source-integration-ledger.json from the audit snapshot CSV + the registry + the generated publisher/capital-program files.
+"""Builds docs/source-ledger/source-integration-ledger.json from the FROZEN 2026-11-19 audit (snapshot CSV + frozen membership). It never reads the live registry.
 Nothing here assumes a result: every field the evidence cannot establish is the string UNVERIFIED (or null). Re-run with --check to prove the ledger on disk is
 exactly what this produces. The snapshot CSV is the 2026-11-19 read-only audit (grouped queries; md5 of the sorted rows a776c7e25895577585ece226473c7b30).
 """
 import csv, json, sys, hashlib, os
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 J = lambda p: json.load(open(os.path.join(root, p)))
-reg = J('supabase/functions/get-address-report/jurisdiction-registry.json')
-pubs = J('supabase/functions/_shared/source-publishers.generated.json')['publishers']
-cap = J('supabase/functions/_shared/capital-program-sources.generated.json')['families']
 retired = J('supabase/functions/_shared/retired-sources.json')['retired']
+# The audited membership is FROZEN (docs/source-ledger/audit-membership-2026-11-19.json): the ledger is historical evidence of the 2026-11-19 audit and must not
+# change when the live registry grows. Sources registered later are not here; they are UNVERIFIED until audited (see test/lib/source-ledger-current.mjs).
+frozen = J('docs/source-ledger/audit-membership-2026-11-19.json')['audited']
 snap = {r['registry_id']: r for r in csv.DictReader(open(os.path.join(root, 'docs/source-ledger/audit-snapshot-2026-11-19.csv')))}
 VERIFIED_ON = '2026-11-19'
-meta = {}
-for conn in ('socrata', 'arcgis', 'ckan', 'csv', 'carto', 'opendatasoft', 'county_cases'):
-    for e in reg.get(conn, []):
-        if isinstance(e, dict) and 'registry_id' in e:
-            meta[e['registry_id']] = dict(connector=conn, jurisdiction=e.get('jurisdiction'), coverage=e.get('coverage'))
+meta = {k: dict(connector=v['connector'], jurisdiction=v['jurisdiction'], coverage=v['coverage']) for k, v in frozen.items() if v['registered']}
 # documented evidence (CLAUDE.md in this repo, cited by section) for sources that stopped updating upstream. Stalled is NOT retired.
 STALLED = {
   'cabarrus-county-plan-reviews': 'newest B1_FILE_DD 2025-04-03, 0 rows in the last 12 months (CLAUDE.md, NORTH CAROLINA PRE-LAUNCH 2026-10-20)',
@@ -42,7 +38,7 @@ for rid in sorted(set(meta) | set(snap), key=lambda s: s.encode()):
         if nolat * 100 > stored: cls = 'partially_connected'; defects.append('COORDINATE_LESS_RECORDS: %d of %d stored records have no coordinates' % (nolat, stored))
         elif nolat: defects.append('COORDINATE_LESS_RECORDS: %d of %d' % (nolat, stored))
         if rej: cls = 'partially_connected'; defects.append('SERVING_KEYS_REJECTED: %d keys rejected by the spatial generation' % rej)
-    p = pubs.get(rid, {})
+    p = dict(agency=frozen.get(rid, {}).get('publishing_agency'))
     out.append(dict(
         registry_id=rid, registered=rid in meta, connector=m.get('connector'),
         publishing_agency=p.get('agency') or m.get('jurisdiction'), jurisdiction=m.get('jurisdiction'), coverage=m.get('coverage'),
@@ -50,7 +46,7 @@ for rid in sorted(set(meta) | set(snap), key=lambda s: s.encode()):
         active_generation_spatial=dict(n5_geom_served=sv, n5_geom_rejected=rej, proven_points=pv),
         classification=cls,
         hydration_verification='UNVERIFIED', report_eligibility_verification='UNVERIFIED',
-        transportation_capital_program_evidence=cap.get(rid) if rid in cap else ('UNVERIFIED' if p.get('agency') and any(w in p['agency'].lower() for w in ('transportation', 'highway', 'dot')) else None),
+        transportation_capital_program_evidence=frozen.get(rid, {}).get('transportation_capital_program_evidence'),
         last_refreshed=r['newest_last_seen'] if r and r['newest_last_seen'] != '-' else None,
         publisher_freshness_and_ingestion_health='UNVERIFIED',
         retirement_or_exclusion_evidence=evidence, outstanding_defects=defects, verification_date=VERIFIED_ON))

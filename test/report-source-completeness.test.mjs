@@ -73,6 +73,35 @@ ok((zeroClean.intelligence?.projects ?? []).length === 0 && lims(zeroClean).leng
 const epa = run([row('frs:1', '110000', 0.1, 'ST_Point')], [{ ...mk('frs:1', '110000', 'ACME PLANT', 'Operating', 'industrial'), record_kind: 'facility' }]);
 ok(ex(epa).development_only === 1 && !ids(epa).has('frs:1'), 'an EPA registry facility row is regulatory-plane, not listed as development activity', ex(epa));
 
+// ── a known retrieval failure is disclosed for every geographically applicable source, even one that contributed nothing ──
+const App = await import('../supabase/functions/_shared/source-applicability.ts');
+const RR = await import('../supabase/functions/_shared/report-run.ts');
+const cov = JSON.parse(readFileSync(join(root, 'supabase/functions/_shared/source-coverage.generated.json'), 'utf8')).families;
+const boulderIds = App.applicableFamilies([{ state: 'Colorado', county: 'Boulder County' }]);
+ok(boulderIds.includes('boulder-construction-permits') && !boulderIds.includes('seattle-building-permits') && boulderIds.every((id) => cov[id].some((c) => c.state === 'CO')), 'applicability: Boulder CO selects only sources whose declared coverage names CO (and Boulder, or statewide)', boulderIds.slice(0, 5));
+ok(App.applicableFamilies([]).length === 0 && App.applicableFamilies([{ state: 'Atlantis', county: 'X' }]).length === 0 && App.applicableFamilies([{ state: 'CO', county: '' }]).every((id) => cov[id].every((c) => c.state !== 'CO' || !c.county) || !cov[id].some((c) => c.county)), 'applicability: unknown geography, or a county-scoped source with no verified county, makes nothing applicable');
+const fakeReads = (health, places, calls = {}) => ({ radius: async () => [], hydrate: async (k) => (calls.h = k, []), ledger: async () => [], events: async () => [],
+  health: async (f) => (calls.fams = f, health.filter((h) => f.includes(h.registry_id))), jurisdictions: async (z) => (calls.zip = z, places) });
+const fail = [{ registry_id: 'boulder-construction-permits', fetch_failures_24h: 3, blocked_24h: 0, truncated_24h: 0 }];
+const calls = {};
+const inp = await RR.readReportInputs(fakeReads(fail, [{ state: 'CO', county: 'Boulder' }], calls), { lat: 40.0177, lng: -105.28, radiusMi: 0.5, now: NOW, zip: '80302' });
+ok(calls.zip === '80302' && calls.fams?.includes('boulder-construction-permits') && inp.health.length === 1, 'failure evidence is READ for an applicable source that returned no record');
+const emptyFail = M.assemble({ now: NOW, subject: SUBJECT, radius_mi: 0.5, view: 'internal', zip_supported: true, attribution, rows: [], projects: [], ledger: [], events: [], health: inp.health, applicable_families: inp.applicable_families });
+ok(lims(emptyFail).includes('SOURCE_NOT_FULLY_READ') && emptyFail.coverage_state === 'LIMITED_COVERAGE' && emptyFail.intelligence?.activity?.outcome !== 'NO_DEVELOPMENT_ACTIVITY', 'a failed read of an applicable source with no records is disclosed and never reads as confirmed absence', { l: lims(emptyFail) });
+const oth = await RR.readReportInputs(fakeReads([{ registry_id: 'seattle-building-permits', fetch_failures_24h: 5, blocked_24h: 0, truncated_24h: 0 }], [{ state: 'CO', county: 'Boulder' }]), { lat: 40.0177, lng: -105.28, radiusMi: 0.5, now: NOW, zip: '80302' });
+const notApplicable = M.assemble({ now: NOW, subject: SUBJECT, radius_mi: 0.5, view: 'internal', zip_supported: true, attribution, rows: [], projects: [], ledger: [], events: [], health: oth.health, applicable_families: oth.applicable_families });
+ok(!lims(notApplicable).includes('SOURCE_NOT_FULLY_READ'), 'control: a failing source that does not apply to the subject\'s verified geography adds no warning');
+const unknownGeo = await RR.readReportInputs(fakeReads(fail, []), { lat: 40.0177, lng: -105.28, radiusMi: 0.5, now: NOW, zip: '80302' });
+ok(unknownGeo.applicable_families.length === 0 && unknownGeo.health.length === 0, 'control: unverified geography makes no source applicable and invents no warning');
+const noZip = await RR.readReportInputs(fakeReads(fail, [{ state: 'CO', county: 'Boulder' }]), { lat: 40.0177, lng: -105.28, radiusMi: 0.5, now: NOW });
+ok(noZip.applicable_families.length === 0, 'control: with no ZIP the applicability route is not used');
+// a source the spatial read FOUND (loaded or not) is judged too, with no geography lookup at all
+const viaRow = M.assemble({ now: NOW, subject: SUBJECT, radius_mi: 0.5, view: 'internal', zip_supported: true, attribution, rows: [row('only:1', 'boulder-construction-permits', 0.1, 'ST_Point')], projects: [], ledger: [], events: [], health: fail });
+ok(lims(viaRow).includes('SOURCE_NOT_FULLY_READ') && lims(viaRow).includes('RECORDS_NOT_LOADED'), 'a source whose key the spatial read found is judged on its failure even when nothing hydrated', lims(viaRow));
+// the other two callers share the one read: the Watch passes the ZIP, and both data layers provide the geography read
+for (const f of ['supabase/functions/run-property-watch/handler.ts', 'supabase/functions/get-development-activity-report/handler.ts']) ok(/zip: (stored\.zip|g\.zip)/.test(readFileSync(join(root, f), 'utf8')), f + ' passes the ZIP to readReportInputs');
+for (const f of ['supabase/functions/run-property-watch/data.ts', 'supabase/functions/get-development-activity-report/data.ts']) ok(/jurisdictions: reportReads\.jurisdictions/.test(readFileSync(join(root, f), 'utf8')), f + ' provides the geography read');
+
 // ── generated files are current ──
-for (const g of ['gen-capital-program-sources.mjs', 'gen-source-publishers.mjs']) { const r = spawnSync(process.execPath, ['scripts/' + g, '--check'], { cwd: root, encoding: 'utf8' }); ok(r.status === 0, g + ' --check is current', r.stderr); }
+for (const g of ['gen-capital-program-sources.mjs', 'gen-source-publishers.mjs', 'gen-source-coverage.mjs']) { const r = spawnSync(process.execPath, ['scripts/' + g, '--check'], { cwd: root, encoding: 'utf8' }); ok(r.status === 0, g + ' --check is current', r.stderr); }
 console.log(fails ? `\n${fails} FAILED` : '\nall passed'); process.exit(fails ? 1 : 0);

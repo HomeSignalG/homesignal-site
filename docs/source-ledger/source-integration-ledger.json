@@ -28,8 +28,8 @@
    "jurisdiction": "Adams County, Colorado",
    "coverage": [
     {
-     "state": "CO",
-     "county": "Adams"
+     "county": "Adams",
+     "state": "CO"
     }
    ],
    "stored_development_records": 7464,
@@ -121,12 +121,12 @@
    "jurisdiction": "City of Albuquerque, New Mexico",
    "coverage": [
     {
-     "state": "NM",
-     "county": "Bernalillo"
+     "county": "Bernalillo",
+     "state": "NM"
     },
     {
-     "state": "NM",
-     "county": "Sandoval"
+     "county": "Sandoval",
+     "state": "NM"
     }
    ],
    "stored_development_records": 2549,
@@ -213,8 +213,8 @@
    "jurisdiction": "Allegheny County Health Department",
    "coverage": [
     {
-     "state": "PA",
-     "county": "Allegheny"
+     "county": "Allegheny",
+     "state": "PA"
     }
    ],
    "stored_development_records": 421,
@@ -242,8 +242,8 @@
    "jurisdiction": "City of Allentown, Pennsylvania",
    "coverage": [
     {
-     "state": "PA",
-     "county": "Lehigh"
+     "county": "Lehigh",
+     "state": "PA"
     }
    ],
    "stored_development_records": 4898,
@@ -271,8 +271,8 @@
    "jurisdiction": "City of Anaheim",
    "coverage": [
     {
-     "state": "CA",
-     "county": "Orange"
+     "county": "Orange",
+     "state": "CA"
     }
    ],
    "stored_development_records": 1009,
@@ -300,8 +300,8 @@
    "jurisdiction": "City of Ann Arbor",
    "coverage": [
     {
-     "state": "MI",
-     "county": "Washtenaw"
+     "county": "Washtenaw",
+     "state": "MI"
     }
    ],
    "stored_development_records": 1371,
@@ -329,8 +329,8 @@
    "jurisdiction": "Anne Arundel County, Maryland \u2014 Office of Planning and Zoning",
    "coverage": [
     {
-     "state": "MD",
-     "county": "Anne Arundel"
+     "county": "Anne Arundel",
+     "state": "MD"
     }
    ],
    "stored_development_records": 0,
@@ -361,8 +361,8 @@
    "jurisdiction": "Anne Arundel County, Maryland \u2014 Office of Planning and Zoning",
    "coverage": [
     {
-     "state": "MD",
-     "county": "Anne Arundel"
+     "county": "Anne Arundel",
+     "state": "MD"
     }
    ],
    "stored_development_records": 0,
@@ -449,8 +449,8 @@
    "jurisdiction": "City of Arlington",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Tarrant"
+     "county": "Tarrant",
+     "state": "TX"
     }
    ],
    "stored_development_records": 71058,
@@ -478,8 +478,8 @@
    "jurisdiction": "City of Arlington",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Tarrant"
+     "county": "Tarrant",
+     "state": "TX"
     }
    ],
    "stored_development_records": 836,
@@ -507,8 +507,8 @@
    "jurisdiction": "City of Arlington",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Tarrant"
+     "county": "Tarrant",
+     "state": "TX"
     }
    ],
    "stored_development_records": 1074,
@@ -536,8 +536,8 @@
    "jurisdiction": "City of Asheville",
    "coverage": [
     {
-     "state": "NC",
-     "county": "Buncombe"
+     "county": "Buncombe",
+     "state": "NC"
     }
    ],
    "stored_development_records": 4384,
@@ -565,16 +565,16 @@
    "jurisdiction": "City of Aurora, Colorado",
    "coverage": [
     {
-     "state": "CO",
-     "county": "Adams"
+     "county": "Adams",
+     "state": "CO"
     },
     {
-     "state": "CO",
-     "county": "Arapahoe"
+     "county": "Arapahoe",
+     "state": "CO"
     },
     {
-     "state": "CO",
-     "county": "Douglas"
+     "county": "Douglas",
+     "state": "CO"
     }
    ],
    "stored_development_records": 20796,
@@ -602,8 +602,8 @@
    "jurisdiction": "City of Austin",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Travis"
+     "county": "Travis",
+     "state": "TX"
     }
    ],
    "stored_development_records": 1516,
@@ -631,8 +631,8 @@
    "jurisdiction": "City of Austin",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Travis"
+     "county": "Travis",
+     "state": "TX"
     }
    ],
    "stored_development_records": 12893,
@@ -660,8 +660,8 @@
    "jurisdiction": "City of Austin",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Travis"
+     "county": "Travis",
+     "state": "TX"
     }
    ],
    "stored_development_records": 4900,
@@ -689,8 +689,8 @@
    "jurisdiction": "City of Austin Planning Department",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Travis"
+     "county": "Travis",
+     "state": "TX"
     }
    ],
    "stored_development_records": 65128,
@@ -718,12 +718,12 @@
    "jurisdiction": "City of Baltimore",
    "coverage": [
     {
-     "state": "MD",
-     "county": "Baltimore"
+     "county": "Baltimore",
+     "state": "MD"
     },
     {
-     "state": "MD",
-     "county": "Baltimore city"
+     "county": "Baltimore city",
+     "state": "MD"
     }
    ],
    "stored_development_records": 2589,
@@ -751,16 +751,16 @@
    "jurisdiction": "Baltimore County",
    "coverage": [
     {
-     "state": "MD",
-     "county": "Baltimore"
+     "county": "Baltimore",
+     "state": "MD"
     },
     {
-     "state": "MD",
-     "county": "Howard"
+     "county": "Howard",
+     "state": "MD"
     },
     {
-     "state": "MD",
-     "county": "Harford"
+     "county": "Harford",
+     "state": "MD"
     }
    ],
    "stored_development_records": 2029,
@@ -788,8 +788,8 @@
    "jurisdiction": "City of Beaverton, Oregon",
    "coverage": [
     {
-     "state": "OR",
-     "county": "Washington"
+     "county": "Washington",
+     "state": "OR"
     }
    ],
    "stored_development_records": 230,
@@ -817,8 +817,8 @@
    "jurisdiction": "City of Bellevue",
    "coverage": [
     {
-     "state": "WA",
-     "county": "King"
+     "county": "King",
+     "state": "WA"
     }
    ],
    "stored_development_records": 321,
@@ -848,8 +848,8 @@
    "jurisdiction": "City of Bellingham",
    "coverage": [
     {
-     "state": "WA",
-     "county": "Whatcom"
+     "county": "Whatcom",
+     "state": "WA"
     }
    ],
    "stored_development_records": 780,
@@ -877,8 +877,8 @@
    "jurisdiction": "City of Bend, Oregon",
    "coverage": [
     {
-     "state": "OR",
-     "county": "Deschutes"
+     "county": "Deschutes",
+     "state": "OR"
     }
    ],
    "stored_development_records": 7823,
@@ -906,8 +906,8 @@
    "jurisdiction": "City of Bentonville, Arkansas",
    "coverage": [
     {
-     "state": "AR",
-     "county": "Benton"
+     "county": "Benton",
+     "state": "AR"
     }
    ],
    "stored_development_records": 32497,
@@ -935,8 +935,8 @@
    "jurisdiction": "City of Bismarck",
    "coverage": [
     {
-     "state": "ND",
-     "county": "Burleigh"
+     "county": "Burleigh",
+     "state": "ND"
     }
    ],
    "stored_development_records": 954,
@@ -964,12 +964,12 @@
    "jurisdiction": "Boone County Planning Commission",
    "coverage": [
     {
-     "state": "KY",
-     "county": "Boone"
+     "county": "Boone",
+     "state": "KY"
     },
     {
-     "state": "OH",
-     "county": "Hamilton"
+     "county": "Hamilton",
+     "state": "OH"
     }
    ],
    "stored_development_records": 1928,
@@ -997,8 +997,8 @@
    "jurisdiction": "City of Boston",
    "coverage": [
     {
-     "state": "MA",
-     "county": "Suffolk"
+     "county": "Suffolk",
+     "state": "MA"
     }
    ],
    "stored_development_records": 3168,
@@ -1026,8 +1026,8 @@
    "jurisdiction": "City of Boulder",
    "coverage": [
     {
-     "state": "CO",
-     "county": "Boulder"
+     "county": "Boulder",
+     "state": "CO"
     }
    ],
    "stored_development_records": 1205,
@@ -1055,8 +1055,8 @@
    "jurisdiction": "City of Bozeman, Montana",
    "coverage": [
     {
-     "state": "MT",
-     "county": "Gallatin"
+     "county": "Gallatin",
+     "state": "MT"
     }
    ],
    "stored_development_records": 1065,
@@ -1086,8 +1086,8 @@
    "jurisdiction": "Brunswick County, North Carolina",
    "coverage": [
     {
-     "state": "NC",
-     "county": "Brunswick"
+     "county": "Brunswick",
+     "state": "NC"
     }
    ],
    "stored_development_records": 152634,
@@ -1115,8 +1115,8 @@
    "jurisdiction": "City of Buffalo",
    "coverage": [
     {
-     "state": "NY",
-     "county": "Erie"
+     "county": "Erie",
+     "state": "NY"
     }
    ],
    "stored_development_records": 622,
@@ -1144,8 +1144,8 @@
    "jurisdiction": "City of Burlington, Vermont \u2014 Department of Permitting & Inspections",
    "coverage": [
     {
-     "state": "VT",
-     "county": "Chittenden"
+     "county": "Chittenden",
+     "state": "VT"
     }
    ],
    "stored_development_records": 16573,
@@ -1173,8 +1173,8 @@
    "jurisdiction": "City of Burlington, Vermont \u2014 Department of Permitting & Inspections (Zoning)",
    "coverage": [
     {
-     "state": "VT",
-     "county": "Chittenden"
+     "county": "Chittenden",
+     "state": "VT"
     }
    ],
    "stored_development_records": 5242,
@@ -1202,8 +1202,8 @@
    "jurisdiction": "Butler County",
    "coverage": [
     {
-     "state": "KS",
-     "county": "Butler"
+     "county": "Butler",
+     "state": "KS"
     }
    ],
    "stored_development_records": 1757,
@@ -1231,8 +1231,8 @@
    "jurisdiction": "Cabarrus County",
    "coverage": [
     {
-     "state": "NC",
-     "county": "Cabarrus"
+     "county": "Cabarrus",
+     "state": "NC"
     }
    ],
    "stored_development_records": 0,
@@ -1295,8 +1295,8 @@
    "jurisdiction": "City of Cambridge",
    "coverage": [
     {
-     "state": "MA",
-     "county": "Middlesex"
+     "county": "Middlesex",
+     "state": "MA"
     }
    ],
    "stored_development_records": 13153,
@@ -1324,8 +1324,8 @@
    "jurisdiction": "City of Cambridge",
    "coverage": [
     {
-     "state": "MA",
-     "county": "Middlesex"
+     "county": "Middlesex",
+     "state": "MA"
     }
    ],
    "stored_development_records": 600,
@@ -1353,8 +1353,8 @@
    "jurisdiction": "City of Cambridge",
    "coverage": [
     {
-     "state": "MA",
-     "county": "Middlesex"
+     "county": "Middlesex",
+     "state": "MA"
     }
    ],
    "stored_development_records": 872,
@@ -1382,12 +1382,12 @@
    "jurisdiction": "Canyon County, Idaho",
    "coverage": [
     {
-     "state": "ID",
-     "county": "Canyon"
+     "county": "Canyon",
+     "state": "ID"
     },
     {
-     "state": "ID",
-     "county": "Ada"
+     "county": "Ada",
+     "state": "ID"
     }
    ],
    "stored_development_records": 5651,
@@ -1415,8 +1415,8 @@
    "jurisdiction": "City of Casa Grande",
    "coverage": [
     {
-     "state": "AZ",
-     "county": "Pinal"
+     "county": "Pinal",
+     "state": "AZ"
     }
    ],
    "stored_development_records": 85,
@@ -1444,8 +1444,8 @@
    "jurisdiction": "Centre County, Pennsylvania",
    "coverage": [
     {
-     "state": "PA",
-     "county": "Centre"
+     "county": "Centre",
+     "state": "PA"
     }
    ],
    "stored_development_records": 8381,
@@ -1473,8 +1473,8 @@
    "jurisdiction": "City of Champaign, Illinois",
    "coverage": [
     {
-     "state": "IL",
-     "county": "Champaign"
+     "county": "Champaign",
+     "state": "IL"
     }
    ],
    "stored_development_records": 255,
@@ -1502,12 +1502,12 @@
    "jurisdiction": "Charleston County, South Carolina",
    "coverage": [
     {
-     "state": "SC",
-     "county": "Charleston"
+     "county": "Charleston",
+     "state": "SC"
     },
     {
-     "state": "SC",
-     "county": "Berkeley"
+     "county": "Berkeley",
+     "state": "SC"
     }
    ],
    "stored_development_records": 36518,
@@ -1535,8 +1535,8 @@
    "jurisdiction": "City of Charlotte",
    "coverage": [
     {
-     "state": "NC",
-     "county": "Mecklenburg"
+     "county": "Mecklenburg",
+     "state": "NC"
     }
    ],
    "stored_development_records": 22191,
@@ -1564,8 +1564,8 @@
    "jurisdiction": "Chattanooga-Hamilton County Regional Planning Agency",
    "coverage": [
     {
-     "state": "TN",
-     "county": "Hamilton"
+     "county": "Hamilton",
+     "state": "TN"
     }
    ],
    "stored_development_records": 14679,
@@ -1593,8 +1593,8 @@
    "jurisdiction": "City of Chattanooga / Hamilton County, Tennessee",
    "coverage": [
     {
-     "state": "TN",
-     "county": "Hamilton"
+     "county": "Hamilton",
+     "state": "TN"
     }
    ],
    "stored_development_records": 41906,
@@ -1622,8 +1622,8 @@
    "jurisdiction": "Chester County, Pennsylvania",
    "coverage": [
     {
-     "state": "PA",
-     "county": "Chester"
+     "county": "Chester",
+     "state": "PA"
     }
    ],
    "stored_development_records": 2415,
@@ -1651,16 +1651,16 @@
    "jurisdiction": "City of Chicago",
    "coverage": [
     {
-     "state": "IL",
-     "county": "Cook"
+     "county": "Cook",
+     "state": "IL"
     },
     {
-     "state": "IL",
-     "county": "DuPage"
+     "county": "DuPage",
+     "state": "IL"
     },
     {
-     "state": "IN",
-     "county": "Lake"
+     "county": "Lake",
+     "state": "IN"
     }
    ],
    "stored_development_records": 97232,
@@ -1688,8 +1688,8 @@
    "jurisdiction": "City of Cincinnati",
    "coverage": [
     {
-     "state": "OH",
-     "county": "Hamilton"
+     "county": "Hamilton",
+     "state": "OH"
     }
    ],
    "stored_development_records": 2822,
@@ -1717,8 +1717,8 @@
    "jurisdiction": "City of Orange, California",
    "coverage": [
     {
-     "state": "CA",
-     "county": "Orange"
+     "county": "Orange",
+     "state": "CA"
     }
    ],
    "stored_development_records": 1012,
@@ -1746,8 +1746,8 @@
    "jurisdiction": "Clark County",
    "coverage": [
     {
-     "state": "WA",
-     "county": "Clark"
+     "county": "Clark",
+     "state": "WA"
     }
    ],
    "stored_development_records": 170,
@@ -1775,8 +1775,8 @@
    "jurisdiction": "Clark County, Nevada \u2014 Public Works",
    "coverage": [
     {
-     "state": "NV",
-     "county": "Clark"
+     "county": "Clark",
+     "state": "NV"
     }
    ],
    "stored_development_records": 880,
@@ -1806,8 +1806,8 @@
    "jurisdiction": "Clarksville-Montgomery County Regional Planning Commission",
    "coverage": [
     {
-     "state": "TN",
-     "county": "Montgomery"
+     "county": "Montgomery",
+     "state": "TN"
     }
    ],
    "stored_development_records": 34,
@@ -1835,8 +1835,8 @@
    "jurisdiction": "Clarksville-Montgomery County Regional Planning Commission",
    "coverage": [
     {
-     "state": "TN",
-     "county": "Montgomery"
+     "county": "Montgomery",
+     "state": "TN"
     }
    ],
    "stored_development_records": 20,
@@ -1864,8 +1864,8 @@
    "jurisdiction": "City of Cleveland",
    "coverage": [
     {
-     "state": "OH",
-     "county": "Cuyahoga"
+     "county": "Cuyahoga",
+     "state": "OH"
     }
    ],
    "stored_development_records": 89512,
@@ -1893,8 +1893,8 @@
    "jurisdiction": "City of Las Vegas",
    "coverage": [
     {
-     "state": "NV",
-     "county": "Clark"
+     "county": "Clark",
+     "state": "NV"
     }
    ],
    "stored_development_records": 2028,
@@ -1922,12 +1922,12 @@
    "jurisdiction": "Coconino County, Arizona",
    "coverage": [
     {
-     "state": "AZ",
-     "county": "Coconino"
+     "county": "Coconino",
+     "state": "AZ"
     },
     {
-     "state": "AZ",
-     "county": "Yavapai"
+     "county": "Yavapai",
+     "state": "AZ"
     }
    ],
    "stored_development_records": 1956,
@@ -1955,8 +1955,8 @@
    "jurisdiction": "City of Colorado Springs",
    "coverage": [
     {
-     "state": "CO",
-     "county": "El Paso"
+     "county": "El Paso",
+     "state": "CO"
     }
    ],
    "stored_development_records": 4059,
@@ -1984,8 +1984,8 @@
    "jurisdiction": "City of Columbia, Missouri",
    "coverage": [
     {
-     "state": "MO",
-     "county": "Boone"
+     "county": "Boone",
+     "state": "MO"
     }
    ],
    "stored_development_records": 1439,
@@ -2013,8 +2013,8 @@
    "jurisdiction": "City of Columbia, Missouri",
    "coverage": [
     {
-     "state": "MO",
-     "county": "Boone"
+     "county": "Boone",
+     "state": "MO"
     }
    ],
    "stored_development_records": 9946,
@@ -2042,12 +2042,12 @@
    "jurisdiction": "City of Columbus",
    "coverage": [
     {
-     "state": "OH",
-     "county": "Franklin"
+     "county": "Franklin",
+     "state": "OH"
     },
     {
-     "state": "OH",
-     "county": "Delaware"
+     "county": "Delaware",
+     "state": "OH"
     }
    ],
    "stored_development_records": 15320,
@@ -2075,8 +2075,8 @@
    "jurisdiction": "Cook County Department of Transportation and Highways",
    "coverage": [
     {
-     "state": "IL",
-     "county": "Cook"
+     "county": "Cook",
+     "state": "IL"
     }
    ],
    "stored_development_records": 459,
@@ -2137,8 +2137,8 @@
    "jurisdiction": "City of Dallas",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Dallas"
+     "county": "Dallas",
+     "state": "TX"
     }
    ],
    "stored_development_records": 31262,
@@ -2168,20 +2168,20 @@
    "jurisdiction": "DeKalb County, Georgia",
    "coverage": [
     {
-     "state": "GA",
-     "county": "DeKalb"
+     "county": "DeKalb",
+     "state": "GA"
     },
     {
-     "state": "GA",
-     "county": "Fulton"
+     "county": "Fulton",
+     "state": "GA"
     },
     {
-     "state": "GA",
-     "county": "Gwinnett"
+     "county": "Gwinnett",
+     "state": "GA"
     },
     {
-     "state": "GA",
-     "county": "Henry"
+     "county": "Henry",
+     "state": "GA"
     }
    ],
    "stored_development_records": 291169,
@@ -2209,8 +2209,8 @@
    "jurisdiction": "Delaware County, Pennsylvania",
    "coverage": [
     {
-     "state": "PA",
-     "county": "Delaware"
+     "county": "Delaware",
+     "state": "PA"
     }
    ],
    "stored_development_records": 5597,
@@ -2238,8 +2238,8 @@
    "jurisdiction": "City of Denton",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Denton"
+     "county": "Denton",
+     "state": "TX"
     }
    ],
    "stored_development_records": 18,
@@ -2267,8 +2267,8 @@
    "jurisdiction": "City of Denton",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Denton"
+     "county": "Denton",
+     "state": "TX"
     }
    ],
    "stored_development_records": 304,
@@ -2296,8 +2296,8 @@
    "jurisdiction": "City of Denton",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Denton"
+     "county": "Denton",
+     "state": "TX"
     }
    ],
    "stored_development_records": 22,
@@ -2325,8 +2325,8 @@
    "jurisdiction": "City of Denton",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Denton"
+     "county": "Denton",
+     "state": "TX"
     }
    ],
    "stored_development_records": 27,
@@ -2354,8 +2354,8 @@
    "jurisdiction": "City of Denton",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Denton"
+     "county": "Denton",
+     "state": "TX"
     }
    ],
    "stored_development_records": 47,
@@ -2383,8 +2383,8 @@
    "jurisdiction": "City of Denton",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Denton"
+     "county": "Denton",
+     "state": "TX"
     }
    ],
    "stored_development_records": 35,
@@ -2412,8 +2412,8 @@
    "jurisdiction": "City of Denton",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Denton"
+     "county": "Denton",
+     "state": "TX"
     }
    ],
    "stored_development_records": 56,
@@ -2441,8 +2441,8 @@
    "jurisdiction": "Denton County",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Denton"
+     "county": "Denton",
+     "state": "TX"
     }
    ],
    "stored_development_records": 0,
@@ -2470,8 +2470,8 @@
    "jurisdiction": "City and County of Denver",
    "coverage": [
     {
-     "state": "CO",
-     "county": "Denver"
+     "county": "Denver",
+     "state": "CO"
     }
    ],
    "stored_development_records": 13760,
@@ -2499,12 +2499,12 @@
    "jurisdiction": "City and County of Denver",
    "coverage": [
     {
-     "state": "CO",
-     "county": "Denver"
+     "county": "Denver",
+     "state": "CO"
     },
     {
-     "state": "CO",
-     "county": "Jefferson"
+     "county": "Jefferson",
+     "state": "CO"
     }
    ],
    "stored_development_records": 12745,
@@ -2532,8 +2532,8 @@
    "jurisdiction": "DeSoto County, Mississippi",
    "coverage": [
     {
-     "state": "MS",
-     "county": "DeSoto"
+     "county": "DeSoto",
+     "state": "MS"
     }
    ],
    "stored_development_records": 7279,
@@ -2563,8 +2563,8 @@
    "jurisdiction": "City of Detroit",
    "coverage": [
     {
-     "state": "MI",
-     "county": "Wayne"
+     "county": "Wayne",
+     "state": "MI"
     }
    ],
    "stored_development_records": 2131,
@@ -2592,8 +2592,8 @@
    "jurisdiction": "City of Detroit",
    "coverage": [
     {
-     "state": "MI",
-     "county": "Wayne"
+     "county": "Wayne",
+     "state": "MI"
     }
    ],
    "stored_development_records": 523,
@@ -2621,8 +2621,8 @@
    "jurisdiction": "City of Detroit",
    "coverage": [
     {
-     "state": "MI",
-     "county": "Wayne"
+     "county": "Wayne",
+     "state": "MI"
     }
    ],
    "stored_development_records": 15932,
@@ -2650,8 +2650,8 @@
    "jurisdiction": "Douglas County",
    "coverage": [
     {
-     "state": "CO",
-     "county": "Douglas"
+     "county": "Douglas",
+     "state": "CO"
     }
    ],
    "stored_development_records": 2710,
@@ -2679,12 +2679,12 @@
    "jurisdiction": "City & County of Durham",
    "coverage": [
     {
-     "state": "NC",
-     "county": "Durham"
+     "county": "Durham",
+     "state": "NC"
     },
     {
-     "state": "NC",
-     "county": "Orange"
+     "county": "Orange",
+     "state": "NC"
     }
    ],
    "stored_development_records": 41843,
@@ -2712,8 +2712,8 @@
    "jurisdiction": "City of Baton Rouge / Parish of East Baton Rouge",
    "coverage": [
     {
-     "state": "LA",
-     "county": "East Baton Rouge"
+     "county": "East Baton Rouge",
+     "state": "LA"
     }
    ],
    "stored_development_records": 1252,
@@ -2741,8 +2741,8 @@
    "jurisdiction": "City of El Paso",
    "coverage": [
     {
-     "state": "TX",
-     "county": "El Paso"
+     "county": "El Paso",
+     "state": "TX"
     }
    ],
    "stored_development_records": 4421,
@@ -2770,8 +2770,8 @@
    "jurisdiction": "City of Eugene, Oregon",
    "coverage": [
     {
-     "state": "OR",
-     "county": "Lane"
+     "county": "Lane",
+     "state": "OR"
     }
    ],
    "stored_development_records": 82,
@@ -2799,8 +2799,8 @@
    "jurisdiction": "Fairfax County Land Development Services",
    "coverage": [
     {
-     "state": "VA",
-     "county": "Fairfax"
+     "county": "Fairfax",
+     "state": "VA"
     }
    ],
    "stored_development_records": 4403,
@@ -2830,16 +2830,16 @@
    "jurisdiction": "Fairfax County Land Development Services",
    "coverage": [
     {
-     "state": "VA",
-     "county": "Fairfax"
+     "county": "Fairfax",
+     "state": "VA"
     },
     {
-     "state": "VA",
-     "county": "Arlington"
+     "county": "Arlington",
+     "state": "VA"
     },
     {
-     "state": "VA",
-     "county": "Prince William"
+     "county": "Prince William",
+     "state": "VA"
     }
    ],
    "stored_development_records": 45442,
@@ -2897,8 +2897,8 @@
    "jurisdiction": "Flathead County, Montana",
    "coverage": [
     {
-     "state": "MT",
-     "county": "Flathead"
+     "county": "Flathead",
+     "state": "MT"
     }
    ],
    "stored_development_records": 338,
@@ -2926,8 +2926,8 @@
    "jurisdiction": "Forsyth County, Georgia",
    "coverage": [
     {
-     "state": "GA",
-     "county": "Forsyth"
+     "county": "Forsyth",
+     "state": "GA"
     }
    ],
    "stored_development_records": 2314,
@@ -2955,8 +2955,8 @@
    "jurisdiction": "City of Fort Collins",
    "coverage": [
     {
-     "state": "CO",
-     "county": "Larimer"
+     "county": "Larimer",
+     "state": "CO"
     }
    ],
    "stored_development_records": 678,
@@ -2984,8 +2984,8 @@
    "jurisdiction": "Fort Worth",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Tarrant"
+     "county": "Tarrant",
+     "state": "TX"
     }
    ],
    "stored_development_records": 13627,
@@ -3013,8 +3013,8 @@
    "jurisdiction": "City of Fort Worth Development Services",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Tarrant"
+     "county": "Tarrant",
+     "state": "TX"
     }
    ],
    "stored_development_records": 442,
@@ -3042,12 +3042,12 @@
    "jurisdiction": "City of Frisco",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Collin"
+     "county": "Collin",
+     "state": "TX"
     },
     {
-     "state": "TX",
-     "county": "Denton"
+     "county": "Denton",
+     "state": "TX"
     }
    ],
    "stored_development_records": 737,
@@ -3106,8 +3106,8 @@
    "jurisdiction": "Town of Gilbert",
    "coverage": [
     {
-     "state": "AZ",
-     "county": "Maricopa"
+     "county": "Maricopa",
+     "state": "AZ"
     }
    ],
    "stored_development_records": 1030,
@@ -3135,8 +3135,8 @@
    "jurisdiction": "Harris County Permits",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Harris"
+     "county": "Harris",
+     "state": "TX"
     }
    ],
    "stored_development_records": 0,
@@ -3166,8 +3166,8 @@
    "jurisdiction": "Harris County Permits (unincorporated / non-Houston)",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Harris"
+     "county": "Harris",
+     "state": "TX"
     }
    ],
    "stored_development_records": 0,
@@ -3197,8 +3197,8 @@
    "jurisdiction": "City of Hartford",
    "coverage": [
     {
-     "state": "CT",
-     "county": "Hartford"
+     "county": "Hartford",
+     "state": "CT"
     }
    ],
    "stored_development_records": 3705,
@@ -3256,8 +3256,8 @@
    "jurisdiction": "City of Henderson, Nevada",
    "coverage": [
     {
-     "state": "NV",
-     "county": "Clark"
+     "county": "Clark",
+     "state": "NV"
     }
    ],
    "stored_development_records": 4373,
@@ -3285,8 +3285,8 @@
    "jurisdiction": "City of Henderson, Nevada",
    "coverage": [
     {
-     "state": "NV",
-     "county": "Clark"
+     "county": "Clark",
+     "state": "NV"
     }
    ],
    "stored_development_records": 11626,
@@ -3314,8 +3314,8 @@
    "jurisdiction": "City of Houston Planning & Development Department",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Harris"
+     "county": "Harris",
+     "state": "TX"
     }
    ],
    "stored_development_records": 0,
@@ -3345,12 +3345,12 @@
    "jurisdiction": "City of Huntsville, Alabama",
    "coverage": [
     {
-     "state": "AL",
-     "county": "Madison"
+     "county": "Madison",
+     "state": "AL"
     },
     {
-     "state": "AL",
-     "county": "Limestone"
+     "county": "Limestone",
+     "state": "AL"
     }
    ],
    "stored_development_records": 94649,
@@ -3440,8 +3440,8 @@
    "jurisdiction": "Independence Township (Oakland County)",
    "coverage": [
     {
-     "state": "MI",
-     "county": "Oakland"
+     "county": "Oakland",
+     "state": "MI"
     }
    ],
    "stored_development_records": 2664,
@@ -3587,8 +3587,8 @@
    "jurisdiction": "City of Irving",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Dallas"
+     "county": "Dallas",
+     "state": "TX"
     }
    ],
    "stored_development_records": 859,
@@ -3672,8 +3672,8 @@
    "jurisdiction": "Jackson County, Oregon",
    "coverage": [
     {
-     "state": "OR",
-     "county": "Jackson"
+     "county": "Jackson",
+     "state": "OR"
     }
    ],
    "stored_development_records": 9536,
@@ -3701,8 +3701,8 @@
    "jurisdiction": "Jackson County, Oregon",
    "coverage": [
     {
-     "state": "OR",
-     "county": "Jackson"
+     "county": "Jackson",
+     "state": "OR"
     }
    ],
    "stored_development_records": 3937,
@@ -3730,12 +3730,12 @@
    "jurisdiction": "City of Johns Creek, Georgia",
    "coverage": [
     {
-     "state": "GA",
-     "county": "Fulton"
+     "county": "Fulton",
+     "state": "GA"
     },
     {
-     "state": "GA",
-     "county": "Gwinnett"
+     "county": "Gwinnett",
+     "state": "GA"
     }
    ],
    "stored_development_records": 4269,
@@ -3763,16 +3763,16 @@
    "jurisdiction": "City of Kansas City, Missouri",
    "coverage": [
     {
-     "state": "MO",
-     "county": "Jackson"
+     "county": "Jackson",
+     "state": "MO"
     },
     {
-     "state": "MO",
-     "county": "Clay"
+     "county": "Clay",
+     "state": "MO"
     },
     {
-     "state": "MO",
-     "county": "Platte"
+     "county": "Platte",
+     "state": "MO"
     }
    ],
    "stored_development_records": 3313,
@@ -3800,20 +3800,20 @@
    "jurisdiction": "City of Kansas City, Missouri",
    "coverage": [
     {
-     "state": "MO",
-     "county": "Jackson"
+     "county": "Jackson",
+     "state": "MO"
     },
     {
-     "state": "MO",
-     "county": "Clay"
+     "county": "Clay",
+     "state": "MO"
     },
     {
-     "state": "MO",
-     "county": "Platte"
+     "county": "Platte",
+     "state": "MO"
     },
     {
-     "state": "MO",
-     "county": "Cass"
+     "county": "Cass",
+     "state": "MO"
     }
    ],
    "stored_development_records": 14067,
@@ -3873,12 +3873,12 @@
    "jurisdiction": "Kent County, Delaware",
    "coverage": [
     {
-     "state": "DE",
-     "county": "Kent"
+     "county": "Kent",
+     "state": "DE"
     },
     {
-     "state": "MD",
-     "county": "Queen Anne's"
+     "county": "Queen Anne's",
+     "state": "MD"
     }
    ],
    "stored_development_records": 1293,
@@ -3906,12 +3906,12 @@
    "jurisdiction": "Planning & Development Services of Kenton County",
    "coverage": [
     {
-     "state": "KY",
-     "county": "Kenton"
+     "county": "Kenton",
+     "state": "KY"
     },
     {
-     "state": "KY",
-     "county": "Campbell"
+     "county": "Campbell",
+     "state": "KY"
     }
    ],
    "stored_development_records": 379,
@@ -3939,8 +3939,8 @@
    "jurisdiction": "City of Knoxville / Knox County, Tennessee",
    "coverage": [
     {
-     "state": "TN",
-     "county": "Knox"
+     "county": "Knox",
+     "state": "TN"
     }
    ],
    "stored_development_records": 6171,
@@ -3999,8 +3999,8 @@
    "jurisdiction": "Lake County, Illinois Division of Transportation",
    "coverage": [
     {
-     "state": "IL",
-     "county": "Lake"
+     "county": "Lake",
+     "state": "IL"
     }
    ],
    "stored_development_records": 80,
@@ -4030,8 +4030,8 @@
    "jurisdiction": "Lee County, Florida",
    "coverage": [
     {
-     "state": "FL",
-     "county": "Lee"
+     "county": "Lee",
+     "state": "FL"
     }
    ],
    "stored_development_records": 5424,
@@ -4059,8 +4059,8 @@
    "jurisdiction": "Lexington-Fayette Urban County Government",
    "coverage": [
     {
-     "state": "KY",
-     "county": "Fayette"
+     "county": "Fayette",
+     "state": "KY"
     }
    ],
    "stored_development_records": 8951,
@@ -4088,8 +4088,8 @@
    "jurisdiction": "City of Lincoln, Nebraska",
    "coverage": [
     {
-     "state": "NE",
-     "county": "Lancaster"
+     "county": "Lancaster",
+     "state": "NE"
     }
    ],
    "stored_development_records": 2607,
@@ -4117,12 +4117,12 @@
    "jurisdiction": "City of Little Rock, Arkansas",
    "coverage": [
     {
-     "state": "AR",
-     "county": "Pulaski"
+     "county": "Pulaski",
+     "state": "AR"
     },
     {
-     "state": "AR",
-     "county": "Saline"
+     "county": "Saline",
+     "state": "AR"
     }
    ],
    "stored_development_records": 49515,
@@ -4153,8 +4153,8 @@
    "jurisdiction": "Loudoun County, Virginia",
    "coverage": [
     {
-     "state": "VA",
-     "county": "Loudoun"
+     "county": "Loudoun",
+     "state": "VA"
     }
    ],
    "stored_development_records": 45618,
@@ -4182,8 +4182,8 @@
    "jurisdiction": "Louisville Metro, Kentucky",
    "coverage": [
     {
-     "state": "KY",
-     "county": "Jefferson"
+     "county": "Jefferson",
+     "state": "KY"
     }
    ],
    "stored_development_records": 13443,
@@ -4211,8 +4211,8 @@
    "jurisdiction": "City of Madison",
    "coverage": [
     {
-     "state": "WI",
-     "county": "Dane"
+     "county": "Dane",
+     "state": "WI"
     }
    ],
    "stored_development_records": 2325,
@@ -4298,8 +4298,8 @@
    "jurisdiction": "County of Marin",
    "coverage": [
     {
-     "state": "CA",
-     "county": "Marin"
+     "county": "Marin",
+     "state": "CA"
     }
    ],
    "stored_development_records": 689,
@@ -4416,8 +4416,8 @@
    "jurisdiction": "City of Memphis Division of Planning & Development",
    "coverage": [
     {
-     "state": "TN",
-     "county": "Shelby"
+     "county": "Shelby",
+     "state": "TN"
     }
    ],
    "stored_development_records": 48765,
@@ -4445,8 +4445,8 @@
    "jurisdiction": "City of Mesa",
    "coverage": [
     {
-     "state": "AZ",
-     "county": "Maricopa"
+     "county": "Maricopa",
+     "state": "AZ"
     }
    ],
    "stored_development_records": 2862,
@@ -4474,8 +4474,8 @@
    "jurisdiction": "City of Miami",
    "coverage": [
     {
-     "state": "FL",
-     "county": "Miami-Dade"
+     "county": "Miami-Dade",
+     "state": "FL"
     }
    ],
    "stored_development_records": 35867,
@@ -4503,12 +4503,12 @@
    "jurisdiction": "City of Minneapolis (CCS)",
    "coverage": [
     {
-     "state": "MN",
-     "county": "Hennepin"
+     "county": "Hennepin",
+     "state": "MN"
     },
     {
-     "state": "MN",
-     "county": "Ramsey"
+     "county": "Ramsey",
+     "state": "MN"
     }
    ],
    "stored_development_records": 47001,
@@ -4536,8 +4536,8 @@
    "jurisdiction": "City of Missoula, Montana",
    "coverage": [
     {
-     "state": "MT",
-     "county": "Missoula"
+     "county": "Missoula",
+     "state": "MT"
     }
    ],
    "stored_development_records": 68117,
@@ -4660,8 +4660,8 @@
    "jurisdiction": "Montgomery County",
    "coverage": [
     {
-     "state": "MD",
-     "county": "Montgomery"
+     "county": "Montgomery",
+     "state": "MD"
     }
    ],
    "stored_development_records": 1284,
@@ -4689,8 +4689,8 @@
    "jurisdiction": "Montgomery County",
    "coverage": [
     {
-     "state": "MD",
-     "county": "Montgomery"
+     "county": "Montgomery",
+     "state": "MD"
     }
    ],
    "stored_development_records": 290,
@@ -4718,8 +4718,8 @@
    "jurisdiction": "Montgomery County Planning Commission",
    "coverage": [
     {
-     "state": "PA",
-     "county": "Montgomery"
+     "county": "Montgomery",
+     "state": "PA"
     }
    ],
    "stored_development_records": 6068,
@@ -4747,8 +4747,8 @@
    "jurisdiction": "Montgomery County",
    "coverage": [
     {
-     "state": "MD",
-     "county": "Montgomery"
+     "county": "Montgomery",
+     "state": "MD"
     }
    ],
    "stored_development_records": 6293,
@@ -4807,8 +4807,8 @@
    "jurisdiction": "City of Murfreesboro, Tennessee",
    "coverage": [
     {
-     "state": "TN",
-     "county": "Rutherford"
+     "county": "Rutherford",
+     "state": "TN"
     }
    ],
    "stored_development_records": 2433,
@@ -4836,12 +4836,12 @@
    "jurisdiction": "City of Naperville, Illinois",
    "coverage": [
     {
-     "state": "IL",
-     "county": "DuPage"
+     "county": "DuPage",
+     "state": "IL"
     },
     {
-     "state": "IL",
-     "county": "Will"
+     "county": "Will",
+     "state": "IL"
     }
    ],
    "stored_development_records": 1094,
@@ -4869,20 +4869,20 @@
    "jurisdiction": "Metro Nashville-Davidson County",
    "coverage": [
     {
-     "state": "TN",
-     "county": "Davidson"
+     "county": "Davidson",
+     "state": "TN"
     },
     {
-     "state": "TN",
-     "county": "Williamson"
+     "county": "Williamson",
+     "state": "TN"
     },
     {
-     "state": "TN",
-     "county": "Wilson"
+     "county": "Wilson",
+     "state": "TN"
     },
     {
-     "state": "TN",
-     "county": "Rutherford"
+     "county": "Rutherford",
+     "state": "TN"
     }
    ],
    "stored_development_records": 8916,
@@ -5067,16 +5067,16 @@
    "jurisdiction": "New Castle County, Delaware",
    "coverage": [
     {
-     "state": "DE",
-     "county": "New Castle"
+     "county": "New Castle",
+     "state": "DE"
     },
     {
-     "state": "PA",
-     "county": "Delaware"
+     "county": "Delaware",
+     "state": "PA"
     },
     {
-     "state": "PA",
-     "county": "Chester"
+     "county": "Chester",
+     "state": "PA"
     }
    ],
    "stored_development_records": 11290,
@@ -5104,8 +5104,8 @@
    "jurisdiction": "New Hanover County, North Carolina",
    "coverage": [
     {
-     "state": "NC",
-     "county": "New Hanover"
+     "county": "New Hanover",
+     "state": "NC"
     }
    ],
    "stored_development_records": 37341,
@@ -5135,12 +5135,12 @@
    "jurisdiction": "City of New Orleans",
    "coverage": [
     {
-     "state": "LA",
-     "county": "Orleans"
+     "county": "Orleans",
+     "state": "LA"
     },
     {
-     "state": "LA",
-     "county": "Jefferson"
+     "county": "Jefferson",
+     "state": "LA"
     }
    ],
    "stored_development_records": 10969,
@@ -5258,24 +5258,24 @@
    "jurisdiction": "New York City (DOB BIS legacy)",
    "coverage": [
     {
-     "state": "NY",
-     "county": "New York"
+     "county": "New York",
+     "state": "NY"
     },
     {
-     "state": "NY",
-     "county": "Kings"
+     "county": "Kings",
+     "state": "NY"
     },
     {
-     "state": "NY",
-     "county": "Queens"
+     "county": "Queens",
+     "state": "NY"
     },
     {
-     "state": "NY",
-     "county": "Bronx"
+     "county": "Bronx",
+     "state": "NY"
     },
     {
-     "state": "NY",
-     "county": "Richmond"
+     "county": "Richmond",
+     "state": "NY"
     }
    ],
    "stored_development_records": 14850,
@@ -5303,28 +5303,28 @@
    "jurisdiction": "New York City (DOB NOW)",
    "coverage": [
     {
-     "state": "NY",
-     "county": "New York"
+     "county": "New York",
+     "state": "NY"
     },
     {
-     "state": "NY",
-     "county": "Kings"
+     "county": "Kings",
+     "state": "NY"
     },
     {
-     "state": "NY",
-     "county": "Queens"
+     "county": "Queens",
+     "state": "NY"
     },
     {
-     "state": "NY",
-     "county": "Bronx"
+     "county": "Bronx",
+     "state": "NY"
     },
     {
-     "state": "NY",
-     "county": "Richmond"
+     "county": "Richmond",
+     "state": "NY"
     },
     {
-     "state": "NY",
-     "county": "Nassau"
+     "county": "Nassau",
+     "state": "NY"
     }
    ],
    "stored_development_records": 67345,
@@ -5594,12 +5594,12 @@
    "jurisdiction": "City of Overland Park, Kansas",
    "coverage": [
     {
-     "state": "KS",
-     "county": "Johnson"
+     "county": "Johnson",
+     "state": "KS"
     },
     {
-     "state": "KS",
-     "county": "Wyandotte"
+     "county": "Wyandotte",
+     "state": "KS"
     }
    ],
    "stored_development_records": 166997,
@@ -5657,8 +5657,8 @@
    "jurisdiction": "City of Peoria, Arizona",
    "coverage": [
     {
-     "state": "AZ",
-     "county": "Maricopa"
+     "county": "Maricopa",
+     "state": "AZ"
     }
    ],
    "stored_development_records": 3333,
@@ -5686,16 +5686,16 @@
    "jurisdiction": "City of Philadelphia",
    "coverage": [
     {
-     "state": "PA",
-     "county": "Philadelphia"
+     "county": "Philadelphia",
+     "state": "PA"
     },
     {
-     "state": "PA",
-     "county": "Montgomery"
+     "county": "Montgomery",
+     "state": "PA"
     },
     {
-     "state": "PA",
-     "county": "Delaware"
+     "county": "Delaware",
+     "state": "PA"
     }
    ],
    "stored_development_records": 10815,
@@ -5723,8 +5723,8 @@
    "jurisdiction": "City of Phoenix",
    "coverage": [
     {
-     "state": "AZ",
-     "county": "Maricopa"
+     "county": "Maricopa",
+     "state": "AZ"
     }
    ],
    "stored_development_records": 70441,
@@ -5752,8 +5752,8 @@
    "jurisdiction": "Pierce County (PALS)",
    "coverage": [
     {
-     "state": "WA",
-     "county": "Pierce"
+     "county": "Pierce",
+     "state": "WA"
     }
    ],
    "stored_development_records": 12510,
@@ -5781,8 +5781,8 @@
    "jurisdiction": "City of Pittsburgh",
    "coverage": [
     {
-     "state": "PA",
-     "county": "Allegheny"
+     "county": "Allegheny",
+     "state": "PA"
     }
    ],
    "stored_development_records": 4991,
@@ -5810,16 +5810,16 @@
    "jurisdiction": "City of Portland",
    "coverage": [
     {
-     "state": "OR",
-     "county": "Multnomah"
+     "county": "Multnomah",
+     "state": "OR"
     },
     {
-     "state": "OR",
-     "county": "Washington"
+     "county": "Washington",
+     "state": "OR"
     },
     {
-     "state": "OR",
-     "county": "Clackamas"
+     "county": "Clackamas",
+     "state": "OR"
     }
    ],
    "stored_development_records": 6970,
@@ -5847,16 +5847,16 @@
    "jurisdiction": "City of Portland",
    "coverage": [
     {
-     "state": "OR",
-     "county": "Multnomah"
+     "county": "Multnomah",
+     "state": "OR"
     },
     {
-     "state": "OR",
-     "county": "Washington"
+     "county": "Washington",
+     "state": "OR"
     },
     {
-     "state": "OR",
-     "county": "Clackamas"
+     "county": "Clackamas",
+     "state": "OR"
     }
    ],
    "stored_development_records": 976,
@@ -5884,8 +5884,8 @@
    "jurisdiction": "Prince George's County",
    "coverage": [
     {
-     "state": "MD",
-     "county": "Prince George's"
+     "county": "Prince George's",
+     "state": "MD"
     }
    ],
    "stored_development_records": 160,
@@ -5913,8 +5913,8 @@
    "jurisdiction": "Provo",
    "coverage": [
     {
-     "state": "UT",
-     "county": "Utah"
+     "county": "Utah",
+     "state": "UT"
     }
    ],
    "stored_development_records": 181,
@@ -5942,8 +5942,8 @@
    "jurisdiction": "City of Raleigh",
    "coverage": [
     {
-     "state": "NC",
-     "county": "Wake"
+     "county": "Wake",
+     "state": "NC"
     }
    ],
    "stored_development_records": 6186,
@@ -5971,8 +5971,8 @@
    "jurisdiction": "City of Reno",
    "coverage": [
     {
-     "state": "NV",
-     "county": "Washoe"
+     "county": "Washoe",
+     "state": "NV"
     }
    ],
    "stored_development_records": 422,
@@ -6055,8 +6055,8 @@
    "jurisdiction": "City of Salem, Oregon",
    "coverage": [
     {
-     "state": "OR",
-     "county": "Marion"
+     "county": "Marion",
+     "state": "OR"
     }
    ],
    "stored_development_records": 3257,
@@ -6084,8 +6084,8 @@
    "jurisdiction": "San Antonio",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Bexar"
+     "county": "Bexar",
+     "state": "TX"
     }
    ],
    "stored_development_records": 182,
@@ -6113,8 +6113,8 @@
    "jurisdiction": "City of San Antonio",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Bexar"
+     "county": "Bexar",
+     "state": "TX"
     }
    ],
    "stored_development_records": 0,
@@ -6144,8 +6144,8 @@
    "jurisdiction": "City of San Diego",
    "coverage": [
     {
-     "state": "CA",
-     "county": "San Diego"
+     "county": "San Diego",
+     "state": "CA"
     }
    ],
    "stored_development_records": 34063,
@@ -6173,8 +6173,8 @@
    "jurisdiction": "City of San Jose, California",
    "coverage": [
     {
-     "state": "CA",
-     "county": "Santa Clara"
+     "county": "Santa Clara",
+     "state": "CA"
     }
    ],
    "stored_development_records": 73432,
@@ -6202,8 +6202,8 @@
    "jurisdiction": "San Marcos",
    "coverage": [
     {
-     "state": "TX",
-     "county": "Hays"
+     "county": "Hays",
+     "state": "TX"
     }
    ],
    "stored_development_records": 297,
@@ -6233,8 +6233,8 @@
    "jurisdiction": "City of Savannah / Chatham County",
    "coverage": [
     {
-     "state": "GA",
-     "county": "Chatham"
+     "county": "Chatham",
+     "state": "GA"
     }
    ],
    "stored_development_records": 3346,
@@ -6295,8 +6295,8 @@
    "jurisdiction": "City of Scottsdale",
    "coverage": [
     {
-     "state": "AZ",
-     "county": "Maricopa"
+     "county": "Maricopa",
+     "state": "AZ"
     }
    ],
    "stored_development_records": 300,
@@ -6550,8 +6550,8 @@
    "jurisdiction": "City of Seattle",
    "coverage": [
     {
-     "state": "WA",
-     "county": "King"
+     "county": "King",
+     "state": "WA"
     }
    ],
    "stored_development_records": 5809,
@@ -6579,8 +6579,8 @@
    "jurisdiction": "City of Seattle",
    "coverage": [
     {
-     "state": "WA",
-     "county": "King"
+     "county": "King",
+     "state": "WA"
     }
    ],
    "stored_development_records": 370,
@@ -6608,8 +6608,8 @@
    "jurisdiction": "Shelby County, Tennessee",
    "coverage": [
     {
-     "state": "TN",
-     "county": "Shelby"
+     "county": "Shelby",
+     "state": "TN"
     }
    ],
    "stored_development_records": 0,
@@ -6639,8 +6639,8 @@
    "jurisdiction": "Sheridan County, Wyoming",
    "coverage": [
     {
-     "state": "WY",
-     "county": "Sheridan"
+     "county": "Sheridan",
+     "state": "WY"
     }
    ],
    "stored_development_records": 6487,
@@ -6668,8 +6668,8 @@
    "jurisdiction": "City of Sioux Falls, South Dakota",
    "coverage": [
     {
-     "state": "SD",
-     "county": "Minnehaha"
+     "county": "Minnehaha",
+     "state": "SD"
     }
    ],
    "stored_development_records": 115711,
@@ -6697,8 +6697,8 @@
    "jurisdiction": "Skagit County, Washington",
    "coverage": [
     {
-     "state": "WA",
-     "county": "Skagit"
+     "county": "Skagit",
+     "state": "WA"
     }
    ],
    "stored_development_records": 405,
@@ -6726,8 +6726,8 @@
    "jurisdiction": "Salt Lake City",
    "coverage": [
     {
-     "state": "UT",
-     "county": "Salt Lake"
+     "county": "Salt Lake",
+     "state": "UT"
     }
    ],
    "stored_development_records": 0,
@@ -6758,8 +6758,8 @@
    "jurisdiction": "San Luis Obispo County Department of Planning & Building",
    "coverage": [
     {
-     "state": "CA",
-     "county": "San Luis Obispo"
+     "county": "San Luis Obispo",
+     "state": "CA"
     }
    ],
    "stored_development_records": 18749,
@@ -6787,8 +6787,8 @@
    "jurisdiction": "County of Sonoma \u2014 Permit Sonoma",
    "coverage": [
     {
-     "state": "CA",
-     "county": "Sonoma"
+     "county": "Sonoma",
+     "state": "CA"
     }
    ],
    "stored_development_records": 2537,
@@ -6816,8 +6816,8 @@
    "jurisdiction": "City of Spokane, Washington",
    "coverage": [
     {
-     "state": "WA",
-     "county": "Spokane"
+     "county": "Spokane",
+     "state": "WA"
     }
    ],
    "stored_development_records": 16752,
@@ -6845,12 +6845,12 @@
    "jurisdiction": "Spokane County, Washington",
    "coverage": [
     {
-     "state": "WA",
-     "county": "Spokane"
+     "county": "Spokane",
+     "state": "WA"
     },
     {
-     "state": "WA",
-     "county": "Stevens"
+     "county": "Stevens",
+     "state": "WA"
     }
    ],
    "stored_development_records": 0,
@@ -6880,8 +6880,8 @@
    "jurisdiction": "City of Stamford",
    "coverage": [
     {
-     "state": "CT",
-     "county": "Fairfield"
+     "county": "Fairfield",
+     "state": "CT"
     }
    ],
    "stored_development_records": 347,
@@ -6909,8 +6909,8 @@
    "jurisdiction": "St. Louis County, Missouri (unincorporated)",
    "coverage": [
     {
-     "state": "MO",
-     "county": "St. Louis"
+     "county": "St. Louis",
+     "state": "MO"
     }
    ],
    "stored_development_records": 41,
@@ -6938,8 +6938,8 @@
    "jurisdiction": "Summit County Planning Commission",
    "coverage": [
     {
-     "state": "OH",
-     "county": "Summit"
+     "county": "Summit",
+     "state": "OH"
     }
    ],
    "stored_development_records": 38,
@@ -6967,8 +6967,8 @@
    "jurisdiction": "Sussex County, Delaware",
    "coverage": [
     {
-     "state": "DE",
-     "county": "Sussex"
+     "county": "Sussex",
+     "state": "DE"
     }
    ],
    "stored_development_records": 629,
@@ -6996,8 +6996,8 @@
    "jurisdiction": "City of Tacoma",
    "coverage": [
     {
-     "state": "WA",
-     "county": "Pierce"
+     "county": "Pierce",
+     "state": "WA"
     }
    ],
    "stored_development_records": 2975,
@@ -7049,8 +7049,8 @@
    "jurisdiction": "City of Tempe",
    "coverage": [
     {
-     "state": "AZ",
-     "county": "Maricopa"
+     "county": "Maricopa",
+     "state": "AZ"
     }
    ],
    "stored_development_records": 3868,
@@ -7109,8 +7109,8 @@
    "jurisdiction": "Thurston County, Washington",
    "coverage": [
     {
-     "state": "WA",
-     "county": "Thurston"
+     "county": "Thurston",
+     "state": "WA"
     }
    ],
    "stored_development_records": 1063,
@@ -7138,8 +7138,8 @@
    "jurisdiction": "City of Tigard, Oregon",
    "coverage": [
     {
-     "state": "OR",
-     "county": "Washington"
+     "county": "Washington",
+     "state": "OR"
     }
    ],
    "stored_development_records": 759,
@@ -7167,8 +7167,8 @@
    "jurisdiction": "City of Tigard, Oregon",
    "coverage": [
     {
-     "state": "OR",
-     "county": "Washington"
+     "county": "Washington",
+     "state": "OR"
     }
    ],
    "stored_development_records": 113,
@@ -7196,8 +7196,8 @@
    "jurisdiction": "Tillamook County Community Development",
    "coverage": [
     {
-     "state": "OR",
-     "county": "Tillamook"
+     "county": "Tillamook",
+     "state": "OR"
     }
    ],
    "stored_development_records": 0,
@@ -7227,8 +7227,8 @@
    "jurisdiction": "City of Topeka, Kansas",
    "coverage": [
     {
-     "state": "KS",
-     "county": "Shawnee"
+     "county": "Shawnee",
+     "state": "KS"
     }
    ],
    "stored_development_records": 0,
@@ -7259,8 +7259,8 @@
    "jurisdiction": "City of Tucson",
    "coverage": [
     {
-     "state": "AZ",
-     "county": "Pima"
+     "county": "Pima",
+     "state": "AZ"
     }
    ],
    "stored_development_records": 1461,
@@ -7288,8 +7288,8 @@
    "jurisdiction": "City of Tucson",
    "coverage": [
     {
-     "state": "AZ",
-     "county": "Pima"
+     "county": "Pima",
+     "state": "AZ"
     }
    ],
    "stored_development_records": 12084,
@@ -7473,8 +7473,8 @@
    "jurisdiction": "City of Virginia Beach",
    "coverage": [
     {
-     "state": "VA",
-     "county": "Virginia Beach"
+     "county": "Virginia Beach",
+     "state": "VA"
     }
    ],
    "stored_development_records": 16977,
@@ -7586,8 +7586,8 @@
    "jurisdiction": "Wake County",
    "coverage": [
     {
-     "state": "NC",
-     "county": "Wake"
+     "county": "Wake",
+     "state": "NC"
     }
    ],
    "stored_development_records": 8342,
@@ -7615,8 +7615,8 @@
    "jurisdiction": "Weld County, Colorado",
    "coverage": [
     {
-     "state": "CO",
-     "county": "Weld"
+     "county": "Weld",
+     "state": "CO"
     }
    ],
    "stored_development_records": 26,
@@ -7677,8 +7677,8 @@
    "jurisdiction": "City of Worcester, Massachusetts",
    "coverage": [
     {
-     "state": "MA",
-     "county": "Worcester"
+     "county": "Worcester",
+     "state": "MA"
     }
    ],
    "stored_development_records": 8523,
@@ -7892,8 +7892,8 @@
    "jurisdiction": "York County, Pennsylvania",
    "coverage": [
     {
-     "state": "PA",
-     "county": "York"
+     "county": "York",
+     "state": "PA"
     }
    ],
    "stored_development_records": 2419,
