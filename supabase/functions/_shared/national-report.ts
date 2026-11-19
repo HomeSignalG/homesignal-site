@@ -509,6 +509,7 @@ export function sourcesNotFullyRead(health: SourceHealth[], families: Set<string
     .filter((h) => families.has(h.registry_id))
     .some((h) => h.fetch_failures_24h > 0 || h.blocked_24h > 0 || h.truncated_24h > 0);
 }
+export const RECORDS_NOT_LOADED = { code: 'RECORDS_NOT_LOADED', text: 'Some records found near this location could not be loaded for this report, so the list may be incomplete.' };
 export const SOURCE_NOT_FULLY_READ = { code: 'SOURCE_NOT_FULLY_READ', text: 'One or more official sources for this area could not be fully read recently.' };
 
 /** The one shape a detected change takes in any customer-facing answer: the event, and what changed from what to what. */
@@ -676,7 +677,7 @@ export function documentedScale(text: string): DocumentedScale | undefined {
 
 /** THE one relevance decision. Pure: reads the record's own words, its canonical Type key and facility kind; no source name, place, clock or value. */
 export function relevance(
-  p: { name: string | null; type_raw: string | null; scope_text?: string | null; registry_id?: string | null; publisher_agency?: string | null }, typeKey?: string | null, facilityKind?: string | null,
+  p: { name: string | null; type_raw: string | null; scope_text?: string | null; registry_id?: string | null; publisher_program?: boolean }, typeKey?: string | null, facilityKind?: string | null,
 ): Relevance {
   const V = RELEVANCE_RULE_VERSION;
   const raw = [p.type_raw ?? '', p.name ?? '', p.scope_text ?? ''].join(' ');
@@ -738,10 +739,19 @@ export function relevance(
   // P0 2026-11-19: a record published by a transportation agency from its own project program IS a road, bridge or transit project, whatever its
   // title says ("SH 119 safety improvements", "Add lanes"): the agency's identity is the evidence, the Type classifier reads titles only. Routine
   // maintenance wording was already excluded above, so this only rescues records whose words establish nothing.
-  if ((!typeKey || typeKey === 'other') && p.publisher_agency && TRANSPORT_AGENCY_RE.test(p.publisher_agency)) return inc('infrastructure', 'transportation agency project program');
+  if ((!typeKey || typeKey === 'other') && p.publisher_program) return inc('infrastructure', 'transportation agency capital-project program');
   return { include: false, reason: 'not_established', evidence: null, rule_version: V };
 }
 const TRANSPORT_AGENCY_RE = /department of transportation|\bdot\b|highway|transportation (?:authority|commission|agency)|turnpike/i;
+/** A transportation agency alone is not enough: the registry family itself must be a capital-project or improvement program (STIP, work plan, active projects,
+ *  construction program), never a permit, right-of-way or inspection feed that merely comes from the same agency. */
+const CAPITAL_PROGRAM_RE = /stip|\btip\b|improvement program|capital|work ?plan|work areas|active (?:construction|design|projects)|construction (?:program|projects)|projects?\b|program book|six.?year|ten.?year|five.?year|rebuild|delivery plan|syip|itip|gpas|spms|wincpms/i;
+const NOT_A_PROGRAM_RE = /permit|license|inspection|row\b|right.of.way/i;
+export function isCapitalProgramSource(family: string | null, pub: { agency: string | null; dataset: string | null }): boolean {
+  if (!family || !pub.agency || !TRANSPORT_AGENCY_RE.test(pub.agency)) return false;
+  if (NOT_A_PROGRAM_RE.test(family)) return false;
+  return CAPITAL_PROGRAM_RE.test(family) || CAPITAL_PROGRAM_RE.test(pub.dataset ?? '') || CAPITAL_PROGRAM_RE.test(pub.agency);
+}
 
 /**
  * Activity dates the SOURCE stated (app_projects.start_date / end_date). Only real calendar days are kept; an end before today says the activity is over, so a
@@ -862,7 +872,12 @@ export function assemble(input: AssembleInput): Assembled {
   let anyChangeReady = false;
 
   // a key the canonical radius returned that hydrate could not read (the serving generation can lead app_projects) is counted, never silently lost
-  { const hydrated = new Set(input.projects.map((p) => p.source_key)); for (const k of distance.keys()) if (!hydrated.has(k)) excluded.not_hydrated++; }
+  // A radius key with no hydrated development row is a LOSS when its source still hydrates other records here (or nothing hydrated at all). A whole family
+  // with no development rows left in the store is a retired source (frozen or stalled upstream), counted apart so it does not mark every nearby report incomplete.
+  let retiredKeys = 0;
+  { const hydrated = new Set(input.projects.map((p) => p.source_key)); const live = new Set(input.projects.map((p) => p.registry_id));
+    const famOf = new Map(input.rows.map((r) => [r.source_key, r.registry_id]));
+    for (const k of distance.keys()) if (!hydrated.has(k)) { if (input.projects.length === 0 || live.has(famOf.get(k) ?? null)) excluded.not_hydrated++; else retiredKeys++; } }
   for (const p of [...input.projects].sort((a, b) => (a.source_key < b.source_key ? -1 : 1))) {
     if (!distance.has(p.source_key)) { excluded.no_distance++; continue; }
     if (p.record_kind !== 'development') { excluded.development_only++; continue; }
@@ -885,7 +900,7 @@ export function assemble(input: AssembleInput): Assembled {
     if (lc.key === 'operating' && !ev && !changeCounts) { excluded.standing_inventory++; continue; }
 
     // RELEVANCE, before the record reaches any section, count, map, history, alert or export (national-7)
-    let rel = relevance({ ...p, publisher_agency: pub.agency }, t ? t.typeKey : null, t && t.facilityKind ? t.facilityKind : null);
+    let rel = relevance({ ...p, publisher_program: isCapitalProgramSource(family, pub) }, t ? t.typeKey : null, t && t.facilityKind ? t.facilityKind : null);
     let timing: TemporaryTiming | null = null;
     if (rel.include && rel.basis === 'temporary_event') {
       timing = temporaryTiming(p, today, titleCut(p.name));
@@ -933,7 +948,9 @@ export function assemble(input: AssembleInput): Assembled {
       source_family: family || null,
       name: p.name,
       address: p.address,
-      type: t ? { key: t.typeKey, label: t.label, ...(t.facilityKind ? { kind: t.facilityKind } : {}) } : null,
+      // a transportation capital-project record whose own title says nothing is filed under Roads & infrastructure, so the category filter finds it
+      type: rel.basis === 'infrastructure' && (!t || t.typeKey === 'other') ? { key: 'infrastructure', label: 'Roads & infrastructure' }
+        : t ? { key: t.typeKey, label: t.label, ...(t.facilityKind ? { kind: t.facilityKind } : {}) } : null,
       lifecycle: { key: lc.key, label: lc.label },
       stage: stage ? { key: stage, label: stageLabel(stage, evidence, p.stage), ...(evidence ? { evidence: evidence.label } : occLabel ? { evidence: occLabel } : {}) } : null,
       publisher_status: p.status,
@@ -986,6 +1003,10 @@ export function assemble(input: AssembleInput): Assembled {
   if (excluded.no_source_family > 0) {
     // records were found near the subject and left out because they carry no source family: the report says so
     limitations.push({ ...RECORDS_NOT_TRACEABLE });
+  }
+  if (excluded.not_hydrated > 0) {
+    // the radius read found records the record store could not return: the list is incomplete, and the report must not read as complete
+    limitations.push({ ...RECORDS_NOT_LOADED });
   }
   if (truncated) {
     limitations.push({ code: 'AREA_TRUNCATED', text: 'This area holds more records than one report can carry; the list is incomplete.' });
