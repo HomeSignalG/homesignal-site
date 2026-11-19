@@ -832,6 +832,24 @@
         "county": "Platte"
       }
     ],
+    "kcmo-capital-projects": [
+      {
+        "state": "MO",
+        "county": "Jackson"
+      },
+      {
+        "state": "MO",
+        "county": "Clay"
+      },
+      {
+        "state": "MO",
+        "county": "Platte"
+      },
+      {
+        "state": "MO",
+        "county": "Cass"
+      }
+    ],
     "kcmo-development-cases": [
       {
         "state": "MO",
@@ -1275,6 +1293,12 @@
       }
     ],
     "phoenix-building-permits": [
+      {
+        "state": "AZ",
+        "county": "Maricopa"
+      }
+    ],
+    "phoenix-proposed-zoning": [
       {
         "state": "AZ",
         "county": "Maricopa"
