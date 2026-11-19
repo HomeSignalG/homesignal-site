@@ -36,6 +36,7 @@
 import {
   assemble, parseRadius, RECENT_DAYS, REPORT_RADIUS_MI, REPORT_VERSION, validateAttribution,
 } from '../_shared/national-report.ts';
+import type { Jurisdiction } from '../_shared/source-applicability.ts';
 import { readReportInputs } from '../_shared/report-run.ts';
 import { creditDecision, CREDIT_RULE_VERSION } from '../_shared/credit-rule.ts';
 import { authorizeReportCaller, trialSummary, MAX_BODY_BYTES, ALLOWED_ORIGINS, readBounded, reply, TOO_LARGE, corsFor } from '../_shared/admin-gate.ts';
@@ -67,6 +68,7 @@ export type Deps = {
   zipSupported: (zip: string) => Promise<boolean>;
   radius: (lat: number, lng: number, radiusMi: number) => Promise<RadiusRow[]>;
   hydrate: (keys: string[]) => Promise<ProjectRow[]>;
+  jurisdictions?: (zip: string) => Promise<Jurisdiction[]>;
   ledger: (keys: string[]) => Promise<LedgerProject[]>;
   events: (keys: string[], sinceDay: string) => Promise<ReportableEvent[]>;
   health: (families: string[]) => Promise<SourceHealth[]>;
@@ -248,18 +250,18 @@ export function makeHandler(deps: Deps) {
       const headerInfo = trial ? { header: await deps.headerOf(trial.userId) } : {};
 
       // 4. the canonical reads: the ONE ordering of them, shared with the Watch (_shared/report-run.ts)
-      const { rows, projects, ledger, events, health } = await readReportInputs(deps, { lat: g.lat, lng: g.lng, radiusMi: radius, now: deps.now() });
+      const { rows, projects, ledger, events, health, applicable_families } = await readReportInputs(deps, { lat: g.lat, lng: g.lng, radiusMi: radius, now: deps.now(), zip: g.zip });
 
       // 5. compose
       const out = assemble({
         now: deps.now(), view, zip_supported: true, radius_mi: radius, attribution,
         subject: { address, matched_address: g.matchedAddress, lat: g.lat, lng: g.lng, zip: g.zip, ...(label ? { label } : {}) },
-        rows, projects, ledger, events, health,
+        rows, projects, ledger, events, health, applicable_families,
       });
       const storable = out.storage_blockers.length === 0;
       // whether this report uses one of the free reports: the ONE rule (founder ruling R5). An admin is never charged and nothing is stored
       // for one; a trial report that the rule does not charge ("No data ingested", a report that cannot be stored) is also stored nowhere
-      const credit = creditDecision({ status: 'OK', view, activity: out.intelligence?.activity, storable });
+      const credit = creditDecision({ status: 'OK', view, activity: out.intelligence?.activity, coverage: out.intelligence?.coverage, storable });
       if (!trial || !credit.uses_report) {
         return reply(req, {
           status: 'OK',

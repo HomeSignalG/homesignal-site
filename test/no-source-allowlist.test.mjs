@@ -61,7 +61,7 @@ const run = (rows, projects, view = 'customer') => M.assemble({ now: NOW, view, 
 ok(!files.some((f) => read(f).includes(NEW)), '3a (control) the new family is named in no file');
 const out = run([row('n1', NEW)], [proj('n1', NEW)]);
 ok(out.intelligence.projects.length === 1 && out.intelligence.projects[0].source_family === NEW, '3b a record from it is in the customer report', out.intelligence.projects.map((p) => p.source_family));
-ok(out.storage_blockers.length === 0 && out.intelligence.coverage.limitations.length === 0, '3c the report is storable and carries no "sources not included" limitation', [out.storage_blockers, out.intelligence.coverage.limitations]);
+ok(out.storage_blockers.length === 0 && out.intelligence.coverage.limitations.filter((l) => !String(l.code).startsWith('PARTIAL_COVERAGE')).length === 0, '3c the report is storable and carries no "sources not included" limitation (the coverage disclosure of coverage-rule-1 is a separate, deliberate limitation)', [out.storage_blockers, out.intelligence.coverage.limitations]);
 const stored = { report_id: '11111111-1111-4111-8111-111111111111', content_hash: 'h'.repeat(64), report_version: M.REPORT_VERSION, generated_at: '2026-11-01T12:00:05Z', body: S.snapshotBodyOf(out.intelligence) };
 const ev = { identity_key: 'n1', event_type: 'status_changed', material: true, observed_at: '2026-11-02T06:00:00Z', created_at: '2026-11-02T06:05:00Z', prev_facts: { status: 'Proposed' }, new_facts: { status: 'Approved' }, changed_fields: ['status'], publisher_event_type: null, publisher_event_date: null };
 const led = { identity_key: 'n1', registry_id: NEW, comparable: true, change_ready: true, observation_count: 2, first_observed_at: '2026-10-20T00:00:00Z', last_observed_at: '2026-11-02T06:00:00Z' };

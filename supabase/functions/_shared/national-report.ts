@@ -26,9 +26,13 @@
 //   renderOnly    distances and map directions from the subject, for the response only. Never stored.
 // They are built separately and never split afterwards, so there is no step at which the address was ever
 // inside the permanent object.
+import { assessCoverage, disclosureParagraph, emptyReasonText } from './coverage-assess.ts';
+import type { HealthRow } from './coverage-assess.ts';
 import './project-type.generated.js';
 import './residential-qualify.generated.js';
 import publishersFile from './source-publishers.generated.json' with { type: 'json' };
+import capitalProgramsFile from './capital-program-sources.generated.json' with { type: 'json' };
+import retiredFile from './retired-sources.json' with { type: 'json' };
 import { snapshotBodyOf, subjectRelativeKeys } from './report-snapshot.ts';
 import type { PrivateContext } from './report-snapshot.ts';
 
@@ -51,7 +55,7 @@ export const PRODUCT_NAME = 'HOMESIGNAL DEVELOPMENT ACTIVITY';
  *   event, is given no stage; the stage labels no longer pair "permitted" with "under construction" on one record; `coverage.records_checked` says when
  *   Jody last read the included records and `coverage.undescribed_records` that some nearby records did not describe their work.
  */
-export const REPORT_VERSION = 'development-activity-national-7';
+export const REPORT_VERSION = 'development-activity-national-8';
 /** Default, not a founder-set value: the plan's "last 90 days" example. Defined once, here. */
 export const RECENT_DAYS = 90;
 /** The radii the canonical spatial read accepts. Anything else is refused there, so it is refused here first. */
@@ -240,6 +244,8 @@ export type ReportableEvent = {
 export type WrittenEvent = ReportableEvent & { created_at: string };
 export type SourceHealth = {
   registry_id: string; fetch_failures_24h: number; blocked_24h: number; truncated_24h: number;
+  /** the last SUCCESSFUL read of the source (dev_source_freshness); absent or null is UNKNOWN and prevents verified coverage (coverage-assess.ts, D2) */
+  last_success_at?: string | null;
 };
 // ── the report's outcome (founder ruling R5, 2026-10-02: docs/development-activity-founder-ruling-r5-2026-10-02.md) ────────────
 //
@@ -259,23 +265,28 @@ export type SourceHealth = {
 // NO_DEVELOPMENT_ACTIVITY becomes reachable only through a reviewed change to activityOutcome() with its own tests, never a setting.
 
 /** Bump whenever activityOutcome() or the labels change: the report carries it, so a stored report says which rule judged it. */
-export const ACTIVITY_RULE_VERSION = 'activity-outcome-2';
-export const ACTIVITY_OUTCOMES = ['DEVELOPMENT_SHOWN', 'NO_DEVELOPMENT_ACTIVITY', 'NO_SIGNIFICANT_CHANGES', 'NO_DATA_INGESTED'] as const;
+export const ACTIVITY_RULE_VERSION = 'activity-outcome-3';
+export const ACTIVITY_OUTCOMES = ['DEVELOPMENT_SHOWN', 'NO_DEVELOPMENT_ACTIVITY', 'NO_SIGNIFICANT_CHANGES', 'NO_VERIFIED_COVERAGE', 'NO_DATA_INGESTED'] as const;
 export type ActivityOutcome = typeof ACTIVITY_OUTCOMES[number];
 /** The founder's words, exactly ("lets be more clear and write \"no devlopment activity\" vs \"no data ingested\""). */
 export const ACTIVITY_LABELS: Readonly<Record<ActivityOutcome, string>> = Object.freeze({
   DEVELOPMENT_SHOWN: 'Development shown',
   NO_DEVELOPMENT_ACTIVITY: 'No development activity',
   NO_SIGNIFICANT_CHANGES: 'No significant nearby changes found',
+  NO_VERIFIED_COVERAGE: 'No records found — coverage here is limited',
   NO_DATA_INGESTED: 'No data ingested',
 });
 
-/** THE one decision of what a report's outcome is. `recordsJudged` is how many official records in this radius the relevance rule read and
- *  left out (the report's relevance_review). Today there is no proof of ingestion beyond that, so an empty report with nothing judged is
- *  "No data ingested". */
+/** THE one decision of what a report's outcome is (activity-outcome-3, founder decisions 2026-11-19).
+ *   1. a development record is displayed ........ DEVELOPMENT_SHOWN
+ *   2. records were read and every one left out .. NO_SIGNIFICANT_CHANGES
+ *   3. anything else ............................ NO_VERIFIED_COVERAGE (the reason is coverage.coverage_disclosure.empty_reason)
+ * There is NO path to NO_DEVELOPMENT_ACTIVITY and none to NO_DATA_INGESTED: county-level applicability is not evidence that a source covers an exact
+ * address (D3), so an empty report never says that nothing is being built. Phase 2 (authoritative jurisdiction boundaries) is a separate, reviewed change.
+ * Both values stay in ACTIVITY_OUTCOMES only so a stored report written under an earlier rule still renders. */
 export function activityOutcome(projectsInReport: number, recordsJudged: number = 0): ActivityOutcome {
   if (Number.isInteger(projectsInReport) && projectsInReport > 0) return 'DEVELOPMENT_SHOWN';
-  return Number.isInteger(recordsJudged) && recordsJudged > 0 ? 'NO_SIGNIFICANT_CHANGES' : 'NO_DATA_INGESTED';
+  return Number.isInteger(recordsJudged) && recordsJudged > 0 ? 'NO_SIGNIFICANT_CHANGES' : 'NO_VERIFIED_COVERAGE';
 }
 
 export type Subject = {
@@ -290,6 +301,8 @@ export type AssembleInput = {
   now: Date; subject: Subject; radius_mi: number; view: View; zip_supported: boolean;
   attribution: SourceAttribution; rows: RadiusRow[]; projects: ProjectRow[]; ledger: LedgerProject[];
   events: ReportableEvent[]; health: SourceHealth[];
+  /** registry families geographically applicable to the subject by verified state and county (report-run.ts); their failure record counts even with no record in the report */
+  applicable_families?: string[];
 };
 export type Assembled = {
   coverage_state: CoverageState;
@@ -509,6 +522,7 @@ export function sourcesNotFullyRead(health: SourceHealth[], families: Set<string
     .filter((h) => families.has(h.registry_id))
     .some((h) => h.fetch_failures_24h > 0 || h.blocked_24h > 0 || h.truncated_24h > 0);
 }
+export const RECORDS_NOT_LOADED = { code: 'RECORDS_NOT_LOADED', text: 'Some records found near this location could not be loaded for this report, so the list may be incomplete.' };
 export const SOURCE_NOT_FULLY_READ = { code: 'SOURCE_NOT_FULLY_READ', text: 'One or more official sources for this area could not be fully read recently.' };
 
 /** The one shape a detected change takes in any customer-facing answer: the event, and what changed from what to what. */
@@ -676,7 +690,7 @@ export function documentedScale(text: string): DocumentedScale | undefined {
 
 /** THE one relevance decision. Pure: reads the record's own words, its canonical Type key and facility kind; no source name, place, clock or value. */
 export function relevance(
-  p: { name: string | null; type_raw: string | null; scope_text?: string | null; registry_id?: string | null }, typeKey?: string | null, facilityKind?: string | null,
+  p: { name: string | null; type_raw: string | null; scope_text?: string | null; registry_id?: string | null; publisher_program?: boolean }, typeKey?: string | null, facilityKind?: string | null,
 ): Relevance {
   const V = RELEVANCE_RULE_VERSION;
   const raw = [p.type_raw ?? '', p.name ?? '', p.scope_text ?? ''].join(' ');
@@ -735,8 +749,20 @@ export function relevance(
   // routine work: positive evidence of interior, single-unit, like-for-like or small-fixture work, or a tenant improvement that states no change of use
   const routine = any(w, ROUTINE) ?? (ONE_UNIT_RE.exec(w)?.[0] ?? null) ?? ti;
   if (routine) return { include: false, reason: 'routine_work', evidence: routine.trim(), rule_version: V };
+  // P0 2026-11-19: a record published by a transportation agency from its own project program IS a road, bridge or transit project, whatever its
+  // title says ("SH 119 safety improvements", "Add lanes"): the agency's identity is the evidence, the Type classifier reads titles only. Routine
+  // maintenance wording was already excluded above, so this only rescues records whose words establish nothing.
+  if ((!typeKey || typeKey === 'other') && p.publisher_program) return inc('infrastructure', 'transportation agency capital-project program');
   return { include: false, reason: 'not_established', evidence: null, rule_version: V };
 }
+/** A transportation record is filed as infrastructure by provenance ONLY when the registry's own text documents the dataset as a development or capital-project
+ *  program (capital-program-sources.generated.json, built by scripts/gen-capital-program-sources.mjs). An agency name or a generic word such as "project" is never
+ *  evidence, and a permit, right-of-way or inspection feed is never listed. */
+const CAPITAL_PROGRAMS: Record<string, unknown> = ((capitalProgramsFile as unknown as { families?: Record<string, unknown> }).families) ?? {};
+export function isCapitalProgramSource(family: string | null): boolean { return !!family && Object.prototype.hasOwnProperty.call(CAPITAL_PROGRAMS, family); }
+/** Families whose retirement is a documented decision (retired-sources.json). Nothing else is ever treated as retired. */
+const RETIRED_SOURCES: Record<string, unknown> = ((retiredFile as unknown as { retired?: Record<string, unknown> }).retired) ?? {};
+export function isRetiredSource(family: string | null): boolean { return !!family && Object.prototype.hasOwnProperty.call(RETIRED_SOURCES, family); }
 
 /**
  * Activity dates the SOURCE stated (app_projects.start_date / end_date). Only real calendar days are kept; an end before today says the activity is over, so a
@@ -841,7 +867,7 @@ export function assemble(input: AssembleInput): Assembled {
   }
   const windowStart = addDays(today, -RECENT_DAYS);
 
-  const excluded = { development_only: 0, no_source_family: 0, no_source_url: 0, standing_inventory: 0, no_distance: 0, routine_work: 0, relevance_not_established: 0, temporary_ended: 0 };
+  const excluded = { retired_source: 0, development_only: 0, no_source_family: 0, no_source_url: 0, standing_inventory: 0, no_distance: 0, not_hydrated: 0, routine_work: 0, relevance_not_established: 0, temporary_ended: 0 };
   // national-6: what relevance() left out, kept in the permanent body for traceability and internal review. No customer surface reads it.
   const relevanceReview: Array<{ project_id: string; source_family: string; reason: string; evidence: string | null; rule_version: string }> = [];
   const checked: string[] = [];
@@ -856,6 +882,12 @@ export function assemble(input: AssembleInput): Assembled {
   const distances: Record<string, number> = {};
   let anyChangeReady = false;
 
+  // a key the canonical radius returned that hydrate could not read (the serving generation can lead app_projects) is counted, never silently lost
+  // A radius key with no hydrated development row is a LOST record, whatever else hydrated and even when the report ends up empty. Only a family whose retirement
+  // is a documented decision (retired-sources.json) is counted apart; absence of rows is never evidence of retirement.
+  let retiredKeys = 0;
+  { const hydrated = new Set(input.projects.map((p) => p.source_key)); const famOf = new Map(input.rows.map((r) => [r.source_key, r.registry_id]));
+    for (const k of distance.keys()) if (!hydrated.has(k)) { if (isRetiredSource(famOf.get(k) ?? null)) { retiredKeys++; excluded.retired_source++; } else excluded.not_hydrated++; } }
   for (const p of [...input.projects].sort((a, b) => (a.source_key < b.source_key ? -1 : 1))) {
     if (!distance.has(p.source_key)) { excluded.no_distance++; continue; }
     if (p.record_kind !== 'development') { excluded.development_only++; continue; }
@@ -878,7 +910,7 @@ export function assemble(input: AssembleInput): Assembled {
     if (lc.key === 'operating' && !ev && !changeCounts) { excluded.standing_inventory++; continue; }
 
     // RELEVANCE, before the record reaches any section, count, map, history, alert or export (national-7)
-    let rel = relevance(p, t ? t.typeKey : null, t && t.facilityKind ? t.facilityKind : null);
+    let rel = relevance({ ...p, publisher_program: isCapitalProgramSource(family) }, t ? t.typeKey : null, t && t.facilityKind ? t.facilityKind : null);
     let timing: TemporaryTiming | null = null;
     if (rel.include && rel.basis === 'temporary_event') {
       timing = temporaryTiming(p, today, titleCut(p.name));
@@ -945,6 +977,8 @@ export function assemble(input: AssembleInput): Assembled {
         ? { first_observed_at: led.first_observed_at, last_observed_at: led.last_observed_at, observation_count: led.observation_count, change_ready: led.change_ready }
         : null,
     };
+    // a transportation capital-project record whose own title says nothing is filed under Roads & infrastructure, so the category filter finds it
+    if (rel.basis === 'infrastructure' && (!t || t.typeKey === 'other')) entry.type = { key: 'infrastructure', label: 'Roads & infrastructure' };
     projects.push(entry);
     distances[p.source_key] = distance.get(p.source_key)!;
     const near = nearest.get(p.source_key);
@@ -980,12 +1014,33 @@ export function assemble(input: AssembleInput): Assembled {
     // records were found near the subject and left out because they carry no source family: the report says so
     limitations.push({ ...RECORDS_NOT_TRACEABLE });
   }
+  if (excluded.not_hydrated > 0) {
+    // the radius read found records the record store could not return: the list is incomplete, and the report must not read as complete
+    limitations.push({ ...RECORDS_NOT_LOADED });
+  }
   if (truncated) {
     limitations.push({ code: 'AREA_TRUNCATED', text: 'This area holds more records than one report can carry; the list is incomplete.' });
   }
-  if (sourcesNotFullyRead(input.health, familiesIncluded)) limitations.push({ ...SOURCE_NOT_FULLY_READ });
-  const state: CoverageState = limitations.length > 0 ? 'LIMITED_COVERAGE' : anyChangeReady ? 'CHANGE_READY' : 'REPORT_READY';
+  // a failed read counts for every source the report can be judged on: one that returned a record, one whose key the spatial read found (loaded or not),
+  // and one whose declared coverage names the subject's verified state and county, even when it contributed nothing
+  const judgedFamilies = new Set<string>([...familiesIncluded, ...input.rows.map((r) => r.registry_id).filter((f): f is string => !!f), ...(input.applicable_families ?? [])]);
+  if (sourcesNotFullyRead(input.health, judgedFamilies)) limitations.push({ ...SOURCE_NOT_FULLY_READ });
+  // THE coverage assessment (coverage-assess.ts): what the sources applicable to this subject support, decided once and printed as written by every surface
   const outcome = activityOutcome(projects.length, relevanceReview.length);
+  const assessment = assessCoverage({
+    now, applicable: input.applicable_families ?? [], found: input.rows.map((r) => r.registry_id).filter((f): f is string => !!f),
+    displayed: projects.map((p) => p.source_family).filter((f): f is string => !!f), health: input.health as HealthRow[],
+    truncated, notHydrated: excluded.not_hydrated, judgedCount: relevanceReview.length, agencyOf: (f) => publisherOf(f).agency,
+  });
+  const form = outcome === 'DEVELOPMENT_SHOWN' ? 'SHOWN' : outcome === 'NO_SIGNIFICANT_CHANGES' ? 'JUDGED' : 'EMPTY';
+  const existingLimitations = [...limitations];
+  limitations.push(...assessment.limitations);
+  if (form === 'EMPTY') limitations.push({ code: assessment.empty_reason, text: emptyReasonText(assessment.empty_reason, [...new Set([...input.applicable_families ?? []].map((f) => publisherOf(f).agency).filter((x): x is string => !!x))].sort()) });
+  const state: CoverageState = limitations.length > 0 ? 'LIMITED_COVERAGE' : anyChangeReady ? 'CHANGE_READY' : 'REPORT_READY';
+  const disclosureAgencies = form === 'EMPTY'
+    ? [...new Set((input.applicable_families ?? []).map((f) => publisherOf(f).agency).filter((x): x is string => !!x))].sort()
+    : [...new Set([...familiesIncluded].map((f) => publisherOf(f).agency).filter((x): x is string => !!x))].sort();
+  const disclosure = disclosureParagraph(assessment, { form, agencies: disclosureAgencies, extra: existingLimitations });
 
   const intelligence: Record<string, unknown> = {
     product: PRODUCT_NAME,
@@ -1020,6 +1075,24 @@ export function assemble(input: AssembleInput): Assembled {
       // confirmed routine work was found and left out (a separate fact from "not described"; neither is a count)
       routine_records: excluded.routine_work > 0,
       limitations,
+      // ONE disclosure, built once here and printed as written by the online report, the PDF, the shared report and the saved report; it also carries the
+      // coverage facts the credit rule reads (credit-rule.ts). A report stored before activity-outcome-3 has none, and renders as it always did.
+      coverage_disclosure: {
+        rule_version: assessment.rule_version,
+        form,
+        headline: disclosure.headline,
+        paragraph: disclosure.paragraph,
+        availability: assessment.availability,
+        classes_shown: assessment.classes_shown,
+        classes_applicable: assessment.classes_applicable,
+        local_permit_read_state: assessment.local_permit_read_state,
+        area_complete: assessment.area_complete,
+        verified_for_credit: assessment.verified_for_credit,
+        credit_basis: assessment.credit_basis,
+        ...(form === 'EMPTY' ? { empty_reason: assessment.empty_reason } : {}),
+        limitations: [...existingLimitations, ...assessment.limitations],
+        agencies: disclosureAgencies,
+      },
     },
     sections: {
       what_changed_recently: order(whatChanged),

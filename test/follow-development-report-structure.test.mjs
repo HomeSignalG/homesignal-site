@@ -153,8 +153,8 @@ const mine = [c.handler, c.data, c.index, c.reader].join('\n');
   const sels = [...c.data.matchAll(/report_snapshot\?select=([^&']+)/g)].map((m) => m[1]);
   ok(same2(sels, ['report_id,content_hash,report_version,generated_at,body', 'private_context_id']), '4h and its two SELECTs are exactly these: the changes read has NO private column, the follow read has NO body', sels);
   const ledgerTables = [...(c.data + c.reads).matchAll(/'([a-z_]+)\?select=/g)].map((m) => m[1]);
-  ok(ledgerTables.every((t) => ['report_snapshot', 'dev_change_project', 'dev_change_event_reportable', 'dev_change_source_fetch_health'].includes(t)) && ledgerTables.length >= 4,
-    '4i every table it reads is one of four: the snapshot, the ledger\'s projects, its reportable view, and the failure-only source-health view (never the whole-ledger dev_change_source_health, which cannot be filtered cheaply)', ledgerTables);
+  ok(ledgerTables.every((t) => ['report_snapshot', 'dev_change_project', 'dev_change_event_reportable', 'dev_change_source_fetch_health', 'dev_source_freshness'].includes(t)) && ledgerTables.length >= 4,
+    '4i every table it reads is one of five: the snapshot, the ledger\'s projects, its reportable view, the failure-only source-health view and the freshness table (last successful read, D2) (never the whole-ledger dev_change_source_health, which cannot be filtered cheaply)', ledgerTables);
   const allRaw = [];
   const walk = (d) => { for (const e of readdirSync(join(root, d))) { const p = d + '/' + e; if (statSync(join(root, p)).isDirectory()) walk(p); else if (/\.(ts|js|mjs)$/.test(e) && /dev_change_event(?!_reportable)/.test(code(read(p)))) allRaw.push(p); } };
   walk('supabase/functions');

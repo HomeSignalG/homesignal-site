@@ -12,8 +12,8 @@ const D = await import('../supabase/functions/get-development-activity-report/da
 
 const NOW = new Date('2026-09-29T12:00:00Z');
 const ADDRESS = '742 Evergreen Terrace, Springfield, OR 97477';
-const CREDITS = { version: 1, attribution: { ['fam-a']: 'Data: A' } };
-const proj = (k, x = {}) => ({ source_key: k, registry_id: 'fam-a', record_kind: 'development', name: 'Ravenna Bridge Retrofit', type: 'Utility', type_raw: null, status: 'Approved', stage: 'Advertised', developer: null, size: null, investment: null, submitted_at: '2026-09-24', date_kind: 'issued', address: '005 King', source_ref: 'https://example.gov/r/1', ...x });
+const CREDITS = { version: 1, attribution: { ['austin-site-plan-cases']: 'Data: A' } };
+const proj = (k, x = {}) => ({ source_key: k, registry_id: 'austin-site-plan-cases', record_kind: 'development', name: 'Ravenna Bridge Retrofit', type: 'Utility', type_raw: null, status: 'Approved', stage: 'Advertised', developer: null, size: null, investment: null, submitted_at: '2026-09-24', date_kind: 'issued', address: '005 King', source_ref: 'https://example.gov/r/1', ...x });
 
 /** Fakes that record every call, so a test can say what was NOT called. */
 function fakes(over = {}) {
@@ -26,11 +26,11 @@ function fakes(over = {}) {
     isAdmin: rec('isAdmin', async (e) => e === 'founder@example.com'),
     geocode: rec('geocode', async () => ({ matchedAddress: '742 EVERGREEN TER, SPRINGFIELD, OR, 97477', lat: 44.04612, lng: -122.98123, zip: '97477' })),
     zipSupported: rec('zipSupported', async () => true),
-    radius: rec('radius', async () => [{ source_key: 'k1', feature_id: 'pt:1', registry_id: 'fam-a', provenance: 'proven_stored_point', distance_mi: 0.31, geometry_type: 'Point', has_more: false }]),
+    radius: rec('radius', async () => [{ source_key: 'k1', feature_id: 'pt:1', registry_id: 'austin-site-plan-cases', provenance: 'proven_stored_point', distance_mi: 0.31, geometry_type: 'Point', has_more: false }]),
     hydrate: rec('hydrate', async () => [proj('k1')]),
     ledger: rec('ledger', async () => []),
     events: rec('events', async () => []),
-    health: rec('health', async () => []),
+    health: rec('health', async (fams) => (fams || []).map((f) => ({ registry_id: f, fetch_failures_24h: 0, blocked_24h: 0, truncated_24h: 0, last_success_at: '2026-09-29T09:00:00Z' }))),
     ...over,
   };
   return { deps, calls };
@@ -158,14 +158,14 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
 {
   const f = fakes({
     radius: async () => [
-      { source_key: 'k2', feature_id: 'pt:1', registry_id: 'fam-a', provenance: 'p', distance_mi: 0.5, geometry_type: 'Point', has_more: false },
-      { source_key: 'k1', feature_id: 'pt:1', registry_id: 'fam-a', provenance: 'p', distance_mi: 0.3, geometry_type: 'Point', has_more: false },
-      { source_key: 'k1', feature_id: 'pt:2', registry_id: 'fam-a', provenance: 'p', distance_mi: 0.2, geometry_type: 'Point', has_more: false },
+      { source_key: 'k2', feature_id: 'pt:1', registry_id: 'austin-site-plan-cases', provenance: 'p', distance_mi: 0.5, geometry_type: 'Point', has_more: false },
+      { source_key: 'k1', feature_id: 'pt:1', registry_id: 'austin-site-plan-cases', provenance: 'p', distance_mi: 0.3, geometry_type: 'Point', has_more: false },
+      { source_key: 'k1', feature_id: 'pt:2', registry_id: 'austin-site-plan-cases', provenance: 'p', distance_mi: 0.2, geometry_type: 'Point', has_more: false },
     ],
     hydrate: async (keys) => { f.seen.hydrate = keys; return [proj('k1'), proj('k2', { name: 'Weather Station' })]; },
     ledger: async (keys) => { f.seen.ledger = keys; return []; },
     events: async (keys, since) => { f.seen.events = [keys, since]; return []; },
-    health: async (fam) => { f.seen.health = fam; return []; },
+    health: async (fam) => { f.seen.health = fam; return fam.map((x) => ({ registry_id: x, fetch_failures_24h: 0, blocked_24h: 0, truncated_24h: 0, last_success_at: '2026-09-29T09:00:00Z' })); },
   });
   f.seen = {};
   const r = await call(f.deps, { ...REQ, label: 'Homer client' }, AUTH);
@@ -173,7 +173,7 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
   ok(r.headers.get('cache-control') === 'no-store', '4b the response is never cacheable (it can hold the customer\'s own address back to them)');
   ok(JSON.stringify(f.seen.hydrate) === '["k1","k2"]' && JSON.stringify(f.seen.ledger) === '["k1","k2"]' && JSON.stringify(f.seen.events) === '[["k1","k2"],"2026-07-01"]',
     '4c the keys are de-duplicated and sorted, and events are asked for only since today minus 90 days', f.seen);
-  ok(JSON.stringify(f.seen.health) === '["fam-a"]', '4c source health is asked only for the families that appear');
+  ok(JSON.stringify(f.seen.health) === '["austin-site-plan-cases"]', '4c source health is asked only for the families that appear');
   ok(r.json.render.distances_mi.k1 === 0.2 && r.json.render.distances_mi.k2 === 0.5, '4d distances come back in the response-only block, nearest instance per project', r.json.render);
   ok(!JSON.stringify(r.json.report).includes('Evergreen') && !JSON.stringify(r.json.report).includes('Homer') && !('distances_mi' in r.json.report), '4e the report itself holds no address, no label and no distance');
   ok(r.json.storable === true && r.json.storage_blockers.length === 0, '4f a clean customer report says it could be stored (and is not)');
@@ -194,14 +194,14 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
 
   // founder ruling R5: every answer carries the one credit decision, and nothing here charges anything
   const cr = (x) => x && [x.uses_report, x.reason, x.rule_version].join('|');
-  ok(cr(r.json.credit) === 'true|DEVELOPMENT_SHOWN|credit-rule-2' && r.json.report.activity.outcome === 'DEVELOPMENT_SHOWN',
+  ok(cr(r.json.credit) === 'true|DEVELOPMENT_SHOWN|credit-rule-3' && r.json.report.activity.outcome === 'DEVELOPMENT_SHOWN',
     '4k a customer report that shows development would use one free report, and says which rule decided it', r.json.credit);
-  ok(cr(cust.json.credit) === 'false|NO_DATA_INGESTED|credit-rule-2' && cust.json.report.activity.label === 'No data ingested',
+  ok(cr(cust.json.credit) === 'false|NO_VERIFIED_COVERAGE|credit-rule-3' && cust.json.report.activity.label === 'No records found — coverage here is limited',
     '4l with nothing traceable, the customer report says "No data ingested" and would use no free report', cust.json.credit);
-  ok(cr(internal.json.credit) === 'false|INTERNAL_VIEW|credit-rule-2', '4m the operator\'s internal view is never charged', internal.json.credit);
-  ok(cr(dflt.json.credit) === 'false|NO_DATA_INGESTED|credit-rule-2', '4n an empty radius is still "No data ingested", not "No development activity"', dflt.json.credit);
+  ok(cr(internal.json.credit) === 'false|INTERNAL_VIEW|credit-rule-3', '4m the operator\'s internal view is never charged', internal.json.credit);
+  ok(cr(dflt.json.credit) === 'false|NO_VERIFIED_COVERAGE|credit-rule-3', '4n an empty radius is still "No data ingested", not "No development activity"', dflt.json.credit);
   ok(r.json.stored === false && r.json.report_id === null && r.json.charged === false && !('trial' in r.json), '4o an admin report is never charged or stored, even when the rule would charge a customer');
-  ok(H.capability().credit_rule === 'credit-rule-2', '4p the capability names the credit rule');
+  ok(H.capability().credit_rule === 'credit-rule-3', '4p the capability names the credit rule');
 }
 
 // ---- 5. cross-origin ----------------------------------------------------------------------------------------
@@ -288,7 +288,7 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
 
   reqs.length = 0;
   d = mk([[/dev_change_event_reportable/, () => json([])], [/dev_change_project/, () => json([])], [/dev_change_source_fetch_health/, () => json([])]]);
-  await d.events(['a', 'b'], '2026-07-01'); await d.ledger(['a']); await d.health(['fam-a']);
+  await d.events(['a', 'b'], '2026-07-01'); await d.ledger(['a']); await d.health(['austin-site-plan-cases']);
   ok(reqs[0].url.includes('dev_change_event_reportable') && reqs[0].url.includes('observed_at=gte.2026-07-01'), '7g changes are read only from the ledger\'s REPORTABLE view, since the window start');
   ok(reqs[1].url.includes('dev_change_project?') && reqs[2].url.includes('dev_change_source_fetch_health?'), '7g change-readiness and source health come from the ledger\'s own relations (health from the failure-only view, never the whole-ledger one)');
   ok(!reqs.some((r) => /dev_change_event\?/.test(r.url)), '7g the raw event table is never read (the reportable view is the one rule)');
@@ -357,7 +357,7 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
   // nothing traceable near the address: a trial report is "No data ingested", free, and stored nowhere
   let f = trialFakes(NONE);
   let r = await call(f.deps, { ...REQ, idempotency_key: KEY }, TAUTH);
-  ok(r.status === 200 && r.json.report.activity.outcome === 'NO_DATA_INGESTED' && cr(r.json.credit) === 'false|NO_DATA_INGESTED' && r.json.charged === false
+  ok(r.status === 200 && r.json.report.activity.outcome === 'NO_VERIFIED_COVERAGE' && cr(r.json.credit) === 'false|NO_VERIFIED_COVERAGE' && r.json.charged === false
     && r.json.stored === false && r.json.report_id === null && !f.calls.includes('issue'),
     '8a a trial member, nothing traceable nearby: "No data ingested", not charged, nothing stored, the ledger never called', [r.status, r.json.credit, f.calls]);
   ok(JSON.stringify(r.json.trial) === '{"status":"active","credits_used":3,"credits_remaining":7}' && f.args.trialOf[0] === USER,

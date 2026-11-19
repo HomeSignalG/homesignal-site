@@ -320,29 +320,29 @@ try {
 // ---- 5. coverage: the engine's own words, never "no activity" ------------------------------------------------------------------------------------
 try {
   const lim = WNONE.report.coverage.limitations.map((l) => l.text);
-  ok(lim.length === 1 && lim[0] === 'Some records near this address are not included because their official source is not identified.', '5a the engine\'s limitation text when records cannot be traced', lim);
+  ok(lim.includes('Some records near this address are not included because their official source is not identified.'), '5a the engine\'s limitation text when records cannot be traced', lim);
   const ev = sec(htmlNone, 'evidence').html;
-  ok(ev.includes('<li>' + lim[0] + '</li>'), '5b a LIMITED_COVERAGE report with zero records shows the engine\'s limitation text verbatim');
+  ok(ev.includes('<li>' + lim.find((t) => /not identified/.test(t)) + '</li>'), '5b a LIMITED_COVERAGE report with zero records shows the engine\'s limitation text verbatim');
   const ABSENCE = /\bno ((recent|new|official) )*(development )?activity|\bno (development|projects?|records?|changes?)( were| was)? (found|nearby|in this area|to report)|\bnothing (was |is )?(found|nearby|happening)|\bno development (was )?found|\bnothing to report|\b0 (projects|records)/i;
   ok(ABSENCE.test('No development activity found near this address') && ABSENCE.test('Nothing nearby') && ABSENCE.test('no recent official activity'), '5c (control) the absence pattern matches the claims it is meant to catch');
-  ok(!ABSENCE.test(textOf(htmlNone)), '5d the empty report makes no claim that nothing is happening (hard rule 66: no activity is not the same as no coverage)', textOf(htmlNone));
+  ok(!ABSENCE.test(textOf(htmlNone).replace(V.OUTCOMES.NO_VERIFIED_COVERAGE.title, '')), '5d the empty report makes no claim that nothing is happening (hard rule 66: no activity is not the same as no coverage)', textOf(htmlNone));
   ok(textOf(htmlNone).includes(V.DISCLOSURE) && textOf(htmlNone).includes(V.SCOPE_LINE) && textOf(htmlNone).includes(V.SCOPE_NOTE), '5e the standard disclosure and both scope lines are on it');
   ok(/da-rv--empty/.test(htmlNone) && !/da-rv--empty/.test(html), '5f an empty report is marked so its limitation text is drawn prominently');
   const nothingNear = await wire({ rows: [], projects: [], ledger: [], events: [], health: [] });
-  ok(nothingNear.report.projects.length === 0 && nothingNear.report.coverage.limitations.length === 0, '5g (control) a zero-record, no-limitation report exists in the engine', nothingNear.report.coverage.limitations);
+  ok(nothingNear.report.projects.length === 0 && nothingNear.report.activity.outcome === 'NO_VERIFIED_COVERAGE' && nothingNear.report.coverage.coverage_disclosure.form === 'EMPTY', '5g (control) a zero-record report with nothing applicable exists in the engine, and carries the engine\'s one disclosure', nothingNear.report.coverage.limitations);
   const hn = view(nothingNear);
-  ok(keysOf(hn) === 'outcome,evidence' && sec(hn, 'outcome').label === 'No data ingested' && !ABSENCE.test(textOf(hn)) && !/<ul class="da-rv-lims">/.test(hn),
-    '5h it says "No data ingested", renders the scope and disclosure, and makes no statement of absence either (a query that returns nothing is not proof, plan line 1338)', keysOf(hn));
+  ok(keysOf(hn) === 'outcome,evidence' && sec(hn, 'outcome').label === V.OUTCOMES.NO_VERIFIED_COVERAGE.title && !ABSENCE.test(textOf(hn).replace(V.OUTCOMES.NO_VERIFIED_COVERAGE.title, '')),
+    '5h it says "No records found — coverage here is limited", renders the scope and disclosure, and makes no statement of absence either (a query that returns nothing is not proof, plan line 1338)', keysOf(hn));
 
   // ---- the outcome, in the founder's words (ruling R5, 2026-10-02): "No development activity" vs "No data ingested" ----
   const out = sec(htmlNone, 'outcome');
-  ok(out && out.label === 'No data ingested' && /<h2 class="da-rv-h2">No data ingested<\/h2>/.test(out.html) && / da-rv-hero/.test(out.cls),
-    '5j the shipped state: the empty report leads with "No data ingested"', out && out.label);
+  ok(out && out.label === 'No records found — coverage here is limited' && /<h2 class="da-rv-h2">No records found \u2014 coverage here is limited<\/h2>/.test(out.html) && / da-rv-hero/.test(out.cls),
+    '5j the shipped state: the empty report leads with the limited-coverage headline', out && out.label);
   // national-6 (2026-11-02): the customer-visible brand is Jody
-  ok(textOf(out.html).includes('Jody cannot yet confirm it receives official development records for this address, so this report cannot say whether there is development nearby. It is not a finding that there is no development.'),
-    '5k and says in plain words that it is HomeSignal\'s gap, not a finding about the area', textOf(out.html));
-  ok(JSON.stringify(Object.fromEntries(Object.entries(V.OUTCOMES).map(([k, o]) => [k, o.title]))) === JSON.stringify({ NO_DATA_INGESTED: M.ACTIVITY_LABELS.NO_DATA_INGESTED, NO_DEVELOPMENT_ACTIVITY: M.ACTIVITY_LABELS.NO_DEVELOPMENT_ACTIVITY, NO_SIGNIFICANT_CHANGES: M.ACTIVITY_LABELS.NO_SIGNIFICANT_CHANGES }),
-    '5l the view\'s three titles are the engine\'s labels, word for word');
+  ok(textOf(out.html).includes(WNONE.report.coverage.coverage_disclosure.paragraph) && /cannot say anything about nearby development/.test(textOf(out.html)),
+    '5k and prints the engine\'s one disclosure verbatim: it says why, and that it is Jody\'s limit, not a finding about the area', textOf(out.html));
+  ok(JSON.stringify(Object.fromEntries(Object.entries(V.OUTCOMES).map(([k, o]) => [k, o.title]))) === JSON.stringify({ NO_VERIFIED_COVERAGE: M.ACTIVITY_LABELS.NO_VERIFIED_COVERAGE, NO_DATA_INGESTED: M.ACTIVITY_LABELS.NO_DATA_INGESTED, NO_DEVELOPMENT_ACTIVITY: M.ACTIVITY_LABELS.NO_DEVELOPMENT_ACTIVITY, NO_SIGNIFICANT_CHANGES: M.ACTIVITY_LABELS.NO_SIGNIFICANT_CHANGES }),
+    '5l the view\'s titles are the engine\'s labels, word for word');
   { // activity-outcome-2 (founder 2026-11-02): records read and all left out
     const q = (rj, lim) => { const x = clone(WNONE); x.report.activity = { outcome: 'NO_SIGNIFICANT_CHANGES', label: 'No significant nearby changes found', rule_version: 'activity-outcome-2', records_judged: rj };
       if (lim) x.report.coverage = Object.assign({}, x.report.coverage, { limitations: [{ code: 'SOURCE_NOT_FULLY_READ', text: 'A source was not fully read.' }] }); return textOf(V.html(x, {})); };
@@ -375,7 +375,7 @@ try {
   const odd = clone(WNONE); odd.report.activity = { outcome: 'NO_ACTIVITY' };
   const notObj = clone(WNONE); notObj.report.activity = 'NO_DEVELOPMENT_ACTIVITY';
   ok([noField, odd, notObj].every((r) => keysOf(view(r)) === 'evidence'), '5q an older response with no outcome, or an outcome the view does not know, shows no outcome block: the view never infers one from an empty list');
-  ok(W.report.activity.outcome === 'DEVELOPMENT_SHOWN' && WNONE.report.activity.outcome === 'NO_DATA_INGESTED' && WINT.report.activity.outcome === 'DEVELOPMENT_SHOWN',
+  ok(W.report.activity.outcome === 'DEVELOPMENT_SHOWN' && WNONE.report.activity.outcome === 'NO_VERIFIED_COVERAGE' && WINT.report.activity.outcome === 'DEVELOPMENT_SHOWN',
     '5r (control) the engine sends the outcome these tests read: development shown when traceable records are shown, "No data ingested" when none can be traced');
   const DIST = /\d\.\d mi\b|Under 0\.1 mi/;
   ok(DIST.test(textOf(html)) && DIST.test(textOf(htmlCold)), '5i (control) with render present, distances are shown');
@@ -388,7 +388,7 @@ try {
   }
   ok(/Under 0\.1 mi/.test(textOf(view({ ...clone(W), render: { distances_mi: { 'k-approved': 0.04 } } }))), '5k a distance under a tenth of a mile is shown as such, not as 0.0');
   const wh = await wire({ ...RICH, health: [{ registry_id: FAM_A, fetch_failures_24h: 2, blocked_24h: 0, truncated_24h: 0 }] });
-  ok(wh.report.coverage.limitations.some((l) => l.code === 'SOURCE_NOT_FULLY_READ') && /<li>One or more official sources for this area could not be fully read recently\.<\/li>/.test(view(wh)),
+  ok(wh.report.coverage.limitations.some((l) => l.code === 'SOURCE_NOT_FULLY_READ') && textOf(view(wh)).includes(wh.report.coverage.coverage_disclosure.paragraph) && /could not be fully read|could not confirm/.test(wh.report.coverage.coverage_disclosure.paragraph),
     '5l a source that could not be fully read is disclosed in the engine\'s words');
 } catch (e) { ok(false, 'a block threw: ' + String((e && e.message) || e) + ' @' + ((e.stack||'').match(/test.da-report-view.test.mjs:(\d+)/)||[])[1]); }
 

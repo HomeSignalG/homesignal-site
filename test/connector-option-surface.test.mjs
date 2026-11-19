@@ -73,7 +73,9 @@ const entries = [];
 // connector ever read it, the baseline would start widening what we ingest, which is the opposite
 // of its purpose.
 const ANNOTATION_KEYS = new Set(['_receipts', '_notes', '_comment', '_zip_mode_note',
-  'status_unresolved', 'vocab_terminal', 'observed_types_unreviewed']);
+  'status_unresolved', 'vocab_terminal', 'observed_types_unreviewed',
+  // coverage-rule-1 (2026-11-19): the billing class of the source, read by the report engine (gen-source-class.mjs), never by a connector
+  'source_class']);
 
 // KNOWN, MEASURED, GATED — entries carrying an option their connector ignores. This list may only
 // ever SHRINK.

@@ -60,7 +60,7 @@ const html3 = cmp(E3);
 // ---- 0. the fixtures ARE the engine's output, and the comparison loads ------------------------------------------------------------------------------
 {
   ok(W.status === 'OK' && W.report.projects.length === 8 && !('render' in W) && W.reopened === true, '0a the first fixture is the engine\'s report as a REOPENED saved report: 8 records, no render');
-  ok(WNONE.report.projects.length === 0 && WNONE.report.activity && WNONE.report.activity.outcome === 'NO_DATA_INGESTED', '0b a world with no traceable record gives an empty report whose engine outcome is "No data ingested"');
+  ok(WNONE.report.projects.length === 0 && WNONE.report.activity && WNONE.report.activity.outcome === 'NO_VERIFIED_COVERAGE', '0b a world with no traceable record gives an empty report whose engine outcome is "No records found — coverage here is limited"');
   ok(WCOLD.report.coverage && WCOLD.report.coverage.change_ready !== true && W.report.coverage.change_ready === true, '0c the cold report has not been observed long enough (change_ready is not true); the rich one has');
   ok(typeof C.build === 'function' && typeof C.html === 'function' && typeof C.mount === 'function' && C.MIN === 2 && C.MAX === 5, '0d the module exposes build, html, mount, and a limit of 2 to 5');
   ok(html3.startsWith('<article class="da-cmp"'), '0e three real reports compare without throwing', html3.slice(0, 60));
@@ -126,11 +126,11 @@ const html3 = cmp(E3);
 {
   const COUNT_ROWS = ['Records with a change HomeSignal detected', 'Records with a recent official event', 'Permit issued / Under construction', 'Approved', 'Proposed / Under review'];
   const mixed = cmp([entry(2, W), entry(1, WNONE)]);
-  ok(COUNT_ROWS.every((l) => rowOf(mixed, l)[1] === 'No data ingested') && rowOf(mixed, 'Residential')[1] === 'No data ingested', '3a a report whose engine outcome is "No data ingested" says so in EVERY count cell, and shows no 0', COUNT_ROWS.map((l) => rowOf(mixed, l)[1]));
+  ok(COUNT_ROWS.every((l) => rowOf(mixed, l)[1] === 'No records found — coverage here is limited') && rowOf(mixed, 'Residential')[1] === 'No records found — coverage here is limited', '3a a report whose engine outcome is "No data ingested" says so in EVERY count cell, and shows no 0', COUNT_ROWS.map((l) => rowOf(mixed, l)[1]));
   const col1 = rowsOf(mixed).map((r) => r.cells[1]);
   ok(!col1.some((c) => /^0$/.test(c)), '3b ... and no cell in that column is a bare 0');
-  ok(textOf(mixed).includes('Jody cannot yet confirm it receives official development records for this address') && textOf(mixed).includes('It is not a finding that there is no development.'), '3c the engine\'s own words for that outcome appear under the table, so the column is explained');
-  ok(rowOf(mixed, 'Most recent official record')[1] === 'No data ingested' && rowOf(mixed, 'Most recent change HomeSignal detected')[1] === 'No data ingested', '3d the timeline rows say it too');
+  ok(textOf(mixed).includes(WNONE.report.coverage.coverage_disclosure.paragraph), '3c the engine\'s own words for that outcome appear under the table, so the column is explained');
+  ok(rowOf(mixed, 'Most recent official record')[1] === 'No records found — coverage here is limited' && rowOf(mixed, 'Most recent change HomeSignal detected')[1] === 'No records found — coverage here is limited', '3d the timeline rows say it too');
   const zero = cmp([entry(2, W), entry(1, WZERO)]);
   ok(COUNT_ROWS.slice(1).every((l) => rowOf(zero, l)[1] === '0') && rowOf(zero, 'Residential')[1] === '0',
     '3e a report the ENGINE calls "No development activity" shows measured zeros for the official-event and stage counts', COUNT_ROWS.map((l) => rowOf(zero, l)[1]));
@@ -213,7 +213,7 @@ const html3 = cmp(E3);
   const noas = cmp([entry(2, WNOAS), entry(1, W)]);
   ok(rowOf(noas, 'Report as of (UTC day)').join('|') === 'Not stated|Sep 29, 2026' && rowOf(noas, 'What "recent" means').join('|') === 'Not stated|The last 90 days', '8b2 a report that does not state its day or its window says "Not stated", never a blank or a guess');
   const lims = rowOf(html3, 'Limits the report states');
-  ok(lims[0] === 'None stated. Which agencies are covered is not measured.' && /their official source is not identified/.test(lims[2]), '8c each report\'s own limitation text is shown verbatim, and "None stated" where it has none', lims);
+  ok(/transportation|could not confirm|record/i.test(lims[0]) && lims[0] !== 'None stated. Which agencies are covered is not measured.' && /their official source is not identified/.test(lims[2]), '8c each report\'s own limitation text is shown verbatim, and "None stated" where it has none', lims);
   ok(rowOf(html3, 'Most recent official record')[0].startsWith('Roads & infrastructure — Highway 99 Widening') && rowOf(html3, 'Most recent change HomeSignal detected')[0].startsWith('Menchaca Apartments · Agency status change, detected Sep 27, 2026'), // national-6 (2026-11-02): the ledger's status_changed reads "Agency status change"
     '8d the timeline rows describe the engine\'s first record the way the report does', [rowOf(html3, 'Most recent official record')[0], rowOf(html3, 'Most recent change HomeSignal detected')[0]]);
   ok(textOf(html3).includes(V.DISCLOSURE) && textOf(html3).includes('Counted as official records: a record is a source record, not a proven separate project.'), '8e the standard disclosure and the unit of counting are on every comparison');
