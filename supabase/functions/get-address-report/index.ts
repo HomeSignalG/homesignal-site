@@ -98,7 +98,7 @@ import { arcgisForZip, type ArcgisRegistryEntry } from "./sources/arcgis.ts";
 import { IDENTITY_ALIAS_FILES } from "./identity-aliases/index.ts";
 import { ckanForZip, type CkanCommunityRow, type CkanRegistryEntry } from "./sources/ckan.ts";
 import { csvForZip, type CsvCommunityRow, type CsvRegistryEntry } from "./sources/csv.ts";
-import { countyCasesForZip, type CountyCommunityRow, type CountyCasesRegistryEntry } from "./sources/county-cases.ts";
+import { countyCasesForZip, namesHeldCase, type CountyCommunityRow, type CountyCasesRegistryEntry } from "./sources/county-cases.ts";
 import { cartoForZip, type CartoCommunityRow, type CartoRegistryEntry } from "./sources/carto.ts";
 const ARCGIS_ENTRIES = (jurisdictionRegistry as unknown as { arcgis?: ArcgisRegistryEntry[] }).arcgis ?? [];
 const CKAN_ENTRIES = (jurisdictionRegistry as unknown as { ckan?: CkanRegistryEntry[] }).ckan ?? [];
@@ -279,6 +279,9 @@ async function devSites(supabase: ReturnType<typeof createClient>, homeLat: numb
   const [ae, an] = toEN(homeLat, homeLng, homeLat, homeLng);   // [0,0] — the report anchor
   for (const a of alerts) {
     const title = ((a.title as string) || "").trim();
+    // A case the registry holds as unverified (hold_cases) is not shown as a current proposal through this path either:
+    // its notice row stays stored, but no development item is built from it.
+    if (namesHeldCase(COUNTY_CASES_ENTRIES, `${title} ${(a.source_url as string) || ""}`)) continue;
     const approved = /\b(approved|approves|granted|adopted|entitled|permit issued|issued a permit|under construction|final plat|site plan approv|authoriz|ground ?break|breaks ground|begins construction|construction begins)\b/i.test(title);
     // A DECIDED item (approved OR denied/withdrawn/tabled) is not an open comment opportunity.
     // ── DENIAL AND WITHDRAWAL ARE DIFFERENT FACTS, AND EACH KEEPS ITS OWN WORD ──────

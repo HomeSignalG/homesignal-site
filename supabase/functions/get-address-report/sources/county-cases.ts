@@ -250,6 +250,14 @@ export function parcelSamplePoints(rings: Ring[] | undefined, max: number): { la
 
 const MEMO = new Map<string, { at: number; v: unknown }>();
 const TTL_MS = 60 * 60 * 1000;
+/** True when `text` (a notice title or its record link) names a case the registry holds as unverified (hold_cases).
+ *  The one rule behind every path that could show a held case as a current proposal: the connector's own quarantine,
+ *  the area-scope notice items in index.ts devSites, and the ZIP page's notices list. Case ids are compared in lower case. */
+export function namesHeldCase(entries: ReadonlyArray<CountyCasesRegistryEntry>, text: string): boolean {
+  const t = String(text ?? "").toLowerCase();
+  return entries.some((e) => (e.hold_cases ?? []).some((h) => h.case_id && t.includes(h.case_id.toLowerCase())));
+}
+
 export function _clearCountyCasesCache(): void { MEMO.clear(); }
 async function memo<T>(key: string, f: () => Promise<T>): Promise<T> {
   const h = MEMO.get(key);
