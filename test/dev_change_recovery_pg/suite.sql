@@ -459,6 +459,31 @@ select public.sim_refresh('76302', pg_temp.cache('76302') || jsonb_build_array(p
 select public.sim_observe('76302');
 select pg_temp.chk('V02 …and the next arrival under the new version is news', pg_temp.rep('nS3') = 1);
 
+-- v2 -> v3 (whole-geometry membership, SCOPE_RULE_VERSION bump): records the geometry rule NEWLY discovers are old, dated and
+-- filed long ago. On the first v3 generation they must be coverage recovery (silent, baselined), never news, so they cannot
+-- reach any notification path; only a LATER genuine arrival is news.
+select public.sim_refresh('76399', jsonb_build_array(public.sim_site('gV0','Issued','2024-01-01')), now() - interval '50 hours',
+   true, '[{"reg":"fixture","scope":"expanded","complete":true,"ver":"v2:A"}]'::jsonb);
+select public.sim_observe('76399', true);
+select public.sim_refresh('76399', jsonb_build_array(public.sim_site('gV0','Issued','2024-01-01')), now() - interval '40 hours',
+   true, '[{"reg":"fixture","scope":"expanded","complete":true,"ver":"v2:A"}]'::jsonb);
+select public.sim_observe('76399');
+select public.sim_refresh('76399', pg_temp.cache('76399') || jsonb_build_array(
+   public.sim_site('gV1','Issued','2010-05-05', true, 'filed'), public.sim_site('gV2','Issued','2023-03-03', true, 'filed')), now() - interval '30 hours',
+   true, '[{"reg":"fixture","scope":"expanded","complete":true,"ver":"v3:A"}]'::jsonb);
+select public.sim_observe('76399');
+select pg_temp.chk('V03 the first v3 generation: geometry-discovered OLD records are coverage recovery (recovery rows, outcome coverage_recovered)',
+  exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:gV1')
+  and exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:gV2'));
+select pg_temp.chk('V04 …and NONE of them is a reportable event, so none can reach the digest, the property watch or any social path',
+  pg_temp.rep('gV1') = 0 and pg_temp.rep('gV2') = 0);
+select pg_temp.chk('V05 …and the baseline moved to v3 (a v2 baseline is re-established, never compared across rule versions)',
+  pg_temp.ready('76399','fixture') = 'v3:A');
+select public.sim_refresh('76399', pg_temp.cache('76399') || jsonb_build_array(public.sim_site('gV3','Issued',(current_date-1)::date, true, 'filed')), now() - interval '20 hours',
+   true, '[{"reg":"fixture","scope":"expanded","complete":true,"ver":"v3:A"}]'::jsonb);
+select public.sim_observe('76399');
+select pg_temp.chk('V06 a genuine later arrival under v3 is news', pg_temp.rep('gV3') = 1);
+
 -- ── 16. OFF / ON CYCLES and successful reactivation ───────────────────────────────────────────────────────────────────
 select public.sim_refresh('76303', jsonb_build_array(public.sim_site('nO0','Issued','2024-01-01')), now() - interval '90 hours');
 select public.sim_observe('76303', true);
