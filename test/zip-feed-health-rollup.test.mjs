@@ -85,5 +85,28 @@ const msql = rd('../docs/zip-feed-health-monitor.sql');
 ok(/cron\.schedule\('zip-feed-health-record'/.test(msql) && /revoke all on public\.zip_feed_health_runs/.test(msql) && /revoke all on function public\._hs_zip_feed_health_findings\(\) from public, anon, authenticated/.test(msql), 'the monitor is scheduled, its tables are closed and the finder is not callable by visitors');
 ok(/COVERAGE_NOT_VERIFIED/.test(msql) && /dev_monitoring_coverage/.test(msql) && !/insert into public\.source_registry|update public\.source_registry/i.test(msql), 'unverified coverage is a recorded finding and source_registry is untouched');
 
+// 6 · full affected-ZIP access and all-ZIP accounting
+const acc = { registry_zips: 12746, bucket_sum: 12746, every_zip_accounted_for: true, buckets: { COVERAGE_NOT_VERIFIED: 11492, SOURCE_READ_FAILING: 888, NO_CHANGE_EVIDENCE: 334, STALE_REPORT: 32 } };
+const ah = H.render({ rollup: real(), as_of: 'x' }, NOW, mon(), acc);
+ok(/Every ZIP is in exactly one bucket \(12,746 of 12,746\)/.test(ah) && /data-key="ACCOUNT\|NO_CHANGE_EVIDENCE"/.test(ah), 'every ZIP is accounted for and each bucket can list its ZIPs');
+ok(/No bucket means "verified complete"/.test(ah), 'no bucket is labelled verified complete');
+ok(/MISMATCH/.test(H.render({ rollup: real() }, NOW, mon(), Object.assign({}, acc, { every_zip_accounted_for: false, bucket_sum: 12700 }))), 'a ZIP missing from the accounting is shown as a mismatch');
+ok(/ZIP accounting unavailable/.test(H.render({ rollup: real() }, NOW, mon(), null)), 'unreadable accounting is shown as unverified');
+ok(/data-key="SOURCE_READ\|fdot"/.test(ah) && /Show all 419 affected ZIPs/.test(ah), 'a finding offers all of its ZIPs, not only the stored preview');
+// paging: 250 ZIPs in 3 pages of 100
+const calls = []; let pg = '';
+const client = { rpc: (fn, a) => { calls.push(a.p_offset); const rows = []; for (let i = a.p_offset; i < Math.min(a.p_offset + a.p_limit, 250); i++) rows.push({ zip: String(10000 + i), subscriber: i === 3 }); return Promise.resolve({ data: { total: 250, rows } }); } };
+const out = { insertAdjacentHTML: (_, h) => { pg += h; } }; const attrs = { 'data-key': 'SOURCE_READ|fdot', 'data-off': '0' };
+const btn = { classList: { contains: (c) => c === 'zfh-all' }, disabled: false, nextSibling: out, style: {}, textContent: '', getAttribute: (k) => attrs[k], setAttribute: (k, v) => { attrs[k] = v; } };
+await HS.zipFeedLoadZips(client, btn); await new Promise((r) => setTimeout(r, 0));
+await HS.zipFeedLoadZips(client, btn); await new Promise((r) => setTimeout(r, 0));
+await HS.zipFeedLoadZips(client, btn); await new Promise((r) => setTimeout(r, 0));
+ok(calls.join(',') === '0,100,200' && /10249/.test(pg) && /10000/.test(pg) && btn.style.display === 'none' && /All 250 ZIPs shown/.test(pg), 'paging reaches every one of 250 ZIPs and then stops');
+ok(/10003\*/.test(pg), 'subscriber ZIPs are flagged in the full list');
+const dsql = rd('../docs/zip-feed-health-detail.sql');
+ok(/limit 50/.test(rd('../docs/zip-feed-health-monitor.sql')) && /least\(greatest\(coalesce\(p_limit, 100\), 1\), 500\)/.test(dsql) && /dashboard_admins/.test(dsql) && /revoke all on function public\.hs_zip_feed_health_zips\(text, int, int\) from public, anon/.test(dsql), 'the full-list reader is admin-gated and paged; the stored 50 is only a preview');
+ok(/last_tick_at > f\.seen_at/.test(dsql) && /anchor 1 appeared/.test(dsql), 'a later successful tick supersedes an earlier failure, spliced fail-closed');
+ok(!/\b(insert|update|delete)\b\s+(into\s+)?public\./i.test(dsql.replace(/--[^\n]*/g, '')), 'the detail SQL writes nothing');
+
 console.log(`\n${n - bad}/${n} passed`);
 process.exit(bad ? 1 : 0);
