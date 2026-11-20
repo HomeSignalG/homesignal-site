@@ -144,10 +144,16 @@ const respMod = await W.wire(world({ source_dates: { created: '2024-08-26', upda
 const vCreated = txt(V.html(respMod, { subject: W.ADDRESS }));
 ok(/Record created/.test(vCreated) && !/Filed Aug/.test(vCreated), 'the view says Record created, not Filed, for a creation date', vCreated.slice(0, 300));
 ok(/a modification is not a project milestone/i.test(vCreated), 'the view explains that a modification is not a milestone');
+ok(/a creation date does not show the work is active/.test(vCreated), 'the view says a creation date does not show the work is active');
+const respStatus = await W.wire(world({ source_dates: { created: '2024-08-26', updated: '2026-09-20', status_updated: '2026-09-15' } }), { attribution: { version: 1, attribution: {} } });
+const vStatus = txt(V.html(respStatus, { subject: W.ADDRESS }));
+ok(/Agency status updated Sep 15, 2026/.test(vStatus), 'a mapped status-update date is shown as the agency status date');
+ok(!/Agency status updated/.test(vCreated), 'a modification date alone is never shown as a status date');
 ok(/does not independently verify/i.test(vCreated), 'the view says Jody does not independently verify a stage');
 const respEmpty = await W.wire({ rows: [], projects: [], ledger: [], events: [], health: [] }, { attribution: { version: 1, attribution: {} } });
-respEmpty.intelligence ? (respEmpty.intelligence.coverage ??= {}, respEmpty.intelligence.coverage.categories = t1) : 0;
+respEmpty.report.coverage ??= {}; respEmpty.report.coverage.categories = t1; // a report whose categories are the t1 case (transportation connected, nothing declared complete)
 const vEmpty = txt(V.html(respEmpty, { subject: W.ADDRESS }));
+ok(/completeness not established/.test(vEmpty) && !/declared complete/.test(vEmpty), 'a connected category with no declared completeness reads "completeness not established", never complete', vEmpty.match(/Connected sources hold.{0,200}/)?.[0]);
 ok(/only the sources Jody has connected/i.test(vEmpty) && /Transportation capital projects|building permits/i.test(vEmpty), 'an empty report names what the connected sources cover and what no source covers', vEmpty.slice(0, 400));
 ok(!/nothing is happening|no development is|no activity/i.test(vEmpty.replace(/No (significant )?development activity[^.]*\./i, '')), 'the caveat makes no absence claim');
 
