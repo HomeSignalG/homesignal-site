@@ -93,3 +93,4 @@ select public.t('G3 replaying it again is idempotent', public.t_opts()='{securit
 select public.t('G4 after the repaired replay anon is still denied and service_role still reads',
   public.t_read('anon','public.dc_current_observation')='denied' and public.t_read('service_role','public.dc_current_observation')='ok:2');
 select 'INFO replica viewdef md5 '||(select (v::jsonb)->>'viewdef' from snaps where k='S0')||' | production 2026-11-20 bbc58f10a4520704f7b8fe58ab65691d';
+select 'DONE suite complete';

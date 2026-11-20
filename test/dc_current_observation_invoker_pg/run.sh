@@ -18,6 +18,12 @@ open(here+"/.new-definition.sql","w").write(m.group(0))
 PY
 trap 'rm -f "$here/.new-definition.sql"; PGDATA="$d" "$PGBIN/pg_ctl" stop -m fast >/dev/null 2>&1 || true; rm -rf "$d"' EXIT
 $P -f "$here/fixture.sql"
-out="$($P -v here="$here" -f "$here/suite.sql" 2>&1 || true)"; echo "$out"
-if echo "$out" | grep -q "FAIL"; then exit 1; fi
-echo "$out" | grep -c "^PASS" | { read n; [ "$n" -ge 20 ] || { echo "FAIL fewer than 20 checks ran ($n)"; exit 1; }; }
+set +e
+out="$($P -v here="$here" -f "$here/suite.sql" 2>&1)"; rc=$?
+set -e
+echo "$out"
+# the process status, any SQL error, any FAIL, a missing end marker, or too few checks all fail the run
+[ "$rc" -eq 0 ] || { echo "FAIL suite.sql exited $rc"; exit 1; }
+if echo "$out" | grep -Eq "FAIL|ERROR"; then exit 1; fi
+echo "$out" | grep -q "^DONE suite complete$" || { echo "FAIL the suite did not reach its end marker"; exit 1; }
+n="$(echo "$out" | grep -c "^PASS")"; [ "$n" -ge 37 ] || { echo "FAIL only $n checks ran (expected at least 37)"; exit 1; }
