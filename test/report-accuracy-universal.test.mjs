@@ -157,6 +157,12 @@ ok(/completeness not established/.test(vEmpty) && !/declared complete/.test(vEmp
 ok(/only the sources Jody has connected/i.test(vEmpty) && /Transportation capital projects|building permits/i.test(vEmpty), 'an empty report names what the connected sources cover and what no source covers', vEmpty.slice(0, 400));
 ok(!/nothing is happening|no development is|no activity/i.test(vEmpty.replace(/No (significant )?development activity[^.]*\./i, '')), 'the caveat makes no absence claim');
 
+// ── generated files are in step with the registry (the same --check the generators expose) ──
+const { spawnSync } = await import('node:child_process');
+for (const g of ['gen-source-categories', 'gen-source-publishers']) {
+  const r = spawnSync(process.execPath, [join(root, 'scripts', g + '.mjs'), '--check'], { cwd: root, encoding: 'utf8' });
+  ok(r.status === 0, g + ' --check: the generated file matches the registry', r.stderr);
+}
 // ── 7. the date-basis audit: names are leads, declared mappings are not re-listed as candidates ──
 const AU = await import('../scripts/audit-date-basis.mjs');
 const au = AU.audit({ arcgis: [

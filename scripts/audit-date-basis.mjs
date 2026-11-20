@@ -39,13 +39,17 @@ export function audit(registry) {
   }
   return rows;
 }
+/** The only things --check enforces: a declared basis outside the vocabulary, and `filing` declared on a field NAMED like a creation/update timestamp. It does not certify any mapping. */
+export function violations(rows) {
+  return rows.filter((r) => (r.file_date_basis && !['filing', 'record_created'].includes(r.file_date_basis)) || (r.file_date_basis === 'filing' && r.name_hits.some((h) => h === 'creation' || h === 'update')));
+}
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   if (!process.argv.includes('--json')) surfaceBanner('audit-date-basis'); // the banner is stdout text, so JSON mode leaves it out
   const rows = audit(REGISTRY);
   const by = (s) => rows.filter((r) => r.status === s);
   if (process.argv.includes('--json')) console.log(JSON.stringify({ total: rows.length, counts: Object.fromEntries(['declared', 'own_label', 'candidate_review', 'name_suggests_filing', 'unclassified_name'].map((s) => [s, by(s).length])), rows }, null, 1));
   else if (process.argv.includes('--check')) {
-    const bad = rows.filter((r) => (r.file_date_basis && !['filing', 'record_created'].includes(r.file_date_basis)) || (r.file_date_basis === 'filing' && r.name_hits.some((h) => h === 'creation' || h === 'update')));
+    const bad = violations(rows);
     for (const r of bad) console.error('REVIEW: ' + r.registry_id + ' declares ' + r.file_date_basis + ' on ' + r.file_date.join(','));
     process.exit(bad.length ? 1 : 0);
   } else {

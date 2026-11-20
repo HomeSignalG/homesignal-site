@@ -229,7 +229,7 @@ const C = code(SRC);
     // 2026-11-03: the partner-sample review and the temporary-installation rule render the view on the Seattle sample
     'test/report-partner-review.test.mjs', 'test/temporary-installation.test.mjs',
     // 2026-11-19 (report-accuracy-universal): the date, status and coverage-category suite renders the view
-    'test/report-accuracy-universal.test.mjs', 'test/report-source-dates-path.test.mjs', 'test/report-accuracy-compat.test.mjs',
+    'test/report-accuracy-universal.test.mjs', 'test/report-source-dates-path.test.mjs', 'test/report-accuracy-compat.test.mjs', 'test/report-accuracy-coexistence.test.mjs',
     // 2026-11-19: the Boulder permit scope-note suite renders the view to prove the statement is printed on a Boulder and a Lafayette ZIP
     'test/boulder-permit-scope-note.test.mjs']);
   const stray = hits.filter((f) => !ALLOWED.has(f));
