@@ -40,3 +40,23 @@ Whether any official source here publishes a complete record-level development l
 - Planning packets are a candidate source for site-plan applications only; search showed packets through 2024 and no 2026 agenda, so currency is unknown. No machine-readable permit inventory found for any of the three. **Confirmed source with qualifying records: none.**
 
 Nothing here activates a source or authorizes a backfill. Next permitted step, if you approve runner egress for it: a bounded read-only probe of the two CivicPlus agenda pages and the Mason document center to establish freshness and record shape.
+
+---
+# Update 2026-11-20: first-party evidence supplied from a separate research environment
+**Provenance:** the founder's separate research tools retrieved these pages and reported the results; **I did not retrieve any of them**, my session proxy still refuses these hosts, and no fetch timestamps were supplied, so none is recorded here. Nothing below is a confirmed qualifying record, a current case status, a geographic-membership result or an eligibility result.
+
+## 07001 Avenel: Woodbridge Township Zoning Board of Adjustment
+- Supplied: the **January 8, 2026** Zoning Board agenda (https://www.twp.woodbridge.nj.us/AgendaCenter/ViewFile/Agenda/_01082026-1850) contains case **Z25-62**, **56 Avenel Street, Avenel**, **Block 859.12, Lot 33**, proposed driveway expansion at a two-family dwelling, with a postponement notation.
+- Supports: the official agenda contains identifiable applications (case number, address, block/lot, description). That is evidence of the record SHAPE only.
+- Does not establish: current status of Z25-62 (it was postponed on that agenda); that it is eligible development; that it lies in ZIP 07001 (a USPS ZIP label is not a geographic-membership test); anything about "Time of Action", which must not be read as a hearing or comment deadline.
+- The listing-page extracts did **not** establish the newest agenda. Whether any 2026 agenda after January exists is unknown.
+- Classification: Planning/Zoning Board agendas remain a **candidate official source**, in a planning-application product category, not a permit inventory. Confirmed source with qualifying records: none yet.
+
+## 48854 Mason area
+- **Vevay Township** official residential-building page: Vevay processes building permits, while electrical, plumbing and mechanical permits go through the State of Michigan. It describes process; it is not a record inventory.
+- **Alaiedon Township** official homepage lists ZBA notices dated **October 20 and October 22, 2026** and an ITC transmission-line project item. These are retrieval leads: the notices' contents, geography and eligibility were not inspected.
+- **City of Mason:** the supplied building-permit page URL could not be retrieved, so nothing is established for the city.
+- Classification: candidate sources for Vevay and Alaiedon; no confirmed source with qualifying records for any of the three governments.
+
+## Next permitted steps
+Inspect the two Alaiedon ZBA notices and the ITC item (do they name addresses or parcels in 48854?); retrieve the Woodbridge listing for the newest agenda and check Avenel items against the ZIP by geography, not by address text; retry the Mason permit page and the newest Planning Commission packet. No source is activated and no backfill is run.
