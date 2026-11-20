@@ -30,7 +30,7 @@ ok(st(real(), 'EPA_LAYER_FAILURES').count === 5818 && st(real(), 'EPA_LAYER_FAIL
 ok(st(real(), 'SOURCE_FAILURES').count === 1, 'a retired source is NOT counted as a failed read');
 ok(/fdot-active-construction-projects \(411 ZIPs\)/.test(st(real(), 'SOURCE_FAILURES').detail), 'the largest failing source is named with its ZIP count');
 ok(st(real(), 'MAP_PLACEMENT').tone === 'info' && /706 have none by design/.test(st(real(), 'MAP_PLACEMENT').detail), 'ZIPs with no map area are shown as by design, not as failures');
-ok(st(real(), 'PUBLISHING').count === 163 + 7 + 4, 'publishing counts waiting drafts, unpublished approvals and failing monitor checks');
+ok(st(real(), 'PUBLISHING').count === 3, 'publishing counts open publishing issues, one unit, without adding drafts to checks');
 ok(st(real(), 'UNVERIFIED_COVERAGE').tone === 'unverified' && /0 of 6 registered sources/.test(st(real(), 'UNVERIFIED_COVERAGE').detail), 'unverified coverage is its own state and names the missing schedules');
 ok(/never verified/.test(st(real(), 'UNVERIFIED_COVERAGE').detail), 'no new activity is distinguished from coverage never verified');
 // 2 · flipping each input moves only its own state
@@ -85,6 +85,10 @@ const msql = rd('../docs/zip-feed-health-monitor.sql');
 ok(/cron\.schedule\('zip-feed-health-record'/.test(msql) && /revoke all on public\.zip_feed_health_runs/.test(msql) && /revoke all on function public\._hs_zip_feed_health_findings\(\) from public, anon, authenticated/.test(msql), 'the monitor is scheduled, its tables are closed and the finder is not callable by visitors');
 ok(/COVERAGE_NOT_VERIFIED/.test(msql) && /dev_monitoring_coverage/.test(msql) && !/insert into public\.source_registry|update public\.source_registry/i.test(msql), 'unverified coverage is a recorded finding and source_registry is untouched');
 
+// 5b · one unit per tile when the monitor is available
+const fm = { findings: [{ class: 'SOURCE_READ_FAILURE', resolved_at: null }, { class: 'SOURCE_READ_FAILURE', resolved_at: null }, { class: 'SOURCE_READ_FAILURE', resolved_at: '2026-11-20T00:00:00Z' }, { class: 'MAPS_DRAFTS_WAITING', resolved_at: null }, { class: 'MONITOR_CHECK_FAILING', resolved_at: null }] };
+ok(HS.zipFeedHealthStates(real(), fm).find((s) => s.key === 'SOURCE_FAILURES').count === 2, 'the failing-source tile counts every open source finding, not only the roll-up top rows, and not recovered ones');
+ok(HS.zipFeedHealthStates(real(), fm).find((s) => s.key === 'PUBLISHING').count === 2, 'the publishing tile counts open publishing findings');
 // 6 · full affected-ZIP access and all-ZIP accounting
 const acc = { registry_zips: 12746, bucket_sum: 12746, every_zip_accounted_for: true, buckets: { COVERAGE_NOT_VERIFIED: 11492, SOURCE_READ_FAILING: 888, NO_CHANGE_EVIDENCE: 334, STALE_REPORT: 32 } };
 const ah = H.render({ rollup: real(), as_of: 'x' }, NOW, mon(), acc);
