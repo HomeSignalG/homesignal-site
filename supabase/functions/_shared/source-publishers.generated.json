@@ -144,7 +144,8 @@
   },
   "boulder-county-accela-applications": {
    "agency": "Boulder County, Colorado (unincorporated areas only; not municipal)",
-   "dataset": "maps.bouldercounty.org, service PLANNING/OP_Accela_Point"
+   "dataset": "maps.bouldercounty.org, service PLANNING/OP_Accela_Point",
+   "scope_note": "Boulder County records shown are applications filed within the last 365 days. Older applications are excluded, including those with pending statuses, so this report is not a complete inventory of ongoing projects. County record statuses do not confirm that construction is underway."
   },
   "bozeman-building-permits": {
    "agency": "City of Bozeman, Montana",
