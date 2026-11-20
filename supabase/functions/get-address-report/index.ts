@@ -885,7 +885,10 @@ async function handleRequest(req: Request): Promise<Response> {
     const countyCases = await countyCasesForZip(zip, (commRows ?? []) as CountyCommunityRow[], COUNTY_CASES_ENTRIES, {
       fetch,
       zipCentroid: { lat: clat, lng: clng },
-      zipMembers: scope.bounds ? zipMembers : null,
+      // Membership comes from the ZIP's own polygon (zip_scope_members) whenever the ZIP has a boundary,
+      // independent of ZIP_SCOPE_BOUNDS_MODE (the map-publication policy). Other connectors still follow
+      // `scope.bounds`; without a boundary this stays null and the connector falls back to its radius test.
+      zipMembers: zipGeo.bounds ? zipMembers : null,
     });
     // Anti-fabrication: a marker with no official record URL is not rendered, not counted.
     const dev = devRaw.filter((s) => (s.url as string) && (s.url as string).trim() !== "");
