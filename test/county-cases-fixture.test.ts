@@ -3,7 +3,7 @@
 // parcel centroids are the REAL values the county's Taxlots layer returned for 5S11130000202 and
 // 5S1124AB01300/01301/01400. Remaining Sahhali lot centroids are synthetic and marked so.
 import {
-  _clearCountyCasesCache, _clearCountyCasesPacing, countyCasesForZip, parseCaseIndex, taxlotKeys, parseTaxlots, requestFromPage, statedDate, statusHistory, pinFromParcels,
+  _clearCountyCasesCache, _clearCountyCasesPacing, countyCasesForZip, namesHeldCase, parseCaseIndex, taxlotKeys, parseTaxlots, requestFromPage, statedDate, statusHistory, pinFromParcels,
   type CountyCasesRegistryEntry,
 } from "../supabase/functions/get-address-report/sources/county-cases.ts";
 import registry from "../supabase/functions/get-address-report/jurisdiction-registry.json" with { type: "json" };
@@ -276,6 +276,19 @@ console.log("status \"BoCC Hearing\" (the county's own spelling)");
   check("a BoCC Hearing case is emitted as proposed", !!c && c.bucket === "proposed", String(c?.bucket));
   check("no approval, denial or disposition is inferred from a hearing status", !!c && !/approved|denied|decided/i.test(JSON.stringify({ b: c.bucket, s: c.status })));
   check("the shipped registry maps it with the other hearing statuses", (SHIPPED.status_to_bucket.proposed ?? []).includes("BoCC Hearing") && !(SHIPPED.status_to_bucket.exclude ?? []).includes("BoCC Hearing"));
+}
+
+console.log("a held case is not shown as a proposal through the area-notice path either");
+{
+  const entries = [SHIPPED];
+  check("a notice title naming a held case is held", namesHeldCase(entries, "Subdivision — 851-25-000549-PLNG"));
+  check("its sibling application is held too", namesHeldCase(entries, "Conditional Use — 851-25-000548-PLNG"));
+  check("a held case is recognised by its record link alone", namesHeldCase(entries, "https://www.tillamookcounty.gov/1139/851-25-000549-plng851-25-000548-plng"));
+  check("the campground is not held", !namesHeldCase(entries, "Conditional Use — 851-26-000190-PLNG https://www.tillamookcounty.gov/2612/851-26-000190-PLNG"));
+  check("no entries holds nothing", !namesHeldCase([], "Subdivision — 851-25-000549-PLNG"));
+  const src = (await import("node:fs")).readFileSync(new URL("../supabase/functions/get-address-report/index.ts", import.meta.url), "utf8");
+  const loop = src.slice(src.indexOf("for (const a of alerts) {"), src.indexOf("for (const a of alerts) {") + 900);
+  check("index.ts devSites skips a held case before it builds an area item", /namesHeldCase\(COUNTY_CASES_ENTRIES,/.test(loop) && loop.indexOf("namesHeldCase") < loop.indexOf("const approved ="));
 }
 
 if (failures) { console.error(`\n${failures} check(s) failed`); process.exit(1); }
