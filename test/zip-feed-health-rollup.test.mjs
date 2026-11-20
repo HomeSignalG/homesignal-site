@@ -63,5 +63,27 @@ ok(/revoke all on function public\._hs_zip_feed_health_core\(\) from public, ano
 ok(!/\b(insert|update|delete)\b\s+(into\s+)?public\./i.test(sql.replace(/--[^\n]*/g, '')), 'the SQL writes nothing');
 ok(/kind/.test(sql) && /'retired'|retired/.test(rd('../lib/acq-zip-feed-health.js')), 'failure kinds stay separate in the reader and the page');
 
+// 5 · standing monitor (stored findings, recovery, monitor-of-the-monitor)
+const mon = (o) => Object.assign({ last_run: { ok: true, error: null }, last_ok_run_at: '2026-11-20T17:00:00Z', runs_24h: 24, failed_runs_24h: 0,
+  cron: [{ job: 'dev-source-freshness', schedule: '41 * * * *', max_age_minutes: 180, owner: 'ingestion', registered: true, last_ok: '2026-11-20T16:41:00Z' }, { job: 'gone', schedule: 'x', max_age_minutes: 10, owner: 'o', registered: false, last_ok: null }],
+  findings: [{ finding_key: 'SOURCE_READ|fdot', class: 'SOURCE_READ_FAILURE', subject: 'fdot', severity: 'bad', first_seen: '2026-11-18T00:00:00Z', last_seen: '2026-11-20T17:00:00Z', resolved_at: null,
+      detail: { what: 'Source read failed', evidence: 'HTTP 403', threshold: 'any failed read in 48 h', action: 'Check endpoint', owner: 'ingestion', zip_count: 419, zips: [{ zip: '33301', subscriber: true }, { zip: '33302' }] } },
+    { finding_key: 'x', class: 'X', subject: 'old-source', severity: 'bad', first_seen: '2026-11-15T00:00:00Z', last_seen: '2026-11-19T00:00:00Z', resolved_at: '2026-11-19T01:00:00Z', detail: { what: 'w', evidence: '<i>e</i>', threshold: 't', action: 'a', owner: 'o', zip_count: 0, zips: [] } }] }, o);
+ok(HS.zipFeedMonitorStatus(mon(), NOW).tone === 'ok', 'a recent good run reads as running');
+ok(HS.zipFeedMonitorStatus(mon({ last_ok_run_at: '2026-11-20T10:00:00Z' }), NOW).tone === 'bad' && /STALE/.test(HS.zipFeedMonitorStatus(mon({ last_ok_run_at: '2026-11-20T10:00:00Z' }), NOW).text), 'a monitor with no good run in 2 h is shown as stale');
+ok(/FAILED/.test(HS.zipFeedMonitorStatus(mon({ last_run: { ok: false, error: 'boom' } }), NOW).text), 'a failed monitor run is shown as failed');
+ok(HS.zipFeedMonitorStatus(null, NOW).tone === 'bad' && /never recorded a run/.test(HS.zipFeedMonitorStatus({}, NOW).text), 'no run on record is shown as not monitored, never as fine');
+const mh = H.render({ rollup: real(), as_of: '2026-11-20T17:30:00Z' }, NOW, mon());
+ok(/ONGOING/.test(mh) && /RECOVERED/.test(mh), 'findings are shown as ongoing or recovered');
+ok(/33301\*/.test(mh) && /subscriber ZIP/.test(mh) && /Affected ZIPs \(419, first 2 shown\)/.test(mh), 'a finding names its affected ZIPs, flags subscribers and says how many are shown');
+ok(/First seen/.test(mh) && /Last checked/.test(mh) && /Threshold/.test(mh) && /Action/.test(mh) && /owner: ingestion/.test(mh), 'a finding states first seen, last checked, threshold, action and owner');
+ok(/NOT REGISTERED/.test(mh), 'a monitoring job that is not registered is flagged');
+ok(!/<i>e<\/i>/.test(mh) && /&lt;i&gt;e/.test(mh), 'finding evidence is escaped');
+ok(/Monitoring history unavailable/.test(H.render({ rollup: real() }, NOW)), 'when the monitor cannot be read the page says history is unverified');
+ok(/not running; see "Coverage not verified"/.test(mh), 'checks that do not run are stated as not running');
+const msql = rd('../docs/zip-feed-health-monitor.sql');
+ok(/cron\.schedule\('zip-feed-health-record'/.test(msql) && /revoke all on public\.zip_feed_health_runs/.test(msql) && /revoke all on function public\._hs_zip_feed_health_findings\(\) from public, anon, authenticated/.test(msql), 'the monitor is scheduled, its tables are closed and the finder is not callable by visitors');
+ok(/COVERAGE_NOT_VERIFIED/.test(msql) && /dev_monitoring_coverage/.test(msql) && !/insert into public\.source_registry|update public\.source_registry/i.test(msql), 'unverified coverage is a recorded finding and source_registry is untouched');
+
 console.log(`\n${n - bad}/${n} passed`);
 process.exit(bad ? 1 : 0);
