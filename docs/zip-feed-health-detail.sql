@@ -66,7 +66,7 @@ declare caller_email text := auth.jwt() ->> 'email'; lim int := least(greatest(c
 begin
   if caller_email is null or not exists (select 1 from public.dashboard_admins da where da.email = caller_email) then raise exception 'not authorized' using errcode = '42501'; end if;
   select coalesce(array_agg(distinct c.zip), '{}') into sub from public.bsky_maps_priority_classification c where c.class = 'eligible' and c.zip ~ '^[0-9]{5}$';
-  create temp table _z on commit drop as
+  with z0 as (
     select z.zip::text zip, z.at from (
       select zip, max(seen_at) at from public.zip_feed_health_open_failures where p_key like 'SOURCE_READ|%' and registry_id = substr(p_key, 13) group by zip
       union all select zip, refreshed_at from public.development_reports where p_key = 'STALE_ZIP_REPORT|all' and refreshed_at < now() - interval '72 hours'
@@ -74,9 +74,9 @@ begin
       union all select zip, facilities_refreshed_at from public.development_reports where p_key = 'EPA_LAYER|all' and facilities_unavailable
       union all select d.zip, null from public.development_reports d where p_key = 'NO_GENERATION_EVIDENCE|all' and d.refreshed_at is not null and not exists (select 1 from public.dev_source_continuity c where c.zip = d.zip)
       union all select zip, report_at from public._hs_zip_feed_health_zip_status() where p_key like 'ACCOUNT|%' and status = substr(p_key, 9)
-    ) z;
-  select count(*) into total from _z;
-  select coalesce(jsonb_agg(jsonb_build_object('zip', t.zip, 'at', t.at, 'subscriber', t.zip = any(sub)) order by t.zip), '[]'::jsonb) into rows from (select * from _z order by zip offset off limit lim) t;
+    ) z
+  ), z as (select zip, at from z0), pg as (select zip, at, count(*) over () as n from z order by zip offset off limit lim)
+  select coalesce(max(n), 0), coalesce(jsonb_agg(jsonb_build_object('zip', zip, 'at', at, 'subscriber', zip = any(sub)) order by zip), '[]'::jsonb) into total, rows from pg;
   return jsonb_build_object('key', p_key, 'total', total, 'offset', off, 'limit', lim, 'rows', rows);
 end $$;
 revoke all on function public.hs_zip_feed_health_zips(text, int, int) from public, anon;
