@@ -77,7 +77,7 @@ import {
 } from "./sources/echo-cwa.ts";
 import { resolvePlanes } from "./sources/planes.ts";
 import { scopePolicy, zipScopeBounds } from "./sources/zip-bounds.ts";
-import { zipMembershipRpc } from "./sources/scope-members.ts";
+import { zipGeomMembershipRpc, zipMembershipRpc } from "./sources/scope-members.ts";
 import { tabsForZip, type TabsPins } from "./sources/tdlr-tabs.ts";
 import { siteKey, tceqForZip, type TceqCommunityRow, type TceqEntity } from "./sources/tceq-cr.ts";
 import tabsPinsTravis from "./pins/tdlr-tabs-projects.travis.json" with { type: "json" };
@@ -731,6 +731,7 @@ async function handleRequest(req: Request): Promise<Response> {
     // Widened-only records are tested against the canonical polygon through ONE batch RPC; the box is
     // never used without it (sources/scope-members.ts).
     const zipMembers = zipMembershipRpc(supabase, zip);
+    const zipGeomMembers = zipGeomMembershipRpc(supabase, zip);
     if (policy.on && !scope.bounds) console.warn(`[scope] ${zip}: legacy centroid scope — ${scope.reason}`);
     // UNIT 4 — the two planes run concurrently under separate deadlines (sources/planes.ts).
     // The join still waits for both; overlay is capped at 45s+grace instead of the unbounded
@@ -828,6 +829,7 @@ async function handleRequest(req: Request): Promise<Response> {
       zipCentroid: { lat: clat, lng: clng },
       zipBounds: scope.bounds,
       zipMembers: scope.bounds ? zipMembers : null,
+      zipGeomMembers: scope.bounds ? zipGeomMembers : null,
       identityAliases: IDENTITY_ALIAS_FILES,
       noteFence,
     });

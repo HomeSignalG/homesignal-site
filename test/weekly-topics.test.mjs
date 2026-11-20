@@ -97,19 +97,21 @@ const q = JSON.parse(read('test/fixtures/weekly-topic-queue.json'));
 const founder = q.leads.filter((l) => !/^TEST/.test(l.title));
 ok(founder.length === 2 && founder.every((l) => !l.promised_publicly && (l.source_urls || []).length === 0 && !l.commitment_post_url) && /not a durable live queue/.test(q._note), '5c in the screen fixture they are still unpromised and addressless; everything else is TEST data');
 
-// 6 nothing outside the weekly files differs from origin/main
-let base = null;
-try { base = execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch (e) { /* none */ }
-if (!base) console.log('SKIP — 6 origin/main is not in this checkout');
+// 6 nothing outside the weekly files differs from origin/main: a FEATURE-BRANCH scope guard, enforced only when the branch touches a weekly-feature path
+// (test/lib/weekly-scope-guard.mjs; policy decision 2026-11-20). Not applicable and unavailable are reported as such, never as a pass.
+import { evaluate, changedAgainst } from './lib/weekly-scope-guard.mjs';
+const cmp = changedAgainst('origin/main', new URL('..', import.meta.url).pathname);
+if (!cmp.available) console.log('UNAVAILABLE — 6/6b the scope guard was NOT ENFORCED: ' + cmp.reason + ' (nothing is fetched here; fetch origin/main to run it)');
 else {
-  const changed = execFileSync('git', ['diff', '--name-only', base], { encoding: 'utf8' }).split('\n').filter(Boolean);
-  ok(!changed.some((f) => /impact|acq-weekly-report|^topics\.js$|youtube|^lib\/.*bluesky|^docs\/(?!weekly-bluesky-sources\.sql$).*bluesky/i.test(f)), '6 no Tab 17, Stage 1, Bluesky or YouTube file differs from origin/main (' + changed.length + ' files changed)');
-  // the one other-tab file that changes: a test that counts the dashboard's tabs (19 -> 20)
-  // Before #2772 merged these three were the expected set; once main carries them, a later branch may change none of them.
-  // CLAUDE.md: the repo's own record of a Tab 20 change (2026-11-15, video production) is documentation, never another tab's code.
-  const allowed = ['acquisition.html', 'CLAUDE.md', 'test/claim-check.test.mjs', 'test/video-bluesky-queue.test.mjs'];
-  ok(changed.filter((f) => !/weekly/i.test(f)).every((f) => allowed.indexOf(f) >= 0),
-    '6b outside the weekly files, only acquisition.html and two tab-count tests changed');
+  const g = evaluate(cmp.changed);
+  if (g.status === 'not_applicable') console.log('NOT APPLICABLE — 6/6b this branch (' + cmp.changed.length + ' files changed against ' + cmp.base.slice(0, 8) + ') touches no weekly-feature path, so the Tab 20 scope guard does not apply');
+  else {
+    ok(g.prohibited.length === 0, '6 no Tab 17, Stage 1, Bluesky or YouTube file differs from origin/main (' + cmp.changed.length + ' files changed)' + (g.prohibited.length ? ': ' + g.prohibited.join(', ') : ''));
+    // the one other-tab file that changes: a test that counts the dashboard's tabs (19 -> 20)
+    // Before #2772 merged these three were the expected set; once main carries them, a later branch may change none of them.
+    // CLAUDE.md: the repo's own record of a Tab 20 change (2026-11-15, video production) is documentation, never another tab's code.
+    ok(g.outside.length === 0, '6b outside the weekly files, only acquisition.html and two tab-count tests changed' + (g.outside.length ? ': ' + g.outside.join(', ') : ''));
+  }
 }
 console.log(fails ? fails + ' failed' : 'all passed');
 process.exit(fails ? 1 : 0);
