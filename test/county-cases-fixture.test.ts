@@ -258,5 +258,25 @@ console.log("three parcels against the REAL ZIP 97149 polygon verdicts (no bound
   check("index.ts gives county cases the polygon membership whenever the ZIP has a boundary, not only under the bounds policy", /\n\s*zipMembers: zipGeo\.bounds \? zipMembers : null,/.test(call) && !/\n\s*zipMembers: scope\.bounds/.test(call));
 }
 
+console.log("status \"BoCC Hearing\" (the county's own spelling)");
+{
+  const BOCC_REQ = "Request for conditional use approval of a 12-site campground. Tax Lot 100 of Section 24AB, Township 5 South, Range 11 West of the Willamette Meridian.";
+  const idx = `<table>` + row(["851-26-000800-PLNG"], "/2950/851-26-000800-PLNG", BOCC_REQ, "Conditional Use", "BoCC Hearing") + `</table>`;
+  const f: typeof fetch = (async (input: RequestInfo | URL) => {
+    const u = String(input);
+    if (u.includes("/1098/")) return new Response(idx, { status: 200 });
+    if (u.includes("/2950/")) return new Response(page("851-26-000800-PLNG", BOCC_REQ, "Monday, November 2, 2026", "Notice issued."), { status: 200 });
+    if (u.includes("/FeatureServer/0/query")) return new Response(JSON.stringify({ features: [{ attributes: { MapTaxlot: "5S1124AB00100" }, centroid: { x: -123.9719, y: 45.1295 } }] }), { status: 200 });
+    return new Response("not found", { status: 404 });
+  }) as typeof fetch;
+  _clearCountyCasesCache(); _clearCountyCasesPacing();
+  const { sites, reports } = await countyCasesForZip("97149", COMM, [ENTRY_WIDE], { fetch: f, sleep: async () => {}, zipMembers: async (p) => p.map(() => "member"), today: new Date("2026-11-20T12:00:00Z") });
+  const c = sites.find((s) => s.case_number === "851-26-000800-PLNG") as any;
+  check("the exact spelling is mapped: not listed as an unmapped status", !reports[0].unmapped_statuses.some((u) => u.status === "BoCC Hearing"), JSON.stringify(reports[0].unmapped_statuses));
+  check("a BoCC Hearing case is emitted as proposed", !!c && c.bucket === "proposed", String(c?.bucket));
+  check("no approval, denial or disposition is inferred from a hearing status", !!c && !/approved|denied|decided/i.test(JSON.stringify({ b: c.bucket, s: c.status })));
+  check("the shipped registry maps it with the other hearing statuses", (SHIPPED.status_to_bucket.proposed ?? []).includes("BoCC Hearing") && !(SHIPPED.status_to_bucket.exclude ?? []).includes("BoCC Hearing"));
+}
+
 if (failures) { console.error(`\n${failures} check(s) failed`); process.exit(1); }
 console.log("\nall county-cases checks passed");
