@@ -545,11 +545,17 @@ export function detectedChangeEntries(events: ReportableEvent[]) {
 // THE PUBLISHER. source-publishers.generated.json is derived mechanically from the development source registry (the one place a
 // source's agency is written down) by scripts/gen-source-publishers.mjs. A record whose source is not in the registry names no agency.
 type Publisher = { agency: string | null; dataset: string | null; status_const?: string | null; date_label?: string | null; date_basis?: DateBasis };
-const PUBLISHERS: Record<string, Publisher> = ((publishersFile as unknown as { publishers?: Record<string, Publisher> }).publishers) ?? {};
+type PublisherRec = Publisher & { scope_note?: string | null };
+const PUBLISHERS: Record<string, PublisherRec> = ((publishersFile as unknown as { publishers?: Record<string, PublisherRec> }).publishers) ?? {};
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
 export function publisherOf(family: string | null, table: Record<string, Publisher> = PUBLISHERS): Publisher {
   const p = family ? table[family] : undefined;
   return { agency: str(p?.agency), dataset: str(p?.dataset), status_const: str(p?.status_const), date_label: str(p?.date_label), ...(dateBasisOf((p as { date_basis?: unknown } | undefined)?.date_basis) !== 'unstated' ? { date_basis: dateBasisOf((p as { date_basis?: unknown } | undefined)?.date_basis) } : {}) };
+}
+/** What a source does NOT establish, in the registry's own words (e.g. a city's permits are not county coverage); null when it states none. */
+export function scopeNoteOf(family: string | null): string | null {
+  const p = family ? PUBLISHERS[family] : undefined;
+  return str(p?.scope_note);
 }
 /**
  * Whether the record's stored stage is a word the AGENCY published. A source with no status column stores its connector's constant
@@ -1065,6 +1071,9 @@ export function assemble(input: AssembleInput): Assembled {
       source_feed_count: [...familiesIncluded].filter(Boolean).length,
       // the publishing agency and dataset of each source in the report, in the families' order: the coverage note names all of them
       source_agencies: [...familiesIncluded].filter(Boolean).sort().map((f) => ({ source_family: f, agency: publisherOf(f, input.publishers).agency, feed_ref: publisherOf(f, input.publishers).dataset })),
+      // what a source does NOT establish, for every source the report was judged on (one that listed a record, one the spatial read found, or one whose declared
+      // county covers the subject), so a ZIP the source does not actually cover still reads the statement even when the source listed nothing. Not a limitation: no state change.
+      source_scope_notes: [...judgedFamilies].filter((f) => !!scopeNoteOf(f)).sort().map((f) => ({ source_family: f, agency: publisherOf(f, input.publishers).agency, note: scopeNoteOf(f) })),
       assessment_basis: 'records_returned_for_this_radius',
       // which kinds of record the connected sources cover for this place, and which have no connected source (a fact apart from source failures and from the outcome)
       categories: categoryCoverageOf(input.category_coverage ?? null),

@@ -2324,6 +2324,7 @@
       "service_url": "https://services.arcgis.com/ePKBjXrBZ2vEEgWd/arcgis/rest/services/Construction_Permits/FeatureServer/0",
       "dataset_url": "https://services.arcgis.com/ePKBjXrBZ2vEEgWd/arcgis/rest/services/Construction_Permits/FeatureServer/0",
       "jurisdiction": "City of Boulder",
+      "scope_note": "This source contains City of Boulder permits only. It does not establish permit coverage for Lafayette, Louisville, Superior, or unincorporated Boulder County. Coverage for those areas, if available, depends on separate sources.",
       "coverage": [
         {
           "state": "CO",
