@@ -76,7 +76,7 @@ ok(HS.zipFeedMonitorStatus(null, NOW).tone === 'bad' && /never recorded a run/.t
 const mh = H.render({ rollup: real(), as_of: '2026-11-20T17:30:00Z' }, NOW, mon());
 ok(/ONGOING/.test(mh) && /RECOVERED/.test(mh), 'findings are shown as ongoing or recovered');
 ok(/33301\*/.test(mh) && /subscriber ZIP/.test(mh) && /Affected ZIPs \(419, first 2 shown\)/.test(mh), 'a finding names its affected ZIPs, flags subscribers and says how many are shown');
-ok(/First seen/.test(mh) && /Last checked/.test(mh) && /Threshold/.test(mh) && /Action/.test(mh) && /owner: ingestion/.test(mh), 'a finding states first seen, last checked, threshold, action and owner');
+ok(/First recorded by this monitor/.test(mh) && /Last checked/.test(mh) && /Threshold/.test(mh) && /Action/.test(mh) && /owner: ingestion/.test(mh), 'a finding states first seen, last checked, threshold, action and owner');
 ok(/NOT REGISTERED/.test(mh), 'a monitoring job that is not registered is flagged');
 ok(!/<i>e<\/i>/.test(mh) && /&lt;i&gt;e/.test(mh), 'finding evidence is escaped');
 ok(/Monitoring history unavailable/.test(H.render({ rollup: real() }, NOW)), 'when the monitor cannot be read the page says history is unverified');
