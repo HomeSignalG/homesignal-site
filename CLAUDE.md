@@ -366,6 +366,44 @@ Google does not render a page whose initial robots says noindex, so a script cou
   artifact in Chromium). Production check: dispatch `verify-map-landing-live.yml` after a deploy.
 - Search Console state is not readable from this repo; inspect `https://jodytracks.com/homesignalmap.html` there and request indexing.
 
+## PUBLIC HEARINGS ARE VISIBLE BEFORE THEY ARE DECIDED ⚖️ FOUNDER POLICY (2026-11-17) — PLAN ONLY, NOT BUILT
+
+Residents must learn of a chance to take part in a development decision BEFORE the decision. Universal, every ZIP and
+jurisdiction; Neskowin / 97149 is a test case, never the scope. Audit and plan: `docs/public-hearing-visibility-plan-2026-11-17.md`.
+The engine half and the full rule text: homesignal-ingest CLAUDE.md, same title.
+1. An officially confirmed public hearing appears on every ZIP page the hearing's government reaches.
+2. A hearing announced by a recognized local government advisory committee may appear labelled **"Official confirmation
+   pending"** with a direct link to the committee's own source. Recognition is decided by nationwide evidence-based criteria, never a guess and never a per-committee approval (founder, 2026-11-19).
+3. A provisional announcement is reconciled automatically with the later official notice; the decision is recorded, not overwritten.
+4. Announcement date, notice publication date, hearing date and decision date are four separate fields. A posting date is never a hearing date.
+5. Comment instructions, participation links and deadlines are shown when the source states them.
+6. A hearing attaches to its development project by evidence (case number, named parcel, named project). **No Map pin is required.**
+7. Duplicate, cancelled, superseded and outdated notices never show as current. A cancelled hearing stays listed, badged "Cancelled"
+   (ruling 2026-10-19), and is never actionable.
+8. Nationwide; no place name, feed id or ZIP appears in the rule.
+**Founder modifications, 2026-11-19 (these govern where they differ from the rules above):**
+- **Recognition is evidence-based and automatic, never per-committee founder approval.** A committee is recognized when it meets the
+  nationwide criteria in the plan (government-established, land-use remit, first-party publication, dated announcement), each
+  verified and recorded in an append-only evidence log; a committee whose announcements keep failing to reconcile is suspended
+  automatically.
+- **A provisional hearing leaves the upcoming list once it expires but stays in historical intelligence**, and reconciliation against
+  official sources continues for confirmation, cancellation or rescheduling.
+- **A hearing needs no Map 1 pin to appear on a ZIP page** where its geographic relevance is verified (government reach, or a named
+  place resolved by the canonical ZIP boundary).
+- **Final direction, 2026-11-19:** committee suspension needs at least 20 independently resolved outcomes and accuracy below 80%
+  (5 outcomes start an assessment only; missing confirmation, cancellations and reschedules are not inaccuracy; reinstatement by a
+  rolling 20-outcome window at 80% or a verified root-cause fix plus 10 validations). Reminders go 7 and 2 days before a verified
+  comment deadline, with catch-up, no duplicates, none expired, independent of the hearing date. The posting-date placeholder in
+  `meeting_date` is gated by `date_basis` and never shown: surfaces say "Hearing date not announced". Hearing identity never rests
+  on dates or a bare case number. Decisions: homesignal-ingest `hearings.py`.
+- Comment deadlines and upcoming hearings are listed first. **A hearing date is never inferred from a publication date.**
+- Subscriber notifications for hearings, reschedules, cancellations and comment deadlines go through the Delivery session's
+  `digest.py`, once per event per person; this work proposes the interface and does not edit that file (Rule #0a).
+- Source evidence and every reconciliation decision are kept permanently.
+- Hearings live in `public.meetings` (read live). Do NOT carry a hearing only as an `app_changes` notice: an `app_changes` row is never re-evaluated.
+- ⛔ Not built, not applied, not deployed. Any database change or deploy needs founder approval.
+- Do not edit the Tillamook `county_cases` files or section for this work; the Tillamook session owns them.
+
 ## Permanent historical intelligence — preserve the longitudinal asset
 
 **HomeSignal's longitudinal development history is a core company data asset. Current product
