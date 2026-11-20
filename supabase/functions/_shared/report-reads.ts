@@ -8,6 +8,7 @@
 import { DataUnavailable, inBatches, quoteIn } from './service-rest.ts';
 import type { FetchFn } from './service-rest.ts';
 import type { ProjectRow, RadiusRow } from './national-report.ts';
+import type { Jurisdiction } from './source-applicability.ts';
 
 /** Rows requested from the canonical spatial read. It reports `has_more`, and a truncated area is disclosed, never hidden. */
 export const RADIUS_ROW_LIMIT = 1000;
@@ -30,6 +31,13 @@ export function makeReportReads(conn: { base: string; svc: Record<string, string
       const rows = await r.json().catch(() => null);
       if (!Array.isArray(rows)) throw new DataUnavailable('shape');
       return rows as RadiusRow[];
+    },
+
+    /** The state and county the ZIP's own community rows declare (public.communities). Empty when none: unknown geography makes no source applicable. */
+    async jurisdictions(zip: string): Promise<Jurisdiction[]> {
+      if (!/^\d{5}$/.test(zip)) return [];
+      const rows = await rest<{ state: string | null; county: string | null }>('communities?select=state,county&zip_codes=cs.' + encodeURIComponent('{' + zip + '}'));
+      return rows.filter((r) => r.state).map((r) => ({ state: String(r.state), county: String(r.county ?? '') }));
     },
 
     async hydrate(keys: string[]): Promise<ProjectRow[]> {

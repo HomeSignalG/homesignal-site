@@ -3,7 +3,7 @@
 // parcel centroids are the REAL values the county's Taxlots layer returned for 5S11130000202 and
 // 5S1124AB01300/01301/01400. Remaining Sahhali lot centroids are synthetic and marked so.
 import {
-  _clearCountyCasesCache, _clearCountyCasesPacing, countyCasesForZip, parseCaseIndex, taxlotKeys, parseTaxlots, requestFromPage, statedDate, statusHistory, pinFromParcels,
+  _clearCountyCasesCache, _clearCountyCasesPacing, countyCasesForZip, namesHeldCase, parseCaseIndex, taxlotKeys, parseTaxlots, requestFromPage, statedDate, statusHistory, pinFromParcels,
   type CountyCasesRegistryEntry,
 } from "../supabase/functions/get-address-report/sources/county-cases.ts";
 import registry from "../supabase/functions/get-address-report/jurisdiction-registry.json" with { type: "json" };
@@ -208,6 +208,87 @@ console.log("pacing");
   const waits: number[] = [];
   await countyCasesForZip("97149", COMM, [ENTRY_WIDE], { fetch: mockFetch({ synth: true, log: [] }), sleep: async (ms) => { waits.push(ms); }, zipMembers: async (p) => p.map(() => "member"), today: new Date("2026-11-16T12:00:00Z") });
   check("requests to the county host are spaced by the robots crawl delay", waits.length >= 1 && waits.every((w) => w > 0 && w <= 10000), JSON.stringify(waits));
+}
+
+console.log("three parcels against the REAL ZIP 97149 polygon verdicts (no bounds policy involved)");
+{
+  const real = (await import("./fixtures/county-cases/zip97149-members.json", { with: { type: "json" } })).default as { members: string[] };
+  const members = new Set(real.members);
+  // The connector's probe points depend on the exact outline, so this block uses the full-precision outline the verdicts were taken with.
+  const CAMP_FULL: number[][] = [[-123.969894371108,45.1410031153875],[-123.969512007895,45.1407838993261],[-123.969243698264,45.1396756331418],[-123.968442049557,45.1384222334788],[-123.967759580811,45.137727554998],[-123.967383039588,45.1369545872621],[-123.967426617566,45.1366753940028],[-123.967354514992,45.1364850955433],[-123.96728948535,45.1362935247054],[-123.967231573264,45.1361008131543],[-123.967180818463,45.1359070933384],[-123.96696592755,45.1353983959282],[-123.96693830064,45.1351682223428],[-123.966920615104,45.1349375590411],[-123.966912887309,45.1347066210799],[-123.966915124339,45.1344756237694],[-123.96692732399,45.1342447824726],[-123.966949474765,45.1340143124046],[-123.966981555894,45.1337844284317],[-123.968452112584,45.1338058558296],[-123.970900680354,45.1338414946572],[-123.970897559279,45.1341435230543],[-123.970887253695,45.1350999934291],[-123.970886251164,45.1351929466712],[-123.970880269809,45.1357481231826],[-123.970871882505,45.1365265691346],[-123.970861750335,45.1374664845912],[-123.973629325799,45.1375083009383],[-123.973733463585,45.1401389982888],[-123.97136775905,45.1407431382848],[-123.97021292253,45.1423600305985],[-123.969894371108,45.1410031153875]];
+  // SYNTHETIC parcels for the test only: IN is a small square wholly inside the ZIP, OUT a square far outside it.
+  const IN_RING = [[-123.9702, 45.1348], [-123.9698, 45.1348], [-123.9698, 45.1352], [-123.9702, 45.1352], [-123.9702, 45.1348]];
+  const OUT_RING = [[-123.9000, 45.1800], [-123.8996, 45.1800], [-123.8996, 45.1804], [-123.9000, 45.1804], [-123.9000, 45.1800]];
+  const inZip = (lat: number, lng: number) => members.has(`${lat.toFixed(6)},${lng.toFixed(6)}`) || (lng > -123.9702 && lng < -123.9698 && lat > 45.1348 && lat < 45.1352);
+  const mk = (n: string, lot: string) => row([`851-26-${n}-PLNG`], `/${n === "000700" ? 2900 : 2901}/851-26-${n}-PLNG`, `Request for conditional use approval of a 12-site campground. Tax Lot ${lot} of Section 24AB, Township 5 South, Range 11 West of the Willamette Meridian.`, "Conditional Use", "Planning Commission Hearing");
+  const idx = `<table>` + [
+    row(["851-26-000190-PLNG"], "https://www.tillamookcounty.gov/2612/851-26-000190-PLNG", CAMP_REQ, "Conditional Use", "Planning Commission Hearing"),
+    mk("000700", "100"), mk("000701", "200"),
+  ].join("") + `</table>`;
+  const ctr = (r: number[][]): [number, number] => [r.slice(0, -1).reduce((a, p) => a + p[1], 0) / (r.length - 1), r.slice(0, -1).reduce((a, p) => a + p[0], 0) / (r.length - 1)];
+  const f: typeof fetch = (async (input: RequestInfo | URL) => {
+    const u = String(input);
+    if (u.includes("/1098/")) return new Response(idx, { status: 200 });
+    if (u.includes("2612")) return new Response(CAMP_PAGE, { status: 200 });
+    if (u.includes("/2900/")) return new Response(page("851-26-000700-PLNG", mk("000700", "100"), "Monday, November 2, 2026", "Notice issued."), { status: 200 });
+    if (u.includes("/2901/")) return new Response(page("851-26-000701-PLNG", mk("000701", "200"), "Monday, November 2, 2026", "Notice issued."), { status: 200 });
+    if (u.includes("/FeatureServer/0/query")) {
+      const where = decodeURIComponent(new URL(u).searchParams.get("where") ?? "");
+      const keys = [...where.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+      const feat = (k: string) => k === "5S11130000202" ? { attributes: { MapTaxlot: k }, centroid: { x: -123.97013017751362, y: 45.137521851790737 }, geometry: { rings: [CAMP_FULL] } }
+        : k === "5S1124AB00100" ? { attributes: { MapTaxlot: k }, centroid: { x: ctr(IN_RING)[1], y: ctr(IN_RING)[0] }, geometry: { rings: [IN_RING] } }
+        : k === "5S1124AB00200" ? { attributes: { MapTaxlot: k }, centroid: { x: ctr(OUT_RING)[1], y: ctr(OUT_RING)[0] }, geometry: { rings: [OUT_RING] } } : null;
+      return new Response(JSON.stringify({ features: keys.map(feat).filter(Boolean) }), { status: 200 });
+    }
+    return new Response("not found", { status: 404 });
+  }) as typeof fetch;
+  _clearCountyCasesCache(); _clearCountyCasesPacing();
+  const { sites } = await countyCasesForZip("97149", COMM, [ENTRY_WIDE], { fetch: f, sleep: async () => {}, zipMembers: async (pts) => pts.map(([la, ln]) => (inZip(la, ln) ? "member" : "outside") as "member" | "outside"), today: new Date("2026-11-20T12:00:00Z") });
+  const camp = sites.find((s) => s.case_number === "851-26-000190-PLNG") as any;
+  const inn = sites.find((s) => s.case_number === "851-26-000700-PLNG") as any;
+  const out = sites.find((s) => s.case_number === "851-26-000701-PLNG");
+  const inside = (ring: number[][], lat: number, lng: number) => { let c = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [xi, yi] = ring[i], [xj, yj] = ring[j]; if ((yi > lat) !== (yj > lat) && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) c = !c; } return c; };
+  check("boundary-crossing campground parcel is emitted with parcel_portion_in_zip", camp?.location_basis === "parcel_portion_in_zip", String(camp?.location_basis));
+  check("campground point is inside its parcel", !!camp && inside(CAMP_FULL, camp.lat, camp.lng));
+  check("campground point is a member of the real ZIP 97149 polygon", !!camp && inZip(camp.lat, camp.lng));
+  check("a parcel wholly inside the ZIP is emitted at its own centroid", !!inn && inn.location_basis === "parcel_centroid" && inside(IN_RING, inn.lat, inn.lng));
+  check("a nearby parcel wholly outside the ZIP is not emitted", !out);
+  const idxSrc = (await import("node:fs")).readFileSync(new URL("../supabase/functions/get-address-report/index.ts", import.meta.url), "utf8");
+  const call = idxSrc.slice(idxSrc.indexOf("countyCasesForZip(zip"), idxSrc.indexOf("countyCasesForZip(zip") + 600);
+  check("index.ts gives county cases the polygon membership whenever the ZIP has a boundary, not only under the bounds policy", /\n\s*zipMembers: zipGeo\.bounds \? zipMembers : null,/.test(call) && !/\n\s*zipMembers: scope\.bounds/.test(call));
+}
+
+console.log("status \"BoCC Hearing\" (the county's own spelling)");
+{
+  const BOCC_REQ = "Request for conditional use approval of a 12-site campground. Tax Lot 100 of Section 24AB, Township 5 South, Range 11 West of the Willamette Meridian.";
+  const idx = `<table>` + row(["851-26-000800-PLNG"], "/2950/851-26-000800-PLNG", BOCC_REQ, "Conditional Use", "BoCC Hearing") + `</table>`;
+  const f: typeof fetch = (async (input: RequestInfo | URL) => {
+    const u = String(input);
+    if (u.includes("/1098/")) return new Response(idx, { status: 200 });
+    if (u.includes("/2950/")) return new Response(page("851-26-000800-PLNG", BOCC_REQ, "Monday, November 2, 2026", "Notice issued."), { status: 200 });
+    if (u.includes("/FeatureServer/0/query")) return new Response(JSON.stringify({ features: [{ attributes: { MapTaxlot: "5S1124AB00100" }, centroid: { x: -123.9719, y: 45.1295 } }] }), { status: 200 });
+    return new Response("not found", { status: 404 });
+  }) as typeof fetch;
+  _clearCountyCasesCache(); _clearCountyCasesPacing();
+  const { sites, reports } = await countyCasesForZip("97149", COMM, [ENTRY_WIDE], { fetch: f, sleep: async () => {}, zipMembers: async (p) => p.map(() => "member"), today: new Date("2026-11-20T12:00:00Z") });
+  const c = sites.find((s) => s.case_number === "851-26-000800-PLNG") as any;
+  check("the exact spelling is mapped: not listed as an unmapped status", !reports[0].unmapped_statuses.some((u) => u.status === "BoCC Hearing"), JSON.stringify(reports[0].unmapped_statuses));
+  check("a BoCC Hearing case is emitted as proposed", !!c && c.bucket === "proposed", String(c?.bucket));
+  check("no approval, denial or disposition is inferred from a hearing status", !!c && !/approved|denied|decided/i.test(JSON.stringify({ b: c.bucket, s: c.status })));
+  check("the shipped registry maps it with the other hearing statuses", (SHIPPED.status_to_bucket.proposed ?? []).includes("BoCC Hearing") && !(SHIPPED.status_to_bucket.exclude ?? []).includes("BoCC Hearing"));
+}
+
+console.log("a held case is not shown as a proposal through the area-notice path either");
+{
+  const entries = [SHIPPED];
+  check("a notice title naming a held case is held", namesHeldCase(entries, "Subdivision — 851-25-000549-PLNG"));
+  check("its sibling application is held too", namesHeldCase(entries, "Conditional Use — 851-25-000548-PLNG"));
+  check("a held case is recognised by its record link alone", namesHeldCase(entries, "https://www.tillamookcounty.gov/1139/851-25-000549-plng851-25-000548-plng"));
+  check("the campground is not held", !namesHeldCase(entries, "Conditional Use — 851-26-000190-PLNG https://www.tillamookcounty.gov/2612/851-26-000190-PLNG"));
+  check("no entries holds nothing", !namesHeldCase([], "Subdivision — 851-25-000549-PLNG"));
+  const src = (await import("node:fs")).readFileSync(new URL("../supabase/functions/get-address-report/index.ts", import.meta.url), "utf8");
+  const loop = src.slice(src.indexOf("for (const a of alerts) {"), src.indexOf("for (const a of alerts) {") + 900);
+  check("index.ts devSites skips a held case before it builds an area item", /namesHeldCase\(COUNTY_CASES_ENTRIES,/.test(loop) && loop.indexOf("namesHeldCase") < loop.indexOf("const approved ="));
 }
 
 if (failures) { console.error(`\n${failures} check(s) failed`); process.exit(1); }

@@ -1,5 +1,5 @@
 {
- "view_sha256": "39cc47d89dfbaa84c388afea003236fbdbf85c5989538ae8e39c17612b2441e9",
+ "view_sha256": "f56897987c3c6e075f279951ff672045ef04b5f7d7eac4a7cf5f6200af4f2b85",
  "fixture_md5": "f04579a6f3adfc15f4f7ab3300e884c3",
  "subject": "4700 Point Fosdick Dr NW, Gig Harbor, WA 98335",
  "caption": "Example property report · real records, as of Oct 15, 2026. Both of the report’s 2 official records are shown. In the full report each record links to its official source.",
@@ -38,7 +38,7 @@
     }
    ],
    "text": "Example property report · real records, as of Oct 15, 2026. Both of the report’s 2 official records are shown. In the full report each record links to its official source. JODY Development Activity 4700 Point Fosdick Dr NW, Gig Harbor, WA 98335 Search radius 0.5 miles · ZIP 98335 Generated Oct 15, 2026 As of Oct 15, 2026, 2 official records within 0.5 miles of this property document a nearby change: 1 with a permit issued · 1 proposed / under review. Types: 2 Residential. These are counts of records, not of separate developments; one development can have several records. DEVELOPMENT STAGE QUALITY-OF-LIFE IMPACT SUPPORTING EVIDENCE Construction Residential Long Acres, Lot 20 2518 50TH STCT NW Jody type: Residential Not on the map: no direction is available for this record. Proposed / Under review Source agency status: Accepted The record documents the work it describes. It states no schedule and no effect on nearby properties. Official record: Filed · Aug 21, 2026 Official source → for Construction Residential Long Acres, Lot 20 (opens in a new tab) Construction Residential Long Acres, Lot 15 2318 50TH STCT NW Jody type: Residential Not on the map: no direction is available for this record. Permit issued Source agency status: Issued An issued permit does not confirm that construction has started. The record documents the work it describes. It states no schedule and no effect on nearby properties. Official record: Filed · Jun 23, 2026 Official source → for Construction Residential Long Acres, Lot 15 (opens in a new tab)",
-   "asset_sha256": "3e97b1f1e72255e75ee28a1ce747058151d2ce61a114a79831a0eb8022cbae5b"
+   "asset_sha256": "88ffb095554520153da251d76cf0324a44d0e2f76bba4dde443bb3b2c493061b"
   },
   "mobile": {
    "width": 688,
@@ -67,7 +67,7 @@
     }
    ],
    "text": "Example property report · real records, as of Oct 15, 2026. Both of the report’s 2 official records are shown. In the full report each record links to its official source. JODY Development Activity 4700 Point Fosdick Dr NW, Gig Harbor, WA 98335 Search radius 0.5 miles · ZIP 98335 Generated Oct 15, 2026 As of Oct 15, 2026, 2 official records within 0.5 miles of this property document a nearby change: 1 with a permit issued · 1 proposed / under review. Types: 2 Residential. These are counts of records, not of separate developments; one development can have several records. DEVELOPMENT STAGE QUALITY-OF-LIFE IMPACT SUPPORTING EVIDENCE Development: Construction Residential Long Acres, Lot 20 2518 50TH STCT NW Jody type: Residential Not on the map: no direction is available for this record. Stage: Proposed / Under review Source agency status: Accepted Quality-of-Life Impact: The record documents the work it describes. It states no schedule and no effect on nearby properties. Supporting Evidence: Official record: Filed · Aug 21, 2026 Official source → for Construction Residential Long Acres, Lot 20 (opens in a new tab) Development: Construction Residential Long Acres, Lot 15 2318 50TH STCT NW Jody type: Residential Not on the map: no direction is available for this record. Stage: Permit issued Source agency status: Issued An issued permit does not confirm that construction has started. Quality-of-Life Impact: The record documents the work it describes. It states no schedule and no effect on nearby properties. Supporting Evidence: Official record: Filed · Jun 23, 2026 Official source → for Construction Residential Long Acres, Lot 15 (opens in a new tab)",
-   "asset_sha256": "f7907b4f16e673cc408f7f11b8bfca4da38039260e1cefff6fb6e5ea4c7e98d2"
+   "asset_sha256": "6a20473da0b5ea53e2cb3057c2b0e6cd9a026035305a0b246a4da29c3fbb8a0f"
   }
  }
 }

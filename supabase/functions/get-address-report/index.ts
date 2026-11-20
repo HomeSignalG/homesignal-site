@@ -77,7 +77,7 @@ import {
 } from "./sources/echo-cwa.ts";
 import { resolvePlanes } from "./sources/planes.ts";
 import { scopePolicy, zipScopeBounds } from "./sources/zip-bounds.ts";
-import { zipMembershipRpc } from "./sources/scope-members.ts";
+import { zipGeomMembershipRpc, zipMembershipRpc } from "./sources/scope-members.ts";
 import { tabsForZip, type TabsPins } from "./sources/tdlr-tabs.ts";
 import { siteKey, tceqForZip, type TceqCommunityRow, type TceqEntity } from "./sources/tceq-cr.ts";
 import tabsPinsTravis from "./pins/tdlr-tabs-projects.travis.json" with { type: "json" };
@@ -98,7 +98,7 @@ import { arcgisForZip, type ArcgisRegistryEntry } from "./sources/arcgis.ts";
 import { IDENTITY_ALIAS_FILES } from "./identity-aliases/index.ts";
 import { ckanForZip, type CkanCommunityRow, type CkanRegistryEntry } from "./sources/ckan.ts";
 import { csvForZip, type CsvCommunityRow, type CsvRegistryEntry } from "./sources/csv.ts";
-import { countyCasesForZip, type CountyCommunityRow, type CountyCasesRegistryEntry } from "./sources/county-cases.ts";
+import { countyCasesForZip, namesHeldCase, type CountyCommunityRow, type CountyCasesRegistryEntry } from "./sources/county-cases.ts";
 import { cartoForZip, type CartoCommunityRow, type CartoRegistryEntry } from "./sources/carto.ts";
 const ARCGIS_ENTRIES = (jurisdictionRegistry as unknown as { arcgis?: ArcgisRegistryEntry[] }).arcgis ?? [];
 const CKAN_ENTRIES = (jurisdictionRegistry as unknown as { ckan?: CkanRegistryEntry[] }).ckan ?? [];
@@ -279,6 +279,9 @@ async function devSites(supabase: ReturnType<typeof createClient>, homeLat: numb
   const [ae, an] = toEN(homeLat, homeLng, homeLat, homeLng);   // [0,0] — the report anchor
   for (const a of alerts) {
     const title = ((a.title as string) || "").trim();
+    // A case the registry holds as unverified (hold_cases) is not shown as a current proposal through this path either:
+    // its notice row stays stored, but no development item is built from it.
+    if (namesHeldCase(COUNTY_CASES_ENTRIES, `${title} ${(a.source_url as string) || ""}`)) continue;
     const approved = /\b(approved|approves|granted|adopted|entitled|permit issued|issued a permit|under construction|final plat|site plan approv|authoriz|ground ?break|breaks ground|begins construction|construction begins)\b/i.test(title);
     // A DECIDED item (approved OR denied/withdrawn/tabled) is not an open comment opportunity.
     // ── DENIAL AND WITHDRAWAL ARE DIFFERENT FACTS, AND EACH KEEPS ITS OWN WORD ──────
@@ -731,6 +734,7 @@ async function handleRequest(req: Request): Promise<Response> {
     // Widened-only records are tested against the canonical polygon through ONE batch RPC; the box is
     // never used without it (sources/scope-members.ts).
     const zipMembers = zipMembershipRpc(supabase, zip);
+    const zipGeomMembers = zipGeomMembershipRpc(supabase, zip);
     if (policy.on && !scope.bounds) console.warn(`[scope] ${zip}: legacy centroid scope — ${scope.reason}`);
     // UNIT 4 — the two planes run concurrently under separate deadlines (sources/planes.ts).
     // The join still waits for both; overlay is capped at 45s+grace instead of the unbounded
@@ -828,6 +832,7 @@ async function handleRequest(req: Request): Promise<Response> {
       zipCentroid: { lat: clat, lng: clng },
       zipBounds: scope.bounds,
       zipMembers: scope.bounds ? zipMembers : null,
+      zipGeomMembers: scope.bounds ? zipGeomMembers : null,
       identityAliases: IDENTITY_ALIAS_FILES,
       noteFence,
     });
@@ -883,7 +888,10 @@ async function handleRequest(req: Request): Promise<Response> {
     const countyCases = await countyCasesForZip(zip, (commRows ?? []) as CountyCommunityRow[], COUNTY_CASES_ENTRIES, {
       fetch,
       zipCentroid: { lat: clat, lng: clng },
-      zipMembers: scope.bounds ? zipMembers : null,
+      // Membership comes from the ZIP's own polygon (zip_scope_members) whenever the ZIP has a boundary,
+      // independent of ZIP_SCOPE_BOUNDS_MODE (the map-publication policy). Other connectors still follow
+      // `scope.bounds`; without a boundary this stays null and the connector falls back to its radius test.
+      zipMembers: zipGeo.bounds ? zipMembers : null,
     });
     // Anti-fabrication: a marker with no official record URL is not rendered, not counted.
     const dev = devRaw.filter((s) => (s.url as string) && (s.url as string).trim() !== "");

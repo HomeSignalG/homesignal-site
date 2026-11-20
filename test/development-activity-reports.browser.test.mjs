@@ -207,7 +207,7 @@ function world({ trial = 'active', used = 0, admin = false, untraceable = false,
     // the report rate limit (docs/report-rate-limit.sql): the database's answer, a refusal when the test sets `w.rate`
     rateClaim: async () => (w.rate ? { allowed: false, ...w.rate } : { allowed: true }),
     zipSupported: async () => true,
-    radius: async () => (w.untraceable ? NO_FAMILY(RICH) : RICH).rows, hydrate: async () => (w.untraceable ? NO_FAMILY(RICH) : RICH).projects, ledger: async () => RICH.ledger ?? [], events: async () => RICH.events ?? [], health: async () => [],
+    radius: async () => (w.untraceable ? NO_FAMILY(RICH) : RICH).rows, hydrate: async () => (w.untraceable ? NO_FAMILY(RICH) : RICH).projects, ledger: async () => RICH.ledger ?? [], events: async () => RICH.events ?? [], health: async () => [], jurisdictions: async () => [],
     trialOf: async () => state(),
     planOf: async () => { if (w.billingFails) throw new RH.DataUnavailable('x'); return usage(); },
     issue: async (_u, key, intelligence, privateContext) => {
@@ -956,7 +956,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   ok(LINK.test(link) && link === SR.shareLink(link.split('#share=')[1]), '9e the link is shown, in the one form the server makes (the page builds none of it)', link);
   const created = shareCalls.filter((c) => c.body.action === 'create');
   ok(created.length === 1 && Object.keys(created[0].body).sort().join() === 'action,report_id', '9f the create request names the report and nothing else: no address, no client label, no expiry, no token');
-  ok(/only this once/.test(await text(page, '#share-note')) && /Anyone who has it can read this report/.test(await text(page, '#share-note')), '9g the page says the link is shown only once and that anyone who has it can read the report');
+  ok(/displayed only once/.test(await text(page, '#share-note')) && /Anyone who has it can read this report/.test(await text(page, '#share-note')), '9g the page says the link is shown only once and that anyone who has it can read the report');
   await waitShare(page, /Working/);
   const rows = await shareList(page);
   ok(rows.length === 1 && /^Working · made / .test(rows[0]) && /works until April 3, 2027/.test(rows[0]) && /Withdraw$/.test(rows[0]), '9h the list shows the link as working, with when it was made and when it stops', rows);
@@ -1004,7 +1004,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   ok(pop.icons.length === 14 && pop.icons.join('|') === siteTargets.join('|'), '9o3 the popup shows the site\'s own 14 Share icons, in the site\'s order', pop.icons);
   ok(pop.hrefs.length === 12 && pop.hrefs.every((h) => h.includes(encodeURIComponent(pop.link))) && !pop.hrefs.join(' ').includes(encodeURIComponent(addrTyped.split(',')[0])),
     '9o4 every icon link carries the same client link, and the message names no street address', pop.hrefs);
-  ok(/Anyone who has it can read this report/.test(pop.note) && /only this once/.test(pop.note), '9o5 the popup says anyone with the link can read the report and that the link is shown once', pop.note);
+  ok(/Anyone who has it can read this report/.test(pop.note) && /displayed only once/.test(pop.note), '9o5 the popup says anyone with the link can read the report and that the link is shown once', pop.note);
   // copy
   await page.evaluate(() => { window.__copied = null; Object.defineProperty(navigator, 'clipboard', { value: { writeText: (t) => { window.__copied = t; return Promise.resolve(); } }, configurable: true }); });
   await page.click('#share-pop-copy');

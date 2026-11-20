@@ -2324,6 +2324,7 @@
       "service_url": "https://services.arcgis.com/ePKBjXrBZ2vEEgWd/arcgis/rest/services/Construction_Permits/FeatureServer/0",
       "dataset_url": "https://services.arcgis.com/ePKBjXrBZ2vEEgWd/arcgis/rest/services/Construction_Permits/FeatureServer/0",
       "jurisdiction": "City of Boulder",
+      "scope_note": "This source contains City of Boulder permits only. It does not establish permit coverage for Lafayette, Louisville, Superior, or unincorporated Boulder County. Coverage for those areas, if available, depends on separate sources.",
       "coverage": [
         {
           "state": "CO",
@@ -2399,6 +2400,210 @@
       "recency_days": 365,
       "record_url_precision": "dataset",
       "_receipts": "Verified live 2026-07-14 via pg_net: City of Boulder's own AGO org (ePKBjXrBZ2vEEgWd, found via the open-data.bouldercolorado.gov DCAT) - a BLDS-style permit TABLE (no geometry): rows geocode via the full OriginalAddress+City+State (connector's address path, geocode-cache-backed) and carry a NATIVE OriginalZip. Fresh through AppliedDate 2026-07-07 (string ISO dates). 24 StatusCurrent values + 29 PermitType values enumerated VERBATIM via groupBy; trade noise (Mechanical 71549, Electrical 66045, Roofing 28236, Plumbing 28210, ROW 21952, fences/signs/events) dropped at source, keeping the 10 building/demolition/grading types. Per-ZIP active volume ~100-240 rows/yr (80301-80305) - geocoding-manageable; if the first live re-cache times out, flip zip_mode:false (Austin precedent) as the one-field fallback. No per-record public link -> REST layer dataset fallback. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'On Hold' moved proposed->exclude \u2014 pausing is not proposing; a held project supports neither resident claim."
+    },
+    {
+      "registry_id": "boulder-county-accela-applications",
+      "platform": "arcgis",
+      "service_url": "https://maps.bouldercounty.org/arcgis/rest/services/PLANNING/OP_Accela_Point/MapServer/0",
+      "dataset_url": "https://maps.bouldercounty.org/arcgis/rest/services/PLANNING/OP_Accela_Point/MapServer/0",
+      "jurisdiction": "Boulder County, Colorado (unincorporated areas only; not municipal)",
+      "coverage": [
+        {
+          "state": "CO",
+          "county": "Boulder"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "Description",
+          "DocketType",
+          "Address"
+        ],
+        "status_raw": "ApplicationStatus",
+        "type_source": "DocketType",
+        "file_date": "ApplicationDate",
+        "decision_date": "StatusDate",
+        "address": "Address",
+        "case_number": "CAPID",
+        "record_url": "Link",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "extra_where": "DocketType IN ('New Residence','Residential Addition','Accessory Dwelling Unit','Manufactured Home','Residential Accessory Building New','Residential Accessory Building Addition','New Commercial Building','Commercial Addition','Manufactured Commercial Building','Commercial Accessory Building New','Grading - Oil and Gas','Small Cell Wireless Facility','Residential Deconstruction','Commercial Deconstruction','Site Plan Review','Expedited Site Plan Review','Special Use Review','Limited Impact Special Use Review','Limited Impact Special Use Review Waiver','Subdivision Exemption','Exemption Plat','Development Plan Review','Variance','Vacation of a Public Road or Easement','Location and Extent Review','Grading','Floodplain Development Permit','Season Extending Agricultural Structure')",
+      "spatial_zip_radius_mi": 3,
+      "type_map": {
+        "New Residence": "Residential",
+        "Residential Addition": "Residential",
+        "Accessory Dwelling Unit": "Residential",
+        "Manufactured Home": "Residential",
+        "Residential Accessory Building New": "Residential",
+        "Residential Accessory Building Addition": "Residential",
+        "New Commercial Building": "Commercial",
+        "Commercial Addition": "Commercial",
+        "Manufactured Commercial Building": "Commercial",
+        "Commercial Accessory Building New": "Commercial",
+        "Grading - Oil and Gas": "Industrial",
+        "Small Cell Wireless Facility": "Utility",
+        "Residential Deconstruction": "Development",
+        "Commercial Deconstruction": "Development",
+        "Site Plan Review": "Development",
+        "Expedited Site Plan Review": "Development",
+        "Special Use Review": "Development",
+        "Limited Impact Special Use Review": "Development",
+        "Limited Impact Special Use Review Waiver": "Development",
+        "Subdivision Exemption": "Development",
+        "Exemption Plat": "Development",
+        "Development Plan Review": "Development",
+        "Variance": "Development",
+        "Vacation of a Public Road or Easement": "Development",
+        "Location and Extent Review": "Development",
+        "Grading": "Development",
+        "Floodplain Development Permit": "Development",
+        "Season Extending Agricultural Structure": "Development"
+      },
+      "use_type_const": "Development",
+      "status_to_bucket": {
+        "proposed": [
+          "Under Review",
+          "In Process",
+          "Payment Pending",
+          "Additional Information Request",
+          "Permit Specialist to Review",
+          "PAC Scheduled",
+          "Pre-Check Complete",
+          "Application Deposit Due",
+          "Outstanding Requirements",
+          "Incomplete",
+          "Ready to Issue",
+          "Plans Examiner to Review",
+          "Planning Process Required",
+          "Application Received",
+          "Application Accepted",
+          "Received",
+          "Accepted",
+          "Public Review",
+          "Public Review of Director Appr",
+          "BOCC Packet Available",
+          "BOCC Hearing",
+          "BOCC Tabled to Date Certain",
+          "HPAB Hearing Scheduled"
+        ],
+        "approved": [
+          "Permit Issued",
+          "Issued",
+          "Approved",
+          "Approved with Conditions",
+          "BOCC Approved",
+          "BOA Approved",
+          "Determination Final"
+        ],
+        "operating": [
+          "Permit Complete",
+          "Closed Complete",
+          "Closed",
+          "Complete",
+          "Final Complete",
+          "Accepted Completed",
+          "Approval Final & Complete",
+          "Final Approval Complete"
+        ],
+        "denied": [
+          "BOCC Denied",
+          "BOA Denied"
+        ],
+        "withdrawn": [
+          "Application Withdrawn",
+          "Withdrawn",
+          "Permit Withdrawn",
+          "Closed-Withdrawn"
+        ],
+        "exclude": [
+          "Void",
+          "Mapped",
+          "BLOT",
+          "BLOTNOT",
+          "",
+          "Permit Not Required",
+          "Incorrect Jurisdiction",
+          "Redirected",
+          "Combined and Subsumed",
+          "Not Accepted",
+          "Extinguished",
+          "Cataloged",
+          "Final Balance Due",
+          "Transfer to Building",
+          "Post Approval",
+          "Not Required",
+          "CLOMR Process Fee",
+          "CLOMR FEMA Review",
+          "LOMR FEMA Review",
+          "TDC Sold",
+          "TDC Extinguished",
+          "PAC Held",
+          "PAC Not Held",
+          "Zoning Hold",
+          "Access and Engineering Hold",
+          "On Hold",
+          "Hold"
+        ]
+      },
+      "incremental_field": "ApplicationDate",
+      "recency_days": 365,
+      "record_url_precision": "record",
+      "scope_note": "Boulder County records shown are applications filed within the last 365 days. Older applications are excluded, including those with pending statuses, so this report is not a complete inventory of ongoing projects. County record statuses do not confirm that construction is underway.",
+      "_receipts": "2026-11-19 Boulder County's own ArcGIS Server, PLANNING/OP_Accela_Point layer 0 (MapServer, point, WGS84; 277,404 rows, newest ApplicationDate 2026-11). Boulder County's Accela records for UNINCORPORATED Boulder County only: it is the county's land-use and building jurisdiction and is NOT a municipal feed for Longmont, Lafayette, Louisville, Superior or Boulder city (whether it holds any municipal-jurisdiction rows is unverified; sampled rows were unincorporated addresses). DocketType and ApplicationStatus vocabularies are VERBATIM live groupBy output over Planning+Building rows since 2025-11-19 (pg_net), never guessed; the whitelist keeps only development-relevant dockets (new buildings, additions, ADUs, deconstruction, site-plan / special-use / subdivision / variance / floodplain / grading cases) and drops roofing, mechanical, electrical, plumbing, window and similar routine permits. Statuses whose meaning the county does not state (Mapped, Final Balance Due, Post Approval, Transfer to Building) are bucketed exclude, not guessed. Per-record Accela link in Link (observed on sampled rows as a boco.org CapDetail URL; not HTTP-fetched). StatusDate is mapped as decision_date only as the date of the latest status change and is not a decision date for in-review records. ACQUISITION WINDOW (founder decision 2026-11-20): a rolling 365-day window on ApplicationDate for every record, whatever its status. There is no status exception and no fixed historical cutoff (the 2021-01-01 floor and the later status-based exception were both removed). Older applications, including those with pending statuses, are excluded from this current-activity report; that does not declare them inactive or complete. Acquisition is also bounded by the ZIP envelope, the verified status list and 1,000-row pagination, and the connector sends the long query as a form POST. A county status (pending, approved, issued) is shown as the agency's own stage word and is never read as construction under way. use_type_const 'Development' is paired with type_map only as the generic fallback for a row whose DocketType is empty (the publisher stated nothing about the kind of work); the DocketType whitelist selects no empty value today. Dry run: the connector query for the ZIP 80501 envelope was run against the live layer (7 records, all with a point and a record link); not yet run through the deployed engine."
+    },
+    {
+      "registry_id": "longmont-active-development",
+      "platform": "arcgis",
+      "service_url": "https://pwnrmaps.ci.longmont.co.us/arcgis_public/rest/services/PLANNING/Planning_Map_2025/FeatureServer/10",
+      "dataset_url": "https://longmontcolorado.gov/news/active-development-map-updated-weekly/",
+      "jurisdiction": "City of Longmont, Colorado",
+      "coverage": [
+        {
+          "state": "CO",
+          "county": "Boulder"
+        },
+        {
+          "state": "CO",
+          "county": "Weld"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "Project_Name",
+          "Project_Type_1"
+        ],
+        "status_raw": "Project_Status",
+        "file_date": "Submittal_Date",
+        "address": "Location",
+        "case_number": "File_No",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "file_date_kind": "filed",
+      "use_type_const": "Development",
+      "status_to_bucket": {
+        "proposed": [
+          "DR",
+          "NM",
+          "PH",
+          "R"
+        ],
+        "approved": [
+          "A",
+          "UC"
+        ],
+        "operating": [],
+        "exclude": [
+          "W",
+          "D"
+        ]
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "incremental_field": "last_edited_date",
+      "_receipts": "2026-11-19 City of Longmont's own ArcGIS Server, PLANNING/Planning_Map_2025 layer 10 (Active Development; polygon, wkid 102100, 212 rows; pg_net). Its Project_Status values are coded and are read from the layer's own coded-value domain, never guessed: DR Development Review (25 rows), NM Neighborhood Meeting, PH Public Hearing (16), R Resubmittal (63), A Approved (44), UC Under Construction (58), W Withdrawn (6), D Denial. DR, NM, PH and R are proposed (an application in review or hearing); A and UC are approved, and the agency's own stage word is kept on the record; W and D are excluded. The stored status is the agency's code, so the page and report say what the agency published. There is no filing-date floor: every row that is not withdrawn or denied is an active development. Submittal_Date is a string (M/D/YYYY), so no date literal is sent. Website_URL is empty on all 212 rows (count 0), so no per-record link exists and record_url is the City's own Active Development Map page, labelled dataset precision, never a made-up per-record URL. Polygon geometry is kept: the connector pins each record at its polygon centroid. Several polygons share one File_No, so identical records collapse under the engine's exact-identity dedupe. This is a city layer on the City's own server, so it carries the City jurisdiction label."
     },
     {
       "registry_id": "fort-collins-building-permits",
@@ -6897,6 +7102,157 @@
       "recency_days": 1095,
       "record_url_precision": "dataset",
       "_receipts": "2026-07-27 polygon wire pass (workbook row HND-BP, layer 2 of 2). Same Henderson service, layer 2 - LIVE NAME IS 'Other Permits' (the brief calls it commercial; the CASETYPE vocabulary below confirms it is the non-residential book, so the registry_id keeps the descriptive name). Distinct service_url from layer 1, so no duplicate-endpoint risk, and the two layers are disjoint by construction (residential vs everything else) - unlike the Houston PlatTracker layer 0/1 pair rejected in PR #412 as a proven subset. geometryType esriGeometryPolygon -> derived shoelace centroid. 8,490 rows. groupBy works and returns real counts. STATUS has 10 values, not 8: Done 6,266 / Expired 731 / Pending 531 / Active - Issued 424 / Cancelled 250 / null 125 / Void 102 / Hold 41 / Template 16 / 'Awaiting Application' 4 = 8,490. NOTE the tenth value differs from layer 1's: this layer has 'Awaiting Application' (4) where layer 1 has 'Awaiting Final Review' (3) - both bucketed proposed, and each entry lists only the value its own layer actually publishes rather than a merged superset. The 125 nulls fail closed. CASETYPE has 14 values, not 12 - the brief omitted 'BLDG - Retail Sales' (46) and 'BLDG - Medical/24HR Care' (14): Commercial Building 7,272 / Office/Warehouse/Industrial 346 / Office Professional 214 / Restaurant 206 / Office Medical 104 / Industrial Building 96 / Assembly 72 / Retail Sales 46 / Hospital/Institution 29 / Assembly Group 27 / Repair Garage/Service Station 24 / Educational 23 / Hotel Low/Mid-Rise 17 / Medical/24HR Care 14 = 8,490. Retail Sales -> Commercial and Medical/24HR Care -> Civic/Public follow the brief's own pattern for the analogous types it did list. Same column_map as layer 1 (identical field names). No ZIP column -> spatial_zip_radius_mi 3. No per-record URL column -> record_url_precision 'dataset'. The workbook lists this endpoint as plain http://; it is wired as https:// because the repo's official-links guard requires it AND https was live-verified to return the identical count from the identical path (28,391 for layer 1, 8,490 for layer 2) - so this is a scheme upgrade, not a different source. RECENCY ADDED 2026-07-27 (follow-up to this pass's own row-size flag): recency_days 1095 (3 years) on APPLICATIONDATE. Verified live BEFORE applying: APPLICATIONDATE is esriFieldTypeDate on both layers (so the connector's `DATE '<cutoff>'` literal applies, not a string compare), it is 100%% populated (8,490 of 8,490 rows) - strictly better than ISSUEDATE, which is 8,490 - and the data spans 2002-01-04 to 2026-07-26, so a 3-year window trims history rather than emptying the source. The EXACT clause the connector emits was live-tested: `APPLICATIONDATE >= DATE '2023-07-28'` returns 2,033 of 8,490 rows (24%% retained). APPLICATIONDATE is chosen over ISSUEDATE deliberately - it is when the permit process STARTED, which is what 'what is happening near me' means, and it is the column already mapped to file_date so buildWhere() picks it up with no other change. Nothing else in this entry was touched (spatial_zip_radius_mi stays 3, type_map and status_to_bucket unchanged)."
+    },
+    {
+      "registry_id": "phoenix-proposed-zoning",
+      "platform": "arcgis",
+      "service_url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/2",
+      "dataset_url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/2",
+      "jurisdiction": "City of Phoenix Planning & Development Department (Proposed Zoning layer)",
+      "coverage": [
+        {
+          "state": "AZ",
+          "county": "Maricopa"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "GISADM.PROPOSED_ZONING.REDEFINE1",
+          "GISADM.PROPOSED_ZONING.ZONING"
+        ],
+        "file_date": "GISADM.PROPOSED_ZONING.DATE_PROPOSED",
+        "case_number": "GISADM.PROPOSED_ZONING.REDEFINE1",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "file_date_kind": "filed",
+      "status_const": "Proposed Zoning",
+      "status_to_bucket": {
+        "proposed": [
+          "Proposed Zoning"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "use_type_const": "Development",
+      "extra_where": "GISADM.PROPOSED_ZONING.ZYEAR >= '25' AND GISADM.PROPOSED_ZONING.REDEFINE1 NOT LIKE 'Z-TA-%'",
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-11-19 SUBSCRIBER-ZIP GAP PASS (85083 Phoenix, Sunset Ridge Z-120-26). The City's own Planning_Permit MapServer layer 2 'Proposed Zoning' (polygon; 78 rows; joined to Z_DESIG_LUT, so field names are qualified GISADM.PROPOSED_ZONING.*). Live runner reads (recon-fetch runs 44589834313, 44590277349, 44590540001, 44590735755): layer 2 count 78; `ZYEAR >= '25'` count 40; the recent rows are Z-119-25 .. Z-172-26 with DATE_PROPOSED 2025-09-16..2026-10-16 (some null); NONE of the case numbers matching Z-%-25 or Z-%-26 appears in layer 3 'Approved Zoning', so these cases have not been moved to the approved layer. The layer has no status column, so status_const 'Proposed Zoning' is the layer's own name, mapped to proposed (status_const discipline: the row-level backing fact is that the row sits in the Proposed Zoning layer with a 2025+ case year). Z-120-26 (DATE_PROPOSED 7/29/2026, DEER VALLEY, R1-10 from S-1, 5.03 ac) lies in the ZIP 85083 extent. Rows from 2015-2022 are excluded by extra_where; a null-year row is a Z-SP special permit or Z-TA text amendment and is excluded, and Z-TA text amendments are citywide, not a site proposal. Date strings are M/D/YYYY (isoDay parses it); the layer also holds '07-31-2015' and '2/25/26' forms that isoDay does not parse, so those records are kept undated (never a guessed date). The URL column is the municipal-code page for the zone, NOT the case, so it is deliberately not used as record_url; record_url is the layer's own REST page (dataset precision). Applicant names are not read. Not wired from the same service, each failing closed: layer 4 'Zoning Adjustments' (981 rows) carries only ZA_NUMBER and ZA_DATE with no status or outcome, and ZA_DATE runs to 2026-12 so it mixes held and decided hearings; layer 5 'GPA' (32 rows) carries a case number, year and applicant but no status, so an adopted amendment and a pending one cannot be told apart."
+    },
+    {
+      "registry_id": "kcmo-capital-projects",
+      "platform": "arcgis",
+      "service_url": "https://mapd.kcmo.org/kcgis/rest/services/AGOL/MapServer/12",
+      "dataset_url": "https://data.kcmo.org/",
+      "jurisdiction": "City of Kansas City, Missouri (Capital Projects)",
+      "coverage": [
+        {
+          "state": "MO",
+          "county": "Jackson"
+        },
+        {
+          "state": "MO",
+          "county": "Clay"
+        },
+        {
+          "state": "MO",
+          "county": "Platte"
+        },
+        {
+          "state": "MO",
+          "county": "Cass"
+        }
+      ],
+      "column_map": {
+        "title": "PROJECTNAME",
+        "status_raw": "CURRENTPHASE",
+        "type_source": "PROJECTTYPE",
+        "file_date": "PROJECTSTARTDATE",
+        "address": "PROJECTLOCATION",
+        "case_number": "PROJECTID",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "file_date_kind": "scheduled",
+      "type_map": {
+        "Streets": "Utility",
+        "Sidewalks": "Utility",
+        "Other": "Utility",
+        "Water Main Replacement": "Utility",
+        "Bridges": "Utility",
+        "Traffic signal": "Utility",
+        "Sanitary Sewers": "Utility",
+        "Crosswalk": "Utility",
+        "Street Lighting": "Utility",
+        "Street Resurfacing": "Utility",
+        "Trails / Paths": "Utility",
+        "Storm Drainage Improvement": "Utility",
+        "Street reconstruction": "Utility",
+        "Streetscape": "Utility",
+        "Signs": "Utility",
+        "Bike Lanes": "Utility",
+        "Curbs": "Utility",
+        "Sewer Manhole Rehabilitation": "Utility",
+        "Smart Sewer Program": "Utility",
+        "Treatment Plant": "Utility",
+        "Water Main Extension": "Utility",
+        "Water Main Relocation": "Utility",
+        "Traffic Signals": "Utility",
+        "Pump Station": "Utility",
+        "Storm Sewers": "Utility",
+        "Street Striping": "Utility",
+        "WMR": "Utility",
+        "New Construction": "Utility",
+        "Parks": "Civic/Public",
+        "Transit": "Civic/Public",
+        "Buildings": "Civic/Public",
+        "Public Art": "Civic/Public",
+        "Parking Lot": "Civic/Public"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Design",
+          "Design (In house)",
+          "Design (using on-call)",
+          "Pre-design",
+          "Pre-Design",
+          "Study/Planning/Pre-design",
+          "Study/Planning/Pre-Design",
+          "Study/Planning",
+          "Bid",
+          "Procurement/Bid",
+          "Construction Contract Procurement",
+          "Procurement of construction contract",
+          "Design Consultant Procurement",
+          "Design Contract Procurement",
+          "Design|Bid",
+          "Right-of-Way",
+          "ROW"
+        ],
+        "approved": [
+          "Construction",
+          "Close Out",
+          "Close Out Final"
+        ],
+        "operating": [
+          "Completed",
+          "Closed"
+        ],
+        "exclude": [
+          "N/A",
+          "RR Coordination (if necessary)",
+          "MODOT and Federal Reviews (Federally Funded Project Only)",
+          "Current Phase"
+        ]
+      },
+      "extra_where": "PROJECTSTATUS = 'Active' AND PROJECTTYPE NOT IN ('Planning Study','Administrative','Pass through agreement','Safety Education','TBD')",
+      "recency_days": 90,
+      "recency_expr": "(CONSTRUCTIONENDDATE >= DATE '{cutoff}')",
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-11-19 SUBSCRIBER-ZIP GAP PASS (64166 Kansas City). The City's own AGOL MapServer layer 12 'Capital Projects' (polygon; 810 rows; recon-fetch runs 44590052410, 44590277349, 44590540001). PROJECTSTATUS Active 632 / Completed 119 / Hold 59; CURRENTPHASE enumerated verbatim (24 values plus null 90; mapped below, anything else fails closed). PROJECTTYPE has 40 values, all mapped: water, sewer, street and traffic work = Utility (the house convention for public works, as in udot-active-projects); Parks, Transit, Buildings, Public Art, Parking Lot = Civic/Public. Studies, administrative, pass-through and safety-education rows are dropped at source because they are not physical projects, and Hold-status rows are dropped because their phase would otherwise read as under construction. Only rows whose scheduled CONSTRUCTIONENDDATE is no more than 90 days past are listed (recency_expr; 562 of 810 have an end date on or after 2025-11-19, 66 have none and are not listed), because LAST_EDITED_DATE is null on 582 of 810 and cannot show currency. The one project inside the 64166 extent (SSP I/I Reduction / North Basin Area 2, sanitary sewers, construction ended 2023-06) is therefore NOT listed: the layer says Active but its own end date is 2.4 years old. file_date is PROJECTSTARTDATE (scheduled; 23 null). Phase to bucket: design / pre-design / study / bid / procurement / right-of-way = proposed; Construction / Close Out = approved (never operating); Completed / Closed = operating. PROJECTLINK is a project document and is not used, so record_url is dataset precision. Contact names, emails and phone numbers on the layer are not read. Not wired: layer 24 'Plats' (6,572 rows): STATUS is 'Accepted' on 6,500 and all 7 rows created since 2025 are 'Accepted', a word that does not say pending or recorded (kcmo-development-cases maps 'Accepted' to proposed and 'Recorded' to approved); DATECREATED is a yyyymmdd double with a garbage maximum 2004091211; no plat lies in the 64166 extent since 2023. Fails closed."
     },
     {
       "registry_id": "phoenix-building-permits",
@@ -17916,6 +18272,7 @@
         "proposed": [
           "Planning Commission Hearing",
           "Board of Commissioners Hearing",
+          "BoCC Hearing",
           "Notice of Application",
           "Public Notice",
           "Pending",

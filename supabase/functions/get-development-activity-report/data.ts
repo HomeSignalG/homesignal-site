@@ -72,6 +72,7 @@ export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
     // the two canonical project reads: ONE definition, shared with the Watch (_shared/report-reads.ts)
     radius: reportReads.radius,
     hydrate: reportReads.hydrate,
+    jurisdictions: reportReads.jurisdictions,
 
     ...changeReads,
 

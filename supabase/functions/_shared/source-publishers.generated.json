@@ -139,7 +139,13 @@
   },
   "boulder-construction-permits": {
    "agency": "City of Boulder",
-   "dataset": "services.arcgis.com, service Construction_Permits"
+   "dataset": "services.arcgis.com, service Construction_Permits",
+   "scope_note": "This source contains City of Boulder permits only. It does not establish permit coverage for Lafayette, Louisville, Superior, or unincorporated Boulder County. Coverage for those areas, if available, depends on separate sources."
+  },
+  "boulder-county-accela-applications": {
+   "agency": "Boulder County, Colorado (unincorporated areas only; not municipal)",
+   "dataset": "maps.bouldercounty.org, service PLANNING/OP_Accela_Point",
+   "scope_note": "Boulder County records shown are applications filed within the last 365 days. Older applications are excluded, including those with pending statuses, so this report is not a complete inventory of ongoing projects. County record statuses do not confirm that construction is underway."
   },
   "bozeman-building-permits": {
    "agency": "City of Bozeman, Montana",
@@ -529,6 +535,10 @@
    "agency": "City of Kansas City, Missouri",
    "dataset": "data.kcmo.org, dataset w8jz-wjgn"
   },
+  "kcmo-capital-projects": {
+   "agency": "City of Kansas City, Missouri (Capital Projects)",
+   "dataset": "mapd.kcmo.org, service AGOL"
+  },
   "kcmo-development-cases": {
    "agency": "City of Kansas City, Missouri",
    "dataset": "mapd.kcmo.org, service AGOL"
@@ -573,6 +583,10 @@
   "little-rock-permits": {
    "agency": "City of Little Rock, Arkansas",
    "dataset": "maps.littlerock.gov, service Permits_All"
+  },
+  "longmont-active-development": {
+   "agency": "City of Longmont, Colorado",
+   "dataset": "pwnrmaps.ci.longmont.co.us, service PLANNING/Planning_Map_2025"
   },
   "loudoun-county-residential-permits": {
    "agency": "Loudoun County, Virginia",
@@ -801,6 +815,11 @@
   "phoenix-building-permits": {
    "agency": "City of Phoenix",
    "dataset": "maps.phoenix.gov, service Public/Planning_Permit"
+  },
+  "phoenix-proposed-zoning": {
+   "agency": "City of Phoenix Planning & Development Department (Proposed Zoning layer)",
+   "dataset": "maps.phoenix.gov, service Public/Planning_Permit",
+   "status_const": "Proposed Zoning"
   },
   "pierce-county-pals-permits": {
    "agency": "Pierce County (PALS)",

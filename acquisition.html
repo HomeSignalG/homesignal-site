@@ -306,6 +306,8 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
      serialize; it touches no post, no queue state and no approval. -->
 <script src="lib/maps-dc-zip-order.js?v=1"></script>
 <script src="lib/acq-saleshandy.js?v=eca3a26c"></script>
+<script src="lib/acq-subscriber-zip-health.js?v=8f3185cb"></script>
+<script src="lib/acq-zip-feed-health.js?v=3adea32c"></script>
 <script src="lib/acq-youtube-videos.js?v=93a936a9"></script>
 <script src="lib/acq-video-suggest.js?v=b1284c80"></script>
 <script src="lib/acq-video-endings.js?v=6e124c92"></script>
@@ -590,6 +592,10 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     if(window.HS && window.HS.acqYouTube) window.HS.acqYouTube.mount(window.hsClient, $('tab-engagement'));
     wireLive();
     wireFeedInventory();
+    // Tab 2: subscriber ZIP health sits first, above the feed inventory (live, gated read; never part of the snapshot).
+    if(window.HS && window.HS.acqSubscriberZipHealth) window.HS.acqSubscriberZipHealth.mount(window.hsClient, $('tab-feed'));
+    // Tab 2: every ZIP page and feed, in counts, directly below the subscriber section (separate fact, separate section).
+    if(window.HS && window.HS.acqZipFeedHealth) window.HS.acqZipFeedHealth.mount(window.hsClient, $('tab-feed'));
     wireAcqLive();
     wireZipBehavior();
     wireAcqMetrics();
