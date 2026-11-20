@@ -28,13 +28,15 @@ const reg = JSON.parse(readFileSync(join(root, 'supabase/functions/get-address-r
 const entry = reg.arcgis.find((e) => e.registry_id === 'boulder-construction-permits');
 ok(entry?.scope_note === NOTE, 'registry: the Boulder city permit entry carries the approved wording, word for word');
 ok(JSON.stringify(entry.coverage) === JSON.stringify([{ state: 'CO', county: 'Boulder' }]) && entry.column_map.zip === 'OriginalZip' && entry.jurisdiction === 'City of Boulder', 'registry: the {CO, Boulder} coverage gate, OriginalZip filter and jurisdiction label are unchanged');
-ok(reg.arcgis.filter((e) => e.scope_note).length === 1, 'registry: only this entry carries a scope note');
+ok(reg.arcgis.filter((e) => e.scope_note).map((e) => e.registry_id).sort().join() === 'boulder-construction-permits,boulder-county-accela-applications', 'registry: exactly two entries carry a scope note (the City of Boulder permit entry and the Boulder County source-window disclosure)');
 
 // 2. a Boulder ZIP page and a Lafayette ZIP page both state it, though the source listed nothing for them
 const boulder = report(subj('80302', '1777 Broadway, Boulder, CO 80302', 40.0177, -105.28), 'Boulder County');
 const lafayette = report(subj('80026', 'Public Rd, Lafayette, CO 80026', 39.9936, -105.0897), 'Boulder County');
 for (const [n, a] of [['Boulder 80302', boulder], ['Lafayette 80026', lafayette]]) {
-  ok(notes(a).length === 1 && notes(a)[0].note === NOTE && notes(a)[0].source_family === 'boulder-construction-permits', `${n}: the engine carries the scope statement`, notes(a));
+  const cityNote = notes(a).filter((x) => x.source_family === 'boulder-construction-permits');
+  ok(cityNote.length === 1 && cityNote[0].note === NOTE, `${n}: the engine carries the City of Boulder scope statement word for word`, notes(a));
+  ok(notes(a).map((x) => x.source_family).sort().join() === 'boulder-construction-permits,boulder-county-accela-applications', `${n}: the only notes are the City of Boulder statement and the Boulder County source-window disclosure`, notes(a));
   ok(html(a).includes(NOTE.replace(/,/g, ',')), `${n}: the report view prints the statement`, html(a).length);
   ok(a.coverage_state !== 'LIMITED_COVERAGE', `${n}: the statement is not a limitation and does not change the coverage state`, a.coverage_state);
 }
