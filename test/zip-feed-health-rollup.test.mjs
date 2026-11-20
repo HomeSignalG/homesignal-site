@@ -89,6 +89,8 @@ ok(/COVERAGE_NOT_VERIFIED/.test(msql) && /dev_monitoring_coverage/.test(msql) &&
 const fm = { findings: [{ class: 'SOURCE_READ_FAILURE', resolved_at: null }, { class: 'SOURCE_READ_FAILURE', resolved_at: null }, { class: 'SOURCE_READ_FAILURE', resolved_at: '2026-11-20T00:00:00Z' }, { class: 'MAPS_DRAFTS_WAITING', resolved_at: null }, { class: 'MONITOR_CHECK_FAILING', resolved_at: null }] };
 ok(HS.zipFeedHealthStates(real(), fm).find((s) => s.key === 'SOURCE_FAILURES').count === 2, 'the failing-source tile counts every open source finding, not only the roll-up top rows, and not recovered ones');
 ok(HS.zipFeedHealthStates(real(), fm).find((s) => s.key === 'PUBLISHING').count === 2, 'the publishing tile counts open publishing findings');
+ok(/Preview: the top \d+ source\/kind rows by ZIPs\. All 1 failing sources are in Findings above/.test(H.render({ rollup: real(), as_of: 'x' }, NOW, mon())), 'the source-events table is labelled a preview and names the true failing-source total');
+ok(/Preview of the top \d+ rows only/.test(H.render({ rollup: real(), as_of: 'x' }, NOW)), 'without the monitor the table is still labelled a preview');
 // 6 · full affected-ZIP access and all-ZIP accounting
 const acc = { registry_zips: 12746, bucket_sum: 12746, every_zip_accounted_for: true, buckets: { COVERAGE_NOT_VERIFIED: 11492, SOURCE_READ_FAILING: 888, NO_CHANGE_EVIDENCE: 334, STALE_REPORT: 32 } };
 const ah = H.render({ rollup: real(), as_of: 'x' }, NOW, mon(), acc);
