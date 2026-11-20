@@ -255,7 +255,7 @@ console.log("three parcels against the REAL ZIP 97149 polygon verdicts (no bound
   check("a nearby parcel wholly outside the ZIP is not emitted", !out);
   const idxSrc = (await import("node:fs")).readFileSync(new URL("../supabase/functions/get-address-report/index.ts", import.meta.url), "utf8");
   const call = idxSrc.slice(idxSrc.indexOf("countyCasesForZip(zip"), idxSrc.indexOf("countyCasesForZip(zip") + 600);
-  check("index.ts gives county cases the polygon membership whenever the ZIP has a boundary, not only under the bounds policy", /zipMembers: zipGeo\.bounds \? zipMembers : null/.test(call) && !/scope\.bounds/.test(call));
+  check("index.ts gives county cases the polygon membership whenever the ZIP has a boundary, not only under the bounds policy", /\n\s*zipMembers: zipGeo\.bounds \? zipMembers : null,/.test(call) && !/\n\s*zipMembers: scope\.bounds/.test(call));
 }
 
 if (failures) { console.error(`\n${failures} check(s) failed`); process.exit(1); }
