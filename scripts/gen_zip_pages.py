@@ -1064,6 +1064,17 @@ def gn_for_display(gn, um_items, today):
     return first[:GN_CAP], first[GN_CAP:] + far
 
 
+def _items(items, heading, empty, kind, zip_code="", rest=None):
+    if not items:
+        return f'<section class="zsec"><h2>{esc(heading)}</h2><p class="quiet">{esc(empty)}</p></section>'
+    li = [_item_li(it, kind, zip_code) for it in items]
+    more = ""
+    if rest:
+        more = (f'<details class="zall"><summary>Show all {len(items) + len(rest)} {esc(heading.lower())}</summary><ul>'
+                + "".join(_item_li(it, kind, zip_code) for it in rest) + "</ul></details>")
+    return (f'<section class="zsec"><h2>{esc(heading)}</h2><ul>' + "".join(li) + "</ul>" + more + "</section>")
+
+
 def _item_li(it, kind, zip_code=""):
     t, u = esc(it["title"]), safe_url(it.get("url"))
     note = ""
@@ -1074,17 +1085,6 @@ def _item_li(it, kind, zip_code=""):
     inner = f'<a href="{esc(u)}" rel="nofollow noopener">{t}</a>{note}' if u else t
     badge = ' <span class="mtg-cancelled">Cancelled</span>' if it.get("cancelled") is True else ""
     return f'<li>{inner}{badge}{f" <time>{when}</time>" if when else ""}</li>'
-
-
-def _items(items, heading, empty, kind, zip_code="", rest=None):
-    if not items:
-        return f'<section class="zsec"><h2>{esc(heading)}</h2><p class="quiet">{esc(empty)}</p></section>'
-    li = [_item_li(it, kind, zip_code) for it in items]
-    more = ""
-    if rest:
-        more = (f'<details class="zall"><summary>Show all {len(items) + len(rest)} {esc(heading.lower())}</summary><ul>'
-                + "".join(_item_li(it, kind, zip_code) for it in rest) + "</ul></details>")
-    return (f'<section class="zsec"><h2>{esc(heading)}</h2><ul>' + "".join(li) + "</ul>" + more + "</section>")
 
 
 OG_IMAGE = f"{BASE}/og-default.png"
