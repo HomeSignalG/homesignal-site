@@ -1,4 +1,5 @@
 -- Tab 2 · PER-FEED READ HEALTH (2026-11-21). SQL of record; supersedes the health parts of docs/feed-inventory-health.sql (apply that first).
+-- A filter may combine parts with '|' (e.g. 'evidence:NO_STORED_OUTPUT_FOR_COMMUNITY|kind:meetings'); every part must hold.
 -- Needs homesignal-ingest migration 20261121010000_feed_read_outcome.sql (public.feed_read_outcome) and feed_health() writing it (homesignal-ingest #1158).
 -- READ-ONLY. Adds _hs_feed_inventory_v2 (inventory + health + last outcome columns), hs_feed_inventory_summary / _page and the recorder's feed findings.
 -- Feed-to-ZIP mapping (zip_pages, FEEDS_REACH_NO_ZIP_PAGE) stays separate from read health; the community-output proxy (evidence_class) is kept as a labelled proxy and is never used as a health state.
@@ -102,13 +103,14 @@ returns jsonb language plpgsql stable security definer set search_path = public 
 declare caller_email text := auth.jwt() ->> 'email'; lim int := least(greatest(coalesce(p_limit, 100), 1), 500); off int := greatest(coalesce(p_offset, 0), 0); res jsonb;
 begin
   if caller_email is null or not exists (select 1 from public.dashboard_admins da where da.email = caller_email) then raise exception 'not authorized' using errcode = '42501'; end if;
-  with f as (select * from public._hs_feed_inventory_v2() r where
-      case when p_filter = 'all' then true when p_filter = 'active' then r.active when p_filter = 'inactive' then not r.active
-           when p_filter = 'no_zip_page' then r.active and r.zip_pages = 0
-           when p_filter like 'kind:%' then r.active and r.kind = substr(p_filter, 6)
-           when p_filter like 'evidence:%' then r.active and r.evidence_class = substr(p_filter, 10)
-           when p_filter like 'health:%' then r.active and r.health_state = substr(p_filter, 8)
-           else false end),
+  with f as (select * from public._hs_feed_inventory_v2() r where not exists (
+      select 1 from unnest(string_to_array(p_filter, '|')) as pt(part) where not (
+      case when pt.part = 'all' then true when pt.part = 'active' then r.active when pt.part = 'inactive' then not r.active
+           when pt.part = 'no_zip_page' then r.active and r.zip_pages = 0
+           when pt.part like 'kind:%' then r.active and r.kind = substr(pt.part, 6)
+           when pt.part like 'evidence:%' then r.active and r.evidence_class = substr(pt.part, 10)
+           when pt.part like 'health:%' then r.active and r.health_state = substr(pt.part, 8)
+           else false end))),
   p as (select *, count(*) over () total from f order by active desc, kind, community_name nulls first, feed_id offset off limit lim)
   select jsonb_build_object('filter', p_filter, 'total', coalesce((select total from p limit 1), (select count(*) from f)), 'offset', off, 'limit', lim,
     'rows', coalesce((select jsonb_agg(jsonb_build_object('feed_id', feed_id, 'active', active, 'kind', kind, 'community', community_name, 'zip_pages', zip_pages, 'shared_source', shared_source,
