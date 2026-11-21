@@ -370,6 +370,22 @@ try {
       ok(!SENT.test(w([{ code: 'AREA_TRUNCATED', text: 'This area holds more records than one report can carry; the list is incomplete.' }], {})), '5l6d an unrelated limitation alone does not claim a failed read');
       ok(SENT.test(w(FAIL, null)), '5l6e the sentence appears with no category-coverage metadata at all');
       ok(SENT.test(w(FAIL, { not_connected: [{ label: 'Building permits' }] })) && /No connected source covers Building permits\. At least one connected source could not be read/.test(w(FAIL, { not_connected: [{ label: 'Building permits' }] })), '5l6f with category coverage too, the coverage sentences come first and the read-failure sentence follows');
+      { // both read-completeness messages decide from the same evidence: BODY ("Not every source was read in full") and CAVEAT (the sentence above)
+        const BODY = /Not every source was read in full, so this is not a complete answer/, INC = /Some records near this property are not included in this report, so the list may be incomplete/;
+        const both = (t) => ({ body: BODY.test(t), cav: SENT.test(t), inc: INC.test(t) });
+        const cases = [
+          ['explicit failed read', w(FAIL, {}), { body: true, cav: true, inc: false }],
+          ['missing categories only', w([], { not_connected: [{ label: 'Building permits' }] }), { body: false, cav: false, inc: false }],
+          ['unknown coverage only', w([], { not_established: [{ label: 'Building permits' }] }), { body: false, cav: false, inc: false }],
+          ['an unrelated limitation only', w([{ code: 'SOMETHING_ELSE', text: 'Unrelated.' }], {}), { body: false, cav: false, inc: false }],
+          ['no limitations', w([], null), { body: false, cav: false, inc: false }],
+          ['truncation (its own explicit limitation)', w([{ code: 'AREA_TRUNCATED', text: 'This area holds more records than one report can carry; the list is incomplete.' }], {}), { body: false, cav: false, inc: true }],
+          ['records not loaded', w([{ code: 'RECORDS_NOT_LOADED', text: 'Some records found near this location could not be loaded for this report, so the list may be incomplete.' }], {}), { body: false, cav: false, inc: true }],
+          ['failed read and truncation together', w([FAIL[0], { code: 'AREA_TRUNCATED', text: 'x' }], {}), { body: true, cav: true, inc: true }]
+        ];
+        cases.forEach(([name, text, want]) => ok(JSON.stringify(both(text)) === JSON.stringify(want), '5l7 read-completeness messages: ' + name, both(text)));
+        ok(/This area holds more records than one report can carry; the list is incomplete\./.test(w([{ code: 'AREA_TRUNCATED', text: 'This area holds more records than one report can carry; the list is incomplete.' }], {})), '5l7 a truncation limitation is still listed in full under Official evidence & coverage, never hidden');
+      }
     }
   }
   const proven = clone(WNONE); proven.report.activity = { outcome: 'NO_DEVELOPMENT_ACTIVITY', label: 'No development activity', rule_version: 'activity-outcome-1' };

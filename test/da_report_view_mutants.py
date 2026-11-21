@@ -191,6 +191,12 @@ m('saved_report_never_flagged', ": e.older_than_a_year === true,\n      filingOn
 m('filing_only_wording_dropped', "(rd.filingOnly ? '. No later official date is available in the source data used for this report.", "(false ? '. No later official date is available in the source data used for this report.")
 # report-accuracy-universal (2026-11-19): a creation date is never read as a filing, an edit is never a milestone, a status date is the source's own, and an empty answer speaks only for the connected sources
 m('creation_only_wording_dropped', ": rd.creationOnly ? '. No later project date is available in the source data used for this report", ": false ? '. No later project date is available in the source data used for this report", ['test/report-accuracy-universal.test.mjs', 'test/report-source-dates-path.test.mjs'])
+# read-completeness messages (follow-up): both decide from the same limitation codes
+m('read_failed_any_limitation', "return limitationCodes(report).indexOf('SOURCE_NOT_FULLY_READ') >= 0; }", "return limitationCodes(report).length > 0; }")
+m('incomplete_any_limitation', "'RECORDS_NOT_TRACEABLE'].some(function (k) { return c.indexOf(k) >= 0; });", "'RECORDS_NOT_TRACEABLE'].some(function (k) { return c.indexOf(k) >= 0; }) || c.length > 0;")
+m('incomplete_sentence_dropped', "if (recordsIncomplete(report)) body +=", "if (false) body +=")
+m('body_read_failed_sentence_dropped', "if (sourceReadFailed(report)) body +=", "if (false) body +=")
+m('caveat_read_failed_sentence_dropped', "if (sourceReadFailed(report) && (key ===", "if (false && (key ===")
 m('modification_shown_without_its_meaning', "a modification is not a project milestone and does not confirm the status.", "a modification confirms the status.", ['test/report-accuracy-universal.test.mjs', 'test/report-source-dates-path.test.mjs'])
 m('status_date_note_dropped', "return sd ? 'Agency status updated ' + sd + '.' : '';", "return '';", ['test/report-accuracy-universal.test.mjs', 'test/report-source-dates-path.test.mjs'])
 m('empty_answer_caveat_dropped', "var cav = key === 'NO_SIGNIFICANT_CHANGES' || key === 'NO_DATA_INGESTED' || key === 'NO_DEVELOPMENT_ACTIVITY' ? emptyCaveat(report) : '';", "var cav = '';", ['test/report-accuracy-universal.test.mjs', 'test/report-source-dates-path.test.mjs'])
