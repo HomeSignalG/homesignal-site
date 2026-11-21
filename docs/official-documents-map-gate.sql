@@ -134,7 +134,10 @@ canonical resolvers only while its G3 gate is open; every other distribution is 
 -- ── 3. THE CURRENT OBSERVATION SET ───────────────────────────────────────────────────────────
 -- Same columns, same order, same whole-release selection. Two additions: admitted distributions only, and
 -- the incremental release mode for a run whose frozen contract declares it.
-create or replace view public.dc_current_observation as
+-- create-or-replace DROPS reloptions (measured, test/dc_current_observation_invoker_pg): this statement shipped
+-- without the option and removed the security_invoker that docs/dc-step3c-view-grants-fix.sql had set, which is
+-- what turned ingest's step2a-isolation-db red. The option is therefore restated here, on every replay.
+create or replace view public.dc_current_observation with (security_invoker = true) as
 select
     o.home_signal_observation_id,
     o.acquisition_run_id,

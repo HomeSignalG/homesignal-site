@@ -1,0 +1,27 @@
+name: dc_current_observation security_invoker suite
+# Disposable-Postgres proof (no production access, no secrets): replaying docs/official-documents-map-gate.sql
+# must keep security_invoker=true on public.dc_current_observation.
+on:
+  pull_request:
+    paths:
+      - 'docs/official-documents-map-gate.sql'
+      - 'docs/dc-step3c-view-grants-fix.sql'
+      - 'test/dc_current_observation_invoker_pg/**'
+      - '.github/workflows/dc-current-observation-invoker-suite.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  invoker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q postgresql postgresql-contrib
+          echo "PGBIN=$(ls -d /usr/lib/postgresql/*/bin | tail -1)" >> "$GITHUB_ENV"
+      - name: Run the suite
+        run: |
+          # initdb refuses to run as root; the runner user is not root
+          bash test/dc_current_observation_invoker_pg/run.sh
