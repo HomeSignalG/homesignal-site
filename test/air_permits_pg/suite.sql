@@ -153,6 +153,50 @@ select pg_temp.ck('circle: includes a record inside, excludes one outside, names
 select pg_temp.ck('circle: a bad radius is refused', pg_temp.raises($$select public.map1_air_permits_near(25.95, -97.39, 25)$$, '22023'));
 select pg_temp.ck('people: a person is never named', public.air_permits_display_applicant('JOHN Q PUBLIC') = 'Individual applicant'
   and public.air_permits_display_applicant('Acme Power Inc.') = 'Acme Power Inc.');
+
+-- H2. THE REPORT RADIUS RULE (0.5 mile around 25.9500,-97.3900). Fixtures only. A verified footprint is judged by the shape, over all its parcels;
+-- a point-only record by its point; no location is disclosed, never placed. 1 mile of longitude here is about 0.0161 degrees.
+select public.air_permits_ingest('tx_tceq_nsr', $j$[
+ {"source_record_id":"fx-cross","permit_no":"FX1","action_kind":"registration","status":"PENDING","county":"Cameron","record_url":"https://x.example/fx1","lat":25.95,"lng":-97.37,"location_basis":"reviewed_point"},
+ {"source_record_id":"fx-out","permit_no":"FX2","action_kind":"registration","status":"PENDING","county":"Cameron","record_url":"https://x.example/fx2","lat":25.95,"lng":-97.388,"location_basis":"reviewed_point"},
+ {"source_record_id":"fx-pt","permit_no":"FX3","action_kind":"registration","status":"PENDING","county":"Cameron","record_url":"https://x.example/fx3","lat":25.95,"lng":-97.388,"location_basis":"reviewed_point"},
+ {"source_record_id":"fx-none","permit_no":"FX4","action_kind":"registration","status":"PENDING","county":"Cameron","record_url":"https://x.example/fx4"},
+ {"source_record_id":"fx-multi","permit_no":"FX5","action_kind":"registration","status":"PENDING","county":"Cameron","record_url":"https://x.example/fx5","lat":25.95,"lng":-97.34,"location_basis":"reviewed_point"}
+]$j$::jsonb, false) as rfx \gset
+-- fx-cross: point 2 km east (outside); boundary spans ~0.4 mi to 2 mi east, so it crosses into the radius
+select public.air_permit_footprint_set('tx_tceq_nsr:fx-cross', 'verified_boundary', 'https://x.example/boundary', 'fixture',
+  '[{"feature_id":"b","geometry":{"type":"Polygon","coordinates":[[[-97.3835,25.948],[-97.360,25.948],[-97.360,25.952],[-97.3835,25.952],[-97.3835,25.948]]]}}]'::jsonb);
+-- fx-out: its point is INSIDE the radius but its verified boundary is entirely outside, so the boundary decides: excluded
+select public.air_permit_footprint_set('tx_tceq_nsr:fx-out', 'verified_parcel', 'https://x.example/parcel', 'fixture',
+  '[{"feature_id":"p","geometry":{"type":"Polygon","coordinates":[[[-97.360,25.948],[-97.350,25.948],[-97.350,25.952],[-97.360,25.952],[-97.360,25.948]]]}}]'::jsonb);
+-- fx-multi: ONE permit, three parcels, two of them inside the radius (point far outside)
+select public.air_permit_footprint_set('tx_tceq_nsr:fx-multi', 'verified_parcel', 'https://x.example/parcels', 'fixture',
+  '[{"feature_id":"p1","geometry":{"type":"Polygon","coordinates":[[[-97.3880,25.948],[-97.3870,25.948],[-97.3870,25.949],[-97.3880,25.949],[-97.3880,25.948]]]}},
+    {"feature_id":"p2","geometry":{"type":"Polygon","coordinates":[[[-97.3890,25.951],[-97.3880,25.951],[-97.3880,25.952],[-97.3890,25.952],[-97.3890,25.951]]]}},
+    {"feature_id":"p3","geometry":{"type":"Polygon","coordinates":[[[-97.340,25.948],[-97.339,25.948],[-97.339,25.949],[-97.340,25.949],[-97.340,25.948]]]}}]'::jsonb);
+create temp table rr as select public.map1_air_permits_near(25.95, -97.39, 0.5, 'TX', 'Cameron') r;
+select pg_temp.ck('radius 1: point outside but verified boundary crosses in -> included, matched by footprint',
+  (select r -> 'matches' -> 'tx_tceq_nsr:fx-cross' ->> 'matched_by' = 'footprint' and r #>> '{matches,tx_tceq_nsr:fx-cross,distance_mi}' is not null from rr));
+select pg_temp.ck('radius 2: boundary entirely outside -> excluded even though its own point is inside',
+  (select not (r -> 'matches' ? 'tx_tceq_nsr:fx-out') and not exists (select 1 from jsonb_array_elements(r -> 'records') e where e ->> 'permit_no' = 'FX2') from rr));
+select pg_temp.ck('radius 3: point only, inside -> included, matched by point',
+  (select r -> 'matches' -> 'tx_tceq_nsr:fx-pt' ->> 'matched_by' = 'point' from rr));
+select pg_temp.ck('radius 4: no location -> excluded from the list and disclosed by county',
+  (select not exists (select 1 from jsonb_array_elements(r -> 'records') e where e ->> 'permit_no' = 'FX4')
+      and (r ->> 'unlocated_in_county')::int = 1 and r ->> 'unlocated_county' = 'Cameron' from rr));
+select pg_temp.ck('radius 5: one permit with several parcels is listed once',
+  (select count(*) = 1 from rr, jsonb_array_elements(r -> 'records') e where e ->> 'permit_no' = 'FX5')
+  and (select r -> 'matches' -> 'tx_tceq_nsr:fx-multi' ->> 'matched_by' = 'footprint' from rr));
+select pg_temp.ck('radius: the same rule at a larger distance changes the answer (the point-only record still obeys its point)',
+  (select r -> 'matches' ? 'tx_tceq_nsr:fx-pt' from (select public.map1_air_permits_near(25.95, -97.30, 0.5) r) x) = false);
+select pg_temp.ck('location: a city or ZIP level basis is refused at ingest, the record is not stored',
+  (select (public.air_permits_ingest('tx_tceq_nsr', '[{"source_record_id":"fx-city","permit_no":"FX6","action_kind":"registration","record_url":"https://x.example/6","lat":25.9,"lng":-97.4,"location_basis":"zip_centroid"}]'::jsonb, false) ->> 'rejected')::int = 1)
+  and not exists (select 1 from public.air_permit_records where record_id = 'tx_tceq_nsr:fx-city'));
+select pg_temp.ck('footprint writer: service_role only; visitors cannot read the table',
+  has_function_privilege('service_role', 'public.air_permit_footprint_set(text,text,text,text,jsonb)', 'execute')
+  and not has_function_privilege('anon', 'public.air_permit_footprint_set(text,text,text,text,jsonb)', 'execute')
+  and not has_table_privilege('anon', 'public.air_permit_footprints', 'select')
+  and pg_temp.raises($$select public.air_permit_footprint_set('tx_tceq_nsr:fx-pt', 'city_centroid', 'https://x.example', 'f', '[{"geometry":{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,0]]]}}]'::jsonb)$$, '22023'));
 update public.air_permit_sources set access_status = 'blocked' where source = 'tx_tceq_nsr';
 select pg_temp.ck('circle: a source that becomes blocked is reported blocked and contributes no records',
   (select jsonb_array_length(r -> 'records') = 0 and r -> 'sources' @> '[{"source":"tx_tceq_nsr","status":"blocked"}]'::jsonb
@@ -163,7 +207,7 @@ select pg_temp.ck('reader: blocked again after being active reads blocked, not a
 -- I. who may do what
 select pg_temp.ck('anon can read through the readers only',
   has_function_privilege('anon', 'public.air_permits_for_zip(text)', 'execute')
-  and has_function_privilege('anon', 'public.map1_air_permits_near(double precision,double precision,double precision)', 'execute')
+  and has_function_privilege('anon', 'public.map1_air_permits_near(double precision,double precision,double precision,text,text)', 'execute')
   and not has_function_privilege('anon', 'public.air_permits_ingest(text,jsonb,boolean)', 'execute')
   and not has_function_privilege('authenticated', 'public.air_permits_ingest(text,jsonb,boolean)', 'execute')
   and has_function_privilege('service_role', 'public.air_permits_ingest(text,jsonb,boolean)', 'execute'));
@@ -171,6 +215,6 @@ select pg_temp.ck('no visitor role can read or write the tables',
   not has_table_privilege('anon', 'public.air_permit_records', 'select') and not has_table_privilege('authenticated', 'public.air_permit_records', 'select')
   and not has_table_privilege('anon', 'public.air_permit_records', 'insert') and not has_table_privilege('anon', 'public.air_permit_sources', 'update'));
 select pg_temp.ck('row level security is on for every table',
-  (select bool_and(relrowsecurity) and count(*) = 5 from pg_class where relname in ('air_permit_sources','air_permit_states','air_permit_runs','air_permit_records','air_permit_record_observations')));
+  (select bool_and(relrowsecurity) and count(*) = 6 from pg_class where relname in ('air_permit_footprints','air_permit_sources','air_permit_states','air_permit_runs','air_permit_records','air_permit_record_observations')));
 
 select name || '|' || case when ok then 't' else 'f' end || '|' || detail from ck order by n;

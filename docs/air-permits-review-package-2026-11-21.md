@@ -39,11 +39,15 @@ Remaining approval needed: (A) approve the 1a probe as written, or (B) approve s
 
 ## 2. Report integration (prepared, not wired)
 - Report = **0.5-mile circle around the address** (`REPORT_RADIUS_MI`), stored as an immutable snapshot. It is not a whole-ZIP product.
-- Reader: `map1_air_permits_near` computes exact great-circle distance on stored points, capped at 20 mi. It is correct for the address circle. It is NOT a ZIP-boundary reader; a whole-ZIP report must call `air_permits_for_zip` (polygon rule). Records with no point are excluded from the circle by construction; the section states that.
-- Prepared: `supabase/functions/_shared/report-air-permits.ts` (reader, fail-closed; section builder) and `test/report-air-permits.test.mjs` (10 fixture checks). Air permits stay out of every development count.
+- Reader: `map1_air_permits_near(lat, lng, radius, state, county)`, capped at 20 mi. It is the address-circle reader, NOT a ZIP-boundary reader (a whole-ZIP report calls `air_permits_for_zip`).
+- **Radius rule (revised 2026-11-21, same predicate as development):** `n5_projects_within_radius` tests development geometry with `ST_DWithin` on the true geometry as geography, so a shape that only partly crosses the radius is included. Air permits reuse that predicate. A record with a VERIFIED footprint (`air_permit_footprints`: `verified_boundary` or `verified_parcel`, each with an https evidence link and a named verifier) is judged by its footprint alone, over all its parcels; a point-only record by its point. One row per record, with `matched_by` and `distance_mi`. A city/ZIP/county location has no basis in the schema and ingest refuses one.
+- Records with no point and no footprint cannot be tested; the reader counts them for the subject's county and the report says e.g. "1 air permit in Cameron County has no mapped location, so it could not be tested against this distance and is not listed."
+- Footprints are written only by `air_permit_footprint_set` (service_role, reviewed, replaces a record's footprints atomically). Nothing populates them automatically yet. The ZIP reader still counts footprint-only records as unlocated (conservative disclosure); extending it to footprints is not done.
+- SpaceX 185303 / 414660 location: **no real location is stored anywhere.** No production record exists. The only record is a labelled FIXTURE with a reviewed-point stand-in near Boca Chica; its true coordinates, parcel or boundary are unverified (the PDFs have not been read) and no source for it has been established.
+- Prepared: `supabase/functions/_shared/report-air-permits.ts` (reader, fail-closed; section builder) and `test/report-air-permits.test.mjs` (13 fixture checks). Air permits stay out of every development count.
 - NOT done, needs approval: wiring into `assemble()` / `readReportInputs`, bumping `REPORT_VERSION`, snapshot hash and PDF template, then deploying get-development-activity-report, follow-development-report, run-property-watch, manage-property-watch. Not authorized by this message.
 
-## 3. SQL review package (`docs/air-permits.sql`, 5 tables, 6 functions)
+## 3. SQL review package (`docs/air-permits.sql`, 6 tables, 7 functions)
 - **Tables**: sources, states, runs, records, record_observations. RLS: no visitor grants on tables; all reads through security-definer readers.
 - **Writer**: `air_permits_ingest` — service_role only; refuses non-`active` sources, missing stable id/number, non-https link, uncontrolled `action_kind`, point without stated basis. Activation = `access_status` set to `active` (a separate, explicit act); Texas ships `blocked`.
 - **Readers**: `air_permits_for_zip` (polygon members), `map1_air_permits_near` (circle); anon/authenticated/service_role may execute; nothing else.
@@ -52,7 +56,7 @@ Remaining approval needed: (A) approve the 1a probe as written, or (B) approve s
 - **Missing coordinates**: stored, county-counted in the ZIP reader, never placed or guessed; circle reader excludes them.
 - **Interaction**: no existing table touched; separate from water rights and `app_projects`; air records never counted as development.
 - **Affected consumers once applied**: Map 1, ZIP page section, `development.html` (all read the readers; empty until a source is active). Report: none until wired.
-- **Replica dry-run plan** (needs separate approval): disposable PostGIS container only (the §7.11 shape), apply file, run `test/air_permits_pg` (42 checks, 16 mutations), apply twice, run rollback block, confirm catalog signature returns to start. No DDL against production, even rolled back.
+- **Replica dry-run plan** (needs separate approval): disposable PostGIS container only (the §7.11 shape), apply file, run `test/air_permits_pg` (50 checks, 19 mutations, run on local PostGIS), apply twice, run rollback block, confirm catalog signature returns to start. No DDL against production, even rolled back.
 - **Rollback**: file footer (drop functions then tables); safe while no source is active, since nothing else depends on them.
 - Separate approvals still needed: (1) replica execution, (2) production application with exact target and actions.
 

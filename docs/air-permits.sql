@@ -120,13 +120,27 @@ drop trigger if exists air_permit_obs_frozen_trg on public.air_permit_record_obs
 create trigger air_permit_obs_frozen_trg before update or delete on public.air_permit_record_observations
   for each row execute function public.air_permit_obs_frozen();
 
+-- A VERIFIED facility shape for a record: a boundary or parcel footprint the agency's own record (or a reviewer, citing evidence) establishes.
+-- Never a city, ZIP or county location; those have no basis here. A record may own several parcels; it is still ONE record.
+create table if not exists public.air_permit_footprints (
+  record_id    text not null references public.air_permit_records (record_id),
+  feature_id   text not null,
+  geom         geometry(MultiPolygon, 4326) not null check (st_isvalid(geom)),
+  basis        text not null check (basis in ('verified_boundary', 'verified_parcel')),
+  evidence_ref text not null check (evidence_ref ~ '^https://[^[:space:]"''<>]+$'),
+  verified_by  text not null check (btrim(verified_by) <> ''),
+  verified_at  timestamptz not null default now(),
+  primary key (record_id, feature_id)
+);
+create index if not exists air_permit_footprints_geom_gix on public.air_permit_footprints using gist (geom);
+alter table public.air_permit_footprints enable row level security;
 alter table public.air_permit_sources enable row level security;
 alter table public.air_permit_states enable row level security;
 alter table public.air_permit_runs enable row level security;
 alter table public.air_permit_records enable row level security;
 alter table public.air_permit_record_observations enable row level security;
 revoke all on public.air_permit_sources, public.air_permit_states, public.air_permit_runs,
-  public.air_permit_records, public.air_permit_record_observations from public, anon, authenticated;
+  public.air_permit_records, public.air_permit_footprints, public.air_permit_record_observations from public, anon, authenticated;
 revoke all on sequence public.air_permit_runs_run_id_seq, public.air_permit_record_observations_id_seq from public, anon, authenticated;
 
 insert into public.air_permit_sources (source, state, authority, agency, permit_types, coverage_note, access_status, access_note, record_page)
@@ -330,19 +344,24 @@ end
 $fn$;
 
 -- Map 1 ADDRESS MODE: records whose point lies within the circle, from every active source.
-create or replace function public.map1_air_permits_near(p_lat double precision, p_lng double precision, p_radius_mi double precision)
+create or replace function public.map1_air_permits_near(p_lat double precision, p_lng double precision, p_radius_mi double precision,
+                                                         p_state text default null, p_county text default null)
 returns jsonb
 language plpgsql
 stable
 security definer
 set search_path to 'public', 'extensions', 'pg_temp'
 as $fn$
-declare v_pts public.air_permit_records[]; v_sources jsonb;
+declare v_pts public.air_permit_records[]; v_sources jsonb; v_matches jsonb; v_unloc integer;
+        v_meters double precision; v_hg geometry; v_home geography; v_dlat double precision; v_dlng double precision;
 begin
   if p_lat is null or p_lng is null or p_radius_mi is null or p_lat not between -90 and 90
      or p_lng not between -180 and 180 or p_radius_mi <= 0 or p_radius_mi > 20 then
     raise exception 'invalid point or radius' using errcode = '22023';
   end if;
+  v_meters := p_radius_mi * 1609.344;
+  v_hg := st_setsrid(st_makepoint(p_lng, p_lat), 4326); v_home := v_hg::geography;
+  v_dlat := p_radius_mi / 69.0 * 1.1; v_dlng := p_radius_mi / (69.0 * greatest(cos(radians(p_lat)), 0.0001)) * 1.1;
   select coalesce(jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
            'source', s.source, 'state', st.state, 'state_name', st.name, 'agency', s.agency,
            'permit_types', to_jsonb(s.permit_types), 'checked_at', r.last,
@@ -354,29 +373,79 @@ begin
     join public.air_permit_sources s on s.source = st.source
     left join lateral (select max(x.finished_at) as last from public.air_permit_runs x where x.source = s.source and x.outcome = 'complete') r on true
    where st.status in ('loaded', 'blocked');
-  select array_agg(w) into v_pts
-    from public.air_permit_records w
-    join public.air_permit_sources s on s.source = w.source and s.access_status = 'active'
-   where w.removed_from_source_at is null and w.lat is not null
-     and w.lat between p_lat - p_radius_mi / 69.0 and p_lat + p_radius_mi / 69.0
-     and w.lng between p_lng - p_radius_mi / (69.0 * cos(radians(p_lat))) and p_lng + p_radius_mi / (69.0 * cos(radians(p_lat)))
-     and ST_DistanceSphere(ST_MakePoint(p_lng, p_lat), ST_MakePoint(w.lng, w.lat)) <= p_radius_mi * 1609.344;
-  return jsonb_build_object('status', 'complete', 'sources', v_sources, 'records', public.air_permit_records_json(v_pts, false));
+  -- THE RULE (the same predicate n5_projects_within_radius applies to development geometry: ST_DWithin on the TRUE geometry, as geography,
+  -- so a shape that only partly crosses the radius is in): a record with a verified footprint is judged by that footprint ALONE,
+  -- over all its parcels; a record with only a point is judged by that point. One row per record either way.
+  with fp_hit as (
+    select f.record_id, min(st_distance(f.geom::geography, v_home)) as d
+      from public.air_permit_footprints f
+     where f.geom && st_expand(v_hg, v_dlng, v_dlat) and st_dwithin(f.geom::geography, v_home, v_meters)
+     group by f.record_id
+  ), pt_hit as (
+    select w.record_id, st_distance(st_setsrid(st_makepoint(w.lng, w.lat), 4326)::geography, v_home) as d
+      from public.air_permit_records w
+     where w.lat is not null and not exists (select 1 from public.air_permit_footprints x where x.record_id = w.record_id)
+       and w.lat between p_lat - p_radius_mi / 69.0 * 1.1 and p_lat + p_radius_mi / 69.0 * 1.1
+       and w.lng between p_lng - v_dlng and p_lng + v_dlng
+       and st_dwithin(st_setsrid(st_makepoint(w.lng, w.lat), 4326)::geography, v_home, v_meters)
+  ), m as (
+    select record_id, d, 'footprint'::text as by from fp_hit union all select record_id, d, 'point'::text from pt_hit
+  )
+  select array_agg(w order by w.record_id),
+         jsonb_object_agg(m.record_id, jsonb_build_object('matched_by', m.by, 'distance_mi', round((m.d / 1609.344)::numeric, 3)))
+    into v_pts, v_matches
+    from m
+    join public.air_permit_records w on w.record_id = m.record_id and w.removed_from_source_at is null
+    join public.air_permit_sources s on s.source = w.source and s.access_status = 'active';
+  -- records the source states WITHOUT any location (no point, no footprint): counted for the subject's county, never placed or guessed
+  if p_state is not null and p_county is not null then
+    select count(*) into v_unloc from public.air_permit_records w
+      join public.air_permit_sources s on s.source = w.source and s.access_status = 'active'
+     where w.removed_from_source_at is null and w.lat is null and upper(w.state) = upper(p_state) and upper(w.county) = upper(p_county)
+       and not exists (select 1 from public.air_permit_footprints x where x.record_id = w.record_id);
+  end if;
+  return jsonb_strip_nulls(jsonb_build_object('status', 'complete', 'sources', v_sources,
+           'records', public.air_permit_records_json(v_pts, false), 'matches', coalesce(v_matches, '{}'::jsonb),
+           'unlocated_in_county', v_unloc, 'unlocated_county', case when v_unloc is not null then p_county end));
 end
 $fn$;
 
+-- Reviewed write of a record's footprint (service_role only). Replaces that record's footprints in one statement set.
+-- p_features: jsonb array of {"feature_id": text, "geometry": GeoJSON Polygon|MultiPolygon}. No features, a bad shape,
+-- an unknown record or a basis outside the two verified kinds raises: nothing is half-written.
+create or replace function public.air_permit_footprint_set(p_record text, p_basis text, p_evidence text, p_by text, p_features jsonb)
+returns integer language plpgsql security definer set search_path to 'public', 'extensions', 'pg_temp' as $fn$
+declare f jsonb; g geometry; n integer := 0;
+begin
+  if not exists (select 1 from public.air_permit_records where record_id = p_record) then raise exception 'unknown record' using errcode = '22023'; end if;
+  if p_basis not in ('verified_boundary', 'verified_parcel') then raise exception 'basis must be verified_boundary or verified_parcel' using errcode = '22023'; end if;
+  if p_features is null or jsonb_typeof(p_features) <> 'array' or jsonb_array_length(p_features) = 0 then raise exception 'features required' using errcode = '22023'; end if;
+  delete from public.air_permit_footprints where record_id = p_record;
+  for f in select * from jsonb_array_elements(p_features) loop
+    g := st_setsrid(st_geomfromgeojson((f -> 'geometry')::text), 4326);
+    if geometrytype(g) not in ('POLYGON', 'MULTIPOLYGON') then raise exception 'footprint must be a polygon' using errcode = '22023'; end if;
+    insert into public.air_permit_footprints (record_id, feature_id, geom, basis, evidence_ref, verified_by)
+      values (p_record, coalesce(nullif(f ->> 'feature_id', ''), 'f' || (n + 1)), st_multi(g), p_basis, p_evidence, p_by);
+    n := n + 1;
+  end loop;
+  return n;
+end
+$fn$;
+
+revoke all on function public.air_permit_footprint_set(text, text, text, text, jsonb) from public, anon, authenticated;
 revoke all on function public.air_permit_obs_frozen() from public, anon, authenticated;
 revoke all on function public.air_permits_ingest(text, jsonb, boolean) from public, anon, authenticated;
 revoke all on function public.air_permits_display_applicant(text) from public, anon, authenticated;
 revoke all on function public.air_permit_records_json(public.air_permit_records[], boolean) from public, anon, authenticated;
 revoke all on function public.air_permits_for_zip(text) from public;
-revoke all on function public.map1_air_permits_near(double precision, double precision, double precision) from public;
+revoke all on function public.map1_air_permits_near(double precision, double precision, double precision, text, text) from public;
 grant execute on function public.air_permits_ingest(text, jsonb, boolean) to service_role;
+grant execute on function public.air_permit_footprint_set(text, text, text, text, jsonb) to service_role;
 grant execute on function public.air_permits_for_zip(text) to anon, authenticated, service_role;
-grant execute on function public.map1_air_permits_near(double precision, double precision, double precision) to anon, authenticated, service_role;
+grant execute on function public.map1_air_permits_near(double precision, double precision, double precision, text, text) to anon, authenticated, service_role;
 
 -- ── ROLLBACK (by hand; keeps nothing it did not create) ──────────────────────────────────────
--- drop function public.map1_air_permits_near(double precision, double precision, double precision), public.air_permits_for_zip(text),
+-- drop function public.air_permit_footprint_set(text, text, text, text, jsonb), public.map1_air_permits_near(double precision, double precision, double precision, text, text), public.air_permits_for_zip(text),
 --   public.air_permits_ingest(text, jsonb, boolean), public.air_permit_records_json(public.air_permit_records[], boolean),
 --   public.air_permits_display_applicant(text), public.air_permit_obs_frozen() cascade;
--- drop table public.air_permit_record_observations, public.air_permit_records, public.air_permit_runs, public.air_permit_states, public.air_permit_sources;
+-- drop table public.air_permit_footprints, public.air_permit_record_observations, public.air_permit_records, public.air_permit_runs, public.air_permit_states, public.air_permit_sources;

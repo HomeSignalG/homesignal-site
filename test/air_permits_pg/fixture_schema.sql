@@ -1,9 +1,9 @@
 -- Stand-ins for the production pieces docs/air-permits.sql relies on (copied from the water-rights fixture; PostGIS is real).
 -- FIXTURE DATA ONLY: nothing here is production evidence. 78521 is a stand-in box over the Starbase area.
 drop schema if exists net cascade; drop schema if exists cron cascade; drop schema if exists geo cascade;
-drop table if exists public.air_permit_record_observations, public.air_permit_records, public.air_permit_runs,
+drop table if exists public.air_permit_footprints, public.air_permit_record_observations, public.air_permit_records, public.air_permit_runs,
   public.air_permit_states, public.air_permit_sources, public.communities cascade;
-drop function if exists public.air_permits_for_zip(text), public.map1_air_permits_near(double precision,double precision,double precision),
+drop function if exists public.air_permits_for_zip(text), public.map1_air_permits_near(double precision,double precision,double precision), public.map1_air_permits_near(double precision,double precision,double precision,text,text), public.air_permit_footprint_set(text,text,text,text,jsonb),
   public.air_permits_ingest(text, jsonb, boolean) cascade;
 do $$ begin
   if not exists (select 1 from pg_roles where rolname='anon') then create role anon; end if;

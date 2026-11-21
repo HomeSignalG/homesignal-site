@@ -10,19 +10,20 @@ import type { FetchFn } from './service-rest.ts';
 
 export type AirRecord = Record<string, unknown> & { permit_no?: string; project_no?: string; status?: string; action_kind?: string; record_url?: string };
 export type AirSource = { source: string; state: string; state_name?: string; agency?: string; permit_types?: string[]; checked_at?: string; status: string };
-export type AirNear = { status: string; sources: AirSource[]; records: AirRecord[] };
+export type AirNear = { status: string; sources: AirSource[]; records: AirRecord[]; matches?: Record<string, { matched_by: 'footprint' | 'point'; distance_mi: number }>; unlocated_in_county?: number; unlocated_county?: string };
 
 export const AIR_STATUS_SCOPE = 'Status applies to this air authorization only, not to the development';
 export const AIR_NOTE = 'An air authorization is one permit for one activity, not approval of a whole development, and permitted limits are not measured air quality at any home.';
 /** The reader is capped at 20 miles; the report radius is far below it. */
 export async function readAirPermitsNear(
   conn: { base: string; svc: Record<string, string> }, fetchFn: FetchFn, lat: number, lng: number, radiusMi: number,
+  place?: { state: string; county: string },
 ): Promise<AirNear> {
   let r: Response;
   try {
     r = await fetchFn(conn.base + '/rest/v1/rpc/map1_air_permits_near', {
       method: 'POST', headers: { ...conn.svc, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ p_lat: lat, p_lng: lng, p_radius_mi: radiusMi }),
+      body: JSON.stringify({ p_lat: lat, p_lng: lng, p_radius_mi: radiusMi, ...(place ? { p_state: place.state, p_county: place.county } : {}) }),
     });
   } catch { throw new DataUnavailable('network'); }
   if (!r.ok) throw new DataUnavailable('http ' + r.status);
@@ -40,8 +41,10 @@ export function airPermitsSection(read: AirNear | null, state: { zip_state?: str
   const limitations: string[] = [];
   if (!own.length) limitations.push('No air-permit source is registered for this state yet, so air permits are not covered by this report.');
   for (const s of incomplete) limitations.push((s.agency || s.source) + ' air permits are ' + (s.status === 'blocked' ? 'not readable by a program' : 'not current') + ', so none can be reported as absent.');
-  limitations.push('Only records with a stored location can be placed within this distance; records without one are not counted here.');
-  const records = read.records.map((r) => ({ ...r, status_scope: r.status ? AIR_STATUS_SCOPE : undefined }));
+  const n = read.unlocated_in_county;
+  if (typeof n === 'number' && n > 0) limitations.push(n + ' air permit' + (n === 1 ? '' : 's') + ' in ' + (read.unlocated_county || 'this') + ' County ' + (n === 1 ? 'has' : 'have') + ' no mapped location, so ' + (n === 1 ? 'it' : 'they') + ' could not be tested against this distance and ' + (n === 1 ? 'is' : 'are') + ' not listed.');
+  else if (n === undefined) limitations.push('Air permits with no mapped location cannot be tested against this distance and are not listed; how many exist for this county was not checked.');
+  const records = read.records.map((r) => ({ ...r, status_scope: r.status ? AIR_STATUS_SCOPE : undefined, location_match: read.matches?.[String(r.record_id)] }));
   return {
     outcome: records.length ? 'records' : complete ? 'none_found_in_complete_source' : 'not_established',
     records, note: AIR_NOTE, limitations,
