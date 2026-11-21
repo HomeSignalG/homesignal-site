@@ -1478,8 +1478,9 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     }
     var st=(window.HS&&HS.bskySubscriberZipStatus)?HS.bskySubscriberZipStatus(sub.zips, allRows):[];
     if(!st.length){
-      return '<div id="bsky-subs" class="muted" style="margin:0 0 12px;font-size:13px">No ZIP has a Development-alert subscriber yet (test sign-ups are not counted).</div>';
+      return '<div id="bsky-subs" class="muted" style="margin:0 0 12px;font-size:13px">No ZIP has a subscriber yet (test sign-ups are not counted).</div>';
     }
+    var BSKY_STREAM_LABEL={maps:'Development map emails',notices:'Government Notices',meetings:'Upcoming Meetings',news:'Local News',global:'Global Best Practices',emerging:'Emerging Tech'};
     return '<div id="bsky-subs" style="margin:0 0 12px;display:grid;gap:6px">'+st.map(function(z){
       var parts=[];
       if(z.drafts) parts.push('<b style="color:var(--persist)">'+z.drafts+' draft'+(z.drafts===1?'':'s')+' to review</b>');
@@ -1487,7 +1488,9 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       if(!z.drafts && !z.approved) parts.push('<span class="muted">nothing waiting</span>');
       parts.push('<span class="muted">'+(z.last_published_at?('last post published '+esc(bskyDay(z.last_published_at))):'no post published yet, so no email has gone out')+'</span>');
       return '<div data-sub-zip="'+esc(z.zip)+'" style="font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)">'+
-        '<b>ZIP '+esc(z.zip)+'</b> <span class="muted">· '+z.subscribers+' subscriber'+(z.subscribers===1?'':'s')+'</span> &nbsp;·&nbsp; '+parts.join(' &nbsp;·&nbsp; ')+'</div>';
+        '<b>ZIP '+esc(z.zip)+'</b> <span class="muted">· '+z.subscribers+' subscriber'+(z.subscribers===1?'':'s')+'</span>'+
+        (z.signed_up_for&&z.signed_up_for.length?' <span style="font-size:11px;padding:1px 7px;border:1px solid var(--line);border-radius:10px">signed up for: '+z.signed_up_for.map(function(k){return esc(BSKY_STREAM_LABEL[k]||k);}).join(', ')+'</span>':'')+
+        ' &nbsp;·&nbsp; '+parts.join(' &nbsp;·&nbsp; ')+'</div>';
     }).join('')+'</div>';
   }
   function bskyQueueHtml(visible, allRows, sub, emptyMsg){

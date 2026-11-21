@@ -89,7 +89,7 @@ ok((out.match(/\[\[/g) || []).length === rows.length, 'every visible post is dra
 const errOut = run('all', { zips: [], error: 'boom' }, rows, false);
 ok(/could not be read \(boom\)/.test(errOut) && /NOT separated/.test(errOut) && !/No ZIP has a/.test(errOut),
   'a failed subscriber read is shown, never read as "no subscribers"');
-ok(/No ZIP has a Development-alert subscriber yet/.test(run('all', { zips: [], error: '' }, rows, false)), 'no subscribers: says so');
+ok(/No ZIP has a subscriber yet/.test(run('all', { zips: [], error: '' }, rows, false)), 'no subscribers: says so');
 ok(!/Subscriber ZIPs/.test(run('ALERTS', SUB, rows.filter((p) => p.content_family !== 'MAPS'), false)), 'the ALERTS view has no subscriber section');
 ok(/EMPTY/.test(run('all', SUB, [], false)), 'an empty queue keeps its message');
 
@@ -102,8 +102,9 @@ ok(/lib\/acq-bluesky-queue-order\.js\?v=[0-9a-f]{8}/.test(PAGE), 'the library is
 // ── 4 · THE SQL READER ───────────────────────────────────────────────────────────
 const SQL = rd('../docs/bluesky-subscriber-zips.sql').split('\n').filter((l) => !/^\s*--/.test(l)).join('\n');
 ok(/dashboard_admins/.test(SQL) && /raise exception 'not authorized'/.test(SQL), 'admin-only');
-ok(/from public\.bsky_maps_priority_classification c\s+where c\.class = 'eligible'/.test(SQL), 'reads the one classification; test sign-ups are not subscribers');
-ok(!/email'?\s*,/.test(SQL.replace(/caller_email[^;]*;/g, '')) && !/user_id/.test(SQL), 'returns no email and no user id');
+ok(/from public\.alert_subscription_state s/.test(SQL) && /s\.subscribed and not public\.bsky_maps_known_test_identity\(s\.user_id\)/.test(SQL), 'reads the resolver for ANY alert type; test sign-ups are not subscribers');
+const OUT = SQL.slice(SQL.indexOf('jsonb_build_object'), SQL.indexOf('into r'));
+ok(!/email|user_id/.test(OUT.replace(/count\(distinct q\.user_id\)/g, '')), 'returns no email and no user id');
 ok(/revoke all on function public\.hs_bsky_subscriber_zips\(\) from public, anon;/.test(SQL)
   && /grant execute on function public\.hs_bsky_subscriber_zips\(\) to authenticated;/.test(SQL), 'anon cannot call it');
 ok(!/\b(insert|update|delete)\b/i.test(SQL), 'it writes nothing');

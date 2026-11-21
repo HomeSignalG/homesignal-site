@@ -36,6 +36,11 @@
 -- decides posting priority); it is not re-derived here. Why: the 65 Pierce County ZIPs each
 -- carried one admin_test sign-up, so the founder could not take them off the list.
 --
+-- ⚖️ ANY ALERT TYPE COUNTS (founder, 2026-11-21: "i want all new subscribers emails added to blue sky even
+-- if only alerts page"). Found when a Round Rock 78681 sign-up (Local News only) never reached the list.
+-- Caveat stated plainly: the MAPS email still goes only to people who chose the Development map emails,
+-- so a ZIP added for a news-only subscriber gets Bluesky drafts but sends that person no email.
+--
 -- It does NOT create drafts. Drafts still come from "Create + refresh drafts" in the
 -- dashboard's All Maps view (or a maps_order dispatch), exactly as before.
 --
@@ -61,15 +66,19 @@ begin
   select coalesce(max(o.founder_position), 0) into next_pos from public.maps_zip_order o;
   for z in
     select x.zip from (
-      select distinct c.zip_codes[1] as zip
+      -- ANY alert type counts (founder, 2026-11-21: "all new subscribers ... even if only alerts page").
+      -- A maps selection is filed on its own ZIP community; every other stream is filed on the chain
+      -- root, so its ZIP is the one the resident signed up on (users.zip_code, via the resolver view).
+      select distinct case when s.stream = 'maps' and c.level = 'zip' and cardinality(c.zip_codes) = 1
+                           then c.zip_codes[1] else s.zip_code end as zip
       from public.alert_subscription_state s
       join public.communities c on c.id = s.community_id
-      where s.stream = 'maps' and s.subscribed
+      where s.subscribed
         and not public.bsky_maps_known_test_identity(s.user_id)
-        and c.level = 'zip' and cardinality(c.zip_codes) = 1
-        and c.zip_codes[1] ~ '^[0-9]{5}$'
-        and not exists (select 1 from public.maps_zip_order o where o.zip = c.zip_codes[1])
+        and case when s.stream = 'maps' and c.level = 'zip' and cardinality(c.zip_codes) = 1
+                 then c.zip_codes[1] else s.zip_code end ~ '^[0-9]{5}$'
     ) x
+    where not exists (select 1 from public.maps_zip_order o where o.zip = x.zip)
     order by x.zip collate "C"
   loop
     next_pos := next_pos + 1;
@@ -183,9 +192,12 @@ begin
   select count(*) into missing
   from public.alert_subscription_state s
   join public.communities c on c.id = s.community_id
-  where s.stream = 'maps' and s.subscribed and c.level = 'zip' and cardinality(c.zip_codes) = 1
-    and not public.bsky_maps_known_test_identity(s.user_id)
-    and not exists (select 1 from public.maps_zip_order o where o.zip = c.zip_codes[1]);
+  where s.subscribed and not public.bsky_maps_known_test_identity(s.user_id)
+    and (case when s.stream = 'maps' and c.level = 'zip' and cardinality(c.zip_codes) = 1
+              then c.zip_codes[1] else s.zip_code end) ~ '^[0-9]{5}$'
+    and not exists (select 1 from public.maps_zip_order o
+                    where o.zip = case when s.stream = 'maps' and c.level = 'zip' and cardinality(c.zip_codes) = 1
+                                       then c.zip_codes[1] else s.zip_code end);
   if missing <> 0 then
     raise exception 'after sync, % subscriber ZIP(s) are still missing from maps_zip_order', missing;
   end if;
