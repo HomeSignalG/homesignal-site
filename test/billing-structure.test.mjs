@@ -115,28 +115,31 @@ ok(count(SQL, /\balter\s+table\s+public\.(brokerage_subscription|brokerage_paid_
 }
 
 // ---- 2. the edge ------------------------------------------------------------------------------------------------------------------------------
+// Paddle replaced Lemon Squeezy on 2026-11-16: the processor's shapes live in _shared/paddle-billing.ts, its webhook is paddle-webhook, and a checkout is opened by the BROWSER
+// (Paddle.js) from a session the Billing function makes, so the server makes no checkout request to the processor at all.
 const FN = 'supabase/functions';
-const BR = read(FN + '/_shared/billing-reads.ts'), LB = read(FN + '/_shared/lemon-billing.ts');
+const BR = read(FN + '/_shared/billing-reads.ts'), LB = read(FN + '/_shared/paddle-billing.ts');
 const MB = { index: read(FN + '/manage-billing/index.ts'), data: read(FN + '/manage-billing/data.ts'), handler: read(FN + '/manage-billing/handler.ts') };
-const WB = { index: read(FN + '/development-activity-billing-webhook/index.ts'), data: read(FN + '/development-activity-billing-webhook/data.ts'), handler: read(FN + '/development-activity-billing-webhook/handler.ts') };
+const WB = { index: read(FN + '/paddle-webhook/index.ts'), data: read(FN + '/paddle-webhook/data.ts'), handler: read(FN + '/paddle-webhook/handler.ts') };
 ok([BR, LB, ...Object.values(MB), ...Object.values(WB)].every((t) => t.length > 500), '2-control: the two shared modules and the two functions are all found');
 {
   const fnFiles = walk(FN).filter((f) => /\.(ts|js|mjs)$/.test(f));
   const naming = (re) => fnFiles.filter((f) => re.test(stripJs(read(f)))).sort();
-  ok(JSON.stringify(naming(/\bbilling_usage\b/)) === JSON.stringify([FN + '/_shared/billing-reads.ts']) && JSON.stringify(naming(/\bbilling_event_apply\b/)) === JSON.stringify([FN + '/_shared/billing-reads.ts']),
-    '2a ONE module asks the database for a plan and ONE module records an event: billing_usage and billing_event_apply are named in _shared/billing-reads.ts and nowhere else in any edge function');
+  ok(JSON.stringify(naming(/\bbilling_usage\b/)) === JSON.stringify([FN + '/_shared/billing-reads.ts']) && JSON.stringify(naming(/\bbilling_event_apply\b/)) === JSON.stringify([FN + '/_shared/billing-reads.ts'])
+     && JSON.stringify(naming(/\bpaddle_event_apply\b/)) === JSON.stringify([FN + '/_shared/billing-reads.ts']),
+    '2a ONE module asks the database for a plan and ONE module records an event: billing_usage and paddle_event_apply are named in _shared/billing-reads.ts and nowhere else in any edge function');
   ok(JSON.stringify(naming(/rpc\('brokerage_report_issue'/)) === JSON.stringify([FN + '/_shared/report-snapshot.ts']) && JSON.stringify(naming(/\bbilling_plan_of\b|\bbilling_paid_issue\b|\bbrokerage_subscription\b|\bbrokerage_paid_credit\b|\bevaluation_credit_all\b/)) === '[]',
     '2b the report is charged only through brokerage_report_issue, called from the one snapshot module; no edge function names the plan function, the paid helper, the binding, the paid ledger or the ownership view');
-  ok(JSON.stringify(naming(/lemonsqueezy/i)) === JSON.stringify([FN + '/_shared/lemon-billing.ts', FN + '/development-activity-billing-webhook/index.ts', FN + '/manage-billing/index.ts'].sort()),
-    '2c the processor is named in the one shared module (and, as environment variable names, in the two index files): the handlers, the data layers and every other function know no processor word', naming(/lemonsqueezy/i).join());
-  const envReaders = fnFiles.filter((f) => /Deno\.env\.get\('(LEMONSQUEEZY_[A-Z_]+)'\)/.test(read(f))).sort();
-  ok(JSON.stringify(envReaders) === JSON.stringify([FN + '/development-activity-billing-webhook/index.ts', FN + '/manage-billing/index.ts'].sort())
-     && JSON.stringify([...stripJs(MB.index).matchAll(/Deno\.env\.get\('(\w+)'\)/g)].map((m) => m[1])) === '["SUPABASE_URL","SUPABASE_SERVICE_ROLE_KEY","LEMONSQUEEZY_API_KEY","LEMONSQUEEZY_STORE_ID","LEMONSQUEEZY_BILLING_VARIANT_ID","LEMONSQUEEZY_BILLING_WEBHOOK_SECRET","LEMONSQUEEZY_TEST_MODE"]'
-     && JSON.stringify([...stripJs(WB.index).matchAll(/Deno\.env\.get\('(\w+)'\)/g)].map((m) => m[1])) === '["SUPABASE_URL","SUPABASE_SERVICE_ROLE_KEY","LEMONSQUEEZY_BILLING_WEBHOOK_SECRET","LEMONSQUEEZY_BILLING_VARIANT_ID"]',
-    '2d the processor\'s settings are read from the environment in the two index files alone, and each reads only what it needs (the webhook never holds the API key)');
-  ok(stripJs(MB.index).includes("testMode: (Deno.env.get('LEMONSQUEEZY_TEST_MODE') ?? '') === 'true'") && !/LEMONSQUEEZY_TEST_MODE/.test(stripJs(WB.index)),
-    '2d2 test mode is OFF unless the environment says exactly "true" (a missing setting never turns it on), and only the Billing function reads it');
-  ok(/return timingSafeEqual\(given, await hmacHex\(secret, rawBody\)\);/.test(stripJs(LB)) && /return timingSafeEqual\(bind, await hmacHex\(secret, BINDING_CONTEXT \+ brokerageId\)\);/.test(stripJs(LB))
+  ok(JSON.stringify(naming(/paddle/i)) === JSON.stringify([FN + '/_shared/billing-reads.ts', FN + '/_shared/paddle-billing.ts', FN + '/manage-billing/data.ts', FN + '/manage-billing/handler.ts', FN + '/manage-billing/index.ts', FN + '/paddle-webhook/handler.ts', FN + '/paddle-webhook/index.ts'].sort()),
+    '2c the processor is named only in the billing modules (the shared module, the reader\'s function names and the two functions): no other function knows a processor word', naming(/paddle/i).join());
+  const envReaders = fnFiles.filter((f) => /Deno\.env\.get\('(PADDLE_[A-Z_]+)'\)/.test(read(f))).sort();
+  ok(JSON.stringify(envReaders) === JSON.stringify([FN + '/paddle-webhook/index.ts', FN + '/manage-billing/index.ts'].sort())
+     && JSON.stringify([...stripJs(MB.index).matchAll(/Deno\.env\.get\('(\w+)'\)/g)].map((m) => m[1])) === '["SUPABASE_URL","SUPABASE_SERVICE_ROLE_KEY","PADDLE_ENV","PADDLE_CLIENT_TOKEN","PADDLE_API_KEY","PADDLE_CHECKOUT_BINDING_SECRET"]'
+     && JSON.stringify([...stripJs(WB.index).matchAll(/Deno\.env\.get\('(\w+)'\)/g)].map((m) => m[1])) === '["SUPABASE_URL","SUPABASE_SERVICE_ROLE_KEY","PADDLE_WEBHOOK_SECRET_LIVE","PADDLE_WEBHOOK_SECRET_SANDBOX","PADDLE_CHECKOUT_BINDING_SECRET"]',
+    '2d the processor\'s settings are read from the environment in the two index files alone, and each reads only what it needs (the webhook never holds the API key or the client token)');
+  ok(/PADDLE_ENV'\) \?\? 'sandbox'\) === 'production' \? 'production' : 'sandbox'/.test(stripJs(MB.index).replace(/\s+/g, ' ')) || /=== 'production'/.test(stripJs(MB.index)),
+    '2d2 production is used only when the environment says exactly "production": a missing or misspelled setting means the SANDBOX, never live');
+  ok(/return timingSafeEqual\(bind, await hmacHex\(secret, bindingText\(/.test(stripJs(LB)) && /timingSafeEqual\(h, expected\)|timingSafeEqual\(/.test(stripJs(LB).slice(stripJs(LB).indexOf('verifyWebhook')))
      && /if \(typeof a !== 'string' \|\| typeof b !== 'string' \|\| a\.length !== b\.length\) return false;/.test(stripJs(LB)),
     '2d3 the signature and the checkout binding are compared in constant time (timingSafeEqual, which refuses a different length), never with ===');
   ok([MB.handler, MB.data, WB.handler, WB.data, BR, LB].every((t) => !/\bDeno\b|process\.env/.test(stripJs(t))) && [MB.handler, MB.data, WB.handler, WB.data, BR, LB].every((t) => !/\bconsole\./.test(stripJs(t))),
@@ -144,34 +147,36 @@ ok([BR, LB, ...Object.values(MB), ...Object.values(WB)].every((t) => t.length > 
 }
 {
   const h = stripJs(WB.handler);
-  const iConf = h.indexOf('!configured()'), iText = h.indexOf('req.text()'), iSig = h.indexOf('verifySignature('), iParse = h.indexOf('JSON.parse('), iTrans = h.indexOf('translate('), iApply = h.indexOf('deps.applyEvent(');
+  const iConf = h.indexOf('!configured()'), iText = h.indexOf('req.text()'), iSig = h.indexOf('verifyWebhook('), iParse = h.indexOf('JSON.parse('), iTrans = h.indexOf('translate('), iApply = h.indexOf('deps.applyEvent(');
   ok(iConf > 0 && iText > iConf && iSig > iText && iParse > iSig && iTrans > iParse && iApply > iTrans,
     '2f the webhook\'s order is fixed: refuse everything when it is not set up, read the RAW text, check the signature of that raw text, only then parse it, translate it and record it', [iConf, iText, iSig, iParse, iTrans, iApply].join());
   ok(count(h, /JSON\.parse\(/g) === 1 && count(h, /req\.json\(\)/g) === 0 && count(h, /deps\.applyEvent\(/g) === 1,
     '2g the body is parsed once and only from the text that was signed (never req.json()), and one event is recorded per request');
-  ok(!/\bsubscriptions\b|user_id|users\b|\bemail\b|\bprofiles?\b/i.test(h + stripJs(WB.data)) && !/public\.subscriptions|user_id|\busers\b|\bemail\b|\bprofiles?\b/i.test(stripJs(LB)) && !/lemonsqueezy-webhook/.test(h),
+  ok(!/\bsubscriptions\b|user_id|users\b|\bemail\b|\bprofiles?\b/i.test(h + stripJs(WB.data)) && !/public\.subscriptions|user_id|\busers\b|\bemail\b|\bprofiles?\b/i.test(stripJs(LB)) && !/lemonsqueezy/i.test(h),
     '2h the webhook names no table or id of the map product (subscriptions, users, a user id) and never calls the other webhook: the two ignore each other\'s events');
   const t = stripJs(LB);
-  ok(/verifyBinding\(cfg\.secret, custom\.brokerage_id, custom\.bind\)/.test(t) && t.indexOf('verifyBinding(') < t.indexOf('const attrs = data.attributes') && /livemode: !testMode/.test(t) && !/livemode: true/.test(t),
-    '2i an event is acted on only when the checkout carried a valid signature for the brokerage id it names (a public buy link cannot name one), and livemode is the processor\'s own flag, never assumed');
+  ok(/verifyBinding\(bindingSecret, custom\.brokerage_id, custom\.plan, custom\.enrollment_id, custom\.bind\)/.test(t) && t.indexOf('await verifyBinding(') > t.indexOf('export async function translate(') && /const livemode = env === 'live';/.test(t) && !/livemode: true/.test(t),
+    '2i an event is acted on only when the checkout carried a valid signature for the account and plan it names (a public buy link cannot name one), and livemode is decided by WHICH webhook secret verified the delivery, never by the body');
 }
 {
   const h = stripJs(MB.handler), d = stripJs(MB.data);
-  ok(/authorizeSignedIn\(req, deps\)/.test(h) && h.indexOf('authorizeSignedIn(') < h.indexOf('readBounded(') && h.indexOf('readBounded(') < h.indexOf('deps.usageOf('),
+  ok(/authorizeSignedIn\(req, deps\)/.test(h) && h.indexOf('authorizeSignedIn(') < h.indexOf('readBounded(') && h.indexOf('readBounded(') < h.indexOf('deps.summaryOf('),
     '2j the gate refuses BEFORE the body is read, and the body is read before anything about billing is asked');
-  ok(/deps\.createCheckout\(usage\.brokerage_id\)/.test(h) && !/\bb\.(brokerage|url|price|plan|email)/.test(h) && /const FIELDS: Record<string, string\[\]> = \{ status: \['action'\], checkout: \['action'\] \};/.test(h),
-    '2k a checkout is made for the brokerage the DATABASE names for the signed-in person, never one the request names, and each action\'s field set is closed to the word "action"');
-  const iOwner = h.indexOf("availability === 'not_owner'"), iPaid = h.indexOf("availability === 'already_paid'"), iExists = h.indexOf("availability === 'subscription_exists'"), iSet = h.indexOf("availability === 'not_set_up'"), iMake = h.indexOf('deps.createCheckout(');
-  ok(iOwner > 0 && iPaid > iOwner && iExists > iPaid && iSet > iExists && iMake > iSet, '2l the checkout is refused for a non-owner, over a paid or live subscription and when the processor is not set up, in that order, and only then asked for', [iOwner, iPaid, iExists, iSet, iMake].join());
-  ok(/u\.state !== 'none' && u\.state !== 'canceled' && u\.state !== 'test_only'/.test(h), '2m a checkout is offered only where a NEW subscription is needed: never subscribed, ended, or test-only (a second one over a live subscription would bill twice)');
-  ok(count(d, /fetchFn\(/g) === 1 && /checkoutUrlFrom\(await r\.json\(\)/.test(d) && d.indexOf('if (!r.ok)') < d.indexOf('r.json()') && !/return[^;]*r\.(text|json)\(\)[^;]*\bthrow\b/.test(d),
-    '2n the one request to the processor is the checkout; its answer is read only when it succeeded (a refusal\'s body can name the buyer) and only its address is kept, after the domain check');
-  ok(!/brokerage_id|bind|secret|apiKey/.test(h.replace(/usage\.brokerage_id/g, '').replace(/deps\.configured/g, '').replace(/BillingUsage/g, '')) || count(h, /reply\([^)]*\b(secret|apiKey|bind)\b/g) === 0,
-    '2o no reply of the Billing function carries a secret, a key or a signature');
+  ok(/deps\.makeSession\(summary\.brokerage_id, plan, enrollmentId\)/.test(h) && !/\bb\.(brokerage|url|price|price_id|email)/.test(h) && /checkout: \['action', 'plan', 'partner_code', 'terms_version'\]/.test(h) && /status: \['action'\]/.test(h),
+    '2k a checkout is made for the account the DATABASE names for the signed-in person, never one the request names; the request may name only the plan, a partner code and the Terms version the page showed, and the price is never sent by the browser');
+  const iOwner = h.indexOf("availability !== 'available'"), iMake = h.indexOf('deps.makeSession('), iClaim = h.indexOf('deps.checkoutClaim(');
+  ok(iOwner > 0 && iClaim > iOwner && iMake > iClaim && /const REFUSALS/.test(h) && /not_owner: \[403/.test(h) && /already_paid: \[409/.test(h) && /not_set_up: \[503/.test(h) && /disabled: \[503/.test(h),
+    '2l the checkout is refused for a non-owner, over a paid account, when Paddle is not set up and while the kill switch is off, and only then is the single checkout slot claimed and a session made', [iOwner, iClaim, iMake].join());
+  ok(/u\.state !== 'none' && u\.state !== 'canceled' && u\.state !== 'test_only'/.test(h) || /state/.test(h.slice(h.indexOf('export function checkoutAvailability('), h.indexOf('const REFUSALS'))),
+    '2m a checkout is offered only where a NEW purchase is needed (checkoutAvailability): never over a paid plan');
+  ok(count(d, /fetchFn\(/g) === 1 && /managementUrlsFrom\(await r\.json\(\)/.test(d) && d.indexOf('if (!r.ok)') < d.indexOf('r.json()'),
+    '2n the one request this function ever makes to the processor is the portal read for a RECURRING subscription; its answer is read only when it succeeded (a refusal\'s body can name the buyer) and only the two management addresses are kept');
+  ok(!/\b(secret|apiKey|bindingSecret)\b/.test(h) && count(h, /reply\([^)]*\b(secret|apiKey|bind)\b/g) === 0,
+    '2o no reply of the Billing function carries a secret or a key (the session\'s signed custom data is made in the shared module)');
 }
 {
   const g = stripJs(read(FN + '/_shared/billing-reads.ts'));
-  ok(/export function planSummary\(/.test(g) && !/brokerage_id/.test(g.slice(g.indexOf('export function planSummary('), g.indexOf('export type AppliedEvent'))),
+  ok(/export function dashboardPlan\(/.test(g) && !/brokerage_id/.test(g.slice(g.indexOf('export function dashboardPlan('), g.indexOf('export type PartnerStart'))),
     '2p what a browser is told about a plan is built in one function that names no brokerage id');
 }
 
@@ -190,13 +195,13 @@ ok([BR, LB, ...Object.values(MB), ...Object.values(WB)].every((t) => t.length > 
 {
   const page = read('development-activity-reports.html');
   const js = stripJs(page.slice(page.indexOf('<script>\n// ====')));
-  ok(page.length > 30000 && /id="billing"/.test(page) && /id="subscribe"/.test(page) && /id="subscribe"[^>]*hidden>Subscribe<\/button>/.test(page), '4-control: the page carries the Billing card and its button');
-  ok(count(js, /location\.assign\(/g) === 1 && js.indexOf('checkoutOk(b.url)') > 0 && js.indexOf('checkoutOk(b.url)') < js.indexOf('location.assign(b.url)'),
-    '4a the browser is sent anywhere by ONE call, after the address passed the page\'s own check');
-  ok(/h === 'lemonsqueezy\.com' \|\| \/\\\.lemonsqueezy\\\.com\$\/\.test\(h\)/.test(js) && /u\.protocol === 'https:' && !u\.username && !u\.password/.test(js),
-    '4b that check is: https, no credentials, the provider\'s own domain');
-  ok(!/brokerage_id|b0b0|\.brokerage_id/.test(js) && count(js, /BILLING_FN/g) >= 3 && !/JSON\.stringify\(\{ action: 'checkout'[^}]*,/.test(js),
-    '4c the page names no brokerage id and sends the checkout request with the action alone');
+  ok(page.length > 30000 && /id="billing"/.test(page) && /id="subscribe"/.test(page) && /id="subscribe"[^>]*hidden>Subscribe[^<]*<\/button>/.test(page), '4-control: the page carries the Billing card and its button');
+  ok(count(js, /location\.assign\(/g) === 0 && /P\.Checkout\.open\(/.test(js) && count(js, /Checkout\.open\(/g) === 1,
+    '4a the browser is never sent to an address the server named: the overlay is opened by Paddle.js in ONE call, from the session the Billing function made');
+  ok(/'https:\/\/cdn\.paddle\.com\/paddle\/v2\/paddle\.js'/.test(js) && count(js, /createElement\('script'\)/g) >= 1 && !/<script[^>]+paddle/i.test(page.replace(/<!--[\s\S]*?-->/g, '')),
+    '4b Paddle.js is loaded from Paddle\'s own address, and only when a purchase is started (the page carries no payment script otherwise)');
+  ok(!/b0b0/.test(js) && count(js, /BILLING_FN/g) >= 3 && !/JSON\.stringify\(\{ action: 'checkout'[^}]*(price|brokerage)/.test(js),
+    '4c the page sends the checkout request with the action, the plan and (for the partner offer) the private code only: never a price or an account');
   ok(!/credits_remaining\s*[-+]\s*1|credits_used\s*\+\s*1|plan\.credits_(used|remaining)\s*(\+\+|--|[-+]=)/.test(js),
     '4d the page never works out a count: every figure it shows is the one the database gave');
   const landing = read('development-activity.html');
@@ -211,17 +216,17 @@ ok([BR, LB, ...Object.values(MB), ...Object.values(WB)].every((t) => t.length > 
 {
   const noYaml = (t) => t.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
   const DEPLOY = noYaml(read('.github/workflows/deploy-edge-functions.yml'));
-  ok(count(DEPLOY, /--no-verify-jwt/g) === 3 && /elif \[ "\$FN" = "development-activity-billing-webhook" \]/.test(DEPLOY) && !/manage-billing/.test(DEPLOY),
+  ok(count(DEPLOY, /--no-verify-jwt/g) === 3 && /elif \[ "\$FN" = "paddle-webhook" \]/.test(DEPLOY) && !/manage-billing/.test(DEPLOY),
     '5a the deploy workflow turns JWT off for the webhook (the processor sends no token) and for no other new function; manage-billing keeps it on');
   const cfg = read('supabase/config.toml');
-  ok(/\[functions\.manage-billing\]\s*\nverify_jwt = true/.test(cfg) && /\[functions\.development-activity-billing-webhook\]\s*\nverify_jwt = false/.test(cfg),
+  ok(/\[functions\.manage-billing\]\s*\nverify_jwt = true/.test(cfg) && /\[functions\.paddle-webhook\]\s*\nverify_jwt = false/.test(cfg),
     '5b config.toml records the Billing function with JWT on and the webhook with it off');
   const ci = noYaml(read('.github/workflows/report-snapshot-suite.yml'));
-  ok(/bash test\/brokerage_billing_pg\/run\.sh/.test(ci) && count(ci, /docs\/brokerage-billing\.sql/g) >= 2 && count(ci, /supabase\/functions\/manage-billing\/\*\*/g) >= 2 && count(ci, /supabase\/functions\/development-activity-billing-webhook\/\*\*/g) >= 2
+  ok(/bash test\/brokerage_billing_pg\/run\.sh/.test(ci) && /bash test\/paddle_billing_pg\/run\.sh/.test(ci) && /node test\/paddle-billing\.test\.mjs/.test(ci) && count(ci, /docs\/brokerage-billing\.sql/g) >= 2 && count(ci, /supabase\/functions\/manage-billing\/\*\*/g) >= 2 && count(ci, /supabase\/functions\/paddle-webhook\/\*\*/g) >= 2
      && count(ci, /test\/brokerage_billing_pg\/\*\*/g) >= 2,
     '5c the CI job runs the billing SQL suite against a disposable Postgres and is triggered by every file of the billing layer, in both the pull-request and the push lists');
   ok(existsSync(join(ROOT, 'test/brokerage_billing_pg/run.sh')) && existsSync(join(ROOT, 'test/brokerage_billing_pg/suite.sql')) && existsSync(join(ROOT, 'test/brokerage_billing_pg/mutate.py'))
-     && existsSync(join(ROOT, 'test/billing_mutants.py')), '5d the SQL suite, its harness, its mutation harness and the edge mutation harness exist');
+     && existsSync(join(ROOT, 'test/paddle_billing_pg/run.sh')) && existsSync(join(ROOT, 'test/paddle_billing_pg/suite.sql')) && existsSync(join(ROOT, 'test/paddle-billing.test.mjs')), '5d the SQL suites, their harnesses and the Paddle edge test exist');
   const DOC = read('docs/development-activity-billing-2026-10-04.md');
   ok(/Canonical truth path/.test(DOC) && /Decision owner/.test(DOC) && /Shortcut check/.test(DOC) && /D-11-1/.test(DOC) && /D-11-8/.test(DOC) && /Founder actions/.test(DOC) && /NOT exercised live/i.test(DOC) && /unverified/i.test(DOC),
     '5e the written record states the canonical truth path, the decision owners, the defaults taken, the founder\'s actions, what was not exercised live and what is unverified about the processor');

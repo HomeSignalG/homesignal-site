@@ -82,7 +82,7 @@ ok(!/(localStorage|sessionStorage|indexedDB)[^;]*(saved|report_id|reports)/i.tes
 ok(/showSaved\(false\)/.test(block(PAGE, 'session.user.id !== lastUser') + PAGE) && (PAGE.match(/showSaved\(false\)/g) || []).length >= 3, '6d the list is forgotten on sign-out, on a new person and when access ends', (PAGE.match(/showSaved\(false\)/g) || []).length);
 ok(/showSaved\(a === 'trial' \|\| a === 'complete'\)/.test(PAGE), '6e the card is offered to a trial member, active or complete, and nobody else');
 ok(!/(refreshSaved|openSaved)[\s\S]{0,400}(idempotency_key|address:)/.test(block(PAGE, 'async function openSaved') + block(PAGE, 'async function refreshSaved')), '6f listing and opening send no address and no key');
-ok(/Opening it did not use a free report/.test(PAGE), '6g the page says plainly that opening does not use a free report');
+ok(/Opening it did not use a report/.test(PAGE), '6g the page says plainly that opening does not use a free report');
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);

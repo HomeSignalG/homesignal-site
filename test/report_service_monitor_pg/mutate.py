@@ -10,7 +10,7 @@ import sys
 
 M = {
     # ---- the probe ---------------------------------------------------------------------------------------------
-    'probe_one_function_missing': [("array['get-development-activity-report', 'manage-billing', 'development-activity-billing-webhook'] loop\n    begin",
+    'probe_one_function_missing': [("array['get-development-activity-report', 'manage-billing', 'paddle-webhook'] loop\n    begin",
                                     "array['get-development-activity-report', 'manage-billing'] loop\n    begin", 1)],
     'probe_timeout_is_5_seconds': [("timeout_milliseconds := 15000", "timeout_milliseconds := 5000", 1)],
     'probe_sends_no_key': [("headers := jsonb_build_object('apikey', _anon, 'Authorization', 'Bearer ' || _anon),", "headers := '{}'::jsonb,", 1)],
@@ -24,7 +24,7 @@ M = {
     'needs_three_bad_answers': [("limit 2)", "limit 3)", 1), ("elsif _n >= 2 and _bad = 2 then", "elsif _n >= 3 and _bad = 3 then", 1)],
     'status_404_is_fine': [("j.status_code is distinct from 200\n", "j.status_code is distinct from 404\n", 1)],
     'timeout_is_not_a_failure': [("count(*) filter (where j.timed_out is true or j.status_code is distinct from 200", "count(*) filter (where j.status_code is distinct from 200", 1)],
-    'webhook_not_set_up_reads_ok': [("or (_fn = 'development-activity-billing-webhook' and j.configured is distinct from 'true'))", ")", 1)],
+    'webhook_not_set_up_reads_ok': [("or (_fn = 'paddle-webhook' and j.configured is distinct from 'true'))", ")", 1)],
     'webhook_configured_false_reads_true': [("then 'true' else 'false' end", "then 'true' else 'true' end", 1)],
     'probe_job_stopped_is_never_noticed': [("elsif _newest < now() - interval '40 minutes' then", "elsif false then", 1)],
     'stale_after_two_hours': [("elsif _newest < now() - interval '40 minutes' then", "elsif _newest < now() - interval '2 hours' then", 1)],

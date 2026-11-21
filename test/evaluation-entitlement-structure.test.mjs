@@ -203,9 +203,13 @@ const daCode = code(DA_SQL);
 // docs/acquisition-attribution.sql (2026-10-23) reads the credit ledger through the view (evaluation_credit_all), the paid ledger and `evaluation` (for the brokerage id) to
 // attribute a stored report to an account, READ-ONLY. It writes no row of this layer and calls none of its functions. test/acquisition-attribution.test.mjs pins it.
 const ACQ_SQL = 'docs/acquisition-attribution.sql';
+const PADDLE_SQL_NAMING = 'docs/paddle-billing.sql';
 const acqCode = code(ACQ_SQL);
 const dmlTargets = (t) => { const x = t.replace(/'(?:[^']|'')*'/g, "''"); return [...x.matchAll(/\binsert\s+into\s+(?:public\.)?(\w+)/gi), ...x.matchAll(/\bupdate\s+(?:public\.)?(\w+)\s+\w*\s*set\b/gi), ...x.matchAll(/\bdelete\s+from\s+(?:public\.)?(\w+)/gi), ...x.matchAll(/\btruncate\s+(?:table\s+)?(?:public\.)?(\w+)/gi)].map((m) => m[1]).filter((t) => t !== 'on'); }; // 'on' is the trigger event of `before truncate on <table>`, not a table
-ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, SAVED_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, RATE_SQL, LIMIT_MIGRATION, LIMIT_MIGRATION_100, EVAL_READS, DA_SQL, 'docs/individual-agent-signup.sql', ACQ_SQL].sort())
+ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, SAVED_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, RATE_SQL, LIMIT_MIGRATION, LIMIT_MIGRATION_100, EVAL_READS, DA_SQL, 'docs/individual-agent-signup.sql', ACQ_SQL, PADDLE_SQL_NAMING].sort())
+   // docs/paddle-billing.sql (2026-11-16, founder: no free plan) adds the evaluation.free_reports_granted flag, replaces evaluation_usage to honour it, and splices the paid-plan
+   // gate into brokerage_report_issue. It never writes a credit: no insert/delete on evaluation_credit.
+   && !/\b(insert\s+into|delete\s+from|truncate)\s+(?:public\.)?evaluation_credit\b/i.test(code(PADDLE_SQL_NAMING))
    && !/\b(insert\s+into|update|delete\s+from|truncate|alter\s+table|drop\s+table|create\s+table)\s+(only\s+)?(?:public\.)?evaluation/i.test(acqCode) && !/evaluation_report_issue|evaluation_create|evaluation_usage|evaluation_invite/.test(acqCode) && dmlTargets(acqCode).every((t) => !/^(evaluation|brokerage_)/.test(t))
    && dmlTargets(daCode).length >= 3 && dmlTargets(daCode).every((t) => /^(brokerage_member|share_view_window|billing_checkout_claim)$/.test(t)) && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(?:public\.)?evaluation/i.test(daCode)
    && (daCode.match(/\bpublic\.evaluation_invite_revoke\(/g) || []).length === 2 && !/\bfrom public\.evaluation_invite_revoke|\bperform public\.evaluation_invite_revoke/.test(daCode) && /to_regprocedure\('public\.evaluation_invite_revoke\(uuid,uuid\)'\)/.test(daCode)

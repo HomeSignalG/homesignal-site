@@ -29,19 +29,48 @@ const rp = text(read('refund-policy.html')), rph = read('refund-policy.html'), t
 // Paddle disclosures and links
 ok(ph.includes('href="https://www.paddle.com/legal/privacy"') && /Paddle acts as the Merchant of Record/.test(text(ph)), 'Privacy links the Paddle Privacy Notice and discloses Merchant of Record');
 ok(/When paid checkout is available/.test(text(ph)), 'Privacy payment text is conditional on paid checkout being available');
-// Plan facts, eligibility, free evaluation
-ok(/currently offered as a free evaluation/.test(terms) && !/\$\d/.test(terms), 'Terms: free evaluation, no price');
-ok(/100 free evaluation reports\. No purchase is required/.test(terms), 'Terms: 100 reports are a free evaluation');
-ok(/HomeSignal currently charges nothing, so there is nothing to refund\./.test(rp) && !/\$\d/.test(rp), 'Refund Policy: retired to the single statement that nothing is charged');
-ok(!/Paddle|cancel|renew|paid access|subscription|money-back|\b\d+[- ]day\b/i.test(terms + ' ' + rp), 'Terms and Refund Policy carry no Paddle, cancellation, renewal, paid-access, subscription or refund-window text (free-only, founder 2026-10-16)');
-ok(/Nothing is sold, and no payment is requested or accepted/.test(terms) && /free during the evaluation/.test(terms), 'Terms: free-only, nothing sold');
-// Cancellation and refund are consistent across Terms and Refund Policy
-// Phone on all four pages
-for (const [n, h] of Object.entries({ 'terms.html': th, 'privacy.html': ph, 'refund-policy.html': rph, 'contact.html': ch })) ok(h.includes('<a href="tel:+15716019432"') && text(h).includes('571-601-9432'), n + ' carries the support phone as a tel:+15716019432 link');
-ok(!/\b(hours|business hours|within \d+|response time)\b/i.test(text(ch).slice(text(ch).indexOf('Other ways to reach us'))), 'Contact page invents no hours or response-time promise');
+// Paid plans (founder, 2026-11-16: no free plan, no free trial; Paddle is the Merchant of Record; the customer agrees to the CURRENT terms before purchase)
+const both = terms + ' ' + rp;
+ok(/Last updated November 16, 2026/.test(terms) && /Last updated November 16, 2026/.test(rp), 'Terms and Refund Policy carry the current version date (November 16, 2026)');
+{
+  // the version the page asks a purchaser to agree to, the version the database accepts and the date these pages show are ONE value
+  const pageV = /var TERMS_VERSION = '(\d{4}-\d{2}-\d{2})'/.exec(read('development-activity-reports.html'));
+  const dbV = /into public\.billing_terms_version \(version, effective_at\) values \('(\d{4}-\d{2}-\d{2})'/.exec(read('docs/paddle-billing.sql'));
+  const shown = new Date(pageV[1] + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  ok(pageV && dbV && pageV[1] === dbV[1] && terms.includes('Last updated ' + shown) && rp.includes('Last updated ' + shown), 'the checkout page, the database and both legal pages name the SAME terms version', [pageV && pageV[1], dbV && dbV[1], shown]);
+}
+ok(/Paddle\.com is the Merchant of Record for all orders/.test(terms) && /Paddle\.com is the Merchant of Record for all orders/.test(rp), 'Terms and Refund Policy both identify Paddle.com as the Merchant of Record');
+ok(/Professional: \$78 per month/.test(terms) && /renews automatically each month until you cancel/.test(terms), 'Terms: Professional is $78 per month, recurring, renews automatically until cancelled');
+ok(/Private Partner Offer: \$234, paid once/.test(terms) && /Six months of Professional access/.test(terms) && /does not renew automatically/.test(terms), 'Terms: the Private Partner Offer is $234 once for six months and does not renew');
+ok(/100 reports per monthly billing period/.test(terms) && /unused reports do not carry over/.test(terms), 'Terms: 100 reports per monthly period, no carry-over');
+ok(/Cancelling stops future renewals and your access continues until the end of the period you have already paid for/.test(terms), 'Terms: cancellation keeps access to the end of the paid period');
+ok(/ends automatically six months after purchase/.test(terms) && /ends automatically six months after purchase/.test(rp), 'Terms and Refund Policy: the partner offer expires after six months by itself');
+ok(/every 30 days/.test(terms) && /every 30 days/.test(rp) && /late check does not end your access|If a check is late, we review it by hand and your access continues/.test(terms + ' ' + rp) && /confirm that you (were not or are no longer|are not) eligible/.test(terms + ' ' + rp), 'Terms and Refund Policy: 30-day eligibility re-checks, a late check never suspends, confirmed ineligibility does');
+ok(/Cancel any time/.test(rp) && /No partial-month refunds/.test(rp) && /No refund of unused months/.test(rp) && /A full refund or a chargeback ends access/.test(rp), 'Refund Policy: cancellation, no partial-period refunds, and what a full refund does to access');
+ok(/reports you (have )?already made stay available|Reports you made while your plan was active remain available/i.test(both), 'historical reports stay available after cancellation, expiry or suspension');
+ok(/agree to these Terms and to the <?[^.]*Refund Policy before you pay|agree to these Terms and to the Refund Policy before you pay/.test(terms), 'Terms: the customer agrees to the Terms and Refund Policy before paying');
+ok(/\$78/.test(both) && /\$234/.test(both), 'the two prices appear in the legal pages');
+// no free plan, no free trial, no free-evaluation promise anywhere in the legal pages (a negation such as "no free plan" is the only mention allowed)
+for (const [n, t] of [['terms.html', terms], ['refund-policy.html', rp]]) {
+  const bad = [...t.matchAll(/\b(free|trial|evaluation|no payment is requested|nothing is sold|nothing to refund)\b/gi)].filter((m) => !/\b(no|not)\s+(free\s+)?$/i.test(t.slice(Math.max(0, m.index - 14), m.index)) && !/no free plan and no free trial/.test(t.slice(Math.max(0, m.index - 20), m.index + 30)));
+  ok(bad.length === 0, n + ' carries no free-plan, free-trial or free-evaluation promise and no "nothing is charged" statement', bad.map((m) => t.slice(Math.max(0, m.index - 30), m.index + 30)));
+}
+// every customer-facing page: no obsolete free promise, and no Lemon Squeezy anywhere (visible text AND source)
+{
+  const pagesToScan = ['index.html', 'about.html', 'how-it-works.html', 'contact.html', 'privacy.html', 'terms.html', 'refund-policy.html', 'development-activity.html', 'development-activity-reports.html', 'reports.html', 'shared-report.html', 'dashboard.html', 'alerts.html'];
+  for (const f of pagesToScan) {
+    const raw = read(f), vis = text(raw.replace(/<!--[\s\S]*?-->/g, '').replace(/<style[\s\S]*?<\/style>/g, ' '));
+    const lit = [...raw.replace(/<!--[\s\S]*?-->/g, '').matchAll(/(['"])((?:\\.|(?!\1).)*?)\1/g)].map((m) => m[2]).filter((x) => x.length > 8 && /[ ]/.test(x));
+    const hits = (t) => [...t.matchAll(/\b(free (plan|trial|evaluation|for agents|during beta|reports?)|start free|free[- ]trial|during beta|public beta|trial (customer|period|ends?|is complete))\b/gi)].filter((m) => !/\bno (free )?$/i.test(t.slice(Math.max(0, m.index - 6), m.index)) && !/no free plan and no free trial/.test(t.slice(Math.max(0, m.index - 6), m.index + 40)));
+    const bad = [...hits(vis), ...lit.flatMap((x) => hits(x))];
+    ok(bad.length === 0, f + ' makes no free-plan, free-trial or beta promise in its visible text or its message strings', bad.map((m) => m[0]));
+    ok(!/lemon\s*squeezy|lemonsqueezy/i.test(raw), f + ' does not mention Lemon Squeezy anywhere');
+  }
+  ok(!/lemonsqueezy|lemon\s*squeezy/i.test(read('supabase/functions/_shared/billing-switch.ts') + read('supabase/config.toml')), 'no Lemon Squeezy function or setting remains in the billing switch or the function config');
+}
 ok(!/personal, non-commercial/i.test(terms), 'Terms do not carry the personal, non-commercial clause');
 ok(/HomeSignal/.test(terms), 'Terms name HomeSignal');
-ok(!/\$79|per month/.test(terms + rp), 'Terms and Refund Policy carry no $79 or monthly price');
+ok(!/\$79/.test(terms + rp) && !/9\.99/.test(terms + rp), 'Terms and Refund Policy carry no $79 and no $9.99 price');
 ok(/href="refund-policy\.html"/.test(read('terms.html')), 'Terms link the Refund Policy');
 ok(/share[^.]*reports[^.]*clients/i.test(terms), 'Terms allow sharing reports with clients');
 

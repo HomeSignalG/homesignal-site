@@ -40,7 +40,7 @@ ok(t4 && t4.message === 'h', '4b a failing sink does not replace the handler err
 
 // 5. the wiring: the three functions are wrapped, and nothing else in them logs
 const FN = 'supabase/functions/';
-for (const f of ['get-development-activity-report', 'development-activity-billing-webhook', 'manage-billing']) {
+for (const f of ['get-development-activity-report', 'paddle-webhook', 'manage-billing']) {
   const idx = readFileSync(FN + f + '/index.ts', 'utf8').replace(/^\s*\/\/.*$/gm, '');
   ok(new RegExp("Deno\\.serve\\(withSafeLog\\('" + f + "',").test(idx) && /_shared\/safe-log\.ts/.test(idx), '5a ' + f + ': the served handler is wrapped');
   ok((idx.match(/console\./g) || []).length === 1 && /\(line\) => console\.log\(line\)/.test(idx), '5b ' + f + ': the only console call passes the fixed line');

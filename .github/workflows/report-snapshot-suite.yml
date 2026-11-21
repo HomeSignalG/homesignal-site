@@ -61,12 +61,12 @@ name: report-snapshot-suite
 #      refused, a second apply, the rollback with paid reports stored (the six readers put back to exactly their earlier definitions), the refusals
 #      when a layer or a splice anchor is absent, and every prohibited mutation, each of which MUST fail a NAMED check (a crash fails the run).
 #  10. THE LAUNCH GATE (test/launch_gate_pg; Development Activity build step 13), in its own job: the plan's end-to-end sequence as ONE scenario, through the
-#      real handlers and data layers of development-activity-trial, get-development-activity-report, manage-billing and development-activity-billing-webhook,
+#      real handlers and data layers of development-activity-trial, get-development-activity-report, manage-billing and paddle-webhook,
 #      against the SHIPPED SQL of every layer the product stands on: sign-up (admin creates the trial, owner joins, owner invites an agent), ten free
 #      reports, the end of the trial, the owner's checkout, the processor's test payment (which grants nothing) and live payment (which binds the subscription
 #      to the brokerage and opens a month of 100), a hundred paid reports, the 101st refused, saved reports across both ledgers, another brokerage unable to
 #      read or take any of it, and a cancellation that ends new reports and deletes nothing. The payment processor is a stand-in that records what it was sent:
-#      NOTHING here reaches Lemon Squeezy, holds a real key or charges anyone, and the processor's field names are still the unconfirmed ones (see
+#      NOTHING here reaches Paddle, holds a real key or charges anyone, and the processor's field names are still the unconfirmed ones (see
 #      docs/development-activity-launch-gate-2026-10-04.md). Its mutation loop (test/launch_gate_mutants.py) is manual, like the other mutation loops.
 #  11. THE REPORT RATE LIMIT (docs/report-rate-limit.sql; launch-readiness, the carried open item "free-report rate limit"), in its own job: a ceiling on how
 #      many report REQUESTS a member and their brokerage may make in a minute, an hour and a day, counted by the DATABASE in fixed windows, serialised, with
@@ -156,6 +156,9 @@ on:
       - 'supabase/functions/manage-property-watch/**'
       - 'supabase/functions/run-property-watch/**'
       - 'docs/brokerage-billing.sql'
+      - 'docs/paddle-billing.sql'
+      - 'supabase/functions/paddle-webhook/**'
+      - 'supabase/functions/_shared/paddle-billing.ts'
       - 'docs/payment-event-ledger.sql'
       - 'docs/report-header.sql'
       - 'test/brokerage_billing_pg/**'
@@ -171,11 +174,11 @@ on:
       - 'supabase/functions/_shared/rate-reads.ts'
       - 'test/billing-structure.test.mjs'
       - 'test/billing-functions.test.mjs'
-      - 'test/lemon-billing.test.mjs'
+      - 'test/paddle-billing.test.mjs'
       - 'supabase/functions/_shared/billing-reads.ts'
-      - 'supabase/functions/_shared/lemon-billing.ts'
+      - 'supabase/functions/_shared/paddle-billing.ts'
       - 'supabase/functions/manage-billing/**'
-      - 'supabase/functions/development-activity-billing-webhook/**'
+      - 'supabase/functions/paddle-webhook/**'
       - '.github/workflows/report-snapshot-suite.yml'
   push:
     branches: [main]
@@ -247,6 +250,9 @@ on:
       - 'supabase/functions/manage-property-watch/**'
       - 'supabase/functions/run-property-watch/**'
       - 'docs/brokerage-billing.sql'
+      - 'docs/paddle-billing.sql'
+      - 'supabase/functions/paddle-webhook/**'
+      - 'supabase/functions/_shared/paddle-billing.ts'
       - 'docs/payment-event-ledger.sql'
       - 'docs/report-header.sql'
       - 'test/brokerage_billing_pg/**'
@@ -262,11 +268,11 @@ on:
       - 'supabase/functions/_shared/rate-reads.ts'
       - 'test/billing-structure.test.mjs'
       - 'test/billing-functions.test.mjs'
-      - 'test/lemon-billing.test.mjs'
+      - 'test/paddle-billing.test.mjs'
       - 'supabase/functions/_shared/billing-reads.ts'
-      - 'supabase/functions/_shared/lemon-billing.ts'
+      - 'supabase/functions/_shared/paddle-billing.ts'
       - 'supabase/functions/manage-billing/**'
-      - 'supabase/functions/development-activity-billing-webhook/**'
+      - 'supabase/functions/paddle-webhook/**'
       - '.github/workflows/report-snapshot-suite.yml'
   workflow_dispatch: {}
 
@@ -474,6 +480,21 @@ jobs:
         run: |
           set -o pipefail
           bash test/brokerage_billing_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/billing.log
+      - name: Paddle billing - the SQL (both checkout flows' entitlements, six monthly allotments then expiry, refunds, replays, out-of-order, sandbox never live, partner eligibility) applies twice identically and rolls back
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/paddle_billing_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/paddle-billing.log
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Paddle billing - the edge half (signature, binding, translation, both handlers and data layers)
+        run: node test/paddle-billing.test.mjs
 
   report-rate-limit:
     runs-on: ubuntu-latest
@@ -587,7 +608,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Refuse to run if any Supabase credential, processor key or signing secret is present
         run: |
-          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}${LEMON_SQUEEZY_API_KEY:-}${LEMON_SQUEEZY_WEBHOOK_SECRET:-}" ]; then
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}${PADDLE_API_KEY:-}${PADDLE_WEBHOOK_SECRET_LIVE:-}" ]; then
             echo "ABORT: this gate must only ever address the disposable container and a stand-in processor."; exit 1
           fi
       - name: Install psql

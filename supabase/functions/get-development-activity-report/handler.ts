@@ -41,7 +41,7 @@ import { readReportInputs } from '../_shared/report-run.ts';
 import { creditDecision, CREDIT_RULE_VERSION } from '../_shared/credit-rule.ts';
 import { authorizeReportCaller, trialSummary, MAX_BODY_BYTES, ALLOWED_ORIGINS, readBounded, reply, TOO_LARGE, corsFor } from '../_shared/admin-gate.ts';
 import type { TrialState } from '../_shared/admin-gate.ts';
-import { AllotmentComplete, EvaluationComplete, NotEntitled } from '../_shared/report-snapshot.ts';
+import { AllotmentComplete, EvaluationComplete, NotEntitled, PaidPlanRequired } from '../_shared/report-snapshot.ts';
 import { planSummary } from '../_shared/billing-reads.ts';
 import type { BillingUsage } from '../_shared/billing-reads.ts';
 import type { RateVerdict } from '../_shared/rate-reads.ts';
@@ -289,6 +289,7 @@ export function makeHandler(deps: Deps) {
         // a refusal stores nothing and charges nothing, and returns no report (a report given anyway would be a free report)
         if (e instanceof EvaluationComplete) return reply(req, { error: 'evaluation_complete' }, 403);
         if (e instanceof AllotmentComplete) return reply(req, { error: 'allotment_complete' }, 403);
+        if (e instanceof PaidPlanRequired) return reply(req, { error: 'payment_required' }, 402);
         if (e instanceof NotEntitled) return reply(req, { error: 'forbidden' }, 403);
         throw e;
       }

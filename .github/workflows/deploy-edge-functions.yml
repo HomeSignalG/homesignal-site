@@ -81,7 +81,7 @@ jobs:
           # gate (matches its live config). (2) view-shared-report (Development Activity step 8): the
           # client who opens a private share link has no account, so the link's secret token is the only
           # credential and the function itself answers only a token the database says is usable; it
-          # reads one stored report and writes nothing. (3) development-activity-billing-webhook
+          # reads one stored report and writes nothing. (3) paddle-webhook
           # (Development Activity step 11): the payment processor sends no Supabase token, so the
           # processor's own HMAC signature over the raw body, checked before the body is parsed, is the
           # only credential, and the function refuses everything when its signing secret is not set.
@@ -98,7 +98,7 @@ jobs:
             supabase functions deploy "$FN" --yes \
               --project-ref "$SUPABASE_PROJECT_REF" \
               --no-verify-jwt
-          elif [ "$FN" = "development-activity-billing-webhook" ]; then
+          elif [ "$FN" = "paddle-webhook" ]; then
             supabase functions deploy "$FN" --yes \
               --project-ref "$SUPABASE_PROJECT_REF" \
               --no-verify-jwt
