@@ -12,6 +12,23 @@ the repo is what ships.
 
 ---
 
+## MANDATORY — CLAUDE USAGE COST CONTROL (founder, 2026-11-17)
+
+The founder reported $30 in extra Claude usage in 30 minutes. Treat model usage as a scarce business resource. This rule applies automatically to EVERY session; the founder must never have to repeat it.
+
+- **One task, one bounded scope.** Work only on the explicitly requested outcome. Prefer the smallest safe change and existing architecture. Do not expand into adjacent fixes, nationwide scans/backfills, unrelated refactors, or new features without explicit approval.
+- **No unnecessary parallel work.** Do not launch subagents, agent teams, or parallel investigations unless explicitly authorized. Check existing PRs, prior evidence, and active work before duplicating anything.
+- **Read narrowly.** Search for relevant files and symbols; read the necessary sections, not entire large files or repeated full logs. Reuse verified results unless the relevant state has changed.
+- **Test efficiently, not less safely.** Run the necessary targeted tests and required safety gates. Do not rerun unchanged successful tests or full suites unnecessarily. Never weaken verification, approvals, data rights, or security to save tokens.
+- **No continuous CI polling.** Use existing CI notifications or check results once when needed. If required checks are still pending, report the PR and pending checks and end the turn; do not spend model usage waiting, monitoring, or repeatedly checking. Resume on explicit request or an existing authorized event-driven workflow.
+- **Stop at the boundary.** If blocked, if the task needs material scope expansion, or if further attempts would repeat the same work, report the evidence, blocker, and smallest next action, then stop. Do not begin unrelated remediation. Do not continue into additional tasks without explicit approval.
+- **No extra paid usage by default.** Never purchase, enable, or recommend automatic reload of additional Claude credits as a workaround. Use the lowest suitable model when selection is available; do not escalate to a higher-cost model without a genuine need. Do not claim to know exact spend or remaining budget unless measured through an authorized usage interface.
+- **Concise output.** Report the result, evidence, blockers and next action once. Avoid repetitive progress narration and lengthy restatements. Preserve existing evidence and approval requirements.
+
+This is a cost-control instruction, not authorization to change production or bypass any existing founder rule.
+
+---
+
 ## Claims discipline — verify the field, attach the evidence (read before asserting)
 
 Most broken rules are just claims that weren't verified. Operational, not abstract:
