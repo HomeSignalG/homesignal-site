@@ -133,5 +133,15 @@ ok(fcalls.join(',') === 'hs_feed_inventory_page:kind:meetings:0,hs_feed_inventor
 const fdsql = rd('../docs/feed-inventory-health.sql');
 ok(/dashboard_admins/.test(fdsql) && /revoke all on function public\.hs_feed_inventory_page/.test(fdsql) && !/\b(insert|update|delete)\b\s+(into\s+)?public\.(feeds|alerts|meetings)\b/i.test(fdsql.replace(/--[^\n]*/g, '')), 'the feed inventory is admin-gated and never writes feeds, alerts or meetings');
 
+// ---- findings that age out (2026-11-21) ----
+const mkF = (key, basis, ev) => ({ finding_key: key, class: 'SOURCE_READ_FAILURE', subject: key.split('|')[1], severity: 'bad', first_seen: '2026-11-20T17:35:00Z', last_seen: '2026-11-20T22:55:00Z', resolved_at: '2026-11-20T23:55:00Z', resolution_basis: basis, resolution_evidence: ev, detail: { what: 'Source read failed', zip_count: 1, zips: [] } });
+const monAged = mon({ findings: [mkF('SOURCE_READ|a', 'AGED_OUT_UNCONFIRMED', { proof: 'the failure left the 48-hour window; no later successful read has been observed', failed_zips: 6, zips_read_again: 5 }), mkF('SOURCE_READ|b', 'POSITIVE_EVIDENCE', { proof: 'every failing ZIP was read again later with no newer failure', failed_zips: 3, zips_read_again: 3 })] });
+const mhAged = H.render({ rollup: real() }, NOW, monAged, null, null);
+ok(/Aged out, recovery not confirmed \(1\)/.test(mhAged) && /Recovered with evidence in the last 7 days \(1\)/.test(mhAged), 'an aged-out failure is listed apart from findings recovered with evidence');
+ok(/AGED OUT · RECOVERY NOT CONFIRMED/.test(mhAged) && (mhAged.match(/<b>RECOVERED<\/b>/g) || []).length === 1, 'an aged-out failure is never labelled RECOVERED');
+ok(/5 of 6 failing ZIPs read again/.test(mhAged) && /3 of 3 failing ZIPs read again/.test(mhAged), 'each resolution says what evidence it rests on');
+const rsql = rd('../docs/zip-feed-health-resolution.sql');
+ok(/AGED_OUT_UNCONFIRMED/.test(rsql) && /anchor appeared/.test(rsql) && /later tick|last_tick_at > lf\.at/.test(rsql) && /resolution_basis = ''?AGED_OUT_UNCONFIRMED/.test(rsql) && !/\b(insert|delete)\b\s+(into|from)\s+public\.(feeds|alerts|meetings|dev_)/i.test(rsql.replace(/--[^\n]*/g, '')), 'the recorder records why a finding left, re-checks unconfirmed ones, and writes no source data');
+
 console.log(`\n${n - bad}/${n} passed`);
 process.exit(bad ? 1 : 0);
