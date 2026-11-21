@@ -112,6 +112,36 @@ export function chooseControls(pins, members) {
 }
 
 
+// ── THE ONE NARROW EXCEPTION: NO WEATHER ANYWHERE (founder, 2026-11-21) ────────────────
+//
+// `weather_thin` is "weather present, still under Rule F". Weather alerts are live NWS data, so on a quiet
+// day NO ZIP page shows any, the class is empty, and the build failed (every `pages` run from about
+// 04:45 UTC on 2026-11-21) — which stops EVERY site update over today's weather, not a defect.
+//
+// The test is skipped ONLY when the class is empty AND zero ZIP documents carry a weather section.
+// If any page shows weather and still no control resolves, that is a real misclassification and it
+// stays a hard failure. No other class ever skips. The caller must print the skip loudly.
+export const WEATHER_SECTION = /<h2>Weather alerts<\/h2>/;
+
+/** Count the ZIP documents that display a weather section. Same read as classifyMembers. */
+export async function countWeatherZips(SITE, deps = {}) {
+  const rd = deps.readdir || (await import('node:fs/promises')).readdir;
+  const rf = deps.readFile || readFile;
+  const dirs = (await rd(join(SITE, 'community'), { withFileTypes: true }))
+    .filter((d) => d.isDirectory() && /^\d{5}$/.test(d.name)).map((d) => d.name);
+  let n = 0;
+  for (const z of dirs) {
+    let h; try { h = await rf(join(SITE, 'community', z, 'index.html'), 'utf8'); } catch { continue; }
+    if (WEATHER_SECTION.test(h)) n++;
+  }
+  return n;
+}
+
+/** PURE decision: skip `weather_thin` only if it is empty and `weatherZips` is exactly 0. */
+export function weatherThinMaySkip(empties, weatherZips) {
+  return Array.isArray(empties) && empties.includes('weather_thin') && weatherZips === 0;
+}
+
 // ── PUBLISHING THE MEMBERSHIP, SO THE DEPLOYED TWIN RESOLVES THE SAME CONTROLS ─────────
 //
 // ⚖️ WHY THIS EXISTS (2026-09-15). The derivation above shipped to the BUILD twin only.

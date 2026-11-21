@@ -21,7 +21,7 @@
 // browser suites by text-matching the TEST FILE for a playwright import, which cannot see a
 // transitive one.
 import { classifyMembers, chooseControls, publishedControls, membersFromPublished,
-         CONTROLS_FILE } from '../scripts/lib/zip-page-controls.mjs';
+         CONTROLS_FILE, countWeatherZips, weatherThinMaySkip } from '../scripts/lib/zip-page-controls.mjs';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail) => {
@@ -239,6 +239,25 @@ const main = async () => {
     const bad = offline.map((f) => [f, reaches(join(testDir, f))]).filter(([, v]) => v);
     ok('no offline suite reaches playwright transitively', bad.length === 0,
       bad.map(([f, v]) => `${f} -> ${v}`).join(', '));
+  }
+
+
+  console.log('\n9) THE ONE NARROW SKIP: weather_thin only, only when NO ZIP page shows weather');
+  {
+    const NOWX = { '10001': DOC({ ln: true, gn: true, um: true }), '10002': DOC({}) };
+    const dNo = { readdir: async () => Object.keys(NOWX).map((name) => ({ name, isDirectory: () => true })),
+                  readFile: async (p) => NOWX[String(p).match(/(\d{5})/)[1]] };
+    ok('countWeatherZips counts 0 on a quiet-weather site', (await countWeatherZips('_site', dNo)) === 0);
+    ok('countWeatherZips counts the pages that show weather', (await countWeatherZips('_site', deps)) === 1);
+    ok('SKIP: weather_thin empty AND 0 weather pages', weatherThinMaySkip(['weather_thin'], 0) === true);
+    ok('NO skip: weather_thin empty but weather IS shown somewhere (real misclassification)',
+      weatherThinMaySkip(['weather_thin'], 1) === false);
+    ok('NO skip: weather count unknown (null) is never treated as zero', weatherThinMaySkip(['weather_thin'], null) === false);
+    ok('NO skip for any other empty class', weatherThinMaySkip(['local_news'], 0) === false
+      && weatherThinMaySkip(['honest_empty', 'fanout'], 0) === false);
+    ok('NO skip when weather_thin is not empty', weatherThinMaySkip([], 0) === false);
+    ok('a mixed empty set still skips only because weather_thin is in it (the others stay hard failures in the caller)',
+      weatherThinMaySkip(['weather_thin', 'local_news'], 0) === true);
   }
 
   console.log(fail ? `\n${fail} check(s) FAILED` : `\nAll ${pass} control-resolution checks passed.`);
