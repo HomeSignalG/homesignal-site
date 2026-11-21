@@ -223,7 +223,7 @@ try {
     const base = stale(W);
     ok(base.has && /over a year old/.test(base.c) && /records? carr(?:y|ies) (?:an )?official dates?/.test(base.brief), '3d2a the fixture\'s old record is flagged in its row AND counted in the briefing (the baseline, and the positive control, for the checks below)', base.brief);
     const fo = stale(withRd((e) => { e.verify = { rule: 'freshness-1', reason: 'filing_only', latest_official_date: e.date }; }));
-    ok(fo.has && /Verify: Issued Jan 10, 2025\. Jody holds no later official date for this record\. Confirm it is still active\./.test(fo.c) && !/over a year old/.test(fo.c), '3d2b a filing_only verdict says Jody holds no later official date, and does not call the project old', fo.c);
+    ok(fo.has && /Verify: Issued Jan 10, 2025\. No later official date is available in the source data used for this report\. Confirm it is still active\./.test(fo.c) && !/over a year old/.test(fo.c), '3d2b a filing_only verdict says Jody holds no later official date, and does not call the project old', fo.c);
     const cleared = stale(withRd((e) => { e.verify = null; }));
     ok(!cleared.has && !/over a year old/.test(cleared.c) && !/records? carr(?:y|ies) (?:an )?official dates?/.test(cleared.brief), '3d2c verify: null (a later official date exists) clears the Verify line AND the briefing count, though the date is still over a year old', cleared);
     const plain = stale(withRd((e) => { e.verify = { rule: 'freshness-1', reason: 'old_date', latest_official_date: e.date }; }));
@@ -348,15 +348,29 @@ try {
     const q = (rj, lim) => { const x = clone(WNONE); x.report.activity = { outcome: 'NO_SIGNIFICANT_CHANGES', label: 'No significant nearby changes found', rule_version: 'activity-outcome-2', records_judged: rj };
       if (lim) x.report.coverage = Object.assign({}, x.report.coverage, { limitations: [{ code: 'SOURCE_NOT_FULLY_READ', text: 'A source was not fully read.' }] }); return textOf(V.html(x, {})); };
     const all = q({ total: 4, routine: 4, undescribed: 0, temporary_ended: 0 });
-    ok(/No significant nearby changes found/.test(all) && /Jody checked 4 official records (within [\d.]+ miles? of|near) this property\. All of them describe routine work, such as interior remodels, repairs and office fit-outs\. None documents a change the neighborhood would notice\./.test(all)
+    ok(/No significant nearby changes found/.test(all) && /Jody checked 4 official records (within [\d.]+ miles? of|near) this property\. All of them describe routine work, such as interior remodels, repairs and office fit-outs\. This is limited to the connected sources listed under Official evidence & coverage\./.test(all)
       && !/No data ingested|Records left out of this report|could still matter/.test(all), '5l2 all routine: the founder\'s wording, with the count, and no "No data ingested"', all.slice(0, 500));
     const mix = q({ total: 4, routine: 2, undescribed: 1, temporary_ended: 1 });
-    ok(/2 describe routine work, such as interior remodels, repairs and office fit-outs; 1 does not say what the work is, or when a temporary activity takes place; 1 was a temporary activity that has ended\. None documents/.test(mix)
+    ok(/2 describe routine work, such as interior remodels, repairs and office fit-outs; 1 does not say what the work is, or when a temporary activity takes place; 1 was a temporary activity that has ended\. This is limited to/.test(mix)
       && /could still matter: check it at its official source\./.test(mix), '5l3 mixed: each kind is counted, and an undescribed record is flagged as possibly mattering', mix.slice(0, 600));
     const bad = q({ total: 4, routine: 3, undescribed: 0, temporary_ended: 0 });
-    ok(/Jody read the official records (within [\d.]+ miles? of|near) this property and left every one out\. None documents/.test(bad) && !/checked 4/.test(bad), '5l4 counts that do not add up are not printed', bad.slice(0, 400));
+    ok(/None of the records Jody read (within [\d.]+ miles? of|near) this property met this report's criteria for a nearby change\. This is limited to/.test(bad) && !/checked 4/.test(bad), '5l4 counts that do not add up are not printed', bad.slice(0, 400));
     const lim = q({ total: 1, routine: 1, undescribed: 0, temporary_ended: 0 }, true);
     ok(/It describes routine work/.test(lim) && /Not every source was read in full, so this is not a complete answer/.test(lim), '5l5 one record, singular; a limitation says the answer is not complete', lim.slice(0, 500));
+    { // the read-failure sentence needs explicit read-failure evidence, never just any limitation
+      const SENT = /At least one connected source could not be read in full, so its records may be missing from this report\./;
+      const w = (lims, cats) => { const y = clone(WNONE); y.report.activity = { outcome: 'NO_SIGNIFICANT_CHANGES', label: 'No significant nearby changes found', rule_version: 'activity-outcome-2' };
+        y.report.coverage = Object.assign({}, y.report.coverage, { limitations: lims });
+        if (cats === null) delete y.report.coverage.categories; else y.report.coverage.categories = Object.assign({ rule: 'coverage-categories-2', connected: [], not_connected: [], not_established: [] }, cats);
+        return textOf(V.html(y, {})); };
+      const FAIL = [{ code: 'SOURCE_NOT_FULLY_READ', text: 'x' }];
+      ok(SENT.test(w(FAIL, {})), '5l6a an incomplete source read shows the read-failure sentence');
+      ok(!SENT.test(w([], { not_connected: [{ label: 'Building permits' }] })) && /No connected source covers Building permits/.test(w([], { not_connected: [{ label: 'Building permits' }] })), '5l6b missing category coverage alone does not claim a failed read (its own sentence still shows)');
+      ok(!SENT.test(w([], { not_established: [{ label: 'Building permits' }] })) && /Coverage is not established for Building permits/.test(w([], { not_established: [{ label: 'Building permits' }] })), '5l6c unknown category coverage alone does not claim a failed read');
+      ok(!SENT.test(w([{ code: 'AREA_TRUNCATED', text: 'This area holds more records than one report can carry; the list is incomplete.' }], {})), '5l6d an unrelated limitation alone does not claim a failed read');
+      ok(SENT.test(w(FAIL, null)), '5l6e the sentence appears with no category-coverage metadata at all');
+      ok(SENT.test(w(FAIL, { not_connected: [{ label: 'Building permits' }] })) && /No connected source covers Building permits\. At least one connected source could not be read/.test(w(FAIL, { not_connected: [{ label: 'Building permits' }] })), '5l6f with category coverage too, the coverage sentences come first and the read-failure sentence follows');
+    }
   }
   const proven = clone(WNONE); proven.report.activity = { outcome: 'NO_DEVELOPMENT_ACTIVITY', label: 'No development activity', rule_version: 'activity-outcome-1' };
   const hp = view(proven), op = sec(hp, 'outcome');

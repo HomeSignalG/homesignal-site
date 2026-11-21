@@ -188,9 +188,9 @@ m('bucket_line_back_on_customer_card', "      + (dc ? line('Jody detected'", "  
 m('verify_verdict_ignored', "old: judged ? isObj(v) : e.older_than_a_year === true,", "old: e.older_than_a_year === true,")
 m('malformed_verify_silences_warning', "judged = v === null || isObj(v);", "judged = v !== undefined;")
 m('saved_report_never_flagged', ": e.older_than_a_year === true,\n      filingOnly", ": false,\n      filingOnly")
-m('filing_only_wording_dropped', "(rd.filingOnly ? '. Jody holds no later official date for this record.", "(false ? '. Jody holds no later official date for this record.")
+m('filing_only_wording_dropped', "(rd.filingOnly ? '. No later official date is available in the source data used for this report.", "(false ? '. No later official date is available in the source data used for this report.")
 # report-accuracy-universal (2026-11-19): a creation date is never read as a filing, an edit is never a milestone, a status date is the source's own, and an empty answer speaks only for the connected sources
-m('creation_only_wording_dropped', ": rd.creationOnly ? '. Jody holds no later project date", ": false ? '. Jody holds no later project date", ['test/report-accuracy-universal.test.mjs', 'test/report-source-dates-path.test.mjs'])
+m('creation_only_wording_dropped', ": rd.creationOnly ? '. No later project date is available in the source data used for this report", ": false ? '. No later project date is available in the source data used for this report", ['test/report-accuracy-universal.test.mjs', 'test/report-source-dates-path.test.mjs'])
 m('modification_shown_without_its_meaning', "a modification is not a project milestone and does not confirm the status.", "a modification confirms the status.", ['test/report-accuracy-universal.test.mjs', 'test/report-source-dates-path.test.mjs'])
 m('status_date_note_dropped', "return sd ? 'Agency status updated ' + sd + '.' : '';", "return '';", ['test/report-accuracy-universal.test.mjs', 'test/report-source-dates-path.test.mjs'])
 m('empty_answer_caveat_dropped', "var cav = key === 'NO_SIGNIFICANT_CHANGES' || key === 'NO_DATA_INGESTED' || key === 'NO_DEVELOPMENT_ACTIVITY' ? emptyCaveat(report) : '';", "var cav = '';", ['test/report-accuracy-universal.test.mjs', 'test/report-source-dates-path.test.mjs'])
