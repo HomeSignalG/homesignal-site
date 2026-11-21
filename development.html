@@ -28,6 +28,7 @@
 <script src="lib/topic-prefs.js?v=fe87d99b"></script>
 <script src="lib/templates.js?v=7373e258"></script>
 <script src="lib/project-type.js?v=852af398"></script>
+<script src="lib/air-permits.js?v=da8ea75e"></script>
 <script src="lib/coverage-copy.js"></script>
 <script src="lib/impact.js"></script>
 <script src="lib/why.js"></script>
@@ -67,6 +68,11 @@ HS.onReady(async function () {
       + '<button class="btn primary" onclick="location.reload()">Try again</button>';
     return;
   }
+  // AIR PERMITS & FILINGS (2026-11-21, docs/air-permits.sql): its own section on the Quality of Life Impact page, read separately
+  // so a failed read never blocks the development list and renders its own "could not be read" words (never "none").
+  var airBody = null;
+  if (HS.airPermits && S.zip) { try { airBody = await HS.airPermits.load(S.zip); } catch (e) { airBody = null; } }
+  function airSection() { return (HS.airPermits && S.zip) ? HS.airPermits.sectionHTML(airBody) : ''; }
 
   // HONEST EMPTY STATE. Only paid for when there is nothing to show: a page with records
   // never runs these reads. The block this produces replaces the old empty-state promise,
@@ -205,7 +211,8 @@ HS.onReady(async function () {
         + '</div><div class="sp"></div>'
         + '<button class="fpill" id="devDataBtn">⊞ Table view</button></div>'
         + body
-        + facSection();   // regulated facilities are appended in their OWN labeled section, never the dev list
+        + facSection()    // regulated facilities are appended in their OWN labeled section, never the dev list
+        + airSection();   // air permits & filings: their own section; never counted as development
       wire();
       // This page rebuilds its .ph dynamically, so re-run the shared header
       // context line (shell.js::HS.paintWhereLine) after each paint.
