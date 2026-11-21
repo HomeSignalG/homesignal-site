@@ -115,21 +115,21 @@ ok(/last_tick_at > f\.seen_at/.test(dsql) && /anchor 1 appeared/.test(dsql), 'a 
 ok(!/\b(insert|update|delete)\b\s+(into\s+)?public\./i.test(dsql.replace(/--[^\n]*/g, '')), 'the detail SQL writes nothing');
 
 // ---- legacy feed inventory (2026-11-20) ----
-const fsum = { feeds_total: 3302, active: 2944, inactive: 358, communities: 507, distinct_sources: 796, active_feeds_sharing_a_source: 2231, active_feeds_reaching_no_zip_page: 0, active_feeds_unknown_community: 0, health_unknown: 2944,
+const fsum = { feeds_total: 3302, active: 2944, inactive: 358, communities: 507, distinct_sources: 796, active_feeds_sharing_a_source: 2231, active_feeds_reaching_no_zip_page: 0, active_feeds_unknown_community: 0, health_unknown: 2944, feeds_with_outcome: 0, health_states: { NEVER_CHECKED: 2944 }, stale_note: 'STALE_EVIDENCE is a monitoring threshold (12 hours), not a source publishing schedule.',
   proxy_note: 'Proxy only: whether anything was stored for the community.', not_in_this_inventory: 'Local News registry endpoints are not in this inventory', parent_job: { last_completed: '2026-11-20T17:21:00Z', proves: 'a run completed, not that each feed succeeded' },
   by_kind_evidence: [{ kind: 'meetings', evidence_class: 'STORED_OUTPUT_WITHIN_30D', feeds: 2000 }, { kind: 'alerts_government', evidence_class: 'NO_STORED_OUTPUT_FOR_COMMUNITY', feeds: 16 }] };
 const fh = HS.feedInventoryHtml(fsum);
-ok(/Health unknown for all 2,944/.test(fh) && !/(is|are) healthy|Healthy:/i.test(fh), 'every feed reads health unknown, never healthy');
+ok(/0 of 2,944 active feeds have a recorded read outcome/.test(fh) && /Never checked \(no recorded outcome\)/.test(fh) && /unknown, not healthy/.test(fh) && !/(is|are) healthy|Healthy:/i.test(fh), 'before any outcome exists every feed reads never checked (unknown), never healthy');
 ok(/3,302 feeds/.test(fh) && /358 inactive/.test(fh) && /Local News registry endpoints are not in this inventory/.test(fh) && /not that each feed succeeded/.test(fh), 'inventory totals, the parent-job caveat and the out-of-scope pipeline are stated');
 ok(/data-filter="evidence:NO_STORED_OUTPUT_FOR_COMMUNITY\|kind:alerts_government"/.test(fh) && /data-filter="inactive"/.test(fh) && /data-filter="no_zip_page"/.test(fh), 'each evidence class, inactive feeds and feeds reaching no ZIP page have a drill-down');
 ok(/unavailable/.test(HS.feedInventoryHtml(null)) && /unverified/.test(HS.feedInventoryHtml(null)), 'a failed inventory read is shown as unverified, not omitted');
 let fcalls = [], fout = '';
-const fcl = { rpc: (fn, a) => { fcalls.push(fn + ':' + (a.p_filter || a.p_feed) + ':' + a.p_offset); return Promise.resolve({ data: fn === 'hs_feed_zips' ? { total: 2, zips: ['84302', '84312'] } : { total: 150, rows: Array.from({ length: Math.min(100, 150 - a.p_offset) }, (_, i) => ({ feed_id: 'f' + (a.p_offset + i), community: 'C', kind: 'meetings', zip_pages: 3, last_output_at: null, health: 'HEALTH_UNKNOWN' })) } }); } };
+const fcl = { rpc: (fn, a) => { fcalls.push(fn + ':' + (a.p_filter || a.p_feed) + ':' + a.p_offset); return Promise.resolve({ data: fn === 'hs_feed_zips' ? { total: 2, zips: ['84302', '84312'] } : { total: 150, rows: Array.from({ length: Math.min(100, 150 - a.p_offset) }, (_, i) => ({ feed_id: 'f' + (a.p_offset + i), community: 'C', kind: 'meetings', zip_pages: 3, last_output_at: null, health: 'NEVER_CHECKED' })) } }); } };
 const fo = { insertAdjacentHTML: (_, h) => { fout += h; } };
 const fa = { 'data-filter': 'kind:meetings', 'data-off': '0' };
 const fb = { classList: { contains: (c) => c === 'zfh-feeds' }, disabled: false, nextSibling: fo, style: {}, textContent: '', getAttribute: (k) => fa[k], setAttribute: (k, v) => { fa[k] = v; } };
 await HS.zipFeedLoadFeeds(fcl, fb); await new Promise((r) => setTimeout(r, 0)); await HS.zipFeedLoadFeeds(fcl, fb); await new Promise((r) => setTimeout(r, 0));
-ok(fcalls.join(',') === 'hs_feed_inventory_page:kind:meetings:0,hs_feed_inventory_page:kind:meetings:100' && /f149/.test(fout) && /All 150 feeds shown/.test(fout) && /nothing stored/.test(fout), 'the feed list pages to the last feed and shows missing output as "nothing stored"');
+ok(fcalls.join(',') === 'hs_feed_inventory_page:kind:meetings:0,hs_feed_inventory_page:kind:meetings:100' && /f149/.test(fout) && /All 150 feeds shown/.test(fout) && /Never checked/.test(fout), 'the feed list pages to the last feed and shows an unchecked feed as "Never checked"');
 const fdsql = rd('../docs/feed-inventory-health.sql');
 ok(/dashboard_admins/.test(fdsql) && /revoke all on function public\.hs_feed_inventory_page/.test(fdsql) && !/\b(insert|update|delete)\b\s+(into\s+)?public\.(feeds|alerts|meetings)\b/i.test(fdsql.replace(/--[^\n]*/g, '')), 'the feed inventory is admin-gated and never writes feeds, alerts or meetings');
 
@@ -142,6 +142,24 @@ ok(/AGED OUT · RECOVERY NOT CONFIRMED/.test(mhAged) && (mhAged.match(/<b>RECOVE
 ok(/5 of 6 failing ZIPs read again/.test(mhAged) && /3 of 3 failing ZIPs read again/.test(mhAged), 'each resolution says what evidence it rests on');
 const rsql = rd('../docs/zip-feed-health-resolution.sql');
 ok(/AGED_OUT_UNCONFIRMED/.test(rsql) && /anchor appeared/.test(rsql) && /later tick|last_tick_at > lf\.at/.test(rsql) && /resolution_basis = ''?AGED_OUT_UNCONFIRMED/.test(rsql) && !/\b(insert|delete)\b\s+(into|from)\s+public\.(feeds|alerts|meetings|dev_)/i.test(rsql.replace(/--[^\n]*/g, '')), 'the recorder records why a finding left, re-checks unconfirmed ones, and writes no source data');
+
+// ---- per-feed read health: the five states (2026-11-21) ----
+const fsum2 = Object.assign({}, fsum, { feeds_with_outcome: 2900, latest_outcome_at: '2026-11-21T08:00:00Z', health_unknown: 44,
+  health_states: { READ_OK_ITEMS: 1800, READ_OK_ZERO_ITEMS: 1000, READ_FAILED: 100, STALE_EVIDENCE: 4, NEVER_CHECKED: 40 } });
+const fh3 = HS.feedInventoryHtml(fsum2);
+ok(/2,900 of 2,944 active feeds have a recorded read outcome/.test(fh3) && /Successful read, items returned/.test(fh3) && /Successful read, zero items \(not a failure\)/.test(fh3) && /Failed read \(newest outcome\)/.test(fh3) && /Stale monitoring evidence/.test(fh3) && /Never checked/.test(fh3), 'all five read-health states are shown with their own counts');
+ok(/data-filter="health:READ_FAILED"/.test(fh3) && /data-filter="health:READ_OK_ZERO_ITEMS"/.test(fh3) && /data-filter="health:NEVER_CHECKED"/.test(fh3), 'each state drills down to its feeds');
+ok(/monitoring threshold \(12 hours\), not a source publishing schedule/.test(fh3), 'the stale threshold is labelled a monitoring threshold, not a publishing schedule');
+ok(/Community output \(proxy only, not read health\)/.test(fh3) && /Feed-to-ZIP mapping \(tracked separately from read health\)/.test(fh3), 'mapping and the community-output proxy stay apart from read health');
+ok(!/(is|are) healthy|Healthy:/i.test(fh3), 'no state is called healthy');
+const L = HS.feedReadLine;
+ok(/^Read OK · last read .* · 14 items, newest item 2026-11-19/.test(L({ health: 'READ_OK_ITEMS', last_attempt_at: '2026-11-21T08:00:00Z', items_returned: 14, newest_item_date: '2026-11-19T00:00:00Z' })), 'a successful read shows its items and newest item date as information');
+ok(/^Read OK, zero items/.test(L({ health: 'READ_OK_ZERO_ITEMS', last_attempt_at: '2026-11-21T08:00:00Z' })) && !/FAIL/.test(L({ health: 'READ_OK_ZERO_ITEMS', last_attempt_at: '2026-11-21T08:00:00Z' })), 'a successful empty read is not a failure');
+ok(/READ FAILED · last read .* · 3 failed reads in a row · URLError: x/.test(L({ health: 'READ_FAILED', last_attempt_at: '2026-11-21T08:00:00Z', consecutive_errors: 3, last_error: 'URLError: x' })), 'a failed read shows its streak and error');
+ok(/^Never checked$/.test(L({ health: 'NEVER_CHECKED' })) && /^Stale monitoring evidence · last read .* \(ok\)/.test(L({ health: 'STALE_EVIDENCE', last_attempt_at: '2026-11-19T08:00:00Z', last_outcome: 'ok' })), 'never checked and stale evidence are distinct lines');
+const hsql = rd('../docs/feed-read-health.sql');
+ok(/interval '12 hours'/.test(hsql) && /MONITORING threshold, not any source's publishing schedule/.test(hsql) && /'READ_FAILED'/.test(hsql) && /'READ_OK_ZERO_ITEMS'/.test(hsql) && /'NEVER_CHECKED'/.test(hsql) && /string_to_array\(p_filter, '\|'\)/.test(hsql), 'the SQL derives the five states with a labelled 12-hour monitoring threshold and supports combined filters');
+ok(!/newest_item_date\s*<|newest_item_date\s*>|age\(.*newest_item_date/.test(hsql.replace(/--[^\n]*/g, '')) && !/\bdrop\s+function/i.test(hsql.replace(/--[^\n]*/g, '')), 'an old newest item date never sets a state, and the migration drops nothing');
 
 console.log(`\n${n - bad}/${n} passed`);
 process.exit(bad ? 1 : 0);
