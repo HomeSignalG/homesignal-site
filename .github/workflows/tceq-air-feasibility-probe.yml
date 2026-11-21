@@ -1,0 +1,25 @@
+name: tceq-air-feasibility-probe
+# READ-ONLY source-feasibility probe for Texas air-permit records. PREPARED; it runs only on a manual dispatch from main that types the confirm
+# string, and the confirm string is given only after the plan in the approved plan recorded in the probe PR description is approved.
+# No secrets, no database access, no writes: its only output is the job log.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type RUN-TCEQ-PROBE (only after the plan is approved)'
+        required: true
+permissions:
+  contents: read
+jobs:
+  probe:
+    if: github.ref == 'refs/heads/main' && inputs.confirm == 'RUN-TCEQ-PROBE'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: Unit-check the probe's own rules (offline)
+        run: node test/tceq-air-feasibility-probe.test.mjs
+      - name: Probe (GET only, 25 requests max, 5 s apart)
+        run: node .github/probes/tceq-air-feasibility-probe.mjs
