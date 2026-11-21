@@ -184,8 +184,8 @@ for (const [w, h] of [[868, 520], [868, 720], [358, 620], [868, 400], [358, 300]
   ok(clicked.status.onScreen && clicked.type.onScreen && clicked.reg.onScreen,
     '2f ...and the panel survives that too');
   // The controls are not merely present — they are the real ones, with their chips.
-  ok(clicked.chips.status === 4 && clicked.chips.type === 7 && clicked.chips.reg === 3,
-    '2g the panel still carries its 4 status / 7 type / 3 regulatory controls (Regulatory facilities + State cleanup sites, 2026-10-21 + Water rights filings, 2026-10-29)',
+  ok(clicked.chips.status === 4 && clicked.chips.type === 7 && clicked.chips.reg === 4,
+    '2g the panel still carries its 4 status / 7 type / 4 regulatory controls (Regulatory facilities + State cleanup sites, 2026-10-21 + Water rights filings, 2026-10-29 + Air permits & filings, 2026-11-21)',
     JSON.stringify(clicked.chips));
   await page.context().close();
 }
