@@ -103,8 +103,9 @@ ok(/lib\/acq-bluesky-queue-order\.js\?v=[0-9a-f]{8}/.test(PAGE), 'the library is
 const SQL = rd('../docs/bluesky-subscriber-zips.sql').split('\n').filter((l) => !/^\s*--/.test(l)).join('\n');
 ok(/dashboard_admins/.test(SQL) && /raise exception 'not authorized'/.test(SQL), 'admin-only');
 ok(/from public\.alert_subscription_state s/.test(SQL) && /s\.subscribed and not public\.bsky_maps_known_test_identity\(s\.user_id\)/.test(SQL), 'reads the resolver for ANY alert type; test sign-ups are not subscribers');
-const OUT = SQL.slice(SQL.indexOf('jsonb_build_object'), SQL.indexOf('into r'));
-ok(!/email|user_id/.test(OUT.replace(/count\(distinct q\.user_id\)/g, '')), 'returns no email and no user id');
+const OUT = SQL.slice(SQL.indexOf('select coalesce(jsonb_agg'), SQL.indexOf('into r'));
+ok(!/user_id/.test(OUT), 'returns no user id');
+ok(SQL.indexOf("raise exception 'not authorized'") < SQL.indexOf('s.email'), 'the admin check comes before anything that reads an email address');
 ok(/revoke all on function public\.hs_bsky_subscriber_zips\(\) from public, anon;/.test(SQL)
   && /grant execute on function public\.hs_bsky_subscriber_zips\(\) to authenticated;/.test(SQL), 'anon cannot call it');
 ok(!/\b(insert|update|delete)\b/i.test(SQL), 'it writes nothing');

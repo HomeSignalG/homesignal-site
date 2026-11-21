@@ -314,7 +314,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
 <script src="lib/acq-bluesky-videos.js?v=574d20af"></script>
 <script src="lib/acq-bluesky-schedule.js?v=d543ca4c"></script>
 <!-- Tab 12 queue order: subscriber ZIPs first, then drafts to review, approved last. A view only. -->
-<script src="lib/acq-bluesky-queue-order.js?v=8fd52631"></script>
+<script src="lib/acq-bluesky-queue-order.js?v=3dd966ed"></script>
 <script src="lib/acq-engagement.js?v=d81c8179"></script>
 <script src="lib/acq-youtube.js?v=44fa15cc"></script>
 <script src="lib/creator-script.js?v=4cae37b2"></script>
@@ -1489,7 +1489,9 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       parts.push('<span class="muted">'+(z.last_published_at?('last post published '+esc(bskyDay(z.last_published_at))):'no post published yet, so no email has gone out')+'</span>');
       return '<div data-sub-zip="'+esc(z.zip)+'" style="font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)">'+
         '<b>ZIP '+esc(z.zip)+'</b> <span class="muted">· '+z.subscribers+' subscriber'+(z.subscribers===1?'':'s')+'</span>'+
-        (z.signed_up_for&&z.signed_up_for.length?' <span style="font-size:11px;padding:1px 7px;border:1px solid var(--line);border-radius:10px">signed up for: '+z.signed_up_for.map(function(k){return esc(BSKY_STREAM_LABEL[k]||k);}).join(', ')+'</span>':'')+
+        (z.people&&z.people.length?z.people.map(function(pp){
+          return ' <span style="font-size:11px;padding:1px 7px;border:1px solid var(--line);border-radius:10px">'+esc(pp.email||'no email')+' · signed up for: '+(pp.signed_up_for||[]).map(function(k){return esc(BSKY_STREAM_LABEL[k]||k);}).join(', ')+'</span>';
+        }).join(''):(z.signed_up_for&&z.signed_up_for.length?' <span style="font-size:11px;padding:1px 7px;border:1px solid var(--line);border-radius:10px">signed up for: '+z.signed_up_for.map(function(k){return esc(BSKY_STREAM_LABEL[k]||k);}).join(', ')+'</span>':''))+
         ' &nbsp;·&nbsp; '+parts.join(' &nbsp;·&nbsp; ')+'</div>';
     }).join('')+'</div>';
   }
