@@ -1,6 +1,6 @@
 -- ============================================================================
 -- ZIP EXPANSION, 2026-11-19 (founder, BOLO REALTORS partnership; deadline 2026-11-26):
--- 80026 Lafayette, 80027 Louisville / Superior, 80310 Boulder (CU). Universe 12,746 -> 12,749.
+-- 80026 Lafayette, 80027 Louisville / Superior, 80310 Boulder (CU). Universe 12,746 -> 12,750.
 -- Source of truth: homesignal-ingest Gold Master row added by scripts/add_gold_master_zips.py from
 -- data/local_news_gold_master/added_zips_2026-11-19_boulder_county_bolo.json (workbook first).
 -- Measured 2026-11-19 (geo.zcta_place_overlap): 80026 Lafayette city 40% / Louisville 1%; 80027
