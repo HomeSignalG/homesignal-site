@@ -4,9 +4,12 @@
 //   * MAX_REQUESTS counts EVERY HTTP request: robots files, each redirect hop, and each retry.
 //   * Every non-robots URL — including each redirect TARGET before it is followed — is checked against that host's robots.txt first.
 //     A Disallow match records RESTRICTED and the URL is not requested.
-//   * A host whose robots.txt is unreachable (any non-200, network error, redirect) or cannot be parsed is RESTRICTED: nothing is fetched from it.
+//   * A host whose robots.txt is unreachable (non-200, network error, unresolved 5xx, redirect) or cannot be parsed (HTML page, challenge page) is RESTRICTED:
+//     nothing is fetched from it. ONE exception, by explicit decision: a GENUINE HTTP 404 for /robots.txt on records.tceq.texas.gov (NO_ROBOTS_404_HOSTS) means
+//     "no robots rules published". That is not permission for unrestricted collection, does not override any terms, and authorizes no ingestion.
+//     A 404 on any other host stays RESTRICTED, and a 404 whose body looks like a challenge/block page is not genuine.
 //   * Honest fixed User-Agent (UA). Never changed, rotated or spoofed. No credentials or cookies.
-//   * Stop the whole run at the first 403 or 429 (recorded as an access refusal, never retried). One retry on 5xx only (counts toward the cap).
+//   * Stop the whole run at the first 401, 403 or 429 (recorded as an access refusal, never retried). One retry on 5xx only (counts toward the cap).
 //   * A redirect to a host outside ROBOTS_HOSTS is not followed (recorded as not followed).
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, mkdtempSync } from 'node:fs';
@@ -14,7 +17,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 export const UA = 'HomeSignal-source-feasibility/1.0 (+https://jodytracks.com; read-only; contact via site)';
-export const MAX_REQUESTS = 25, SPACING_MS = 5000, MAX_LINKS = 6, MAX_BYTES = 8_000_000, MAX_HOPS = 3;
+export const MAX_REQUESTS = 25, SPACING_MS = 5000, MAX_LINKS = 6, MAX_BYTES = 8_000_000, MAX_HOPS = 3, REQUEST_TIMEOUT_MS = 30_000;
+export const NO_ROBOTS_404_HOSTS = ['records.tceq.texas.gov'];
+const CHALLENGE = /(just a moment|attention required|cf-chl|cf-browser-verification|captcha|access denied|request blocked|incapsula|akamai|are you a human|bot (detection|protection)|enable javascript)/i;
+/** A genuine robots.txt 404: status 404, no redirect, and a body that is not a challenge/block page. */
+export function genuineRobots404(status, bodyText, hasLocation) { return status === 404 && !hasLocation && !CHALLENGE.test(String(bodyText).slice(0, 4000)); }
 export const ROBOTS_HOSTS = ['www.tceq.texas.gov', 'www2.tceq.texas.gov', 'records.tceq.texas.gov', 'data.texas.gov', 'api.us.socrata.com'];
 const DOC = (id) => 'https://records.tceq.texas.gov/cs/idcplg?IdcService=TCEQ_EXTERNAL_SEARCH_GET_FILE&Rendition=Web&dID=' + id + '&searchType=External';
 export const SEEDS = [
@@ -60,11 +67,11 @@ export function makeProbe(opts = {}) {
     if (used >= MAX_REQUESTS) return { skipped: 'request cap reached' };
     const wait = last + spacing - Date.now(); if (used > 0 && wait > 0) await sleep(wait);
     used++; last = Date.now();
-    let r; try { r = await fetchImpl(url, { method: 'GET', headers: { 'User-Agent': UA, Accept: '*/*' }, redirect: 'manual' }); }
+    let r; try { r = await fetchImpl(url, { method: 'GET', headers: { 'User-Agent': UA, Accept: '*/*' }, redirect: 'manual', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) }); }
     catch (e) { return { row: { url, kind, status: 'NETWORK_ERROR', detail: String(e?.cause?.code || e.message) } }; }
     const buf = Buffer.from(await r.arrayBuffer()).subarray(0, MAX_BYTES);
     const row = { url, kind, status: r.status, content_type: r.headers.get('content-type') || '', bytes: buf.length };
-    if (r.status === 403 || r.status === 429) { row.note = 'REFUSED — stop; not retried; recorded as an access refusal'; stopped = true; }
+    if (r.status === 401 || r.status === 403 || r.status === 429) { row.note = 'REFUSED — stop; not retried; recorded as an access refusal'; stopped = true; }
     return { row, buf, location: r.headers.get('location') };
   }
   async function robotsFor(host) { // returns groups or null (null => host RESTRICTED)
@@ -74,7 +81,9 @@ export function makeProbe(opts = {}) {
     let groups = null;
     if (res.row) {
       if (res.row.status === 200 && res.buf) groups = parseRobots(res.buf.toString('utf8'));
-      res.row.robots_result = groups ? 'parsed' : (res.row.status === 200 ? 'UNPARSEABLE -> host RESTRICTED' : 'unreachable (status ' + res.row.status + ') -> host RESTRICTED');
+      const body404 = res.buf ? res.buf.toString('utf8') : '';
+      if (!groups && NO_ROBOTS_404_HOSTS.includes(host) && genuineRobots404(res.row.status, body404, res.location)) { groups = []; res.row.robots_result = 'genuine HTTP 404: no robots rules published (not permission; terms and other limits still apply)'; }
+      else res.row.robots_result = groups ? 'parsed' : (res.row.status === 200 ? 'UNPARSEABLE -> host RESTRICTED' : 'unreachable or not a valid robots response (status ' + res.row.status + ') -> host RESTRICTED');
       log.push(res.row);
     }
     return (robots[host] = groups);

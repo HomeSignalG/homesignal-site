@@ -1,6 +1,6 @@
 // Offline checks of the probe's own guarantees (no network; fetch is injected). Run: node test/tceq-air-feasibility-probe.test.mjs
 import { readFileSync } from 'node:fs';
-import { parseRobots, robotsVerdict, makeProbe, MAX_REQUESTS, SPACING_MS, SEEDS, ROBOTS_HOSTS, UA } from '../.github/probes/tceq-air-feasibility-probe.mjs';
+import { parseRobots, robotsVerdict, makeProbe, genuineRobots404, NO_ROBOTS_404_HOSTS, REQUEST_TIMEOUT_MS, MAX_REQUESTS, SPACING_MS, SEEDS, ROBOTS_HOSTS, UA } from '../.github/probes/tceq-air-feasibility-probe.mjs';
 let bad = 0; const ok = (c, m) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + m); if (!c) bad++; };
 const g = parseRobots('User-agent: *\nDisallow: /\nAllow: /public/\n');
 ok(!robotsVerdict(g, '/airperm/x').allowed && robotsVerdict(g, '/public/a').allowed, 'P1 Disallow: / blocks, a longer Allow wins');
@@ -18,7 +18,7 @@ const R = (body, status = 200, headers = {}) => new Response(body, { status, hea
 const OPEN = 'User-agent: *\nDisallow:\n', CLOSED = 'User-agent: *\nDisallow: /\n';
 const base = (robotsBy, pages) => (url) => {
   const u = new URL(url); const call = { url };
-  if (u.pathname === '/robots.txt') { const r = robotsBy[u.host]; return Promise.resolve(r instanceof Response ? r : R(r ?? '', r === undefined ? 404 : 200)); }
+  if (u.pathname === '/robots.txt') { const r = robotsBy[u.host]; if (typeof r === 'function') { try { r(); } catch (e) { return Promise.reject(e); } } return Promise.resolve(r instanceof Response ? r : R(r ?? '', r === undefined ? 404 : 200)); }
   const p = pages[url]; return Promise.resolve(p ? (typeof p === 'function' ? p() : p) : R('nope', 404));
 };
 const T = { spacingMs: 0 };
@@ -60,4 +60,38 @@ const T = { spacingMs: 0 };
   const out = await makeProbe({ ...T, fetchImpl: f, seeds: ['https://www.tceq.texas.gov/a', 'https://www.tceq.texas.gov/b'] }).run();
   ok(out.stopped_on_refusal && !out.log.some((r) => r.url === 'https://www.tceq.texas.gov/b' && typeof r.status === 'number'), 'B8 the first 403 stops the run and nothing further is requested');
 }
+// ---- the records.tceq.texas.gov robots.txt 404 decision ----
+const REC = 'records.tceq.texas.gov', OTHERS = { 'www.tceq.texas.gov': OPEN, 'www2.tceq.texas.gov': CLOSED, 'data.texas.gov': OPEN, 'api.us.socrata.com': OPEN };
+const PAGE = 'https://records.tceq.texas.gov/cs/idcplg?IdcService=TCEQ_EXTERNAL_SEARCH';
+async function recordsCase(recRobots) {
+  const seen = []; const f = (u) => { seen.push(u); return base({ ...OTHERS, [REC]: recRobots }, { [PAGE]: R('<title>Search</title>', 200, { 'content-type': 'text/html' }) })(u); };
+  const out = await makeProbe({ ...T, fetchImpl: f, seeds: [PAGE] }).run();
+  return { out, fetchedPage: seen.includes(PAGE) };
+}
+ok(NO_ROBOTS_404_HOSTS.length === 1 && NO_ROBOTS_404_HOSTS[0] === REC, 'N0 only records.tceq.texas.gov is exempt from the 404 rule');
+{ const { out, fetchedPage } = await recordsCase(R('Not Found', 404, { 'content-type': 'text/plain' }));
+  ok(fetchedPage && !out.hosts_restricted.includes(REC) && out.log.some((r) => /genuine HTTP 404/.test(r.robots_result || '')), 'N1 a GENUINE 404 robots.txt on records.tceq.texas.gov means no rules published: the host is allowed'); }
+{ const { out, fetchedPage } = await recordsCase(R('<html><head><title>404 Not Found</title></head><body>The page cannot be found</body></html>', 404, { 'content-type': 'text/html' }));
+  ok(fetchedPage && !out.hosts_restricted.includes(REC), 'N2 an ordinary HTML 404 error page is still a genuine 404'); }
+{ const { out, fetchedPage } = await recordsCase(() => { throw new TypeError('fetch failed', { cause: { code: 'ECONNRESET' } }); });
+  ok(!fetchedPage && out.hosts_restricted.includes(REC), 'N3 a NETWORK failure on robots.txt keeps the host RESTRICTED'); }
+{ const { out, fetchedPage } = await recordsCase(R('oops', 503));
+  ok(!fetchedPage && out.hosts_restricted.includes(REC), 'N4 an unresolved 5xx on robots.txt keeps the host RESTRICTED'); }
+{ const { out, fetchedPage } = await recordsCase(R('<html><title>Just a moment...</title><script>cf-chl</script></html>', 200, { 'content-type': 'text/html' }));
+  ok(!fetchedPage && out.hosts_restricted.includes(REC), 'N5 an HTML challenge page served with 200 is not a robots file: RESTRICTED'); }
+{ const { out, fetchedPage } = await recordsCase(R('<html><title>Attention Required! | Cloudflare</title><div>cf-browser-verification</div></html>', 404, { 'content-type': 'text/html' }));
+  ok(!fetchedPage && out.hosts_restricted.includes(REC), 'N6 a challenge/block page that carries a 404 status is NOT a genuine 404: RESTRICTED'); }
+{ const { out, fetchedPage } = await recordsCase(R('', 404, { location: 'https://www.tceq.texas.gov/robots.txt' }));
+  ok(!fetchedPage && out.hosts_restricted.includes(REC), 'N7 a 404 that carries a redirect is not genuine: RESTRICTED'); }
+{ const { out, fetchedPage } = await recordsCase(R('User-agent: *\nDisallow: /cs/\n'));
+  ok(!fetchedPage && out.log.some((r) => r.status === 'RESTRICTED' && /Disallow: \/cs\//.test(r.restriction)), 'N8 an explicit applicable Disallow is respected'); }
+{ const out = await makeProbe({ ...T, fetchImpl: base({ ...OTHERS, 'www.tceq.texas.gov': R('Not Found', 404) }, {}), seeds: ['https://www.tceq.texas.gov/permitting/air'] }).run();
+  ok(out.hosts_restricted.includes('www.tceq.texas.gov') && out.log.filter((r) => r.kind === 'seed').every((r) => r.status === 'RESTRICTED'), 'N9 a robots.txt 404 on any OTHER host stays RESTRICTED'); }
+for (const code of [401, 403, 429]) {
+  let n = 0; const f = (u) => { n++; return base({ ...OTHERS, [REC]: R('x', code) }, {})(u); };
+  const out = await makeProbe({ ...T, fetchImpl: f, seeds: [PAGE] }).run();
+  ok(out.stopped_on_refusal && !out.log.some((r) => r.url === PAGE && typeof r.status === 'number'), 'N10 a ' + code + ' stops the run and nothing further is requested');
+}
+ok(genuineRobots404(404, 'Not Found', null) && !genuineRobots404(404, 'Just a moment', null) && !genuineRobots404(500, '', null) && !genuineRobots404(404, '', 'https://x'), 'N11 genuineRobots404 distinguishes 404 from 5xx, challenge text and redirects');
+ok(REQUEST_TIMEOUT_MS === 30000 && /AbortSignal\.timeout\(REQUEST_TIMEOUT_MS\)/.test(src), 'N12 each request has a timeout');
 if (bad) { console.log(bad + ' FAILURE(S)'); process.exit(1); } console.log('tceq probe: all checks pass');
