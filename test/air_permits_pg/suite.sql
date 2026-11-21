@@ -197,6 +197,63 @@ select pg_temp.ck('footprint writer: service_role only; visitors cannot read the
   and not has_function_privilege('anon', 'public.air_permit_footprint_set(text,text,text,text,jsonb)', 'execute')
   and not has_table_privilege('anon', 'public.air_permit_footprints', 'select')
   and pg_temp.raises($$select public.air_permit_footprint_set('tx_tceq_nsr:fx-pt', 'city_centroid', 'https://x.example', 'f', '[{"geometry":{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,0]]]}}]'::jsonb)$$, '22023'));
+
+-- H3. THE WHOLE-ZIP RULE FOR SHAPES (78521 fixture box: lng -97.45..-97.30, lat 25.88..26.02). Same boundary accessor and ST_Intersects as points.
+select public.air_permits_ingest('tx_tceq_nsr', $j$[
+ {"source_record_id":"z-fponly","permit_no":"Z1","action_kind":"registration","county":"Cameron","record_url":"https://x.example/z1"},
+ {"source_record_id":"z-edge","permit_no":"Z2","action_kind":"registration","county":"Cameron","record_url":"https://x.example/z2"},
+ {"source_record_id":"z-multi","permit_no":"Z3","action_kind":"registration","county":"Cameron","record_url":"https://x.example/z3","lat":25.99,"lng":-97.20,"location_basis":"reviewed_point"},
+ {"source_record_id":"z-ptin-fpout","permit_no":"Z4","action_kind":"registration","county":"Cameron","record_url":"https://x.example/z4","lat":25.95,"lng":-97.40,"location_basis":"reviewed_point"},
+ {"source_record_id":"z-ptout-fpin","permit_no":"Z5","action_kind":"registration","county":"Cameron","record_url":"https://x.example/z5","lat":25.95,"lng":-97.20,"location_basis":"reviewed_point"},
+ {"source_record_id":"z-noloc","permit_no":"Z6","action_kind":"registration","county":"Cameron","record_url":"https://x.example/z6"}
+]$j$::jsonb, false) as rz \gset
+create or replace function pg_temp.sq(x1 float, y1 float, x2 float, y2 float) returns jsonb language sql as $$
+  select jsonb_build_object('type','Polygon','coordinates', jsonb_build_array(jsonb_build_array(jsonb_build_array(x1,y1),jsonb_build_array(x2,y1),jsonb_build_array(x2,y2),jsonb_build_array(x1,y2),jsonb_build_array(x1,y1)))) $$;
+select public.air_permit_footprint_set('tx_tceq_nsr:z-fponly', 'verified_boundary', 'https://x.example/e', 'fixture', jsonb_build_array(jsonb_build_object('feature_id','a','geometry', pg_temp.sq(-97.42,25.95,-97.41,25.96))));
+select public.air_permit_footprint_set('tx_tceq_nsr:z-edge', 'verified_parcel', 'https://x.example/e', 'fixture', jsonb_build_array(jsonb_build_object('feature_id','a','geometry', pg_temp.sq(-97.31,25.95,-97.29,25.96))));
+select public.air_permit_footprint_set('tx_tceq_nsr:z-multi', 'verified_parcel', 'https://x.example/e', 'fixture', jsonb_build_array(
+  jsonb_build_object('feature_id','a','geometry', pg_temp.sq(-97.40,25.90,-97.39,25.91)), jsonb_build_object('feature_id','b','geometry', pg_temp.sq(-97.38,25.90,-97.37,25.91)),
+  jsonb_build_object('feature_id','c','geometry', pg_temp.sq(-97.20,25.90,-97.19,25.91))));
+select public.air_permit_footprint_set('tx_tceq_nsr:z-ptin-fpout', 'verified_parcel', 'https://x.example/e', 'fixture', jsonb_build_array(jsonb_build_object('feature_id','a','geometry', pg_temp.sq(-97.20,25.95,-97.19,25.96))));
+select public.air_permit_footprint_set('tx_tceq_nsr:z-ptout-fpin', 'verified_parcel', 'https://x.example/e', 'fixture', jsonb_build_array(jsonb_build_object('feature_id','a','geometry', pg_temp.sq(-97.40,25.95,-97.39,25.96))));
+create temp table zz as select public.air_permits_for_zip('78521') r;
+create or replace function pg_temp.inz(p text) returns boolean language sql as $$ select exists (select 1 from zz, jsonb_array_elements(r -> 'records') e where e ->> 'permit_no' = p) $$;
+select pg_temp.ck('zip 1: a footprint-only record (no point) is mapped geometry: listed, matched by footprint, not "no location"',
+  pg_temp.inz('Z1') and (select r -> 'matches' -> 'tx_tceq_nsr:z-fponly' ->> 'matched_by' = 'footprint' from zz));
+select pg_temp.ck('zip 2: a footprint crossing the ZIP edge is in (boundary-inclusive intersection, as for an edge point)', pg_temp.inz('Z2'));
+select pg_temp.ck('zip 3: one permit, three parcels (two in the ZIP, one out) -> listed once, two parcels counted',
+  (select count(*) = 1 from zz, jsonb_array_elements(r -> 'records') e where e ->> 'permit_no' = 'Z3')
+  and (select (r -> 'matches' -> 'tx_tceq_nsr:z-multi' ->> 'parcels')::int = 2 from zz));
+select pg_temp.ck('zip 4: a point inside the ZIP never overrides a verified footprint outside it -> excluded', not pg_temp.inz('Z4'));
+select pg_temp.ck('zip 5: a point outside the ZIP does not exclude a verified footprint inside it -> included, with no point reported',
+  pg_temp.inz('Z5') and (select e -> 'points' = '[]'::jsonb from zz, jsonb_array_elements(r -> 'records') e where e ->> 'permit_no' = 'Z5'));
+select pg_temp.ck('zip 6: a record with no point and no footprint is excluded and counted as unlocated; footprint-only records are not',
+  not pg_temp.inz('Z6')
+  and (select (r ->> 'unlocated_in_county')::int from zz) = (select count(*) from public.air_permit_records w where w.lat is null and w.removed_from_source_at is null and w.county = 'Cameron' and w.source = 'tx_tceq_nsr' and not exists (select 1 from public.air_permit_footprints x where x.record_id = w.record_id))
+  and (select (r ->> 'unlocated_in_county')::int from zz) >= 1);
+select pg_temp.ck('zip: the circle reader is not what decides ZIP membership (a record far from any circle is still in the ZIP)',
+  (select r ->> 'status' = 'complete' from zz) and pg_temp.inz('Z2'));
+
+-- H4. PRIVILEGES AS THE APPLICATION ROLES (not the table owner): attempt each action under SET ROLE
+create or replace function pg_temp.as_role(r text, q text) returns text language plpgsql as $$
+begin execute 'set local role ' || quote_ident(r); execute q; execute 'reset role'; return 'ok';
+exception when others then reset role; return sqlstate; end $$;
+select pg_temp.ck('roles: anon and authenticated cannot read or write any air-permit table (42501 for each)',
+  (select bool_and(pg_temp.as_role(r, 'select count(*) from public.' || t) = '42501'
+              and pg_temp.as_role(r, 'delete from public.' || t) = '42501')
+     from unnest(array['anon','authenticated']) r, unnest(array['air_permit_footprints','air_permit_records','air_permit_sources','air_permit_states','air_permit_runs','air_permit_record_observations']) t));
+select pg_temp.ck('roles: anon and authenticated cannot call the reviewed footprint writer, the ingest function or the shape helper',
+  (select bool_and(pg_temp.as_role(r, q) = '42501')
+     from unnest(array['anon','authenticated']) r,
+          unnest(array[$$select public.air_permit_footprint_set('x','verified_parcel','https://x.example','f','[]'::jsonb)$$,
+                       $$select public.air_permits_ingest('tx_tceq_nsr','[]'::jsonb,false)$$,
+                       $$select public.air_permit_shape_adjust('[]'::jsonb,'{}'::jsonb)$$]) q));
+select pg_temp.ck('roles: anon and authenticated CAN call both readers; service_role passes the writer''s privilege check',
+  (select bool_and(pg_temp.as_role(r, 'select public.air_permits_for_zip(''78521'')') = 'ok' and pg_temp.as_role(r, 'select public.map1_air_permits_near(25.95,-97.39,0.5)') = 'ok')
+     from unnest(array['anon','authenticated']) r)
+  and pg_temp.as_role('service_role', $$select public.air_permit_footprint_set('no-such-record','verified_parcel','https://x.example','f','[]'::jsonb)$$) = '22023');
+select pg_temp.ck('roles: the readers are security definer, so a visitor sees rows only through them, never the table',
+  (select bool_and(prosecdef) from pg_proc where proname in ('air_permits_for_zip','map1_air_permits_near','air_permit_footprint_set','air_permits_ingest')));
 update public.air_permit_sources set access_status = 'blocked' where source = 'tx_tceq_nsr';
 select pg_temp.ck('circle: a source that becomes blocked is reported blocked and contributes no records',
   (select jsonb_array_length(r -> 'records') = 0 and r -> 'sources' @> '[{"source":"tx_tceq_nsr","status":"blocked"}]'::jsonb

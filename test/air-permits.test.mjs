@@ -72,6 +72,7 @@ const appr = Object.assign({}, SPACEX, { record_id: 'a', permit_no: '9', action_
 const at = text(A.sectionHTML(body({ records: [appr] }), NOW));
 ok(/Agency status: APPROVED/.test(at) && at.includes(A.STATUS_SCOPE), 'B16 an agency status of APPROVED is printed verbatim and scoped to the air authorization');
 ok(!/approved/i.test(text(A.sectionHTML(body({ records: [Object.assign({}, SPACEX, { status: 'PENDING' })] }), NOW)).replace(A.NOTE, '')), 'B17 a PENDING record produces no approval wording of ours');
+ok(/Facility parcels \(3\) verified from the record; listed by its shape, not pinned/.test(A.locationLine({ location_basis: 'verified_parcel', footprint_parcels: 3 })) && /boundary verified/.test(A.locationLine({ location_basis: 'verified_boundary' })), 'B18 a footprint-decided record says it is listed by its verified shape and is never pinned from a centroid');
 // C — regression case through the Map layer
 const sites = HS.airPermitsSitesFrom(body());
 ok(sites.length === 1 && HS.isAirPermit(sites[0]) && sites[0].air.record.permit_no === '185303' && sites[0].air.record.project_no === '414660' && sites[0].air.record.facility_ref === 'RN112524897', 'C1 the regression record becomes one Map 1 site with its identifiers', sites.length);

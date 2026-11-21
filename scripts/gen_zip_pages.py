@@ -1375,7 +1375,7 @@ def render(p, built):
         '<script src="/shell.js?v=5d10566b"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
         '<script src="/lib/water-rights.js?v=add4200a"></script>\n'
-        '<script src="/lib/air-permits.js?v=8ac16507"></script>\n'
+        '<script src="/lib/air-permits.js?v=656d8a98"></script>\n'
         '<script src="/lib/community-page.js?v=53823aec"></script>\n'
         "</body>\n</html>\n")
 

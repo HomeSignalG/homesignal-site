@@ -16,19 +16,22 @@ Evidence already on file (homesignal-ingest `docs/air-permit-coverage-audit-2026
 
 Not established: whether Records Online has a machine-usable search or feed; TCEQ's reuse/automated-access terms; whether 185303 is in any federal dataset. These are exactly what the probe decides. A different hostname is not treated as permission.
 
-### 1a. Proposed read-only probe (REQUIRES YOUR APPROVAL — not run)
-- Runner: GitHub Actions `workflow_dispatch` from `main`, no secrets, no database key, read-only. New workflow file would be its only repo write.
-- Identification: the repo's honest user agent, unchanged. No header spoofing.
-- Request ceiling: **25 GET requests total, one at a time, 5 s apart, one retry on a 5xx only, never on 403/429.** Stop at the first 403/429.
-- Requests (exact):
-  1. `GET https://www.tceq.texas.gov/robots.txt`, `GET https://www2.tceq.texas.gov/robots.txt`, `GET https://records.tceq.texas.gov/robots.txt` (3). Records the exact bodies and status.
-  2. `GET https://www.tceq.texas.gov/permitting/air` and its "NSR permits" and "data" subpages (≤4): look for a published bulk file, feed, or terms page.
-  3. `GET https://www.tceq.texas.gov/` pages titled "Open Data" / "Public Information" / "Terms of use" (≤4).
-  4. The two known document URLs (dID 10258370, 10258371) once each, headers only then body (2 + 2): confirm the permit number, project number, action date and any coordinates are in the text.
-  5. The Records Online search entry page, **GET only, no form submission** (1), and its robots/terms. If a search needs a POST, the probe stops there and reports; it does not submit.
-  6. A single query of data.texas.gov catalog `https://api.us.socrata.com/api/catalog/v1?domains=data.texas.gov&q=air%20permit` (1).
-- Output (job log only): per URL status, `Content-Type`, robots verdict, and for the PDFs the extracted identifiers; a table "discovery? incremental? coverage of standard permits? geography? status? terms?" with the evidence line for each cell.
-- Decision rule: if any robots file disallows the path, that route is recorded RESTRICTED and not tried. If no compliant discovery route exists, section 1b is the outcome.
+### 1a. Option A probe — EXACT PLAN AWAITING YOUR APPROVAL (prepared, NOT run)
+Files (in the PR, inert until dispatched): `scripts/tceq-air-feasibility-probe.mjs`, `.github/workflows/tceq-air-feasibility-probe.yml`, `test/tceq-air-feasibility-probe.test.mjs` (9 offline checks of the guarantees below).
+- **Run:** GitHub Actions `workflow_dispatch` from `main` only, input `confirm` must equal `RUN-TCEQ-PROBE`. Permissions `contents: read`. No secrets, no database, no writes; output is the job log. 15-minute timeout. It cannot start until this PR is merged (a separate approval) and you give the confirm string.
+- **Command:** `node scripts/tceq-air-feasibility-probe.mjs` after `node test/tceq-air-feasibility-probe.test.mjs`.
+- **Hard limits, enforced in code:** GET only (never POST or a form); one request at a time, ≥ 5 s apart; **25 requests maximum** including robots files; honest fixed User-Agent `HomeSignal-source-feasibility/1.0 (+https://jodytracks.com; read-only; contact via site)`, never changed; one retry on 5xx only; **stop at the first 403 or 429** (recorded as an access refusal, not retried); every non-robots URL is checked against its host's robots.txt first and a Disallow is recorded `RESTRICTED` and **not fetched**; a host with no robots.txt is recorded as "none answered", not as permission.
+- **Exact requests (≤ 16 expected):**
+  1. robots.txt of: `www.tceq.texas.gov`, `www2.tceq.texas.gov`, `records.tceq.texas.gov`, `data.texas.gov`, `api.us.socrata.com` (5).
+  2. `https://www.tceq.texas.gov/permitting/air` (1).
+  3. `https://api.us.socrata.com/api/catalog/v1?domains=data.texas.gov&q=air%20permit&limit=20` (1).
+  4. `https://records.tceq.texas.gov/cs/idcplg?IdcService=TCEQ_EXTERNAL_SEARCH_GET_FILE&Rendition=Web&dID=10258370&searchType=External` and the same with `dID=10258371` (2).
+  5. `https://records.tceq.texas.gov/cs/idcplg?IdcService=TCEQ_EXTERNAL_SEARCH` — Records Online search entry page, GET only, never submitted (1). If that exact seed is wrong it is recorded as such; the probe does not guess further paths.
+  6. Up to **6 same-allowlisted-host links** found on the TCEQ air page whose text or path matches open data / bulk / download / dataset / terms / permit status / NSR / public notice / RSS / feed / API, robots-checked first (≤ 6).
+- **Output (job log between BEGIN/END RESULT):** per URL: status, content type, robots verdict and rule, bytes, title; for the two PDFs: whether `185303` and `414660` appear, plus up to 12 matching lines (RN, county, latitude/longitude, action, registration) so location evidence is visible; the Socrata catalog hit list; the discovered links.
+- **What the probe can and cannot settle:** it can show whether a documented bulk/feed/dataset exists on these pages, whether any path is robots-restricted (exact rule quoted), whether the PDFs carry identifiers, status/action and location, and what terms text is published. It cannot prove incremental refresh on Records Online without a search submission, which it will not make; if the pages offer no feed or documented data route, that is recorded and **option B (1b) is the fallback**. Retrieving the two known PDFs alone is not recorded as a working ingestion source.
+- **Restrictions that apply:** TCEQ's NSR search and CR Query send `Disallow: /` (evidence in ingest#1156); the probe re-reads robots and will not request a disallowed path. Different hostnames are not treated as permission.
+- **Needs from you:** approve this plan as written (and, separately, merging this PR so the workflow can run from main).
 
 ### 1b. Bulk/export request — DRAFT FOR YOUR REVIEW (not sent)
 > To: TCEQ Air Permits Division / Public Information (address to be confirmed by you).
@@ -72,3 +75,26 @@ Remaining approval needed: (A) approve the 1a probe as written, or (B) approve s
 - Texas ingestion/backfill: not tested.
 - Surfaces: Map 1, ZIP page, QoL code done and fixture-tested; report prepared, not wired.
 - Deployment/public verification: not done.
+
+## 6. ZIP reader geometry correction (prepared; SQL NOT applied)
+- Defect closed in the SQL: `air_permits_for_zip` used points only, so a record with a verified footprint and no point read as "no location".
+- Rule: the established whole-ZIP assignment — boundary-inclusive `ST_Intersects` against `geo.zip_membership_boundary` (the predicate `geo.zip_point_membership_in` uses for points, applied to the shape; ZCTAs tile, so a shape crossing two ZIPs is listed in both, like an edge point). A verified footprint decides alone over all its parcels; a point never overrides it in either direction; point-only records use the point; one row per permit with the count of intersecting parcels; footprint-decided records return no point and state `verified_parcel`/`verified_boundary`.
+- Genuinely unlocated = no point and no footprint, counted separately; footprint-only records are not counted as unlocated.
+- Not substituted: no centroid, no radius reader. No new function was added to the `geo` schema; the predicate is the same one, inlined, so there is no second membership definition to keep in sync.
+- Not done: Map 1 draws pins from points only, so a footprint-only record appears in the ZIP list/section and is "listed by its shape, not pinned"; drawing footprint polygons on Map 1 is not built.
+- Fixture tests (local PostGIS): ZIP 1 footprint-only included; 2 edge-crossing included; 3 three parcels listed once with 2 intersecting counted; 4 point inside + footprint outside excluded; 5 point outside + footprint inside included with no point; 6 no location excluded and counted, footprint-only not counted; 7 circle reader is not used. Suite: 61 checks, 0 failed; 23 deliberate-break checks all caught (point-overrides-footprint, footprint counted as unlocated, centroid for radius, bbox, removal, etc.).
+
+## 7. Permissions evidence (SQL revoke correction + role tests)
+- Correction: `air_permit_footprints` was missing from the table revoke line, so `anon` could read it (found by the new test, fixed). The footprint writer and shape helper are explicitly revoked from public/anon/authenticated and granted only to `service_role` (writer).
+- Test (`test/air_permits_pg/suite.sql`, H4, runs under `SET ROLE`, not as the owner): anon and authenticated get SQLSTATE 42501 on SELECT and DELETE of all six tables; 42501 calling the footprint writer, the ingest function and the shape helper; both readers execute for anon and authenticated; service_role passes the writer's privilege check (reaches its own validation, 22023); all four functions are security definer; RLS on for all six tables.
+- Mutations proving it: table left exposed → 2 checks fail; writer granted to anon → 2 fail. Run on local PostGIS with fixture roles; production role grants are verified only after an approved replica/apply.
+
+## 8. Completion items (kept separate)
+| item | state |
+|---|---|
+| Radius behavior (report circle, footprints) | SQL + TS prepared, fixture-tested; not applied |
+| ZIP behavior (footprints) | SQL prepared, fixture-tested; not applied; Map 1 does not draw polygons |
+| Source acquisition (Texas) | blocked; option A probe prepared, awaiting approval |
+| Report wiring / REPORT_VERSION / snapshot / PDF / edge deploys | not done; each needs approval |
+| Public verification | none; nothing deployed |
+Passing CI does not complete Texas ingestion or public coverage.

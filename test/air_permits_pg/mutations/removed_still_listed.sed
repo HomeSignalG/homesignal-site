@@ -1,1 +1,1 @@
-s/ and r.removed_from_source_at is null and r.lat is not null/ and r.lat is not null/
+s/w\.source = src\.source and w\.removed_from_source_at is null;/w.source = src.source;/

@@ -166,6 +166,18 @@ returns text language sql immutable set search_path to 'pg_temp' as $fn$
   end
 $fn$;
 
+-- A record judged by its VERIFIED FOOTPRINT keeps no point in the answer: a point must never stand in for, or contradict, the shape that decided it.
+-- p_matches maps record_id -> {matched_by, ...}; for matched_by = footprint the point list is emptied and the footprint basis is stated.
+create or replace function public.air_permit_shape_adjust(p_records jsonb, p_matches jsonb)
+returns jsonb language sql immutable set search_path to 'public', 'pg_temp' as $fn$
+  select coalesce(jsonb_agg(case when p_matches -> (e ->> 'record_id') ->> 'matched_by' = 'footprint'
+                                 then (e - 'points' - 'location_basis') || jsonb_build_object('points', '[]'::jsonb,
+                                        'location_basis', p_matches -> (e ->> 'record_id') ->> 'basis',
+                                        'footprint_parcels', (p_matches -> (e ->> 'record_id') -> 'parcels'))
+                                 else e end order by ord), '[]'::jsonb)
+    from jsonb_array_elements(p_records) with ordinality as t(e, ord)
+$fn$;
+
 -- ONE shape for a list of records, used by both readers. p_zip_member stamps each point with the polygon verdict.
 create or replace function public.air_permit_records_json(p_recs public.air_permit_records[], p_zip_member boolean)
 returns jsonb language sql stable set search_path to 'public', 'pg_temp' as $fn$
@@ -303,7 +315,7 @@ security definer
 set search_path to 'public', 'geo', 'pg_temp'
 as $fn$
 declare
-  v_state text; v_county text; st public.air_permit_states; src public.air_permit_sources;
+  v_state text; v_county text; st public.air_permit_states; src public.air_permit_sources; v_matches jsonb;
   v_last timestamptz; v_geom geometry; v_box box2d; v_status text; v_pts public.air_permit_records[]; v_unloc int;
   v_base jsonb;
 begin
@@ -328,18 +340,38 @@ begin
   end if;
   v_status := case when v_last is null or v_last < now() - make_interval(hours => src.max_age_hours) then 'unavailable' else 'complete' end;
   v_box := box2d(v_geom);
-  select array_agg(r) into v_pts
-    from public.air_permit_records r
-   where r.source = src.source and r.removed_from_source_at is null and r.lat is not null
-     and r.lat between st_ymin(v_box) and st_ymax(v_box) and r.lng between st_xmin(v_box) and st_xmax(v_box)
-     and geo.zip_point_membership_in(v_geom, r.lat, r.lng) = 'member';
+  -- THE WHOLE-ZIP RULE, extended from points to verified shapes with the SAME predicate and boundary accessor: boundary-inclusive ST_Intersects against
+  -- geo.zip_membership_boundary (ZCTAs tile, so a shape crossing two ZIPs belongs to both, as an edge point does). A record with a verified footprint is judged by
+  -- that footprint alone (a point never overrides it, in either direction); a point-only record by its point. One row per record however many parcels it has.
+  with fp_in as (
+    select f.record_id, string_agg(distinct f.basis, '+' order by f.basis) as basis, count(*) as parcels
+      from public.air_permit_footprints f
+     where f.geom && st_setsrid(st_envelope(v_geom), 4326) and st_intersects(st_setsrid(f.geom, 4269), v_geom)
+     group by f.record_id
+  ), pt_in as (
+    select r.record_id
+      from public.air_permit_records r
+     where r.source = src.source and r.lat is not null
+       and r.lat between st_ymin(v_box) and st_ymax(v_box) and r.lng between st_xmin(v_box) and st_xmax(v_box)
+       and geo.zip_point_membership_in(v_geom, r.lat, r.lng) = 'member'
+       and not exists (select 1 from public.air_permit_footprints x where x.record_id = r.record_id)
+  ), m as (
+    select record_id, 'footprint'::text as by, basis, parcels from fp_in
+    union all select record_id, 'point', null, null from pt_in
+  )
+  select array_agg(w order by w.record_id),
+         jsonb_object_agg(m.record_id, jsonb_strip_nulls(jsonb_build_object('matched_by', m.by, 'basis', m.basis, 'parcels', m.parcels)))
+    into v_pts, v_matches
+    from m join public.air_permit_records w on w.record_id = m.record_id and w.source = src.source and w.removed_from_source_at is null;
   -- records in this ZIP's county the source states WITHOUT a point: counted, never placed, never guessed
   select count(*) into v_unloc from public.air_permit_records r
    where r.source = src.source and r.removed_from_source_at is null and r.lat is null
-     and v_county is not null and upper(r.county) = upper(v_county);
+     and v_county is not null and upper(r.county) = upper(v_county)
+     and not exists (select 1 from public.air_permit_footprints x where x.record_id = r.record_id);
   return v_base || jsonb_build_object('status', v_status, 'checked_at', v_last,
                                       'unlocated_in_county', v_unloc,
-                                      'records', public.air_permit_records_json(v_pts, true));
+                                      'records', public.air_permit_shape_adjust(public.air_permit_records_json(v_pts, true), coalesce(v_matches, '{}'::jsonb)),
+                                      'matches', coalesce(v_matches, '{}'::jsonb));
 end
 $fn$;
 
@@ -377,7 +409,8 @@ begin
   -- so a shape that only partly crosses the radius is in): a record with a verified footprint is judged by that footprint ALONE,
   -- over all its parcels; a record with only a point is judged by that point. One row per record either way.
   with fp_hit as (
-    select f.record_id, min(st_distance(f.geom::geography, v_home)) as d
+    select f.record_id, min(st_distance(f.geom::geography, v_home)) as d,
+           string_agg(distinct f.basis, '+' order by f.basis) as basis, count(*) as parcels
       from public.air_permit_footprints f
      where f.geom && st_expand(v_hg, v_dlng, v_dlat) and st_dwithin(f.geom::geography, v_home, v_meters)
      group by f.record_id
@@ -389,10 +422,10 @@ begin
        and w.lng between p_lng - v_dlng and p_lng + v_dlng
        and st_dwithin(st_setsrid(st_makepoint(w.lng, w.lat), 4326)::geography, v_home, v_meters)
   ), m as (
-    select record_id, d, 'footprint'::text as by from fp_hit union all select record_id, d, 'point'::text from pt_hit
+    select record_id, d, 'footprint'::text as by, basis, parcels from fp_hit union all select record_id, d, 'point'::text, null, null from pt_hit
   )
   select array_agg(w order by w.record_id),
-         jsonb_object_agg(m.record_id, jsonb_build_object('matched_by', m.by, 'distance_mi', round((m.d / 1609.344)::numeric, 3)))
+         jsonb_object_agg(m.record_id, jsonb_strip_nulls(jsonb_build_object('matched_by', m.by, 'basis', m.basis, 'parcels', m.parcels, 'distance_mi', round((m.d / 1609.344)::numeric, 3))))
     into v_pts, v_matches
     from m
     join public.air_permit_records w on w.record_id = m.record_id and w.removed_from_source_at is null
@@ -405,7 +438,7 @@ begin
        and not exists (select 1 from public.air_permit_footprints x where x.record_id = w.record_id);
   end if;
   return jsonb_strip_nulls(jsonb_build_object('status', 'complete', 'sources', v_sources,
-           'records', public.air_permit_records_json(v_pts, false), 'matches', coalesce(v_matches, '{}'::jsonb),
+           'records', public.air_permit_shape_adjust(public.air_permit_records_json(v_pts, false), coalesce(v_matches, '{}'::jsonb)), 'matches', coalesce(v_matches, '{}'::jsonb),
            'unlocated_in_county', v_unloc, 'unlocated_county', case when v_unloc is not null then p_county end));
 end
 $fn$;
@@ -432,7 +465,7 @@ begin
 end
 $fn$;
 
-revoke all on function public.air_permit_footprint_set(text, text, text, text, jsonb) from public, anon, authenticated;
+revoke all on function public.air_permit_footprint_set(text, text, text, text, jsonb), public.air_permit_shape_adjust(jsonb, jsonb) from public, anon, authenticated;
 revoke all on function public.air_permit_obs_frozen() from public, anon, authenticated;
 revoke all on function public.air_permits_ingest(text, jsonb, boolean) from public, anon, authenticated;
 revoke all on function public.air_permits_display_applicant(text) from public, anon, authenticated;
