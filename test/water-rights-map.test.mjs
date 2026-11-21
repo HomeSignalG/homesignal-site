@@ -67,8 +67,8 @@ ok(HS.zipModeSites([], null, [], []).length === 0, 'C2 the four-argument call st
 // ── D ──
 const PAGE = read('homesignalmap.html');
 ok(/rpc\/water_rights_for_zip/.test(PAGE) && /rpc\/map1_water_rights_near/.test(PAGE), 'D1 ZIP mode and address mode each read their reader');
-ok(/zipModeSites\(rsSites, auth, natlSites, cleanupSites, waterSites\)/.test(PAGE), 'D2 ZIP mode passes water sites through the one door');
-ok(/&& !\(HS\.isWaterRight && HS\.isWaterRight\(s\)\); \}\);/.test(PAGE), 'D3 water-rights pins never enter the facility set');
+ok(/zipModeSites\(rsSites, auth, natlSites, cleanupSites, waterSites(?:, airSites)?\)/.test(PAGE), 'D2 ZIP mode passes water sites through the one door');
+ok(/&& !\(HS\.isWaterRight && HS\.isWaterRight\(s\)\)(?: && !\(HS\.isAirPermit && HS\.isAirPermit\(s\)\))?; \}\);/.test(PAGE), 'D3 water-rights pins never enter the facility set');
 ok(/HS\.waterRightsVisible\(\)/.test(PAGE) && /waterToggle/.test(PAGE), 'D4 the pins answer their own switch');
 ok(/lib\/water-rights-map\.js\?v=[0-9a-f]{8}/.test(PAGE), 'D5 the module is loaded with a content key');
 

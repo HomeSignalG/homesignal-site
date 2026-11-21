@@ -1,0 +1,1 @@
+s/^revoke all on function public\.air_permit_footprint_set(text, text, text, text, jsonb), public\.air_permit_shape_adjust(jsonb, jsonb) from public, anon, authenticated;$/grant execute on function public.air_permit_footprint_set(text, text, text, text, jsonb) to anon;/

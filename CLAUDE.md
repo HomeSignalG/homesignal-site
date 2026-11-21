@@ -7099,3 +7099,33 @@ that returns zero rows near an address is not proof it was checked.
 - **Reconciled 2026-11-19:** the ledger is `docs/source-ledger/source-integration-ledger.json` (259 rows: 257 registry families + 2 unregistered; built by `scripts/build-source-ledger.py` from `docs/source-ledger/audit-snapshot-2026-11-19.csv`, rows md5 `a776c7e2…`); the backlog is `docs/source-remediation-backlog-2026-11-19.md`. "Spatially connected" (the active generation returns the source) is NOT end-to-end integration: hydration and report eligibility are UNVERIFIED for every real source, and no source is "fully verified". `record_kind = development` removes only the EPA facility plane (no development family is stored as `facility`).
 - **PERMANENT SOURCE-INTEGRATION ACCEPTANCE (CTO, 2026-11-19).** Onboarding or changing a development source is not done until: (1) it has a ledger row; (2) its served keys hydrate to `app_projects` development rows (a lost key is counted `not_hydrated` and the report says `RECORDS_NOT_LOADED`; only a family in `retired-sources.json`, which needs a cited decision, is exempt; absence of rows is NEVER evidence of retirement); (3) point, line and polygon geometry reach the report through the existing spatial interface; (4) a transportation record is filed as Roads & infrastructure by provenance only when the registry's own text documents a capital-project program (`capital-program-sources.generated.json`; an agency name or the word "project" is never evidence); (5) an empty or incomplete retrieval is never presented as a confirmed absence. Tests: `test/report-source-completeness.test.mjs`, `test/source-ledger.test.mjs`.
 - **Ledger is frozen evidence; failures are judged on every applicable source (2026-11-19).** `docs/source-ledger/audit-membership-2026-11-19.json` + the snapshot CSV are IMMUTABLE; the ledger never reads the live registry, and a source registered later is UNVERIFIED until audited (`test/lib/source-ledger-current.mjs`), so adding a source never breaks CI. `readReportInputs` reads failure evidence for the families that hydrated, the families of every key the spatial read found, and the families whose declared coverage (`source-coverage.generated.json`, `scripts/gen-source-coverage.mjs`) names the subject's verified state/county (`communities`); unknown geography applies nothing. Deploy set for the shared engine: get-development-activity-report, follow-development-report, run-property-watch, manage-property-watch.
+
+---
+
+## AIR PERMITS & FILINGS: A FIRST-CLASS REGULATORY LAYER (founder requirement, 2026-11-21) — BUILT, SQL NOT APPLIED, TEXAS BLOCKED AT THE SOURCE
+
+The equal of "Water rights filings": one shared national ingestion function, per-authority sources, one reader, four surfaces.
+SQL of record `docs/air-permits.sql` (NOT applied; replica dry-run rule, §7.11). Suite `test/air_permits_pg` (`air-permits-suite.yml`,
+disposable PostGIS, fixtures only, 16 prohibited mutations); offline `test/air-permits.test.mjs`.
+- **Three entities, never merged or counted twice:** the regulated FACILITY (`facility_ref` = agency regulated-entity id, `facility_name`),
+  the DEVELOPMENT PROJECT (`project_link_ref`, set only by a reviewed link, never by an adapter, never counted), and the PERMIT RECORD
+  (`air_permit_records`, history in append-only `air_permit_record_observations`). An air authorization is never approval of a development.
+- **One write path:** `public.air_permits_ingest(source, records, complete)` (service_role only). It refuses a source that is not `active`,
+  rejects a record without a stable id, a permit or project number, an https official link, a controlled `action_kind`
+  (application, registration, proposed_action, issued, modification, renewal, amendment, other) or a point without its stated basis
+  (`source_point`, `geocoded_address`, `reviewed_point`). History is written only when a field changed. A read is `complete` only when it is
+  whole, clears `expected_min` and has no rejects; only `complete` refreshes freshness or marks anything removed.
+- **Coverage is data:** `air_permit_sources.access_status` is `active | blocked | not_built`; the reader answers `complete | unavailable |
+  not_measured | not_covered | blocked`. Only `complete` may say "none". Blocked, not covered, stale and failed are never "no air permits".
+- **Surfaces (all read `air_permits_for_zip` / `map1_air_permits_near`, none counts air permits as development):** Map 1 chip, band, popup and
+  `?air=0/1` (`lib/air-permits-map.js`, `homesignalmap.html`; admitted through `HS.zipModeSites` on the polygon verdict, never in the EPA facility
+  count, never makes a page indexable); the ZIP page section (`lib/community-page.js`, generated documents); the Quality of Life Impact page
+  (`development.html`). Presentation rules (pinned): no "approved"; renewals/modifications say they concern an existing authorization and are
+  counted apart from new filings; public comment only from a stated deadline; no emission amount; permitted limits are not measured exposure;
+  reviewed or geocoded locations are labelled approximate; records without a point are counted for the county, never placed or guessed.
+- ⚠️ **NOT BUILT: the Development Activity Report (national-report.ts) and the report PDF do not yet read air permits.** That needs the
+  report engine and the edge-function deploy set (get-development-activity-report, follow-development-report, run-property-watch,
+  manage-property-watch), which are approval-gated; the reader contract it should call is `map1_air_permits_near`.
+- ⛔ **TEXAS (`tx_tceq_nsr`) is registered BLOCKED.** TCEQ's NSR project list (`www2.tceq.texas.gov/airperm`) and CR Query send robots
+  `Disallow: /`; data.texas.gov has no air dataset (checked 2026-11-21, homesignal-ingest docs/air-permit-coverage-audit-2026-11-21.md).
+  So registration 185303 / project 414660 appears nowhere until a compliant route exists; the regression record exists only as a labelled FIXTURE.

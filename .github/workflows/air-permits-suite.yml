@@ -1,0 +1,71 @@
+name: air-permits-suite
+
+# AIR PERMITS & FILINGS (docs/air-permits.sql): the shared ingestion function, the readers and the coverage states
+# (complete / unavailable / not_measured / not_covered / blocked), run as the SHIPPED SQL against a DISPOSABLE PostGIS.
+# Every prohibited mutation in test/air_permits_pg/mutations MUST fail the suite. FIXTURE DATA ONLY.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/air-permits.sql'
+      - 'test/air_permits_pg/**'
+      - 'test/air-permits.test.mjs'
+      - 'lib/air-permits*.js'
+      - '.github/workflows/air-permits-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/air-permits.sql'
+      - 'test/air_permits_pg/**'
+      - 'test/air-permits.test.mjs'
+      - 'lib/air-permits*.js'
+      - '.github/workflows/air-permits-suite.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  air-permits:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: air_permits_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Shipped SQL passes; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: air_permits_disposable
+        run: |
+          set -o pipefail
+          bash test/air_permits_pg/run.sh 2>&1 | grep -v -E 'NOTICE|DETAIL|drop cascades' | tee /tmp/ap.log
+      - name: Receipt
+        if: always()
+        run: |
+          { echo '## Air permits & filings'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|NO-OP|\|f\|' /tmp/ap.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

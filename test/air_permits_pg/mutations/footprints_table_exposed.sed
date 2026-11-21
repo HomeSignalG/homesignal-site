@@ -1,0 +1,1 @@
+s/public\.air_permit_records, public\.air_permit_footprints, public\.air_permit_record_observations from public, anon, authenticated;/public.air_permit_records, public.air_permit_record_observations from public, anon, authenticated;/
