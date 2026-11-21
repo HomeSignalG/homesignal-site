@@ -179,10 +179,10 @@ await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base
 // The new account's onboarding covers the page, so call the header button's own handler.
 ok(await page.getAttribute('#hs-share', 'onclick') === "HS.openModal('shareModal')", '4 the header Share button opens #shareModal');
 await page.evaluate(() => HS.openModal('shareModal'));
-await page.waitForFunction(() => document.querySelectorAll('#shareGrid .sopt').length === 12, null, { timeout: 5000 }).catch(() => {});
+await page.waitForFunction(() => document.querySelectorAll('#shareGrid .sopt').length === 14, null, { timeout: 5000 }).catch(() => {});
 ok(await page.locator('#shareModal').isVisible(), '4a Share opens the site Share box');
 const targets = await page.$$eval('#shareGrid .sopt', (els) => els.map((e) => e.lastChild.textContent.trim()));
-ok(targets.length === 12 && targets[0] === 'Copy link' && targets[11] === 'LinkedIn', '4b it lists the 12 share targets', targets);
+ok(targets.length === 14 && targets[0] === 'Copy link' && targets[13] === 'LinkedIn', '4b it lists the 14 share targets', targets);
 ok((await page.textContent('#shareUrl')).includes('alerts.html?zip=97702'), '4c it shares this page', await page.textContent('#shareUrl'));
 await page.evaluate(() => document.querySelector('#shareGrid [data-hs-copy]').click());
 ok((await page.evaluate(() => navigator.clipboard.readText())).endsWith('/alerts.html?zip=97702'), '4d Copy link copies this page');

@@ -1,0 +1,165 @@
+// TAB 2 · ALL ZIP PAGES AND FEEDS ROLL-UP (2026-11-20). Run: node test/zip-feed-health-rollup.test.mjs
+// The roll-up below is the reader's real output on 2026-11-20 (trimmed). Each class is checked on it, then flipped to prove it is load-bearing.
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+const rd = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
+let n = 0, bad = 0;
+const ok = (c, m) => { n++; if (c) console.log('PASS — ' + m); else { bad++; console.log('FAIL — ' + m); } };
+
+const ctx = { console, Date }; ctx.globalThis = ctx; vm.createContext(ctx);
+vm.runInContext(rd('../lib/acq-zip-feed-health.js'), ctx);
+const HS = ctx.HS, H = HS.acqZipFeedHealth;
+const NOW = Date.parse('2026-11-20T17:30:00Z');
+
+const real = () => ({
+  zips: { registry_zips: 12746, with_report: 12746, refreshed_24h: 5759, refreshed_24_72h: 6955, refreshed_72h_7d: 14, refreshed_older_7d: 18, epa_layer_unavailable: 5818, epa_clock_older_7d: 3585,
+    no_map_area_by_design: 706, map_area_measured: 12040, serving_generation: 'n5-national-2026-11-20 · 2026-11-20 10:04:28+00',
+    stalest: [{ zip: '99999', refreshed_at: '2026-10-01T00:00:00Z', epa_unavailable: true, subscriber_zip: false }, { zip: '85083', refreshed_at: '2026-11-19T19:56:00Z', epa_unavailable: true, subscriber_zip: true }] },
+  sources_48h: [{ registry_id: 'fdot-active-construction-projects', kind: 'fetch_failed', events: 411, zips: 411, last_seen: '2026-11-20T10:00:00Z', sample_reason: 'timeout', subscriber_zips: 0 },
+    { registry_id: 'old-source', kind: 'retired', events: 3, zips: 3, last_seen: '2026-11-20T10:00:00Z', sample_reason: 'retired', subscriber_zips: 0 }],
+  publishing: { maps_posts_by_status: { draft: 175 }, drafts_waiting_over_3d: 163, approved_not_published: 7, newest_published: '2026-11-20T16:30:43Z' },
+  alarms: { total: 20, failing: 4, failing_checks: [{ check: 'x_check', detail: '<b>bad</b>', since: '2026-11-19', alertable: true }] },
+  source_registry: { registered_sources: 6, with_schedule: 0 }, heartbeats: [],
+  not_computed: ['per-ZIP records missing from Map 1 for non-subscriber ZIPs', 'per-source expected schedules', 'comparison with official city systems'],
+});
+const st = (r, k) => HS.zipFeedHealthStates(r).find((s) => s.key === k);
+
+// 1 · each class is its own state, with the real numbers
+ok(st(real(), 'STALE_REPORTS').count === 32 && st(real(), 'STALE_REPORTS').tone === 'bad', 'stale reports = 14 + 18, bad');
+ok(st(real(), 'EPA_LAYER_FAILURES').count === 5818 && st(real(), 'EPA_LAYER_FAILURES').tone === 'warn', 'EPA layer failures counted apart from stale reports');
+ok(st(real(), 'SOURCE_FAILURES').count === 1, 'a retired source is NOT counted as a failed read');
+ok(/fdot-active-construction-projects \(411 ZIPs\)/.test(st(real(), 'SOURCE_FAILURES').detail), 'the largest failing source is named with its ZIP count');
+ok(st(real(), 'MAP_PLACEMENT').tone === 'info' && /706 have none by design/.test(st(real(), 'MAP_PLACEMENT').detail), 'ZIPs with no map area are shown as by design, not as failures');
+ok(st(real(), 'PUBLISHING').count === 3, 'publishing counts open publishing issues, one unit, without adding drafts to checks');
+ok(st(real(), 'UNVERIFIED_COVERAGE').tone === 'unverified' && /0 of 6 registered sources/.test(st(real(), 'UNVERIFIED_COVERAGE').detail), 'unverified coverage is its own state and names the missing schedules');
+ok(/never verified/.test(st(real(), 'UNVERIFIED_COVERAGE').detail), 'no new activity is distinguished from coverage never verified');
+// 2 · flipping each input moves only its own state
+const clean = real(); clean.zips.refreshed_72h_7d = 0; clean.zips.refreshed_older_7d = 0;
+ok(st(clean, 'STALE_REPORTS').tone === 'ok' && st(clean, 'EPA_LAYER_FAILURES').count === 5818, 'clearing stale reports does not touch the EPA state');
+const noSrc = real(); noSrc.sources_48h = [];
+ok(st(noSrc, 'SOURCE_FAILURES').tone === 'ok' && st(noSrc, 'STALE_REPORTS').tone === 'bad', 'no source failures does not clear stale reports');
+const missing = real(); missing.zips.with_report = 12700;
+ok(st(missing, 'ZIP_PAGES_WITHOUT_REPORT').count === 46 && st(missing, 'ZIP_PAGES_WITHOUT_REPORT').tone === 'bad', 'ZIP pages with no report are counted');
+const unk = real(); unk.source_registry.with_schedule = 6; unk.not_computed = [];
+ok(st(unk, 'UNVERIFIED_COVERAGE').count === 0, 'the state clears only when schedules AND every not-computed item are gone');
+const nc = real(); nc.source_registry.with_schedule = 6;
+ok(st(nc, 'UNVERIFIED_COVERAGE').count === 3 && st(nc, 'UNVERIFIED_COVERAGE').tone === 'unverified', 'recording schedules does NOT clear unverified coverage');
+
+// 3 · rendering
+const html = H.render({ rollup: real(), as_of: '2026-11-20T17:30:00Z' }, NOW);
+ok(/All ZIP pages and feeds/.test(html) && /Separate from Subscriber ZIP Health/.test(html), 'the section says it is separate from subscriber monitoring');
+ok(/\(subscriber ZIP\)/.test(html), 'subscriber ZIPs are flagged inside the all-ZIP lists');
+ok(!/<b>bad<\/b>/.test(html) && /&lt;b&gt;bad/.test(html), 'monitor detail text is escaped');
+ok(/No roll-up was returned/.test(H.render({}, NOW)), 'an empty answer is shown as unverified, not as fine');
+ok(!/healthy/i.test(html), 'the word "healthy" is never printed');
+
+// 4 · wiring and SQL shape
+const page = rd('../acquisition.html'), sql = rd('../docs/zip-feed-health-rollup.sql'), lib = rd('../lib/acq-zip-feed-health.js');
+ok(/lib\/acq-zip-feed-health\.js\?v=[0-9a-f]{8}/.test(page), 'the page loads the module with a content key');
+ok(/acqSubscriberZipHealth\.mount[^\n]*\n[^\n]*\n\s*if\(window\.HS && window\.HS\.acqZipFeedHealth\)[^\n]*mount\(window\.hsClient, \$\('tab-feed'\)\)/.test(page), 'it mounts right after the subscriber section');
+ok(/hs_zip_feed_health/.test(lib) && !/\.from\(/.test(lib), 'the page reads one gated RPC and no table');
+ok(/dashboard_admins/.test(sql) && /grant execute on function public\.hs_zip_feed_health\(\) to authenticated/.test(sql) && /revoke all on function public\.hs_zip_feed_health\(\) from public, anon/.test(sql), 'the reader is admin-gated and closed to anon');
+ok(/revoke all on function public\._hs_zip_feed_health_core\(\) from public, anon, authenticated/.test(sql), 'the core function is not callable by any visitor role');
+ok(!/\b(insert|update|delete)\b\s+(into\s+)?public\./i.test(sql.replace(/--[^\n]*/g, '')), 'the SQL writes nothing');
+ok(/kind/.test(sql) && /'retired'|retired/.test(rd('../lib/acq-zip-feed-health.js')), 'failure kinds stay separate in the reader and the page');
+
+// 5 · standing monitor (stored findings, recovery, monitor-of-the-monitor)
+const mon = (o) => Object.assign({ last_run: { ok: true, error: null }, last_ok_run_at: '2026-11-20T17:00:00Z', runs_24h: 24, failed_runs_24h: 0,
+  cron: [{ job: 'dev-source-freshness', schedule: '41 * * * *', max_age_minutes: 180, owner: 'ingestion', registered: true, last_ok: '2026-11-20T16:41:00Z' }, { job: 'gone', schedule: 'x', max_age_minutes: 10, owner: 'o', registered: false, last_ok: null }],
+  findings: [{ finding_key: 'SOURCE_READ|fdot', class: 'SOURCE_READ_FAILURE', subject: 'fdot', severity: 'bad', first_seen: '2026-11-18T00:00:00Z', last_seen: '2026-11-20T17:00:00Z', resolved_at: null,
+      detail: { what: 'Source read failed', evidence: 'HTTP 403', threshold: 'any failed read in 48 h', action: 'Check endpoint', owner: 'ingestion', zip_count: 419, zips: [{ zip: '33301', subscriber: true }, { zip: '33302' }] } },
+    { finding_key: 'x', class: 'X', subject: 'old-source', severity: 'bad', first_seen: '2026-11-15T00:00:00Z', last_seen: '2026-11-19T00:00:00Z', resolved_at: '2026-11-19T01:00:00Z', detail: { what: 'w', evidence: '<i>e</i>', threshold: 't', action: 'a', owner: 'o', zip_count: 0, zips: [] } }] }, o);
+ok(HS.zipFeedMonitorStatus(mon(), NOW).tone === 'ok', 'a recent good run reads as running');
+ok(HS.zipFeedMonitorStatus(mon({ last_ok_run_at: '2026-11-20T10:00:00Z' }), NOW).tone === 'bad' && /STALE/.test(HS.zipFeedMonitorStatus(mon({ last_ok_run_at: '2026-11-20T10:00:00Z' }), NOW).text), 'a monitor with no good run in 2 h is shown as stale');
+ok(/FAILED/.test(HS.zipFeedMonitorStatus(mon({ last_run: { ok: false, error: 'boom' } }), NOW).text), 'a failed monitor run is shown as failed');
+ok(HS.zipFeedMonitorStatus(null, NOW).tone === 'bad' && /never recorded a run/.test(HS.zipFeedMonitorStatus({}, NOW).text), 'no run on record is shown as not monitored, never as fine');
+const mh = H.render({ rollup: real(), as_of: '2026-11-20T17:30:00Z' }, NOW, mon());
+ok(/ONGOING/.test(mh) && /RECOVERED/.test(mh), 'findings are shown as ongoing or recovered');
+ok(/33301\*/.test(mh) && /subscriber ZIP/.test(mh) && /Affected ZIPs \(419, first 2 shown\)/.test(mh), 'a finding names its affected ZIPs, flags subscribers and says how many are shown');
+ok(/First recorded by this monitor/.test(mh) && /Last checked/.test(mh) && /Threshold/.test(mh) && /Action/.test(mh) && /owner: ingestion/.test(mh), 'a finding states first seen, last checked, threshold, action and owner');
+ok(/NOT REGISTERED/.test(mh), 'a monitoring job that is not registered is flagged');
+ok(!/<i>e<\/i>/.test(mh) && /&lt;i&gt;e/.test(mh), 'finding evidence is escaped');
+ok(/Monitoring history unavailable/.test(H.render({ rollup: real() }, NOW)), 'when the monitor cannot be read the page says history is unverified');
+ok(/not running; see "Coverage not verified"/.test(mh), 'checks that do not run are stated as not running');
+const msql = rd('../docs/zip-feed-health-monitor.sql');
+ok(/cron\.schedule\('zip-feed-health-record'/.test(msql) && /revoke all on public\.zip_feed_health_runs/.test(msql) && /revoke all on function public\._hs_zip_feed_health_findings\(\) from public, anon, authenticated/.test(msql), 'the monitor is scheduled, its tables are closed and the finder is not callable by visitors');
+ok(/COVERAGE_NOT_VERIFIED/.test(msql) && /dev_monitoring_coverage/.test(msql) && !/insert into public\.source_registry|update public\.source_registry/i.test(msql), 'unverified coverage is a recorded finding and source_registry is untouched');
+
+// 5b · one unit per tile when the monitor is available
+const fm = { findings: [{ class: 'SOURCE_READ_FAILURE', resolved_at: null }, { class: 'SOURCE_READ_FAILURE', resolved_at: null }, { class: 'SOURCE_READ_FAILURE', resolved_at: '2026-11-20T00:00:00Z' }, { class: 'MAPS_DRAFTS_WAITING', resolved_at: null }, { class: 'MONITOR_CHECK_FAILING', resolved_at: null }] };
+ok(HS.zipFeedHealthStates(real(), fm).find((s) => s.key === 'SOURCE_FAILURES').count === 2, 'the failing-source tile counts every open source finding, not only the roll-up top rows, and not recovered ones');
+ok(HS.zipFeedHealthStates(real(), fm).find((s) => s.key === 'PUBLISHING').count === 2, 'the publishing tile counts open publishing findings');
+ok(/Preview: the top \d+ source\/kind rows by ZIPs\. All 1 failing sources are in Findings above/.test(H.render({ rollup: real(), as_of: 'x' }, NOW, mon())), 'the source-events table is labelled a preview and names the true failing-source total');
+ok(/Preview of the top \d+ rows only/.test(H.render({ rollup: real(), as_of: 'x' }, NOW)), 'without the monitor the table is still labelled a preview');
+// 6 · full affected-ZIP access and all-ZIP accounting
+const acc = { registry_zips: 12746, bucket_sum: 12746, every_zip_accounted_for: true, buckets: { COVERAGE_NOT_VERIFIED: 11492, SOURCE_READ_FAILING: 888, NO_CHANGE_EVIDENCE: 334, STALE_REPORT: 32 } };
+const ah = H.render({ rollup: real(), as_of: 'x' }, NOW, mon(), acc);
+ok(/Every ZIP is in exactly one bucket \(12,746 of 12,746\)/.test(ah) && /data-key="ACCOUNT\|NO_CHANGE_EVIDENCE"/.test(ah), 'every ZIP is accounted for and each bucket can list its ZIPs');
+ok(/No bucket means "verified complete"/.test(ah), 'no bucket is labelled verified complete');
+ok(/MISMATCH/.test(H.render({ rollup: real() }, NOW, mon(), Object.assign({}, acc, { every_zip_accounted_for: false, bucket_sum: 12700 }))), 'a ZIP missing from the accounting is shown as a mismatch');
+ok(/ZIP accounting unavailable/.test(H.render({ rollup: real() }, NOW, mon(), null)), 'unreadable accounting is shown as unverified');
+ok(/data-key="SOURCE_READ\|fdot"/.test(ah) && /Show all 419 affected ZIPs/.test(ah), 'a finding offers all of its ZIPs, not only the stored preview');
+// paging: 250 ZIPs in 3 pages of 100
+const calls = []; let pg = '';
+const client = { rpc: (fn, a) => { calls.push(a.p_offset); const rows = []; for (let i = a.p_offset; i < Math.min(a.p_offset + a.p_limit, 250); i++) rows.push({ zip: String(10000 + i), subscriber: i === 3 }); return Promise.resolve({ data: { total: 250, rows } }); } };
+const out = { insertAdjacentHTML: (_, h) => { pg += h; } }; const attrs = { 'data-key': 'SOURCE_READ|fdot', 'data-off': '0' };
+const btn = { classList: { contains: (c) => c === 'zfh-all' }, disabled: false, nextSibling: out, style: {}, textContent: '', getAttribute: (k) => attrs[k], setAttribute: (k, v) => { attrs[k] = v; } };
+await HS.zipFeedLoadZips(client, btn); await new Promise((r) => setTimeout(r, 0));
+await HS.zipFeedLoadZips(client, btn); await new Promise((r) => setTimeout(r, 0));
+await HS.zipFeedLoadZips(client, btn); await new Promise((r) => setTimeout(r, 0));
+ok(calls.join(',') === '0,100,200' && /10249/.test(pg) && /10000/.test(pg) && btn.style.display === 'none' && /All 250 ZIPs shown/.test(pg), 'paging reaches every one of 250 ZIPs and then stops');
+ok(/10003\*/.test(pg), 'subscriber ZIPs are flagged in the full list');
+const dsql = rd('../docs/zip-feed-health-detail.sql');
+ok(/limit 50/.test(rd('../docs/zip-feed-health-monitor.sql')) && /least\(greatest\(coalesce\(p_limit, 100\), 1\), 500\)/.test(dsql) && /dashboard_admins/.test(dsql) && /revoke all on function public\.hs_zip_feed_health_zips\(text, int, int\) from public, anon/.test(dsql), 'the full-list reader is admin-gated and paged; the stored 50 is only a preview');
+ok(/last_tick_at > f\.seen_at/.test(dsql) && /anchor 1 appeared/.test(dsql), 'a later successful tick supersedes an earlier failure, spliced fail-closed');
+ok(!/\b(insert|update|delete)\b\s+(into\s+)?public\./i.test(dsql.replace(/--[^\n]*/g, '')), 'the detail SQL writes nothing');
+
+// ---- legacy feed inventory (2026-11-20) ----
+const fsum = { feeds_total: 3302, active: 2944, inactive: 358, communities: 507, distinct_sources: 796, active_feeds_sharing_a_source: 2231, active_feeds_reaching_no_zip_page: 0, active_feeds_unknown_community: 0, health_unknown: 2944, feeds_with_outcome: 0, health_states: { NEVER_CHECKED: 2944 }, stale_note: 'STALE_EVIDENCE is a monitoring threshold (12 hours), not a source publishing schedule.',
+  proxy_note: 'Proxy only: whether anything was stored for the community.', not_in_this_inventory: 'Local News registry endpoints are not in this inventory', parent_job: { last_completed: '2026-11-20T17:21:00Z', proves: 'a run completed, not that each feed succeeded' },
+  by_kind_evidence: [{ kind: 'meetings', evidence_class: 'STORED_OUTPUT_WITHIN_30D', feeds: 2000 }, { kind: 'alerts_government', evidence_class: 'NO_STORED_OUTPUT_FOR_COMMUNITY', feeds: 16 }] };
+const fh = HS.feedInventoryHtml(fsum);
+ok(/0 of 2,944 active feeds have a recorded read outcome/.test(fh) && /Never checked \(no recorded outcome\)/.test(fh) && /unknown, not healthy/.test(fh) && !/(is|are) healthy|Healthy:/i.test(fh), 'before any outcome exists every feed reads never checked (unknown), never healthy');
+ok(/3,302 feeds/.test(fh) && /358 inactive/.test(fh) && /Local News registry endpoints are not in this inventory/.test(fh) && /not that each feed succeeded/.test(fh), 'inventory totals, the parent-job caveat and the out-of-scope pipeline are stated');
+ok(/data-filter="evidence:NO_STORED_OUTPUT_FOR_COMMUNITY\|kind:alerts_government"/.test(fh) && /data-filter="inactive"/.test(fh) && /data-filter="no_zip_page"/.test(fh), 'each evidence class, inactive feeds and feeds reaching no ZIP page have a drill-down');
+ok(/unavailable/.test(HS.feedInventoryHtml(null)) && /unverified/.test(HS.feedInventoryHtml(null)), 'a failed inventory read is shown as unverified, not omitted');
+let fcalls = [], fout = '';
+const fcl = { rpc: (fn, a) => { fcalls.push(fn + ':' + (a.p_filter || a.p_feed) + ':' + a.p_offset); return Promise.resolve({ data: fn === 'hs_feed_zips' ? { total: 2, zips: ['84302', '84312'] } : { total: 150, rows: Array.from({ length: Math.min(100, 150 - a.p_offset) }, (_, i) => ({ feed_id: 'f' + (a.p_offset + i), community: 'C', kind: 'meetings', zip_pages: 3, last_output_at: null, health: 'NEVER_CHECKED' })) } }); } };
+const fo = { insertAdjacentHTML: (_, h) => { fout += h; } };
+const fa = { 'data-filter': 'kind:meetings', 'data-off': '0' };
+const fb = { classList: { contains: (c) => c === 'zfh-feeds' }, disabled: false, nextSibling: fo, style: {}, textContent: '', getAttribute: (k) => fa[k], setAttribute: (k, v) => { fa[k] = v; } };
+await HS.zipFeedLoadFeeds(fcl, fb); await new Promise((r) => setTimeout(r, 0)); await HS.zipFeedLoadFeeds(fcl, fb); await new Promise((r) => setTimeout(r, 0));
+ok(fcalls.join(',') === 'hs_feed_inventory_page:kind:meetings:0,hs_feed_inventory_page:kind:meetings:100' && /f149/.test(fout) && /All 150 feeds shown/.test(fout) && /Never checked/.test(fout), 'the feed list pages to the last feed and shows an unchecked feed as "Never checked"');
+const fdsql = rd('../docs/feed-inventory-health.sql');
+ok(/dashboard_admins/.test(fdsql) && /revoke all on function public\.hs_feed_inventory_page/.test(fdsql) && !/\b(insert|update|delete)\b\s+(into\s+)?public\.(feeds|alerts|meetings)\b/i.test(fdsql.replace(/--[^\n]*/g, '')), 'the feed inventory is admin-gated and never writes feeds, alerts or meetings');
+
+// ---- findings that age out (2026-11-21) ----
+const mkF = (key, basis, ev) => ({ finding_key: key, class: 'SOURCE_READ_FAILURE', subject: key.split('|')[1], severity: 'bad', first_seen: '2026-11-20T17:35:00Z', last_seen: '2026-11-20T22:55:00Z', resolved_at: '2026-11-20T23:55:00Z', resolution_basis: basis, resolution_evidence: ev, detail: { what: 'Source read failed', zip_count: 1, zips: [] } });
+const monAged = mon({ findings: [mkF('SOURCE_READ|a', 'AGED_OUT_UNCONFIRMED', { proof: 'the failure left the 48-hour window; no later successful read has been observed', failed_zips: 6, zips_read_again: 5 }), mkF('SOURCE_READ|b', 'POSITIVE_EVIDENCE', { proof: 'every failing ZIP was read again later with no newer failure', failed_zips: 3, zips_read_again: 3 })] });
+const mhAged = H.render({ rollup: real() }, NOW, monAged, null, null);
+ok(/Aged out, recovery not confirmed \(1\)/.test(mhAged) && /Recovered with evidence in the last 7 days \(1\)/.test(mhAged), 'an aged-out failure is listed apart from findings recovered with evidence');
+ok(/AGED OUT · RECOVERY NOT CONFIRMED/.test(mhAged) && (mhAged.match(/<b>RECOVERED<\/b>/g) || []).length === 1, 'an aged-out failure is never labelled RECOVERED');
+ok(/5 of 6 failing ZIPs read again/.test(mhAged) && /3 of 3 failing ZIPs read again/.test(mhAged), 'each resolution says what evidence it rests on');
+const rsql = rd('../docs/zip-feed-health-resolution.sql');
+ok(/AGED_OUT_UNCONFIRMED/.test(rsql) && /anchor appeared/.test(rsql) && /later tick|last_tick_at > lf\.at/.test(rsql) && /resolution_basis = ''?AGED_OUT_UNCONFIRMED/.test(rsql) && !/\b(insert|delete)\b\s+(into|from)\s+public\.(feeds|alerts|meetings|dev_)/i.test(rsql.replace(/--[^\n]*/g, '')), 'the recorder records why a finding left, re-checks unconfirmed ones, and writes no source data');
+
+// ---- per-feed read health: the five states (2026-11-21) ----
+const fsum2 = Object.assign({}, fsum, { feeds_with_outcome: 2900, latest_outcome_at: '2026-11-21T08:00:00Z', health_unknown: 44,
+  health_states: { READ_OK_ITEMS: 1800, READ_OK_ZERO_ITEMS: 1000, READ_FAILED: 100, STALE_EVIDENCE: 4, NEVER_CHECKED: 40 } });
+const fh3 = HS.feedInventoryHtml(fsum2);
+ok(/2,900 of 2,944 active feeds have a recorded read outcome/.test(fh3) && /Successful read, items returned/.test(fh3) && /Successful read, zero items \(not a failure\)/.test(fh3) && /Failed read \(newest outcome\)/.test(fh3) && /Stale monitoring evidence/.test(fh3) && /Never checked/.test(fh3), 'all five read-health states are shown with their own counts');
+ok(/data-filter="health:READ_FAILED"/.test(fh3) && /data-filter="health:READ_OK_ZERO_ITEMS"/.test(fh3) && /data-filter="health:NEVER_CHECKED"/.test(fh3), 'each state drills down to its feeds');
+ok(/monitoring threshold \(12 hours\), not a source publishing schedule/.test(fh3), 'the stale threshold is labelled a monitoring threshold, not a publishing schedule');
+ok(/Community output \(proxy only, not read health\)/.test(fh3) && /Feed-to-ZIP mapping \(tracked separately from read health\)/.test(fh3), 'mapping and the community-output proxy stay apart from read health');
+ok(!/(is|are) healthy|Healthy:/i.test(fh3), 'no state is called healthy');
+const L = HS.feedReadLine;
+ok(/^Read OK · last read .* · 14 items, newest item 2026-11-19/.test(L({ health: 'READ_OK_ITEMS', last_attempt_at: '2026-11-21T08:00:00Z', items_returned: 14, newest_item_date: '2026-11-19T00:00:00Z' })), 'a successful read shows its items and newest item date as information');
+ok(/^Read OK, zero items/.test(L({ health: 'READ_OK_ZERO_ITEMS', last_attempt_at: '2026-11-21T08:00:00Z' })) && !/FAIL/.test(L({ health: 'READ_OK_ZERO_ITEMS', last_attempt_at: '2026-11-21T08:00:00Z' })), 'a successful empty read is not a failure');
+ok(/READ FAILED · last read .* · 3 failed reads in a row · URLError: x/.test(L({ health: 'READ_FAILED', last_attempt_at: '2026-11-21T08:00:00Z', consecutive_errors: 3, last_error: 'URLError: x' })), 'a failed read shows its streak and error');
+ok(/^Never checked$/.test(L({ health: 'NEVER_CHECKED' })) && /^Stale monitoring evidence · last read .* \(ok\)/.test(L({ health: 'STALE_EVIDENCE', last_attempt_at: '2026-11-19T08:00:00Z', last_outcome: 'ok' })), 'never checked and stale evidence are distinct lines');
+const hsql = rd('../docs/feed-read-health.sql');
+ok(/interval '12 hours'/.test(hsql) && /MONITORING threshold, not any source's publishing schedule/.test(hsql) && /'READ_FAILED'/.test(hsql) && /'READ_OK_ZERO_ITEMS'/.test(hsql) && /'NEVER_CHECKED'/.test(hsql) && /string_to_array\(p_filter, '\|'\)/.test(hsql), 'the SQL derives the five states with a labelled 12-hour monitoring threshold and supports combined filters');
+ok(!/newest_item_date\s*<|newest_item_date\s*>|age\(.*newest_item_date/.test(hsql.replace(/--[^\n]*/g, '')) && !/\bdrop\s+function/i.test(hsql.replace(/--[^\n]*/g, '')), 'an old newest item date never sets a state, and the migration drops nothing');
+
+console.log(`\n${n - bad}/${n} passed`);
+process.exit(bad ? 1 : 0);

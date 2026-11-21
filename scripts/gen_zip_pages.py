@@ -27,7 +27,7 @@ Rule D: >= 3 publishable Development entities from the compact ingest plane
 absent from the plane is not eligible. INDEX = Rule F OR Rule D.
 """
 import argparse, hashlib, html, json, os, re, subprocess, sys, tempfile, time, unicodedata, urllib.error, urllib.parse, urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 # Loaded by path in some tests (importlib spec_from_file_location), where this directory is not
 # on sys.path; the sibling module is the page-semantics authority and is imported by name.
@@ -1018,21 +1018,73 @@ def _weather_host(u):
     return pu.scheme in ("http", "https") and h == WEATHER_AGENCY
 
 
-def _items(items, heading, empty, kind, zip_code=""):
+# ---- Government notices on the ZIP page (what is listed, and in what order) --------------------------
+# A notice is left out only when the SAME item is already listed under Upcoming public meetings (same
+# record link AND same title). A county that files every calendar event as both a meeting and a notice
+# otherwise fills the notices list with copies of the meetings list. Distinct notices that happen to
+# share a generic link keep their own titles, so they stay.
+def _norm_title(t):
+    return re.sub(r"\s+", " ", (t or "").strip().lower())
+
+
+def _held_case_ids():
+    """Case ids the connector holds as unverified (registry county_cases[].hold_cases), the SAME list the
+    map path reads, so a held case is never shown as a current proposal through the notice path either.
+    The stored notice rows stay; only this display leaves them out."""
+    try:
+        reg = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "supabase", "functions", "get-address-report", "jurisdiction-registry.json")))
+    except (OSError, ValueError):
+        return ()
+    return tuple(h["case_id"].lower() for e in reg.get("county_cases") or [] for h in e.get("hold_cases") or [] if h.get("case_id"))
+
+
+def gn_for_display(gn, um_items, today):
+    """-> (shown, rest). `date` on a notice is the record's own date: a publication date for most, the event
+    date for a calendar event, so a future date is never treated as a publication date. Order shown:
+    notices dated within the next 30 days (soonest first), then notices already dated (newest first).
+    Everything else, including hearings and deadlines further out, is `rest` and is listed under a
+    "Show all" control, so nothing eligible is unreachable."""
+    held = _held_case_ids()
+    shown_um = {(it.get("url") or "", _norm_title(it.get("title"))) for it in um_items}
+    elig = []
+    for x in gn:
+        blob = f'{x.get("title") or ""} {x.get("url") or ""}'.lower()
+        if any(h in blob for h in held):
+            continue
+        if (x.get("url") or "", _norm_title(x.get("title"))) in shown_um:
+            continue
+        elig.append(x)
+    horizon = (datetime.strptime(today, "%Y-%m-%d") + timedelta(days=30)).strftime("%Y-%m-%d")
+    near = sorted((x for x in elig if today < (x.get("date") or "") <= horizon), key=lambda x: (x["date"], x["title"], x.get("url") or ""))
+    past = sorted((x for x in elig if (x.get("date") or "") <= today), key=lambda x: (x["date"], x["title"], x.get("url") or ""), reverse=True)
+    far = sorted((x for x in elig if (x.get("date") or "") > horizon), key=lambda x: (x["date"], x["title"], x.get("url") or ""))
+    first = near + past
+    if not first:                      # only far-out items: still list them, never "no notices"
+        return far[:GN_CAP], far[GN_CAP:]
+    return first[:GN_CAP], first[GN_CAP:] + far
+
+
+def _items(items, heading, empty, kind, zip_code="", rest=None):
     if not items:
         return f'<section class="zsec"><h2>{esc(heading)}</h2><p class="quiet">{esc(empty)}</p></section>'
-    li = []
-    for it in items:
-        t, u = esc(it["title"]), safe_url(it.get("url"))
-        note = ""
-        if kind == "wx" or _weather_host(it.get("url")):
-            u = WEATHER_ZIP_PAGE + zip_code if re.fullmatch(r"[0-9]{5}", zip_code or "") else None
-            note = f' <span class="quiet">{esc(WEATHER_NOTE)}</span>' if u else ""
-        when = esc(it.get("date") or "")
-        inner = f'<a href="{esc(u)}" rel="nofollow noopener">{t}</a>{note}' if u else t
-        badge = ' <span class="mtg-cancelled">Cancelled</span>' if it.get("cancelled") is True else ""
-        li.append(f'<li>{inner}{badge}{f" <time>{when}</time>" if when else ""}</li>')
-    return (f'<section class="zsec"><h2>{esc(heading)}</h2><ul>' + "".join(li) + "</ul></section>")
+    li = [_item_li(it, kind, zip_code) for it in items]
+    more = ""
+    if rest:
+        more = (f'<details class="zall"><summary>Show all {len(items) + len(rest)} {esc(heading.lower())}</summary><ul>'
+                + "".join(_item_li(it, kind, zip_code) for it in rest) + "</ul></details>")
+    return (f'<section class="zsec"><h2>{esc(heading)}</h2><ul>' + "".join(li) + "</ul>" + more + "</section>")
+
+
+def _item_li(it, kind, zip_code=""):
+    t, u = esc(it["title"]), safe_url(it.get("url"))
+    note = ""
+    if kind == "wx" or _weather_host(it.get("url")):
+        u = WEATHER_ZIP_PAGE + zip_code if re.fullmatch(r"[0-9]{5}", zip_code or "") else None
+        note = f' <span class="quiet">{esc(WEATHER_NOTE)}</span>' if u else ""
+    when = esc(it.get("date") or "")
+    inner = f'<a href="{esc(u)}" rel="nofollow noopener">{t}</a>{note}' if u else t
+    badge = ' <span class="mtg-cancelled">Cancelled</span>' if it.get("cancelled") is True else ""
+    return f'<li>{inner}{badge}{f" <time>{when}</time>" if when else ""}</li>'
 
 
 OG_IMAGE = f"{BASE}/og-default.png"
@@ -1147,6 +1199,8 @@ def render(p, built):
                  "date": (m.get("meeting_date") or "")[:10],
                  "cancelled": m.get("is_cancelled") is True} for m in um_show]
 
+    gn_shown, gn_rest = gn_for_display(p["gn"], um_items, datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+
     county_bit = f" in {esc(p['county_label'])}" if p.get("county_label") else ""
     lead = ("Development records, government notices, public meetings and local news"
             if p.get("rule_d") else
@@ -1226,8 +1280,8 @@ def render(p, built):
            f'ZIP {esc(z)}{county_bit}.</p></header>')
         + ("" if cov else _dev_items(p.get("dev_entities") or []))
         + ("" if cov else _dc_listing_items(p.get("dc_listings") or [], z))
-        + _items(p["gn"][:GN_CAP], "Government notices",
-                 "No government notices on file for this ZIP yet.", "gn")
+        + _items(gn_shown, "Government notices",
+                 "No government notices on file for this ZIP yet.", "gn", rest=gn_rest)
         + _items(um_items, "Upcoming public meetings",
                  "No upcoming public meetings on file for this ZIP yet.", "um")
         + _items(ln_show, "Local news",
@@ -1318,10 +1372,10 @@ def render(p, built):
         # one host only.
         '<script src="/lib/premium-waitlist.js?v=3cb9baaf"></script>\n'
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
-        '<script src="/shell.js?v=c05902b4"></script>\n'
+        '<script src="/shell.js?v=5d10566b"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
         '<script src="/lib/water-rights.js?v=add4200a"></script>\n'
-        '<script src="/lib/community-page.js?v=97633cae"></script>\n'
+        '<script src="/lib/community-page.js?v=d96cd8ab"></script>\n'
         "</body>\n</html>\n")
 
 

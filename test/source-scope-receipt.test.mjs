@@ -46,8 +46,11 @@ const R0 = (o) => o.reports[0].scope_receipt;
 
 console.log('1) the pure builder');
 {
-  const base = { requested: true, widens: true, widenedRan: true, fallback: null, truncatedAt: null, metrics: { unresolved_excluded: 0, rpc_failures: 0, capacity_truncated: false }, version: 'v2:x' };
-  ok(JSON.stringify(sr.buildScopeReceipt(base)) === '{"scope":"expanded","version":"v2:x","complete":true}', 'a clean widened run is expanded + complete');
+  const base = { requested: true, widens: true, widenedRan: true, fallback: null, truncatedAt: null, metrics: { unresolved_excluded: 0, rpc_failures: 0, capacity_truncated: false }, version: 'v3:x' };
+  ok(JSON.stringify(sr.buildScopeReceipt(base)) === '{"scope":"expanded","version":"v3:x","complete":true}', 'a clean widened run is expanded + complete');
+  ok(sr.buildScopeReceipt({ ...base, metrics: { ...base.metrics, geometry_unresolved_kept: 1 } }).complete === false, 'a geometry check that could not decide ⇒ INCOMPLETE');
+  ok(sr.buildScopeReceipt({ ...base, metrics: { ...base.metrics, geometry_untested_kept: 1 } }).complete === false, 'an oversize geometry kept untested ⇒ INCOMPLETE');
+  ok(sr.SCOPE_RULE_VERSION === 'v3', 'the rule version moved to v3 so a v2 baseline is re-established, not compared');
   ok(sr.buildScopeReceipt({ ...base, truncatedAt: 20 }).complete === false, 'truncation is incomplete');
   ok(sr.buildScopeReceipt({ ...base, metrics: { ...base.metrics, unresolved_excluded: 1 } }).complete === false, 'an unresolved membership test is incomplete');
   ok(sr.buildScopeReceipt({ ...base, metrics: { ...base.metrics, rpc_failures: 1 } }).complete === false, 'a failed membership call is incomplete');
@@ -82,7 +85,7 @@ for (const z of Object.keys(Z)) {
   const L = legacyPts(z, 5), W = widenedPts(z, 6);
   const deps = (mem) => ({ zipCentroid: cen(z), zipBounds: bounds(z), zipMembers: mem });
   const e1 = await arcRun(z, [...L, ...W], deps(allMember));
-  ok(R0(e1).scope === 'expanded' && R0(e1).complete === true && /^v2:/.test(R0(e1).version), 'members found ⇒ expanded, complete, versioned', JSON.stringify(R0(e1)));
+  ok(R0(e1).scope === 'expanded' && R0(e1).complete === true && /^v3:/.test(R0(e1).version), 'members found ⇒ expanded, complete, versioned', JSON.stringify(R0(e1)));
   const e2 = await arcRun(z, [...L, ...W], deps(allOutside));
   ok(e2.sites.length === 5 && R0(e2).scope === 'expanded' && R0(e2).complete === true, 'EMPTY ring (every widened record outside the polygon) ⇒ still expanded + complete', JSON.stringify(R0(e2)));
   const e3 = await arcRun(z, L, deps(allMember));
@@ -116,7 +119,7 @@ console.log('\n3) csv (the connector that used to set scope_widened only when a 
   const d = (mem) => ({ zipCentroid: cen(z), zipBounds: bounds(z), zipMembers: mem });
   const r = (o) => o.reports[0].scope_receipt;
   const e1 = await go([...L, ...W], d(allMember));
-  ok(r(e1).scope === 'expanded' && r(e1).complete === true && /^v2:/.test(r(e1).version), 'members found ⇒ expanded + complete');
+  ok(r(e1).scope === 'expanded' && r(e1).complete === true && /^v3:/.test(r(e1).version), 'members found ⇒ expanded + complete');
   const e2 = await go([...L, ...W], d(allOutside));
   ok(e2.reports[0].scope_widened !== true && r(e2).scope === 'expanded' && r(e2).complete === true, 'EMPTY ring: scope_widened stays unset (nothing kept) but the RECEIPT still proves the expanded read', JSON.stringify(r(e2)));
   const e3 = await go(L, d(allMember));

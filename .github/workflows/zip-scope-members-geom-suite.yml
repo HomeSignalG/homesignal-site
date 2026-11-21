@@ -1,0 +1,60 @@
+name: zip-scope-members-geom-suite
+
+# WHOLE-GEOMETRY MEMBERSHIP PREFILTER (docs/zip-scope-members-geom.sql, sources/scope-members.ts).
+# Runs the SHIPPED batch membership function against a DISPOSABLE PostGIS: 36 checks (irregular
+# L-shaped polygon, boundary-inclusive edges, malformed elements, bounded batch, privileges, a
+# 1000-point performance bound, equality with the canonical predicate), then eight prohibited mutations and a parity check against the serving converter
+# — each MUST fail the suite. Never addresses production.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/zip-scope-members-geom.sql'
+      - 'docs/zip-membership-canonical.sql'
+      - 'test/zip_scope_members_geom_pg/**'
+      - 'scripts/phase2_b1_zcta.py'
+      - 'test/zip_membership_pg/fixture_schema.sql'
+      - '.github/workflows/zip-scope-members-geom-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/zip-scope-members-geom.sql'
+      - 'test/zip_scope_members_geom_pg/**'
+      - 'scripts/phase2_b1_zcta.py'
+
+jobs:
+  members:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: zip_scope_members_geom_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Shipped function passes; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: zip_scope_members_geom_disposable
+        run: |
+          set -o pipefail
+          bash test/zip_scope_members_geom_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/zsm.log
