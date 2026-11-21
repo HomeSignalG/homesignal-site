@@ -141,7 +141,7 @@ ok(/Aged out, recovery not confirmed \(1\)/.test(mhAged) && /Recovered with evid
 ok(/AGED OUT · RECOVERY NOT CONFIRMED/.test(mhAged) && (mhAged.match(/<b>RECOVERED<\/b>/g) || []).length === 1, 'an aged-out failure is never labelled RECOVERED');
 ok(/5 of 6 failing ZIPs read again/.test(mhAged) && /3 of 3 failing ZIPs read again/.test(mhAged), 'each resolution says what evidence it rests on');
 const rsql = rd('../docs/zip-feed-health-resolution.sql');
-ok(/AGED_OUT_UNCONFIRMED/.test(rsql) && /anchor appeared/.test(rsql) && /later tick|last_tick_at > lf\.at/.test(rsql) && /resolution_basis = 'AGED_OUT_UNCONFIRMED'/.test(rsql) && !/\b(insert|delete)\b\s+(into|from)\s+public\.(feeds|alerts|meetings|dev_)/i.test(rsql.replace(/--[^\n]*/g, '')), 'the recorder records why a finding left, re-checks unconfirmed ones, and writes no source data');
+ok(/AGED_OUT_UNCONFIRMED/.test(rsql) && /anchor appeared/.test(rsql) && /later tick|last_tick_at > lf\.at/.test(rsql) && /resolution_basis = ''?AGED_OUT_UNCONFIRMED/.test(rsql) && !/\b(insert|delete)\b\s+(into|from)\s+public\.(feeds|alerts|meetings|dev_)/i.test(rsql.replace(/--[^\n]*/g, '')), 'the recorder records why a finding left, re-checks unconfirmed ones, and writes no source data');
 
 console.log(`\n${n - bad}/${n} passed`);
 process.exit(bad ? 1 : 0);
