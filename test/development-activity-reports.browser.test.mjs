@@ -1001,8 +1001,8 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   const lastCreate = shareCalls.filter((c) => c.body.action === 'create').pop();
   ok(Object.keys(lastCreate.body).sort().join() === 'action,report_id', '9o2 the popup\'s create request names the report and nothing else (no address, no label)');
   const siteTargets = await page.evaluate(() => window.HS.SHARE_TARGETS.map((t) => t.ic + t.t));
-  ok(pop.icons.length === 12 && pop.icons.join('|') === siteTargets.join('|'), '9o3 the popup shows the site\'s own 12 Share icons, in the site\'s order', pop.icons);
-  ok(pop.hrefs.length === 10 && pop.hrefs.every((h) => h.includes(encodeURIComponent(pop.link))) && !pop.hrefs.join(' ').includes(encodeURIComponent(addrTyped.split(',')[0])),
+  ok(pop.icons.length === 14 && pop.icons.join('|') === siteTargets.join('|'), '9o3 the popup shows the site\'s own 14 Share icons, in the site\'s order', pop.icons);
+  ok(pop.hrefs.length === 12 && pop.hrefs.every((h) => h.includes(encodeURIComponent(pop.link))) && !pop.hrefs.join(' ').includes(encodeURIComponent(addrTyped.split(',')[0])),
     '9o4 every icon link carries the same client link, and the message names no street address', pop.hrefs);
   ok(/Anyone who has it can read this report/.test(pop.note) && /displayed only once/.test(pop.note), '9o5 the popup says anyone with the link can read the report and that the link is shown once', pop.note);
   // copy

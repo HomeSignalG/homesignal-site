@@ -14,6 +14,6 @@ ok(by('mailto:').length === 1 && !/target=/.test(by('mailto:')[0]), 'Email opens
 ok(by('sms:').length === 1 && !/target=/.test(by('sms:')[0]), 'Messages opens in place (no target)');
 ok(/href="mailto:\?subject=A%20private%20development%20activity%20report%20prepared%20for%20you&amp;body=https%3A%2F%2Fjodytracks\.com%2Fr%2Fabc"/.test(html), 'Email subject and body are encoded');
 const web = tags.filter((t) => /href="https?:/.test(t));
-ok(web.length === 8 && web.every((t) => /target="_blank" rel="noopener"/.test(t)), 'every web target still opens a new tab with noopener');
+ok(web.length === 10 && web.every((t) => /target="_blank" rel="noopener"/.test(t)), 'every web target still opens a new tab with noopener');
 console.log(fails ? fails + ' FAILED' : 'all passed');
 process.exit(fails ? 1 : 0);
