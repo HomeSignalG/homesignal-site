@@ -1,8 +1,7 @@
 import fs from 'node:fs';
-import { runInNewContext } from 'node:vm';
 const site='/home/user/homesignal-site';
 const H = await import(site+'/supabase/functions/get-development-activity-report/handler.ts');
-const sb={window:{}}; runInNewContext(fs.readFileSync(site+'/lib/da-report-view.js','utf8'), sb); const V=sb.window.HS.daReportView;
+// This committed harness prints the handler's report object only. It does not render the report HTML, so it does not print the headline text.
 const CREDITS = JSON.parse(fs.readFileSync(site+'/supabase/functions/_shared/source-attribution.json','utf8'));
 const D = JSON.parse(fs.readFileSync('data.json','utf8'));
 const subj = {
@@ -11,8 +10,6 @@ const subj = {
  S3:{addr:'12400 NE Sherman Rd, Kansas City, MO 64166',lat:39.316609376222,lng:-94.511564544437,zip:'64166'},
  S4:{addr:'6550 W Happy Valley Rd, Phoenix, AZ 85310',lat:33.7134154669538,lng:-112.201473975353,zip:'85310'}};
 const rows=(n)=>D.radius[n].map(a=>({source_key:a[0],feature_id:a[1],registry_id:a[2],provenance:a[3],distance_mi:+a[4],geometry_type:a[5],has_more:a[6],marker_lat:a[7],marker_lng:a[8]}));
-const decode=s=>s.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&');
-const text=h=>decode(h.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim());
 const out={};
 for (const n of Object.keys(subj)) {
   const s=subj[n]; const R=rows(n);
@@ -35,6 +32,5 @@ for (const n of Object.keys(subj)) {
     included:(rep.projects||[]).length, included_by_family:(rep.projects||[]).reduce((m,p)=>{const f=p.source?.family||p.source_family||'?';m[f]=(m[f]||0)+1;return m},{}),
     relevance_review_by_reason:(rep.relevance_review||[]).reduce((m,x)=>{m[x.reason]=(m[x.reason]||0)+1;return m},{}),
     limitations:(rep.coverage?.limitations||rep.limitations||[]).map(l=>l.code), coverage_state:rep.coverage_state};
-  const html=V.html(body,{subject:s.addr}); out[n].headline=(text(html).match(/\d+ official records? within .*? Types:/)||[null])[0]; out[n].shown=text(html).slice(0,700);
 }
 console.log(JSON.stringify(out,null,1));

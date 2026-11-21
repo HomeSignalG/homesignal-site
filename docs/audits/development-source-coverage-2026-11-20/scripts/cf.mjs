@@ -1,8 +1,6 @@
 import fs from 'node:fs';
-import { runInNewContext } from 'node:vm';
 const site='/home/user/homesignal-site';
 const H = await import(site+'/supabase/functions/get-development-activity-report/handler.ts');
-const sb={window:{}}; runInNewContext(fs.readFileSync(site+'/lib/da-report-view.js','utf8'), sb); const V=sb.window.HS.daReportView;
 const CREDITS = JSON.parse(fs.readFileSync(site+'/supabase/functions/_shared/source-attribution.json','utf8'));
 const D = JSON.parse(fs.readFileSync('data.json','utf8'));
 const hav=(a,b,c,d)=>{const R=3958.8,r=x=>x*Math.PI/180,dl=r(c-a),dn=r(d-b);const h=Math.sin(dl/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(h))};
