@@ -23,10 +23,10 @@ echo "SHIPPED: $n checks, $f failed"
 MUT=(
  "no-insert-trigger|s.replace('after insert or update on public.user_subscriptions','after delete on public.user_subscriptions')"
  "no-users-trigger|s.replace('after update of unsubscribed, alert_email_consent, community_id on public.users','after delete on public.users')"
- "ignores-subscribed|s.replace(\"where s.stream = 'maps' and s.subscribed\\n        and not public\",\"where s.stream = 'maps'\\n        and not public\",1)"
+ "ignores-subscribed|s.replace(\"where s.subscribed\\n        and not public\",\"where true\\n        and not public\",1)"
  "upload-drops-subscribers|s.replace('  perform public.maps_zip_order_sync_subscribers();\n\n  return query','  return query')"
  "no-exception-guard|s.replace('exception when others then','exception when division_by_zero then')"
- "test-signups-count|s.replace(\"        and not public.bsky_maps_known_test_identity(s.user_id)\\n        and c.level\",\"        and c.level\",1)"
+ "test-signups-count|s.replace(\"        and not public.bsky_maps_known_test_identity(s.user_id)\\n        and case\",\"        and case\",1)"
  "prepends|s.replace('next_pos := next_pos + 1;','next_pos := 1000 - next_pos;')"
 )
 bad=0

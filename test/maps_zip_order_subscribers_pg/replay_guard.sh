@@ -28,7 +28,7 @@ create table public.users (id uuid primary key default gen_random_uuid(), email 
   alert_email_consent boolean not null default true, unsubscribed boolean not null default false);
 create table public.user_subscriptions (user_id uuid, community_id uuid, stream text, topic text, origin text, sort_order integer, created_at timestamptz default now());
 create view public.alert_subscription_state as
-  select u.id as user_id, u.community_id, s.stream, s.topic,
+  select u.id as user_id, u.community_id, u.zip_code, s.stream, s.topic,
          ((u.community_id is not null) and u.alert_email_consent and not u.unsubscribed and s.origin = 'explicit') as subscribed
     from public.users u join public.user_subscriptions s on s.user_id = u.id and s.community_id = u.community_id;
 create function public.bsky_maps_known_test_identity(p_user uuid) returns boolean language sql stable as $$ select false $$;

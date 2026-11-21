@@ -22,9 +22,9 @@ select 'S04 new sign-up 85083 appended|' || ((select founder_position from maps_
 insert into users (id, email, community_id, zip_code) values ('10000000-0000-0000-0000-000000000004','d@x','00000000-0000-0000-0000-000000064166','64166');
 insert into user_subscriptions values ('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000064166','maps','t','follow_floor',0,now());
 select 'S05 follow_floor does not add|' || (not exists (select 1 from maps_zip_order where zip='64166'))::text;
--- a notices sign-up is not a maps sign-up
+-- a notices sign-up now counts as a subscriber ZIP
 insert into user_subscriptions values ('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000064166','notices','t','explicit',0,now());
-select 'S06 other streams do not add|' || (not exists (select 1 from maps_zip_order where zip='64166'))::text;
+select 'S06 any other alert type adds its ZIP too (founder 2026-11-21)|' || exists (select 1 from maps_zip_order where zip='64166')::text;
 update user_subscriptions set origin='explicit' where user_id='10000000-0000-0000-0000-000000000004' and stream='maps';
 select 'S07 becoming explicit adds 64166|' || exists (select 1 from maps_zip_order where zip='64166')::text;
 -- re-subscribe through users.unsubscribed
