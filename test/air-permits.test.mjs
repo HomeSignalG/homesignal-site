@@ -47,7 +47,7 @@ for (const st of ['blocked', 'not_covered', 'unavailable', 'not_measured']) ok(!
 
 // B — presentation rules
 const full = text(A.sectionHTML(body(), NOW));
-ok(!/approved/i.test(A.sectionHTML(body(), NOW)), 'B1 the word "approved" never appears for a pending registration');
+ok(!/approved/i.test(A.sectionHTML(body(), NOW)), 'B1 no approval wording is invented for a PENDING registration');
 ok(/Registration 185303/.test(full) && /Agency status: PENDING/.test(full) && /Facility: BOCA CHICA FACILITY \(RN112524897\)/.test(full), 'B2 type, status and facility are the agency’s words', full);
 ok(full.includes(A.NOTE) && /not approval of a whole development/.test(full) && /not measured air quality/.test(full), 'B3 the section says an authorization is not project approval and limits are not measured exposure');
 ok(!/\b(tons?|tpy|ppm|µg|lbs?)\b/i.test(full) && !/emission(s)? (of|totaling)/i.test(full), 'B4 no emission amount is ever printed');
@@ -67,6 +67,11 @@ ok(!/href="javascript:|href="http:/.test(A.sectionHTML(body({ records: [Object.a
 ok(A.sectionHTML(body(), NOW).includes('href="' + DOC + '"'.replace(/&/g, '&amp;')) || A.sectionHTML(body(), NOW).includes(DOC.replace(/&/g, '&amp;')), 'B14 the official record link is the one the reader supplied');
 ok(!/data-center|data center/i.test(full), 'B15 no data-center connection is asserted from an air permit alone');
 
+// B16 — the agency's own word is shown as written, with its scope; this module adds no approval wording
+const appr = Object.assign({}, SPACEX, { record_id: 'a', permit_no: '9', action_kind: 'issued', status: 'APPROVED' });
+const at = text(A.sectionHTML(body({ records: [appr] }), NOW));
+ok(/Agency status: APPROVED/.test(at) && at.includes(A.STATUS_SCOPE), 'B16 an agency status of APPROVED is printed verbatim and scoped to the air authorization');
+ok(!/approved/i.test(text(A.sectionHTML(body({ records: [Object.assign({}, SPACEX, { status: 'PENDING' })] }), NOW)).replace(A.NOTE, '')), 'B17 a PENDING record produces no approval wording of ours');
 // C — regression case through the Map layer
 const sites = HS.airPermitsSitesFrom(body());
 ok(sites.length === 1 && HS.isAirPermit(sites[0]) && sites[0].air.record.permit_no === '185303' && sites[0].air.record.project_no === '414660' && sites[0].air.record.facility_ref === 'RN112524897', 'C1 the regression record becomes one Map 1 site with its identifiers', sites.length);
