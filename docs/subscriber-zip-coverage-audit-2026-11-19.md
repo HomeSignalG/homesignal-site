@@ -93,3 +93,41 @@ Why PARTIALLY_COMPLETE (not COMPLETE, not BLOCKED): connected sources demonstrab
 ## Audit history note (added 2026-11-19, after the second review)
 - The first-pass map counts in this document (e.g. 48854 "3 absent", 85083 "627 not drawn") are PRESERVED as written and are SUPERSEDED. They counted rows rather than distinct keys, counted scheduled STIP dates as filing dates, and lumped keys the active N5 generation recorded as unresolved (`POINT_REJECTED` / `MULTI_COORD_UNRESOLVED`) with unexplained ones. The corrected reader is `docs/subscriber-zip-health.sql` (output keys `n5_unresolved` and `n5_unresolved_by_reason`; an earlier draft named it `withheld_by_n5_rule`, which overclaimed: most N5 reason codes are data-quality problems).
 - Precision of the corrected finding: it is a DATABASE-BASED explanation of why records are not in a ZIP's `geo.n5_serving_membership` (they lie in a neighbouring ZIP polygon, or the N5 point rule withheld them and recorded it). It is NOT a verification of the public Map 1 page, and it does not establish that the underlying coordinates or boundaries are correct.
+
+# ZIP 85083 read-only pilot: corrected receipt and key findings (2026-11-22)
+
+**Coverage for ZIP 85083 remains NOT ESTABLISHED.** The pilot validates only the declared Phoenix building-permit scope (`phoenix-building-permits`, City of Phoenix Planning_Permit layer 1, `PER_ENT_DATE >= 2025-11-19`). It is a diagnostic. Nothing was recorded as source- or ZIP-level verification, and no other Phoenix layer or source was assessed.
+
+## Corrected receipt (ingest run `44914623904`, commit `62f79adb371a5d39d08357012184c4f932ec3a0d`, one run, no rerun)
+Figures below are as supplied by the founder from the full receipt. My earlier figures (53 matched, 1,174 outside polygon, 58 unplaced) came from a partial log read and are **withdrawn**; I did not read the full receipt myself.
+- Retrieval complete: 1,728 of 1,728 rows, 5 of 8 requests.
+- 114 qualifying official records: 112 MATCHED, 2 MISSING_FROM_JODY (`2605036`, `2605046`), 1 MISSING_TIMING_UNRESOLVED (`2605045`). None unplaced. 1,609 OUTSIDE_POLYGON.
+- JODY-only: `T165773`, `T165906`, both NOT_FOUND_ON_SOURCE. 4 duplicate official keys, none conflicting.
+- ARITHMETIC NOTE: 112 + 2 + 1 = 115, not 114. The frozen JODY member set is 114 (`member_n`), and 112 matched + 2 JODY-only = 114. So "114" reads as the JODY-side count; the official qualifying count looks like 115. Unresolved until the receipt is re-read.
+- `2605045` stays unresolved by design (filed 2026-11-19, inside the 3-day timing window).
+
+## Findings (JODY data and repo only; no new official request)
+**2605036** (INSTALL 500GAL A/G LPG TANK, 28012 N 37TH AVE, Approved, JODY `submitted_at` 2026-11-13, point 0.62 mi from the 85083 centre).
+- Not the radius: 0.62 mi inside the 3-mi scope. Not permit type or window: Industrial, filed inside the window, kept by the registry filter.
+- Ingest timing explains the snapshot gap. The frozen set (as of 2026-11-19 21:36Z) predates every JODY copy. First copies: 85085 and 85310 at 2026-11-20 19:26Z; the 85083 copy at 2026-11-22 06:01Z (85083 report refreshed 2026-11-22 01:20Z). It is now present in JODY and in the cached 85083 report.
+- Not explained: why it reached JODY 7 days after its filing date. Permits filed 11-12 to 11-14 in these five ZIPs first appeared on 11-14 (7 keys), 11-16 (1), 11-18 (2), 11-20 (1) and 11-22 (4), so the lag is not unique to this key. Whether the delay is source publication or refresh cadence needs the publisher's side, which this pass did not request.
+
+**2605046** — **unexplained.** It has no row in `app_projects` in any ZIP and is not in the cached report of 85083, 85085, 85086, 85310 or 85383. Its filing date, type and location are not in repo or JODY data (the receipt carries outcome only), so radius, date and type cannot be tested. The pilot's rule classed it MISSING_FROM_JODY, meaning filed before 2026-11-16, yet its number follows 2605045 (filed 11-19).
+
+**T165773** — in JODY, but no longer on 85083.
+- 6.48 KW AC PV, 6512 W EAGLE TALON TRL, Proposed, filed 2026-11-06, Utility. Rows exist only for 85310 (first created 11-07 15:45Z, last seen 11-20 19:27Z) and 85383 (first created 11-07 15:45Z, last seen 11-20 23:01Z). No 85083 row; the 85083 report does not carry it.
+- No other record at that address in 85383, so a renumbering is not supported by JODY data.
+- The 85310/85383 copies have not refreshed since 11-20, so they are probably stale copies the next refresh will drop. This is inference, not tested.
+
+**T165906** — still a member in `geo.n5_serving_membership` (85083, generation `n5-national-2026-11-22`) but has **no `app_projects` row in any ZIP** and is absent from the cached reports checked. First and last seen cannot be shown: the row is gone, and the one table that might hold it (`preservation.app_project_identity`) timed out at 12 s and was not probed again.
+
+**Pattern with T969035 and T970655** (homesignal-site#3111, REPORT-round2 C1: both N5 radius keys with no `app_projects` row, not found at the publisher).
+- All four vanished keys are T-prefixed Phoenix numbers, and none has a surviving sibling at the same address (checked for T165773 only).
+- It is not "all T-keys vanish": 8 of the 10 T-prefixed member keys matched, and the 85083 membership holds 116 Phoenix keys, 115 with rows (105 numeric all with rows, 10 T-keys with rows, 1 T-key without). Numeric keys: 0 vanished.
+- So: a possible pattern (T-keys withdrawn or replaced at the source), small sample, **not established**. No record was deleted or hidden.
+
+## Proposed fixes (none made)
+1. Confirm whether Phoenix withdraws or renumbers T-prefixed applications. This needs one bounded official lookup by key, which needs explicit approval.
+2. Reconcile the membership/row gap: N5 membership can hold a key (T165906) whose `app_projects` row has been reaped. The next generation will drop it; an alarm on "membership keys without a row" would surface it.
+3. Measure ingest lag per source (filing date to first JODY copy). 2605036's 7-day lag is the unexplained part.
+4. Re-run the reconciliation only after 1 and 3, never as a coverage claim.
