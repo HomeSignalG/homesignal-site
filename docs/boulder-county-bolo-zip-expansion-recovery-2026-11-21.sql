@@ -3,12 +3,15 @@
 -- (reviewed head 27ca30c78e42, blob b8be7a685b8bef99bd34e71d7407775b5415f8ab). NOT APPLIED.
 --
 -- INTENDED WINDOW: after the expansion committed and BEFORE any enrollment, feed activation, ZIP refresh,
--- report generation or other write that depends on the four ZIPs. It claims nothing beyond the checks below.
+-- report generation, or the next N5 generation open (a daily job; it would capture the new ZIPs), or any other write
+-- that depends on the four ZIPs. It claims nothing beyond the checks below.
 -- ORDER: if the city-community v2 rows exist, run the v2 rollback FIRST; this file refuses while they do.
 --
 -- Everything is ONE transaction (the db-sql route was proven to submit a string as one implicit transaction,
 -- run 44958496732). Every check runs before the first change; any failed check raises and nothing changes.
--- No cascade delete, no constraint or trigger is disabled. Run it twice: the second run is a no-op that says so.
+-- No cascade delete is relied on, no constraint or trigger is disabled. It takes ONE deliberate lock, SHARE ROW
+-- EXCLUSIVE on public.self_reports (the only table that cascades from communities), with lock_timeout 5s, held to
+-- commit, so no row can slip in between the check and the delete. Run it twice: the second run is a no-op that says so.
 --
 -- State the forward file changed, and what this restores (all of it is checked first):
 --   1. public.canonical_zip_registry : 4 rows (80026, 80027, 80310, 80021; version 2.4; workbook sha 6010b509...).
@@ -19,8 +22,10 @@
 --                                      value and its order are kept.
 --   4. public.canonical_zip_guard_selftest() : body 12746 -> 12750 (two literals). Restored to the pinned baseline
 --                                      body md5 8d6bee1c736996ab9c1a6ff64247ab95.
--- Not restorable, stated: loaded_at / created_at / ids of the deleted rows (they are deleted, not restored), and
--- any audit or API log entry written when the forward file ran.
+-- LOGICAL restore only, as asserted below: the same rows, array values and order, and guard body hash. NOT
+-- reconstructed: loaded_at / created_at / uuid ids of the deleted rows (deleted; a later re-expansion mints new ones),
+-- physical tuple versions, and statistics. Audit/history is NOT erased: the forward run, this run, the Management
+-- API query log and the Actions run records all remain.
 -- ============================================================================
 do $$
 declare
@@ -29,6 +34,10 @@ declare
   _sha         constant text   := '6010b50953d2123330397e52d54163486e5705b882ed3dfdc4ad70ed0a990f12';
   _reg_md5     constant text   := 'ad61d07cabc455edd9468e1ed0401a74';
   _base_md5    constant text   := '8d6bee1c736996ab9c1a6ff64247ab95';
+  -- County arrays as read from production before the expansion (read-only, 2026-11-22). The forward file only appends.
+  _bbase       constant text[] := array['80301','80302','80303','80304','80305','80501','80503'];
+  _jbase       constant text[] := array['80001','80002','80004','80005','80007','80123','80127','80401','80403','80439'];
+  _t0 timestamptz;
   _barr text[]; _jarr text[];
   _broot uuid; _jroot uuid; _ids uuid[]; _page_ids uuid[];
   _n int; _md5 text; _src text; _old text; _mode text;
@@ -105,15 +114,32 @@ begin
     raise exception 'refusing: city-community v2 rows exist; run the v2 rollback FIRST, then this recovery';
   end if;
 
-  -- ---- 3. county arrays: each added ZIP exactly once in its own root, none in the other ----------------
+  -- ---- 3. county arrays: the expansion must have ADDED each ZIP, never found it already there ------------
+  -- The forward file appends a ZIP only when it is missing, so a ZIP that was in a county array before the
+  -- expansion would be indistinguishable afterwards by value. Evidence that none was: (a) the pinned pre-expansion
+  -- arrays below lack all four; (b) trg_communities_canonical_zip refuses any zip_codes value that is not in the
+  -- registry, and the registry lacked all four (section 1 pins the baseline); (c) here, every pinned baseline ZIP
+  -- must still be present and every added ZIP must sit AFTER all of them, where the forward file appends.
   select zip_codes into _barr from public.communities where id = _broot;
   select zip_codes into _jarr from public.communities where id = _jroot;
+  if _bbase && _zips or _jbase && _zips then
+    raise exception 'refusing: the pinned baseline arrays already contain one of the four ZIPs';
+  end if;
+  if not (_bbase <@ _barr) or not (_jbase <@ _jarr) then
+    raise exception 'refusing: a pinned baseline ZIP is missing from a county array; which memberships the expansion added is ambiguous';
+  end if;
   if (select count(*) from unnest(_barr) z where z = any(_bzips)) <> 3
      or (select count(distinct z) from unnest(_barr) z where z = any(_bzips)) <> 3
      or '80021' = any(_barr)
      or (select count(*) from unnest(_jarr) z where z = '80021') <> 1
      or _jarr && _bzips then
     raise exception 'refusing: a county ZIP array is not in the expected expanded shape (each added ZIP exactly once, in its own county root)';
+  end if;
+  if (select min(o) from unnest(_barr) with ordinality t(z, o) where z = any(_bzips))
+       <= (select max(o) from unnest(_barr) with ordinality t(z, o) where z = any(_bbase))
+     or (select o from unnest(_jarr) with ordinality t(z, o) where z = '80021')
+       <= (select max(o) from unnest(_jarr) with ordinality t(z, o) where z = any(_jbase)) then
+    raise exception 'refusing: an added ZIP is not positioned after the pinned baseline ZIPs (not where the expansion appends)';
   end if;
 
   -- ---- 4. guard self-test body must be the forward output of the pinned baseline ------------------------
@@ -135,13 +161,44 @@ begin
     raise exception 'refusing: guard self-test is failing before recovery';
   end if;
 
-  -- ---- 5. dependent references: every public base table, by column name and by foreign key ---------------
+  -- ---- 4b. generation / serving data. A daily N5 generation opened after the expansion carries the new ZIPs ----
+  select min(loaded_at) into _t0 from public.canonical_zip_registry where zip = any(_zips);
+  if exists (select 1 from geo.n5_generation where opened_at >= _t0)
+     or exists (select 1 from geo.n5_generation where state not in ('ACTIVE','ACTIVE_LEGACY','SUPERSEDED','FAILED')) then
+    raise exception 'refusing: an N5 generation was opened after the expansion (or one is still building); serving data may carry the new ZIPs';
+  end if;
+  -- Specific cross-schema objects (each assessed: indexed or small). Reference data that legitimately held these
+  -- ZCTAs before the expansion (geo.zcta_boundary, geo.zcta_place_overlap) is deliberately NOT checked.
+  if exists (select 1 from geo.maps_zip_geography_status where zip = any(_zips::char(5)[])) then _problems := _problems || 'geo.maps_zip_geography_status.zip'; end if;
+  if exists (select 1 from geo.maps_zip_export where zip = any(_zips::char(5)[])) then _problems := _problems || 'geo.maps_zip_export.zip'; end if;
+  if exists (select 1 from geo.n5_generation_unresolved where zip = any(_zips)) then _problems := _problems || 'geo.n5_generation_unresolved.zip'; end if;
+  if exists (select 1 from geo.zip_authoritative_membership where generation_id in (select generation_id from geo.n5_generation) and zcta5 = any(_zips::char(5)[])) then _problems := _problems || 'geo.zip_authoritative_membership.zcta5'; end if;
+  if exists (select 1 from geo.zip_authoritative_marker where generation_id in (select generation_id from geo.n5_generation) and zcta5 = any(_zips::char(5)[])) then _problems := _problems || 'geo.zip_authoritative_marker.zcta5'; end if;
+  if exists (select 1 from geo.n5_boundary_membership where generation_id in (select generation_id from geo.n5_generation) and zcta5 = any(_zips::char(5)[])) then _problems := _problems || 'geo.n5_boundary_membership.zcta5'; end if;
+  if exists (select 1 from preservation.community_meta where zip = any(_zips)) then _problems := _problems || 'preservation.community_meta.zip'; end if;
+  if exists (select 1 from preservation.development_report where zip = any(_zips)) then _problems := _problems || 'preservation.development_report.zip'; end if;
+  -- Not scanned, by design: geo.n5_association (8.4M rows, zip is not an index prefix), preservation.app_project_identity
+  -- (10M rows, same), and the historical n5_* baseline/cutover tables. Association/identity rows are written only by a
+  -- generation or snapshot capture, which the generation check above and the preservation checks exclude.
+
+  -- ---- 4c. delete safety: only self_reports may cascade from communities, and nothing may slip in meanwhile -----
+  if exists (select 1 from pg_constraint where contype = 'f' and confrelid = 'public.communities'::regclass
+               and confdeltype in ('c','n','d') and conrelid not in ('public.self_reports'::regclass)) then
+    raise exception 'refusing: a foreign key other than self_reports cascades or nulls on community delete';
+  end if;
+  perform set_config('lock_timeout', '5s', true);
+  lock table public.self_reports in share row exclusive mode;   -- held to commit; fails closed after 5 s
+
+  -- ---- 5. dependent references: public base tables, by column name and by foreign key (cost assessed; see doc) ----
   for r in
     select c.relname as tbl, a.attname as col, format_type(a.atttypid, a.atttypmod) as typ, 'community'::text as kind
       from pg_class c join pg_namespace n on n.oid = c.relnamespace
       join pg_attribute a on a.attrelid = c.oid and a.attnum > 0 and not a.attisdropped
      where n.nspname = 'public' and c.relkind in ('r','p') and c.relname not in ('communities','canonical_zip_registry')
        and a.attname = 'community_id'
+       -- app_projects.community_id: 3.1M rows, no index on it (plan: seq scan, cost ~423k). Its rows are written only by
+       -- app_refresh_zip for a ZIP page and carry the ZIP, so the indexed app_projects.zip check below covers them.
+       and not (c.relname = 'app_projects' and a.attname = 'community_id')
     union all
     select c.relname, a.attname, format_type(a.atttypid, a.atttypmod), 'zip'
       from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -172,7 +229,7 @@ begin
     if _hit then _problems := _problems || (r.tbl || '.' || r.col); end if;
   end loop;
   if array_length(_problems, 1) > 0 then
-    raise exception 'refusing: dependent records reference the four ZIPs or their pages in: %', array_to_string(_problems, ', ');
+    raise exception 'refusing: dependent or serving records reference the four ZIPs or their pages in: %', array_to_string(_problems, ', ');
   end if;
 
   -- ---- 6. all checks passed: reverse, in dependency order -------------------------------------------------
