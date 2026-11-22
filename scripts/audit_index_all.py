@@ -34,6 +34,7 @@ NON_PUBLIC = {
     "/box-elder.html": "redirect page to /community/<zip>/ (an actual redirect)",
     "/eagle-mountain.html": "redirect page to /community/<zip>/ (an actual redirect)",
     "/community.html": "legacy query-string alias; canonical points to /community/<zip>/",
+    "/homesignalmap.html": "redirect page to /development-map.html (an actual redirect; the old address of the Development Map)",
     "/development-map.html": "the Development Map shell: the ZIP-less landing state is indexable, its query-string states are aliases",
 }
 # robots.txt Disallow'd pages are non-public by declaration (login-gated / app / admin).
