@@ -172,7 +172,7 @@ async function open(path, preState) {
 }
 
 // ═══════ 1. A Bluesky visitor, signed OUT, taps the button and signs up in place ═══════
-const LANDING = '/homesignalmap.html?zip=97702&utm_source=bluesky&utm_medium=social&utm_campaign=maps';
+const LANDING = '/development-map.html?zip=97702&utm_source=bluesky&utm_medium=social&utm_campaign=maps';
 {
   const { ctx, page } = await open(LANDING);
   const btn = page.locator('#zipEmailBtn');
@@ -231,7 +231,7 @@ const LANDING = '/homesignalmap.html?zip=97702&utm_source=bluesky&utm_medium=soc
   ok(!F.log.some(e => e.kind === 'rpc' && /subscribe_area_defaults|signup_complete/.test(e.name)),
     '1l nothing is written on the county identity (no floor, no reconcile-to-exact signup)');
   // Map 1 shows /map/<zip> in the address bar (founder, 2026-10-22); the utm_* stay.
-  ok(page.url() === base + LANDING.replace(/^\/homesignalmap\.html\?zip=(\d{5})&/, '/map/$1?'), '1m the page did NOT navigate: the ZIP and utm_* are intact', page.url());
+  ok(page.url() === base + LANDING.replace(/^\/development-map\.html\?zip=(\d{5})&/, '/map/$1?'), '1m the page did NOT navigate: the ZIP and utm_* are intact', page.url());
   ok((await btn.textContent()).includes("You're signed up") && await btn.isDisabled(),
     '1n the button now says the resident is signed up', await btn.textContent());
   const onb = page.locator('#onboardingOverlay');
@@ -245,7 +245,7 @@ const LANDING = '/homesignalmap.html?zip=97702&utm_source=bluesky&utm_medium=soc
 
 // ═══════ 2. Already subscribed: the button says so on load (read from the canonical view) ═══════
 {
-  const { ctx, page } = await open('/homesignalmap.html?zip=97702',
+  const { ctx, page } = await open('/development-map.html?zip=97702',
     { session: { access_token: 'fake', user: { id: 'auth-user-1', email: 'resident@example.com' } },
       subscribed: true, follows: ['97702'] });
   await page.waitForFunction(() => (document.getElementById('zipEmailBtn').textContent || '').indexOf('signed up') > -1,
@@ -257,7 +257,7 @@ const LANDING = '/homesignalmap.html?zip=97702&utm_source=bluesky&utm_medium=soc
 
 // ═══════ 3. Signed in but not subscribed: one tap, no sign-in ═══════
 {
-  const { ctx, page } = await open('/homesignalmap.html?zip=97702',
+  const { ctx, page } = await open('/development-map.html?zip=97702',
     { session: { access_token: 'fake', user: { id: 'auth-user-1', email: 'resident@example.com' } },
       subscribed: false, follows: ['97702'] });
   await page.click('#zipEmailBtn');
@@ -276,7 +276,7 @@ const LANDING = '/homesignalmap.html?zip=97702&utm_source=bluesky&utm_medium=soc
 
 // ═══════ 4. The Place-page embed never shows it ═══════
 {
-  const { ctx, page } = await open('/homesignalmap.html?zip=97702&embed=1');
+  const { ctx, page } = await open('/development-map.html?zip=97702&embed=1');
   ok(!(await page.locator('#zipEmailBtn').isVisible()), '4a the button is hidden inside a Place-page embed');
   await ctx.close();
 }
@@ -289,7 +289,7 @@ async function searchAddress(page, address) {
   await page.waitForTimeout(1500);
 }
 {
-  const { ctx, page } = await open('/homesignalmap.html?zip=97702',
+  const { ctx, page } = await open('/development-map.html?zip=97702',
     { session: { access_token: 'fake', user: { id: 'auth-user-1', email: 'resident@example.com' } },
       subscribed: false, follows: ['97702'] });
   await searchAddress(page, '123 Main St, Bend, OR 97702');
@@ -310,7 +310,7 @@ async function searchAddress(page, address) {
   await ctx.close();
 }
 {
-  const { ctx, page } = await open('/homesignalmap.html?zip=97702');
+  const { ctx, page } = await open('/development-map.html?zip=97702');
   await searchAddress(page, '1 Nowhere Rd, Somewhere, ZZ 99999');
   ok(!(await page.evaluate(() => document.body.classList.contains('addrzip'))), '5g an address in a ZIP with no ZIP page gets no sign-up');
   ok(!(await page.locator('#zipEmailBtn').isVisible()), '5h and the button is hidden');

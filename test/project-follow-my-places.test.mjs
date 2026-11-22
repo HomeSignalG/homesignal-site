@@ -27,7 +27,7 @@ const property = strip(read('property.html'));
 const templates = strip(read('lib/templates.js'));
 const cpage = strip(read('lib/community-page.js'));
 const dash = strip(read('dashboard.html'));
-const map = strip(read('homesignalmap.html'));
+const map = strip(read('development-map.html'));
 const seed = read('seed/delvalle.js');
 
 const ADD = 'Add to My Places to follow';

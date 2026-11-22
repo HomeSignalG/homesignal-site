@@ -78,9 +78,9 @@ ok(/status: r\.map_status,/.test(LIB) && !/normalized_status === 'operational' \
    && /HS\.canonicalLifecycle\(\{ status: r\.map_status \}\)/.test(LIB)
    && /bucket: bucket, type: bucket, use_type: r\.project_type/.test(LIB),
   'B3 the pin lifecycle is the server map_status, through the shared vocabulary into bucket/type (the fields Map 1 reads) — the client lifecycle collapse is gone');
-const PAGE = stripJs(read('homesignalmap.html'));
+const PAGE = stripJs(read('development-map.html'));
 ok(/rest\/v1\/rpc\/" \+ HS\.MAP1_DC_RPC/.test(PAGE) && /natl\.records\.map\(HS\.map1DcSite\)/.test(PAGE),
-  'B4 homesignalmap.html reads the one contract through the one mapper');
+  'B4 development-map.html reads the one contract through the one mapper');
 ok(!/normalized_status === "operational" \? "Operating" : "Approved"/.test(PAGE),
   'B5 the page carries no lifecycle mapping of its own');
 
@@ -100,7 +100,7 @@ const FORBIDDEN = /\b(national_dc_for_zip|national_dc_zip_members|atlas_for_zip|
 const hits = RESIDENT.filter((p) => FORBIDDEN.test(stripJs(read(p))));
 ok(hits.length === 0, 'B7 no resident file calls a radius reader, a source-specific reader or a private table', hits);
 const callers = RESIDENT.filter((p) => /HS\.MAP1_DC_RPC/.test(stripJs(read(p))));
-ok(callers.sort().join(',') === 'homesignalmap.html,lib/data.js',
+ok(callers.sort().join(',') === 'development-map.html,lib/data.js',
   'B8 exactly the two known surfaces read the contract, both through HS.MAP1_DC_RPC', callers);
 
 // ── C. NO SECOND PUBLICATION CONTRACT ANYWHERE IN THE REPO ───────────────────────────────

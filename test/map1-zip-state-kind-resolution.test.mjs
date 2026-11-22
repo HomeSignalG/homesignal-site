@@ -119,7 +119,7 @@ ok(!/if \(settle\.n === 0\)/.test(CODE) && /if \(!settle\.settled\) \{/.test(COD
 // Cross-file pin. The page has two distinct failure copies; this gate only ever matched one, so
 // an honest "the page could not load" was scored as a contract violation. These assertions read
 // the SHIPPED page and would fail if either sentence were reworded away from the pattern.
-const PAGE = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const PAGE = readFileSync(new URL('../development-map.html', import.meta.url), 'utf8');
 const catchLit = (PAGE.match(/status\("(Couldn't load ZIP )" \+ zip \+ "([^"]*)"/) || []);
 ok(catchLit.length === 3, '9a: located the page\'s own outer-catch sentence', catchLit[1] || 'NOT FOUND');
 const rendered = (catchLit[1] || '') + '01001' + (catchLit[2] || '');

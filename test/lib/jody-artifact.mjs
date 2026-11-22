@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 export const ORIGIN = 'https://jodytracks.com';
-export const LANDING = ORIGIN + '/homesignalmap.html';
+export const LANDING = ORIGIN + '/development-map.html';
 
 export function buildJodyArtifact() {
   const out = mkdtempSync(join(tmpdir(), 'map-landing-seo-'));

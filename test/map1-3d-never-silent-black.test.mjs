@@ -1,7 +1,7 @@
 // MAP 1 — A 3D VIEW MUST NEVER PRESENT AS A SILENT BLACK RECTANGLE.
 //
 // THE DEFECT THIS LOCKS DOWN (reproduced against the real page, 2026-09-06)
-//   homesignalmap.html offers two WebGL views layered over a dark panel (#0a1012):
+//   development-map.html offers two WebGL views layered over a dark panel (#0a1012):
 //   3D aerial (three.js) and 3D satellite (MapLibre GL). setView() revealed that panel
 //   BEFORE the library initialised, and the lazy loader ran its callback inside a bare
 //   `try{ fn(); }catch(e){}`. So any initialisation failure left the panel's own
@@ -43,7 +43,7 @@ globalThis.document = { getElementById: () => null };
 new Function('window', 'document', readFileSync(join(root, 'lib/project-type.js'), 'utf8'))(win, globalThis.document);
 new Function('window', 'document', readFileSync(join(root, 'lib/map.js'), 'utf8'))(win, globalThis.document);
 const HS = win.HS;
-const page = readFileSync(join(root, 'homesignalmap.html'), 'utf8');
+const page = readFileSync(join(root, 'development-map.html'), 'utf8');
 
 // ── §1 the capability probe answers the question the 3D views actually ask ──────────────
 const docWith = (ctx) => ({ createElement: () => ({ getContext: ctx }) });

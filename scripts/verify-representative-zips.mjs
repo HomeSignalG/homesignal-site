@@ -1,4 +1,4 @@
-// Representative multi-state production verification for homesignalmap.html.
+// Representative multi-state production verification for development-map.html.
 //
 // Goes beyond the original single-ZIP smoke (84302 / 78617) with a curated panel
 // across UT/TX/IL/MA/CO/WA/MI/AZ covering: ingestion, projects, map, hearings,
@@ -6,7 +6,7 @@
 //
 //   SITE_BASE=https://homesignal.net node scripts/verify-representative-zips.mjs
 //
-// Env: SITE_BASE, ZIP_PATH (default /homesignalmap.html?zip={zip}), LINK_PROBE (0|1, default 1
+// Env: SITE_BASE, ZIP_PATH (default /development-map.html?zip={zip}), LINK_PROBE (0|1, default 1
 // for a HEAD/GET sample of one record_url per ZIP), SKIP_ENGINE (0|1).
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -22,17 +22,17 @@ import {
   ingestionIssues,
 } from './lib/verify-dev-helpers.mjs';
 
-const html = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const html = readFileSync(new URL('../development-map.html', import.meta.url), 'utf8');
 const grabVar = (name) => {
   const m = html.match(new RegExp(`var ${name}\\s*=\\s*["']([^"']+)["']`));
-  if (!m) throw new Error(`Could not read ${name} from homesignalmap.html`);
+  if (!m) throw new Error(`Could not read ${name} from development-map.html`);
   return m[1];
 };
 const ENDPOINT = grabVar('ENDPOINT');
 const APIKEY = grabVar('APIKEY');
 const SUPABASE_URL = ENDPOINT.replace(/\/functions\/v1\/.*$/, '');
 const SITE_BASE = (process.env.SITE_BASE || 'https://homesignal.net').replace(/\/$/, '');
-const ZIP_PATH = process.env.ZIP_PATH || '/homesignalmap.html?zip={zip}';
+const ZIP_PATH = process.env.ZIP_PATH || '/development-map.html?zip={zip}';
 const LINK_PROBE = process.env.LINK_PROBE !== '0';
 const SKIP_ENGINE = process.env.SKIP_ENGINE === '1';
 
@@ -238,7 +238,7 @@ async function verifyZipPage(page, spec, cached) {
     if (expect.devMax != null && (cached.counts?.development || 0) > expect.devMax) {
       fail('facilities-only expectation', `cached development ${cached.counts?.development} > ${expect.devMax}`);
     }
-    // ⚠️ ASK THE PAGE'S OWN CONDITION, NEVER ONE BRANCH OF IT. `homesignalmap.html`'s
+    // ⚠️ ASK THE PAGE'S OWN CONDITION, NEVER ONE BRANCH OF IT. `development-map.html`'s
     // coverage note has a FAC_UNAVAILABLE branch that TAKES PRECEDENCE over the
     // facilities copy and deliberately suppresses it — "the facility count for this area
     // cannot be confirmed and is shown as unavailable rather than zero" (Phase 1B: a
@@ -425,7 +425,7 @@ async function verifyZipPage(page, spec, cached) {
     }
 
     if (expect.propertyPage) {
-      const propTarget = `${SITE_BASE}/homesignalmap.html?addr=${encodeURIComponent(expect.propertyPage)}`;
+      const propTarget = `${SITE_BASE}/development-map.html?addr=${encodeURIComponent(expect.propertyPage)}`;
       await gotoWithRetry(page, propTarget);
       await page.waitForFunction(() => Array.isArray(window.__HS_PROP), { timeout: 20000 });
       const prop = await page.evaluate(() => ({

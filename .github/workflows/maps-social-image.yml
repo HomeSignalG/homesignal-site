@@ -150,9 +150,9 @@ jobs:
         run: |
           set -euo pipefail
           curl -sS -o /tmp/live.html -w 'live Map 1 HTTP %{http_code}, %{size_download} bytes\n' \
-            "$BASE/homesignalmap.html"
+            "$BASE/development-map.html"
           echo "live page sha256: $(sha256sum /tmp/live.html | cut -d' ' -f1)"
-          echo "repo page sha256: $(sha256sum homesignalmap.html | cut -d' ' -f1)"
+          echo "repo page sha256: $(sha256sum development-map.html | cut -d' ' -f1)"
 
       - name: Capture MAPS visuals
         env:

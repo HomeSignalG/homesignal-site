@@ -5,7 +5,7 @@ PLAN.md §11 threshold c).
 The whole site uses the new layout; a ZIP page is advertised to search only once the
 materializer stamped app_community_meta.indexable = data_quality 'pass' AND (>=1
 parcel-precise development record OR >=3 facility records). That flag is computed ONCE
-in SQL (app_refresh_zip) and read by community.html, homesignalmap.html, this generator,
+in SQL (app_refresh_zip) and read by community.html, development-map.html, this generator,
 and both CI verifiers — no per-reader duplication of the threshold. Empty /
 coverage-coming / thin pages stay real, reachable pages but are noindexed and never
 appear here (a sitemap entry would contradict their robots value).
@@ -60,7 +60,7 @@ STATIC = [("/", "weekly", "1.0"),
           # The ZIP-less Development Map landing page (founder, 2026-10-26): index-eligible from its first byte, so it is
           # advertised once. Its per-ZIP /map/<zip>/ pages are advertised by the build only where their own robots say index;
           # its ?zip= / ?addr= URLs are never advertised (test/map-landing-seo.test.mjs).
-          ("/homesignalmap.html", "weekly", "0.8"),
+          ("/development-map.html", "weekly", "0.8"),
           ("/how-it-works.html", "monthly", "0.7"),
           ("/about.html", "monthly", "0.6"), ("/contact.html", "monthly", "0.5"),
           ("/privacy.html", "yearly", "0.3"),
@@ -93,7 +93,7 @@ def fetch_index_zips():
 
 
 def fetch_dev_zips():
-    """Every cached development ZIP page (homesignalmap.html?zip=<zip>). Zero-touch: as the
+    """Every cached development ZIP page (development-map.html?zip=<zip>). Zero-touch: as the
     development-tracker batch caches more ZIPs into development_reports, they appear here with
     no edit. Public anon read (RLS: public select on development_reports)."""
     zips, off = [], 0
@@ -131,7 +131,7 @@ def url_el(loc, freq, pri):
 def zip_coverage():
     """The ZIP coverage model (lib/zip-coverage.json, founder 2026-10-03). Returns
     (retired, coverage_limited): `retired` ZIPs (USPS-confirmed only; none today) are never
-    advertised; `coverage_limited` ZIPs have no ZIP-wide map, so their homesignalmap.html?zip=
+    advertised; `coverage_limited` ZIPs have no ZIP-wide map, so their development-map.html?zip=
     development page is not advertised. Their /community/<zip>/ page follows the usual rule.
     Missing or malformed is an error, never an empty set."""
     path = os.path.join(os.path.dirname(__file__), "..", "lib", "zip-coverage.json")
@@ -214,7 +214,7 @@ def main():
     for z in comm_zips:
         lines.append(url_el(f"{BASE}/community.html?zip={urllib.parse.quote(z)}", "daily", "0.8"))
     for z in dev_zips:
-        lines.append(url_el(f"{BASE}/homesignalmap.html?zip={urllib.parse.quote(z)}", "daily", "0.8"))
+        lines.append(url_el(f"{BASE}/development-map.html?zip={urllib.parse.quote(z)}", "daily", "0.8"))
     lines.append("</urlset>")
     with open("sitemap.xml", "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")

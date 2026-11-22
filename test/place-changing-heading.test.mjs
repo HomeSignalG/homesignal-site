@@ -30,7 +30,7 @@ const propRaw = read('property.html');
 const prop = code(propRaw);
 const cpRaw = read('lib/community-page.js');
 const cp = code(cpRaw);
-const m1Raw = read('homesignalmap.html');
+const m1Raw = read('development-map.html');
 const m1 = code(m1Raw);
 
 console.log('='.repeat(78));

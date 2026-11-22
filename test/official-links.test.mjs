@@ -66,7 +66,7 @@ const allStatic = [
   ...ENGINE_TEMPLATES,
   ...seedRefs,
   readFileSync(join(root, 'supabase/functions/get-address-report/index.ts'), 'utf8'),
-  readFileSync(join(root, 'homesignalmap.html'), 'utf8'),
+  readFileSync(join(root, 'development-map.html'), 'utf8'),
 ].join('\n');
 for (const b of banned) {
   ok(!allStatic.includes(b), `obsolete pattern absent: ${b}`);

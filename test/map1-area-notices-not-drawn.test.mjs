@@ -1,7 +1,7 @@
 // A dot means a precise project site (founder bar, Denton launch 2026-10-12). Jurisdiction-level ("area") records have no
 // trustworthy coordinate, so Map 1 must not DRAW them (they stay in the lists/counters). Structural pin on the shipped page.
 import fs from 'node:fs';
-const src = fs.readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const src = fs.readFileSync(new URL('../development-map.html', import.meta.url), 'utf8');
 let bad = 0; const ok = (c, m) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + m); if (!c) bad++; };
 const m = src.match(/function mappable\(s\)\{([^}]*)\}/);
 ok(!!m, 'mappable() exists exactly once');

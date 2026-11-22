@@ -285,7 +285,7 @@ export function assertZip(zip, rep, isIndexable, st) {
   //
   // ⚠️ THIS ASSERTION USED TO PUNISH THE HONESTY FIX IT SHOULD HAVE BEEN PROTECTING.
   // When the EPA read is REFUSED, Phase 1B's whole point is that the count is UNKNOWN, not
-  // zero, so homesignalmap.html renders an em-dash. `parseInt('\u2014')` is NaN, `NaN != null`
+  // zero, so development-map.html renders an em-dash. `parseInt('\u2014')` is NaN, `NaN != null`
   // is true and `NaN !== wantFac` is ALWAYS true — so the page doing exactly the right thing
   // reported as `facility count NaN != cached counts.facilities N`. Measured 2026-09-19:
   // 5,656 of 12,722 reports carry facilities_unavailable, every one with a count to be

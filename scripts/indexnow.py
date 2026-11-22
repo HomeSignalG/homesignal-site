@@ -12,7 +12,7 @@ Policy, all enforced in code and pinned by test/indexnow-*.test.mjs:
   * nothing is submitted until the live site serves the candidate state, the key file, and the
     exact bytes of a sample of the changed pages (a crawler that arrives early sees stale HTML);
   * only canonical https://homesignal.net page URLs are ever sent: no query strings, no
-    homesignalmap.html?zip=, no community.html?zip=, no other host;
+    development-map.html?zip=, no community.html?zip=, no other host;
   * at most 10,000 URLs per POST;
   * 200/202 accepted; 400/403/422 hard failure; 429 and 5xx/network bounded exponential retry;
   * a failure here never touches the deployment: it runs after `deploy`, in its own job.

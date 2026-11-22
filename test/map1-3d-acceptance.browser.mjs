@@ -152,7 +152,7 @@ async function scenario(name, opts) {
   }
   await routeAll(page, opts);
 
-  await page.goto(base + '/homesignalmap.html?zip=84302', { waitUntil: 'load', timeout: 60000 });
+  await page.goto(base + '/development-map.html?zip=84302', { waitUntil: 'load', timeout: 60000 });
   await page.waitForTimeout(2500);
 
   for (const [v, viewName] of [['3d', '3D aerial'], ['gl', '3D satellite']]) {
@@ -234,7 +234,7 @@ async function contextLossScenario() {
     MOBILE ? { ...devices[ENGINE === 'webkit' ? 'iPhone 13' : 'Pixel 7'] } : { viewport: { width: 1280, height: 1100 } });
   const page = await ctx.newPage();
   await routeAll(page, {});
-  await page.goto(base + '/homesignalmap.html?zip=84302', { waitUntil: 'load', timeout: 60000 });
+  await page.goto(base + '/development-map.html?zip=84302', { waitUntil: 'load', timeout: 60000 });
   await page.waitForTimeout(2500);
   await page.evaluate(() => document.querySelector('#viewSeg button[data-v="3d"]').click());
   await page.waitForTimeout(6000);

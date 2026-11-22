@@ -100,9 +100,9 @@ for (const zip of ['97702', '78617']) {
   const n = await page.locator('iframe#devMapFrame').count();
   ok(n === 1, zip + ': exactly one Map 1 preview', n);
   const src = await page.getAttribute('#devMapFrame', 'src');
-  ok(src === 'homesignalmap.html?embed=1&zip=' + zip, zip + ': iframe src is canonical Map 1 embed', src);
+  ok(src === 'development-map.html?embed=1&zip=' + zip, zip + ': iframe src is canonical Map 1 embed', src);
   const full = await page.getAttribute('#devMapFull', 'href');
-  ok(full === 'homesignalmap.html?zip=' + zip, zip + ': full-map link resolves to Map 1', full);
+  ok(full === 'development-map.html?zip=' + zip, zip + ': full-map link resolves to Map 1', full);
   const title = await page.getAttribute('#devMapFrame', 'title');
   ok(/Development Map for ZIP /.test(title) && title.indexOf(zip) >= 0, zip + ': iframe has an accurate title', title);
   // Order: header CTA -> preview -> toolbar.
@@ -169,7 +169,7 @@ await page.waitForTimeout(500);
 ok(await page.locator('#devMapFrame, #devMapPreview').count() === 0, 'detail page (?id=) has no preview');
 
 // ---- Full-page Map 1 is not in embed mode ----
-await page.goto(base + '/homesignalmap.html?zip=97702', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=97702', { waitUntil: 'domcontentloaded' });
 await waitReady();
 ok(!(await page.evaluate(() => document.documentElement.classList.contains('hs-embed'))), 'full-page Map 1 is NOT in embed mode');
 

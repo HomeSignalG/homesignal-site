@@ -6,7 +6,7 @@
 // energy records admitted by `facility` while their own Type chip was off.
 //
 // ── WHY THIS IS A GLOBAL PROOF AND NOT A SAMPLE, STATED EXACTLY ──────────────────────
-// Map 1 is ONE document (`homesignalmap.html`) parameterised by `?zip=`, loading ONE
+// Map 1 is ONE document (`development-map.html`) parameterised by `?zip=`, loading ONE
 // runtime (`lib/map.js`) through ONE <script> tag. There are not 12,722 Map 1 documents to
 // check — there is one file that all 12,722 canonical ZIPs resolve to. So:
 //
@@ -38,9 +38,9 @@ const ok = (c, name, extra) => {
 // ══ LAYER A — THE SHIPPED BYTES, WHICH IS THE GLOBAL CLAIM ═══════════════════════════
 console.log('== LAYER A — the deployed runtime (one file, all 12,722 ZIPs) ==');
 
-const pageHtml = await (await fetch(BASE + '/homesignalmap.html')).text();
+const pageHtml = await (await fetch(BASE + '/development-map.html')).text();
 const tag = (pageHtml.match(/<script src="lib\/map\.js\?v=([a-f0-9]+)"><\/script>/) || [])[1];
-ok(!!tag, 'A1: homesignalmap.html loads lib/map.js with a cache key', tag || 'NO TAG');
+ok(!!tag, 'A1: development-map.html loads lib/map.js with a cache key', tag || 'NO TAG');
 
 // Exactly one loader. A second <script> for the same runtime would mean a page could get
 // different bytes depending on which tag won, and the global claim would not hold.
@@ -142,7 +142,7 @@ for (const zip of ZIPS) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await ctx.newPage();
   try {
-    await page.goto(BASE + '/homesignalmap.html?zip=' + zip, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.goto(BASE + '/development-map.html?zip=' + zip, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 60000 });
     await page.waitForTimeout(1500);
 

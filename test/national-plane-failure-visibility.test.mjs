@@ -2,7 +2,7 @@
 //
 // THE DEFECT THIS FILE EXISTS TO PREVENT. The plane shipped with two swallow points:
 //   lib/data.js        `if (error) return [];`
-//   homesignalmap.html `.then(r => r.ok ? r.json() : []).catch(() => [])`
+//   development-map.html `.then(r => r.ok ? r.json() : []).catch(() => [])`
 // so a permission error (the 401 that actually shipped — see docs/national-dc-plane.sql),
 // a 5xx, a client timeout, a dropped connection, a malformed body, and a plane that is
 // not deployed ALL reached the resident as the same result as "no eligible national data
@@ -16,7 +16,7 @@
 //
 // ⚠️ THE MODEL IS NOT THE PRODUCT. Truth tables prove the RULE; they cannot prove the
 // shipped page composes it. Every semantic case below is therefore paired with a
-// STRUCTURAL assertion against homesignalmap.html — and those assertions read the page
+// STRUCTURAL assertion against development-map.html — and those assertions read the page
 // with whole-line comments stripped, because this file's own fix comment QUOTES the old
 // `catch(function(){ return []; })` string it forbids (CLAUDE.md: "a pin that names the
 // string it forbids cannot also search the whole file for it").
@@ -32,7 +32,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 let fails = 0;
 const ok = (c, name) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + name); if (!c) fails++; };
 
-const mapSrc = readFileSync(join(root, 'homesignalmap.html'), 'utf8');
+const mapSrc = readFileSync(join(root, 'development-map.html'), 'utf8');
 /** Executable page source only: every whole-line // comment removed. */
 const mapExec = mapSrc.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
 const planeSql = readFileSync(join(root, 'docs/national-dc-plane.sql'), 'utf8');
@@ -45,7 +45,7 @@ function makeSb(result) {
 async function loadData(sbClient) {
   delete require.cache[require.resolve('../lib/data.js')];
   // The lifecycle vocabulary is loaded too, as every page that reaches HS.map1DcSite loads it
-  // (homesignalmap.html). Without it the mapping fails closed to `unknown` on every row, so a
+  // (development-map.html). Without it the mapping fails closed to `unknown` on every row, so a
   // lifecycle regression would be invisible here.
   delete require.cache[require.resolve('../lib/project-type.js')];
   global.window = {

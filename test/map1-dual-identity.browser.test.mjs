@@ -2,7 +2,7 @@
 //
 // The unit test next door (test/marker-dual-identity.test.mjs) proves the RESOLVER.
 // This one proves the PRODUCT: the founder's acceptance scenario performed the way a
-// resident performs it — by clicking the legend — on the real homesignalmap.html.
+// resident performs it — by clicking the legend — on the real development-map.html.
 //
 //   A site proven to be DATA CENTER + EPA REGULATED FACILITY.
 //   Turn OFF every Map 1 type except EPA / Regulated facility.
@@ -121,7 +121,7 @@ await page.route('**/*', async (route) => {
   return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
 });
 
-await page.goto(base + '/homesignalmap.html?zip=20171', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=20171', { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
 await page.waitForTimeout(600);
 

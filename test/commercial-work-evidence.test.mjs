@@ -278,7 +278,7 @@ console.log('§10 the LIVE page path labels the Type, not the Stage');
 {
   // The read-only gate reported "typeLabel receives the Stage word" from a DIRECT
   // HS.resolveMarker() call on the ZIP-mode site shape. That is NOT the page's path:
-  // homesignalmap.html calls HS.resolveTrackerMarker, which normalises through
+  // development-map.html calls HS.resolveTrackerMarker, which normalises through
   // HS.trackerSiteItem first (type <- use_type, status <- the bucket). Pinning the real path
   // here so the correction cannot silently regress into the defect that was reported.
   new Function('window', readFileSync(join(root, 'lib/zip-authoritative.js'), 'utf8'))(win);

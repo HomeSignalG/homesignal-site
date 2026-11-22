@@ -29,7 +29,7 @@ on:
   # push:
   #   branches: [main]
   #   paths:
-  #     - 'homesignalmap.html'
+  #     - 'development-map.html'
   #     - 'config.js'
   #     - 'shell.js'
   #     - 'partials/shell.html'
@@ -58,6 +58,6 @@ jobs:
       - name: Verify development pages
         env:
           SITE_BASE: https://homesignal.net
-          ZIP_PATH: '/homesignalmap.html?zip={zip}'   # canonical live route (no per-ZIP files)
+          ZIP_PATH: '/development-map.html?zip={zip}'   # canonical live route (no per-ZIP files)
           SAMPLE: ${{ github.event.inputs.sample }}
         run: node scripts/verify-development.mjs

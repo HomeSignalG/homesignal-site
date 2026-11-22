@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 
 const GEN = readFileSync(new URL('../scripts/maps-social-image.mjs', import.meta.url), 'utf8');
-const MAP1 = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const MAP1 = readFileSync(new URL('../development-map.html', import.meta.url), 'utf8');
 const DASH = readFileSync(new URL('../acquisition.html', import.meta.url), 'utf8');
 const WF = readFileSync(new URL('../.github/workflows/maps-social-image.yml', import.meta.url), 'utf8');
 
@@ -15,7 +15,7 @@ const WF = readFileSync(new URL('../.github/workflows/maps-social-image.yml', im
 // screenshot path"), so those checks run against the CODE with comments stripped — a doc
 // comment mentioning a forbidden concept is not the same as using it.
 const GEN_CODE = GEN
-// ⚠️ The block-comment strip must not fire inside a URL: homesignalmap.html's CSP carries
+// ⚠️ The block-comment strip must not fire inside a URL: development-map.html's CSP carries
 // `https://*.tile.openstreetmap.org`, whose `/*` opened a phantom comment swallowing 2,297
 // bytes of that file's head — so an absence-pin over the CSP or the head scripts passed by
 // reading nothing. Requiring the opener not to follow `:` or `/` keeps every real comment.
@@ -35,12 +35,12 @@ const ok = (cond, msg) => { n++; if (cond) console.log('PASS — ' + msg); else 
 ok(/from 'playwright'/.test(GEN), 'the generator drives a real browser, not a drawing library');
 ok(!/tile\.openstreetmap|L\.tileLayer|canvas|new Image\(|createCanvas/.test(GEN),
   'the generator never fetches tiles or draws its own map');
-ok(/homesignalmap\.html\?zip=/.test(GEN), 'it opens the real public Map 1 ZIP page');
+ok(/development-map\.html\?zip=/.test(GEN), 'it opens the real public Map 1 ZIP page');
 ok(/window\.siteMarkers/.test(GEN), 'it uses the markers Map 1 itself drew');
 ok(/window\.siteMarkers/.test(MAP1), 'and Map 1 really does expose them (contract still present)');
 
 // ── no invented public deep link ──────────────────────────────────────────────────────
-const genUrls = [...GEN.matchAll(/homesignalmap\.html\?([a-z0-9_=&${}.\-]+)/gi)].map((m) => m[1]);
+const genUrls = [...GEN.matchAll(/development-map\.html\?([a-z0-9_=&${}.\-]+)/gi)].map((m) => m[1]);
 ok(genUrls.length > 0, 'the generator builds Map 1 URLs');
 ok(genUrls.every((q) => /^zip=/.test(q)), 'every Map 1 URL it builds uses only ?zip= : ' + genUrls.join(' | '));
 ok(!/[?&]addr=/.test(GEN), 'it never opens address mode');

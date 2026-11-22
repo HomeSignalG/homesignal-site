@@ -10,7 +10,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'homesignalmap.html'
+      - 'development-map.html'
       - 'scripts/verify-representative-zips.mjs'
       - 'scripts/lib/verify-dev-helpers.mjs'
       - '.github/workflows/verify-representative-zips.yml'
@@ -32,5 +32,5 @@ jobs:
       - name: Verify representative ZIP panel
         env:
           SITE_BASE: https://homesignal.net
-          ZIP_PATH: '/homesignalmap.html?zip={zip}'
+          ZIP_PATH: '/development-map.html?zip={zip}'
         run: node scripts/verify-representative-zips.mjs

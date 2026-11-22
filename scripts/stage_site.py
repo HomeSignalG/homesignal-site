@@ -69,6 +69,7 @@ ROOT_FILES = (
     'development.html',
     'eagle-mountain.html',
     'gov-archive.html',
+    'development-map.html',
     'homesignalmap.html',
     'how-it-works.html',
     'index.html',

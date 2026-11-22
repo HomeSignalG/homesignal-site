@@ -3,7 +3,7 @@
 // Water rights filings column on /map/84307/ showed no title (founder, 2026-10-30).
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
-const page = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const page = readFileSync(new URL('../development-map.html', import.meta.url), 'utf8');
 assert.match(page, /\.band-h\{[^}]*color:#fff/, 'band headers are white text (premise of this test)');
 // Other attributes may follow the class (the first band's heading carries id="builtHead", set at run time).
 const heads = [...page.matchAll(/<div class="(band-h[^"]*)"[^>]*>([^<]*)<\/div>/g)];

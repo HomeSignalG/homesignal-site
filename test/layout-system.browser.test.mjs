@@ -27,7 +27,7 @@ const PAGES = [
   ['community.html?zip=84302', 'reading', 1180],
   ['development-activity-reports.html', 'workspace', 1440],
   ['development-activity-review.html', 'reading', 1180], ['shared-report.html', 'reading', 1180],
-  ['homesignalmap.html?zip=84302', 'full', null],
+  ['development-map.html?zip=84302', 'full', null],
 ];
 const browser = await chromium.launch();
 for (const [pg, tier, tierW] of PAGES) {

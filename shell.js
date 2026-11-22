@@ -8,7 +8,7 @@
   const CFG = window.HS_CONFIG;
   const $ = (id) => document.getElementById(id);
 
-  // THE SHORT MAP ADDRESS (founder, 2026-10-22). homesignalmap.html shows /map/<zip> in the
+  // THE SHORT MAP ADDRESS (founder, 2026-10-22). development-map.html shows /map/<zip> in the
   // address bar instead of its own file name, so on that page the ZIP is in the PATH, not in
   // ?zip=. Every reader of "the ZIP this URL names" asks HS.urlZip(), which accepts both.
   HS.MAP_ROUTE_RE = /^\/map\/(\d{5})\/?$/;
@@ -127,8 +127,8 @@
       return null;
     };
     // Mirrors lib/view-zip.js::ZIP_NAV_PAGES — dashboard.html excluded (Fix 8 D1); see there.
-    HS.ZIP_NAV_PAGES = ['alerts.html', 'development.html', 'homesignalmap.html', 'community.html'];
-    HS.MAP_PAGES = ['homesignalmap.html'];
+    HS.ZIP_NAV_PAGES = ['alerts.html', 'development.html', 'development-map.html', 'community.html'];
+    HS.MAP_PAGES = ['development-map.html'];
     HS.hasViewedZipContext = function (opts) {
       opts = opts || {};
       if (!opts.urlZip) opts.urlZip = HS.urlZip();
@@ -185,7 +185,7 @@
     set(k, v) { try { if (v == null) sessionStorage.removeItem('hs:' + k); else sessionStorage.setItem('hs:' + k, String(v)); } catch (e) {} }
   };
   // AN EMBEDDED MAP IS NOT THE VISITOR'S BROWSING CONTEXT. Map 1's embed mode
-  // (homesignalmap.html?embed=1, class hs-embed set in its <head> before this file runs) is
+  // (development-map.html?embed=1, class hs-embed set in its <head> before this file runs) is
   // iframed by other pages, and a same-origin iframe shares this tab's sessionStorage. The
   // homepage's sample map (?embed=1&preview=1&zip=78657) would otherwise write 78657 as the
   // tab's viewed ZIP on every visit, so the visitor's next page would open a ZIP they never
@@ -425,7 +425,7 @@
     if (/\/community\/\d{5}\/?$/.test(path)) return 'community';
     const base = path.split('/').pop() || 'index.html';
     if (base === 'community.html') return 'community';
-    if (base === 'development.html' || base === 'homesignalmap.html') return 'map';
+    if (base === 'development.html' || base === 'development-map.html') return 'map';
     return null;
   };
   HS.isZipPagePath = function (path) {
@@ -1218,7 +1218,7 @@
     const file = parts[parts.length - 1] || '';
     if (/\.html$/i.test(file)) return file;
     if (parts[0] === 'community') return 'community.html';
-    if (parts[0] === 'map') return 'homesignalmap.html';
+    if (parts[0] === 'map') return 'development-map.html';
     return 'dashboard.html';
   }
   function focusHref(zip) {

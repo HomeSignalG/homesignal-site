@@ -5,7 +5,7 @@
 // under EACH generation — geo.n5_zip_projects_markers_at(<generation>, zip, 'development'), the
 // one function public.app_zip_projects_markers itself calls for the serving generation
 // (docs/map1-zip-read-generation.sql) — and hands both to this script. For every ZIP and both
-// generations it opens the real homesignalmap.html in Chromium, answers the page's own
+// generations it opens the real development-map.html in Chromium, answers the page's own
 // app_zip_projects_markers request with that generation's answer, and compares what the page
 // rendered (window.__HS_SITES, the ZIP-authoritative sites) with what the shipped builder
 // (lib/zip-authoritative.js, run here in Node) says that answer contains.
@@ -36,7 +36,7 @@ for (const f of ['lib/project-type.js', 'lib/map.js', 'lib/residential-qualify.j
 }
 const HS = globalThis.window.HS;
 
-// The page's own record-URL gate (homesignalmap.html sourced()).
+// The page's own record-URL gate (development-map.html sourced()).
 const sourced = (s) => !!(s && ((s.url && String(s.url).trim()) || (s.record_url && String(s.record_url).trim())));
 const siteKey = (s) => [s.zip_project_ref, s.zip_marker_seq, s.lat, s.lng].join('|');
 
@@ -110,7 +110,7 @@ async function render(browser, base, z, payload, markersRpc) {
     return route.continue();
   });
   try {
-    await page.goto(base + '/homesignalmap.html?zip=' + encodeURIComponent(z.zip), { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.goto(base + '/development-map.html?zip=' + encodeURIComponent(z.zip), { waitUntil: 'domcontentloaded', timeout: 60000 });
     await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 90000 });
     await page.waitForTimeout(500);
     const rendered = await page.evaluate(() => (window.__HS_SITES || [])

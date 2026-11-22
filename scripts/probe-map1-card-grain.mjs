@@ -16,7 +16,7 @@
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 
-const html = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const html = readFileSync(new URL('../development-map.html', import.meta.url), 'utf8');
 
 // The SHIPPED site builder, loaded in the page's own order, so the expected-set control below is
 // the product's answer rather than a re-derivation of it.
@@ -91,7 +91,7 @@ for (const zip of ZIPS) {
   console.log(`── ${zip} · backend: ${b.projects} projects, ${b.markers} markers, `
     + `${b.multi.length} project(s) with >1 marker (max ${b.multi.length ? b.multi[0][1] : 0}) ──`);
 
-  await page.goto(`${SITE_BASE}/homesignalmap.html?zip=${encodeURIComponent(zip)}`,
+  await page.goto(`${SITE_BASE}/development-map.html?zip=${encodeURIComponent(zip)}`,
                   { waitUntil: 'domcontentloaded', timeout: 45000 });
   await page.waitForFunction(() => window.__HS_VERIFY && Array.isArray(window.__HS_SITES),
                              null, { timeout: 45000 });
@@ -99,7 +99,7 @@ for (const zip of ZIPS) {
   const m = await page.evaluate(() => {
     const sites = window.__HS_SITES || [];
     const dev = sites.filter((s) => s && s.scope === 'point' && s.relevance === 'development');
-    // The page's own rail identity (homesignalmap.html railKey): a row with no project ref is its
+    // The page's own rail identity (development-map.html railKey): a row with no project ref is its
     // own card, never collapsed. National data-centre rows carry no ref, and since 2026-09-27 they
     // reach the Approved/Proposed rails, so pooling them under one '(no-ref)' key would report
     // repeats the renderer does not make.

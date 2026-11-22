@@ -97,7 +97,7 @@ await page.route('**/*', async (route) => {
   return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
 });
 
-await page.goto(base + '/homesignalmap.html?zip=85006', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=85006', { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES) && window.__HS_SITES.length > 0, null, { timeout: 30000 });
 await page.waitForTimeout(600);
 

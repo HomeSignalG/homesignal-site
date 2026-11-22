@@ -101,7 +101,7 @@ ok(H.openWindowCount([{ window_closes_at: new Date().toISOString() }]) === 1,
 console.log('\n--- §2 NO SHIPPED COMPARISON IS UNGUARDED --------------------------------');
 const SHIPPED = ['properties.html', 'property.html', 'alerts.html', 'shell.js', 'lib/templates.js',
                  'lib/why.js', 'development.html', 'dashboard.html', 'lib/community-page.js',
-                 'homesignalmap.html'];
+                 'development-map.html'];
 const unguarded = [];
 for (const f of SHIPPED) {
   let src; try { src = strip(read(f)); } catch (e) { continue; }

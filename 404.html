@@ -7,10 +7,10 @@
 <script>
 // Pretty development route: GitHub Pages serves 404.html for unmatched paths, so
 // /development/<zip> is caught here and forwarded to the one dynamic page. No per-ZIP
-// files (CLAUDE.md §0 / development-tracker §0) — the canonical URL is homesignalmap.html?zip=.
+// files (CLAUDE.md §0 / development-tracker §0) — the canonical URL is development-map.html?zip=.
 (function(){
   var m = window.location.pathname.match(/^\/development\/(\d{5})\/?$/);
-  if (m) window.location.replace('/homesignalmap.html?zip=' + m[1]);
+  if (m) window.location.replace('/development-map.html?zip=' + m[1]);
   // Pretty community route. Once the Pages deployment source is GitHub Actions, every
   // canonical ZIP has a REAL document at /community/<zip>/ and this branch never fires for
   // one — 404.html is only reached for paths that do not exist. It matters in two cases:
@@ -21,7 +21,7 @@
   // Short map address (2026-10-21). Every built ZIP has a real /map/<zip>/ document; this catches
   // a ZIP without one, so the link still opens Map 1 with its query kept.
   var mp = window.location.pathname.match(/^\/map\/(\d{5})\/?$/);
-  if (mp) window.location.replace('/homesignalmap.html?zip=' + mp[1] + (window.location.search ? '&' + window.location.search.slice(1) : ''));
+  if (mp) window.location.replace('/development-map.html?zip=' + mp[1] + (window.location.search ? '&' + window.location.search.slice(1) : ''));
   var c = window.location.pathname.match(/^\/community\/(\d{5})\/?$/);
   if (c) window.location.replace('/community.html?zip=' + c[1]);
 })();

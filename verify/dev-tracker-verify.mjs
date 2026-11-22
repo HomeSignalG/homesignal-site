@@ -1,5 +1,5 @@
 // Faithful render check for the 84336 development page (buckets a/b/c).
-// Runs on the GitHub Actions runner (open egress): loads the REAL homesignalmap.html against the
+// Runs on the GitHub Actions runner (open egress): loads the REAL development-map.html against the
 // LIVE Supabase anon endpoint + real OSM tiles, waits for the resolved anchor + notices + parcel
 // polygons to render, then (1) screenshots the full page and (2) prints a structured assertion of
 // every honesty label so we can confirm nothing is faked or dropped. No stubs, no fixtures.
@@ -7,7 +7,7 @@ import { chromium } from 'playwright';
 import fs from 'fs';
 
 const ZIP = process.env.VERIFY_ZIP || '84336';
-const URL = process.env.VERIFY_URL || ('http://localhost:8080/homesignalmap.html?zip=' + ZIP);
+const URL = process.env.VERIFY_URL || ('http://localhost:8080/development-map.html?zip=' + ZIP);
 const OUT_PNG = 'verify/dev-tracker-' + ZIP + '.png';
 const OUT_JSON = 'verify/dev-tracker-' + ZIP + '-assertions.json';
 

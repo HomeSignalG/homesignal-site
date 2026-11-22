@@ -105,7 +105,7 @@ async function openDossier() {
 }
 
 console.log('\nA. ZIP MODE — a resident opens their ZIP');
-await page.goto(BASE + '/homesignalmap.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.goto(BASE + '/development-map.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 90000 });
 await page.waitForTimeout(4000);
 const z = await readScreen();
@@ -145,7 +145,7 @@ ok(/^Nearby regulated facilities$/i.test((z.k_fac || '').trim()),
   'A9c the facility counter says NEARBY, never a whole-ZIP claim', z.k_fac);
 
 // Marker -> dossier -> evidence: the page's primary interaction. Opened through the page's
-// OWN hook (window.siteMarkers), which homesignalmap.html exposes precisely so a proof can
+// OWN hook (window.siteMarkers), which development-map.html exposes precisely so a proof can
 // open a specific marker's real popup "instead of guessing at DOM order". Guessing is what
 // the first version of this gate did, and it clicked the HOME pin in address mode and
 // something inert in ZIP mode - reporting a harness artifact as a product defect.
@@ -158,7 +158,7 @@ ok(!!(zPop && zPop.link), 'A11 the dossier carries an official record link (evid
 // Address mode already deletes the engine's development counters when canonical results
 // replace them, so B6 below is the POSITIVE CONTROL for A8: same assertion, known-good path.
 console.log('\nB. ADDRESS MODE — a resident searches their street address');
-await page.goto(BASE + '/homesignalmap.html', { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.goto(BASE + '/development-map.html', { waitUntil: 'domcontentloaded', timeout: 60000 });
 await page.waitForSelector('#addr', { timeout: 30000 });
 await page.fill('#addr', ADDRESS);
 await page.click('#go');
@@ -178,7 +178,7 @@ ok(/^Showing development within .+ of$/.test((a.withinLbl || '').trim()),
   'B5 the page says WHAT is shown and the radius it is within', a.withinLbl);
 // THE WAY BACK. run() flips ZIP_MODE in JS without touching the URL, so without this control
 // an address search is a one-way door: no control, no history entry, no visible route back.
-ok(a.backZipShown === true && /^homesignalmap\.html\?zip=\d{5}$/.test(a.backZipHref || ''),
+ok(a.backZipShown === true && /^development-map\.html\?zip=\d{5}$/.test(a.backZipHref || ''),
   'B5b address mode offers a real link back to the whole-ZIP view',
   { shown: a.backZipShown, href: a.backZipHref });
 ok(a.scopeNoteShown === false,

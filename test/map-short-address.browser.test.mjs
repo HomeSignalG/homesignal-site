@@ -1,7 +1,7 @@
 // THE SHORT MAP ADDRESS (founder, 2026-10-22): Map 1 shows /map/<zip> in the address bar.
 //
-// Proves, in a real browser, against the shipped homesignalmap.html + shell.js:
-//   1. /homesignalmap.html?zip=<zip>&utm_* is shown as /map/<zip>?utm_* , the page still renders the
+// Proves, in a real browser, against the shipped development-map.html + shell.js:
+//   1. /development-map.html?zip=<zip>&utm_* is shown as /map/<zip>?utm_* , the page still renders the
 //      ZIP's records, and nothing it loads afterwards resolves under /map/ (the <base href="/">);
 //   2. a filter click keeps /map/<zip> and adds its own parameter;
 //   3. RELOADING that address goes /map/<zip> -> 301 /map/<zip>/, which IS the map for that ZIP
@@ -144,7 +144,7 @@ const pins = () => page.evaluate(() => document.querySelectorAll('#map .leaflet-
 const here = () => { const u = new URL(page.url()); return u.pathname + u.search; };
 
 // ── 1 ────────────────────────────────────────────────────────────────────────────────────
-await page.goto(base + '/homesignalmap.html?zip=20171&utm_source=bluesky&utm_campaign=maps', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=20171&utm_source=bluesky&utm_campaign=maps', { waitUntil: 'domcontentloaded' });
 await wait();
 ok(here() === '/map/20171?utm_source=bluesky&utm_campaign=maps', '1a the address bar reads /map/20171 with the campaign tags kept', here());
 ok((await pins()) === 3, '1b the ZIP\'s three records render', await pins());
@@ -173,18 +173,18 @@ const u3 = new URL(page.url());
 ok(u3.pathname === '/map/20171/', '3a a reload lands on the map document /map/20171/', here());
 ok(u3.searchParams.get('types') === typesBefore && u3.searchParams.get('utm_source') === 'bluesky' && !u3.searchParams.has('zip'),
   '3b with the same filters and tags, and no ?zip=', here());
-ok(served.includes('/map/20171') && served.includes('/map/20171/') && !served.includes('/homesignalmap.html')
+ok(served.includes('/map/20171') && served.includes('/map/20171/') && !served.includes('/development-map.html')
   && served.some(p => /^\/map1\/page\.[0-9a-f]{8}\.js$/.test(p)),
-  '3c through the 301 to the map document and its shared runtime, never homesignalmap.html', served.filter(p => /map/.test(p)).join(','));
+  '3c through the 301 to the map document and its shared runtime, never development-map.html', served.filter(p => /map/.test(p)).join(','));
 const off = await page.evaluate(() => { const c = document.querySelector('#mapkeyShapes .typechip[data-cat="industrial"] input'); return c ? !c.checked : null; });
 ok(off === true, '3d the Type filter the visitor set is still off after the reload');
 ok((await pins()) > 0, '3e records still render', await pins());
 
 // ── 4 ────────────────────────────────────────────────────────────────────────────────────
 for (const [q, why] of [['?zip=20171&embed=1', 'an embed'], ['?zip=20171&addr=1+Main+St', 'an address search'], ['?zip=20171&lat=38.95&lng=-77.36', 'a lat/lng point']]) {
-  await page.goto(base + '/homesignalmap.html' + q, { waitUntil: 'domcontentloaded' });
+  await page.goto(base + '/development-map.html' + q, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(800);
-  ok(new URL(page.url()).pathname === '/homesignalmap.html', '4 ' + why + ' keeps its own address', here());
+  ok(new URL(page.url()).pathname === '/development-map.html', '4 ' + why + ' keeps its own address', here());
 }
 
 ok(pageErrors.length === 0, '5 no page errors', pageErrors.join(' | '));

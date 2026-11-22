@@ -185,9 +185,9 @@ ok(typeOf(opDeck) === 'residential' && HS.residentialQualifySites([opDeck]).leng
   '7d: a rejected Residential record is removed, never retyped to Development or other');
 
 // ── 8. THE PAGE ACTUALLY CALLS IT ───────────────────────────────────────────────────────────
-const page = fs.readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const page = fs.readFileSync(new URL('../development-map.html', import.meta.url), 'utf8');
 const calls = page.match(/HS\.residentialQualifySites\(/g) || [];
-ok(calls.length === 2, '8a: homesignalmap.html routes BOTH funnels through the gate (render + property) — found ' + calls.length);
+ok(calls.length === 2, '8a: development-map.html routes BOTH funnels through the gate (render + property) — found ' + calls.length);
 ok(/window\.__HS_SITES = sites;/.test(page) && page.indexOf('HS.residentialQualifySites(sites)') < page.indexOf('window.__HS_SITES = sites;'),
   '8b: the gate runs BEFORE __HS_SITES is exposed, so rails/counts/markers read the qualified set');
 

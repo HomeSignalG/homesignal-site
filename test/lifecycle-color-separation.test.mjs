@@ -99,7 +99,7 @@ function pairsOf(palette) {
 const FACILITY = HS.markerRegistry.facilityHex;
 
 // §1 — THE LIFECYCLE STAGE PALETTE, read from the SHIPPED registry, never restated.
-// These four ARE the "Stage — pin color" legend on homesignalmap.html, and they colour
+// These four ARE the "Stage — pin color" legend on development-map.html, and they colour
 // its 2D pins, its 3D-satellite pins and (since lc3D) its 3D-aerial blocks. Four
 // members exactly: the lifecycle contract in lib/map.js admits no fifth, so a new key
 // appearing here is itself a finding.
@@ -175,7 +175,7 @@ if (fb) {
 }
 
 // §7 — STAGE vs the REGULATED-FACILITY purple, on the SAME floor as everything else.
-// Facility is not a stage — homesignalmap.html filters it out of the stage row and shows
+// Facility is not a stage — development-map.html filters it out of the stage row and shows
 // it in the "Type — pin shape" row as a SQUARE — but all of these pins share one map, so
 // colour has to separate them too and there is no reason to hold it to a weaker bar.
 //
@@ -224,7 +224,7 @@ ok(dE00('#7b2d8e', LC.unknown) < FLOOR,
 //
 // Recolouring lib/templates.js could never have reached a restated literal, and
 // fixing the 2D pin colour could never have reached a view that ignored mk.color.
-const mapPage = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const mapPage = readFileSync(new URL('../development-map.html', import.meta.url), 'utf8');
 const aerial = mapPage.slice(mapPage.indexOf('function build3DFacilities'),
   mapPage.indexOf('function resize3D'));
 ok(aerial.length > 500, '8a: build3DFacilities was located in the page (the slice is not empty)');
@@ -372,7 +372,7 @@ ok(dE00('#1f5130', LC.unknown) > FLOOR,
   '10d: control — and it PASSED the distance floor while failing to read as green, which is '
   + 'exactly why a distance floor alone was not enough');
 
-// §11 — the three `.band-h.t-*` section headers in homesignalmap.html are stage swatches too:
+// §11 — the three `.band-h.t-*` section headers in development-map.html are stage swatches too:
 // same three colours, same stage names, white 16px BOLD text on them. 16px bold is BELOW the
 // WCAG large-text threshold (18.66px bold), so they need 4.5:1, not 3:1.
 const bandContrast = (hex) => contrast(hex, '#ffffff');
@@ -388,7 +388,7 @@ ok(bandContrast(LC.proposed) >= 3.0,
   `11c: Proposed band header — ${bandContrast(LC.proposed).toFixed(2)}:1, a NAMED pre-existing `
   + 'exception below 4.5, pinned at its current worst');
 // The CSS must actually carry the stage colour, or the header and the legend drift apart.
-const page = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const page = readFileSync(new URL('../development-map.html', import.meta.url), 'utf8');
 const bandHex = (page.match(/\.band-h\.t-built\{background:(#[0-9a-fA-F]{6})\}/) || [])[1];
 ok(String(bandHex).toLowerCase() === String(LC.operating).toLowerCase(),
   `11d: the "Operating now" band header uses the stage colour (${bandHex} === ${LC.operating})`);

@@ -67,7 +67,7 @@ await HS.mountDcFreshness(el, [], working);
 ok(el.innerHTML === '', '12 a ZIP with no data-centre pins clears the panel');
 
 // The page wires it after the development-source panel, and the reader name matches the SQL.
-const page = read('homesignalmap.html');
+const page = read('development-map.html');
 ok(/<div id="dcFresh"><\/div>\s*<div id="srcFresh"><\/div>/.test(page), '13 the page has its own panel above the development-source panel');
 ok(/HS\.mountDcFreshness\(\$\("dcFresh"\)/.test(page) && /lib\/dc-freshness\.js\?v=/.test(page), '14 the page loads and mounts it');
 const sql = read('docs/map1-datacentre-freshness.sql');

@@ -20,7 +20,7 @@
 | Saved preferences | `dev` picks may exist in `hs:topicPrefs` (localStorage) and `app_topic_prefs` (category=`dev`). Removal hides the UI only; **existing rows are preserved** (no migration). |
 | Subscriptions | Production query `user_subscriptions WHERE topic IN (Development subtopics)` returns **0 rows** — none of the eight Development subtopics were ever subscription keys. |
 | Tests | No test asserts the Development tile (`cc-dev`, `openTopics('dev')`). |
-| Duplicate product surface | Development project tracking lives on **Development & Impact** (`development.html`, `homesignalmap.html`) — the Alerts tile duplicated that experience with non-deliverable topics. |
+| Duplicate product surface | Development project tracking lives on **Development & Impact** (`development.html`, `development-map.html`) — the Alerts tile duplicated that experience with non-deliverable topics. |
 
 **Implemented in this branch:** tile removed from `alerts.html`; `dev` entry removed from `seed/delvalle.js::topicCategories`; tile grid updated from 4→3 columns in `app.css`.
 

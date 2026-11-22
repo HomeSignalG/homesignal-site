@@ -11,7 +11,7 @@
 //   backend — public.map1_dc_zip_members, fetched here with the page's public anon key; the
 //             expected lifecycle of each row is its map_status through the ONE lifecycle
 //             vocabulary (lib/project-type.js), computed in node from the shipped file.
-//   page    — homesignalmap.html?zip=Z in a real browser; every data-centre site the page
+//   page    — development-map.html?zip=Z in a real browser; every data-centre site the page
 //             accepted (window.__HS_SITES) is resolved by the page's own resolver
 //             (window.__HS_RESOLVE_TRACKER, the function its pins, filters and lists use).
 //
@@ -22,7 +22,7 @@
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 
-const html = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const html = readFileSync(new URL('../development-map.html', import.meta.url), 'utf8');
 globalThis.window = globalThis.window || globalThis;
 (0, eval)(readFileSync(new URL('../lib/project-type.js', import.meta.url), 'utf8'));
 const HS = globalThis.window.HS;
@@ -77,7 +77,7 @@ for (const zip of ZIPS) {
   const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)));
-  await page.goto(SITE_BASE + '/homesignalmap.html?zip=' + zip, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.goto(SITE_BASE + '/development-map.html?zip=' + zip, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForFunction(() => Array.isArray(window.__HS_SITES) && window.__HS_NATIONAL_PLANE !== undefined,
     null, { timeout: 60000 }).catch(() => {});
   await page.waitForTimeout(1500);

@@ -76,7 +76,7 @@ const aboutState = (page) => page.evaluate(() => {
 
 // B1. the landing page: index, the copy is visible under the map, nothing flipped it
 {
-  const page = await open('/homesignalmap.html');
+  const page = await open('/development-map.html');
   await page.waitForFunction(() => document.querySelector('#hs-slot #hs-map-about'), null, { timeout: 30000 });
   await page.waitForTimeout(1500);
   const a = await aboutState(page);
@@ -89,10 +89,10 @@ const aboutState = (page) => page.evaluate(() => {
 }
 // B2. every non-landing state is noindex, and the copy is not shown there
 for (const [label, path, opts] of [
-  ['a street-address route (?addr=)', '/homesignalmap.html?addr=' + encodeURIComponent('4700 Point Fosdick Dr NW, Gig Harbor, WA 98335')],
-  ['a lat/lng point', '/homesignalmap.html?lat=47.3&lng=-122.6'],
-  ['an embed', '/homesignalmap.html?embed=1&preview=1&zip=98335'],
-  ['a typed address handed over from the homepage (no query string at all)', '/homesignalmap.html', { handoff: '123 Main St, Anywhere, UT 84302' }],
+  ['a street-address route (?addr=)', '/development-map.html?addr=' + encodeURIComponent('4700 Point Fosdick Dr NW, Gig Harbor, WA 98335')],
+  ['a lat/lng point', '/development-map.html?lat=47.3&lng=-122.6'],
+  ['an embed', '/development-map.html?embed=1&preview=1&zip=98335'],
+  ['a typed address handed over from the homepage (no query string at all)', '/development-map.html', { handoff: '123 Main St, Anywhere, UT 84302' }],
 ]) {
   const page = await open(path, opts);
   await page.waitForFunction(() => document.querySelector('#hs-slot'), null, { timeout: 30000 });
@@ -104,7 +104,7 @@ for (const [label, path, opts] of [
 }
 // B3. the noindex is in place immediately for the URL routes, before the runtime has had a chance to run
 {
-  const page = await open('/homesignalmap.html?addr=' + encodeURIComponent('1 Private Way, Somewhere, WA 98335'));
+  const page = await open('/development-map.html?addr=' + encodeURIComponent('1 Private Way, Somewhere, WA 98335'));
   ok(await robotsNow(page) === 'noindex, nofollow', 'B8 address route: noindex is set at DOMContentLoaded, before any data call returns');
   await page.context().close();
 }
@@ -135,7 +135,7 @@ if (!(() => { try { createRequire(import.meta.url).resolve('leaflet/dist/leaflet
   ok(await own.evaluate(() => (window.__HS_SITES || []).length) > 0, 'B10 control: the per-ZIP document rendered the mocked evidence');
   ok(await robotsNow(own) === 'index, follow', 'B11 control: that per-ZIP document ends "index, follow" (its own evidence rules are intact)', await robotsNow(own));
   await own.context().close();
-  const landing = await open(`/homesignalmap.html?zip=${Z}`, { zipRow, zipAuth });
+  const landing = await open(`/development-map.html?zip=${Z}`, { zipRow, zipAuth });
   await landing.waitForFunction(() => Array.isArray(window.__HS_SITES) && window.__HS_SITES.length > 0, null, { timeout: 30000 }).catch(() => {});
   await landing.waitForTimeout(1500);
   ok(await landing.evaluate(() => (window.__HS_SITES || []).length) > 0, 'B12 control: the same evidence reached the landing document and rendered content');

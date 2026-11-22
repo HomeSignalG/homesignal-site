@@ -20,7 +20,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const src = readFileSync(join(root, 'homesignalmap.html'), 'utf8');
+const src = readFileSync(join(root, 'development-map.html'), 'utf8');
 const mapjs = readFileSync(join(root, 'lib/map.js'), 'utf8');
 const failures = [];
 const need = (cond, msg) => { if (!cond) failures.push(msg); };

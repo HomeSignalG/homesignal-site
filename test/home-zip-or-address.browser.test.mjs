@@ -12,8 +12,8 @@
 // is kept here:
 //   1. the box takes letters and more than five characters (no numeric keypad, no maxlength),
 //      and its accessible name says address or ZIP; the hero has no Dashboard link;
-//   2. a ZIP goes to homesignalmap.html?zip=<zip>;
-//   3. an address goes to homesignalmap.html, handed over once in sessionStorage (never in a
+//   2. a ZIP goes to development-map.html?zip=<zip>;
+//   3. an address goes to development-map.html, handed over once in sessionStorage (never in a
 //      URL); Map 1 reads and removes it and runs its own search (the one geocoder call);
 //   4. input too short to be a ZIP or an address says so under the box and goes nowhere;
 //   5. the placeholder is not cut off, side by side on a desktop and stacked on a phone.
@@ -116,9 +116,9 @@ async function searchAndCatch(typed, how) {
   const o = await homepage();
   const { page } = o;
   let hit = null;
-  await page.route('**/homesignalmap.html*', (route) => {
+  await page.route('**/development-map.html*', (route) => {
     // Only the TAB leaving the homepage counts. The homepage's own sample map is an iframe on this same URL
-    // (homesignalmap.html?embed=1&preview=1&zip=...); on a slow runner its request can arrive after this route is
+    // (development-map.html?embed=1&preview=1&zip=...); on a slow runner its request can arrive after this route is
     // installed, and answering it with the blank page below read as "the page navigated" (hit set, page errors from
     // a map with no scripts), which failed the refusal checks intermittently on CI. Let that request through untouched.
     const req = route.request();
@@ -128,7 +128,7 @@ async function searchAndCatch(typed, how) {
     return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>map</title>' });
   });
   await submit(page, typed, how);
-  await page.waitForFunction(() => location.pathname === '/homesignalmap.html', null, { timeout: 8000 }).catch(() => {});
+  await page.waitForFunction(() => location.pathname === '/development-map.html', null, { timeout: 8000 }).catch(() => {});
   const stored = await page.evaluate((k) => { try { return sessionStorage.getItem(k); } catch (e) { return 'ERR'; } }, HANDOFF_KEY);
   return { ...o, hit, stored };
 }
@@ -137,7 +137,7 @@ async function searchAndCatch(typed, how) {
 console.log('--- 2. a ZIP goes straight to the Development Map ---');
 for (const how of ['enter', 'click']) {
   const { ctx, hit, stored, errors } = await searchAndCatch('84302', how);
-  ok(hit && hit.path === '/homesignalmap.html' && hit.search === '?zip=84302', `2 "84302" (${how}) opens homesignalmap.html?zip=84302`, hit);
+  ok(hit && hit.path === '/development-map.html' && hit.search === '?zip=84302', `2 "84302" (${how}) opens development-map.html?zip=84302`, hit);
   ok(stored === null, `2 "84302" (${how}) hands nothing over in storage`, stored);
   ok(errors.length === 0, `2 (${how}) no page errors`, errors);
   await ctx.close();
@@ -147,7 +147,7 @@ for (const how of ['enter', 'click']) {
 console.log('--- 3. an address goes to the Development Map, handed over once and never in the URL ---');
 for (const how of ['click', 'enter']) {
   const { ctx, hit, stored, errors } = await searchAndCatch(ADDR_OK, how);
-  ok(hit && hit.path === '/homesignalmap.html', `3 (${how}) opens the Development Map`, hit);
+  ok(hit && hit.path === '/development-map.html', `3 (${how}) opens the Development Map`, hit);
   ok(hit && hit.search === '' && !/coomes|13313|del%20valle|del\+valle|lat=|lng=/i.test(hit.href), `3 (${how}) the address is not in the URL`, hit);
   ok(stored === ADDR_OK, `3 (${how}) the address is handed over exactly as typed, in this tab's sessionStorage`, stored);
   ok(errors.length === 0, `3 (${how}) no page errors`, errors);
@@ -163,7 +163,7 @@ for (const how of ['click', 'enter']) {
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ match: null }) });
   });
   await o.page.evaluate(([k, v]) => sessionStorage.setItem(k, v), [HANDOFF_KEY, ADDR_OK]);
-  await o.page.goto(base + '/homesignalmap.html', { waitUntil: 'domcontentloaded' });
+  await o.page.goto(base + '/development-map.html', { waitUntil: 'domcontentloaded' });
   await o.page.waitForFunction(() => window.HS && window.HS.ready, null, { timeout: 30000 });
   await o.page.waitForTimeout(800);
   const m = await o.page.evaluate((k) => ({ box: document.getElementById('addr').value, left: sessionStorage.getItem(k), url: location.href }), HANDOFF_KEY);
@@ -182,7 +182,7 @@ for (const how of ['click', 'enter']) {
   const geocodes = [];
   await o.page.route('**/functions/v1/geocode-address', (route) => { geocodes.push(1); return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }); });
   await o.page.evaluate(([k, v]) => sessionStorage.setItem(k, v), [HANDOFF_KEY, ADDR_OK]);
-  await o.page.goto(base + '/homesignalmap.html?zip=84302', { waitUntil: 'domcontentloaded' });
+  await o.page.goto(base + '/development-map.html?zip=84302', { waitUntil: 'domcontentloaded' });
   await o.page.waitForFunction(() => window.HS && window.HS.ready, null, { timeout: 30000 });
   await o.page.waitForTimeout(500);
   const left = await o.page.evaluate((k) => sessionStorage.getItem(k), HANDOFF_KEY);

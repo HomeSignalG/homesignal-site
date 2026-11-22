@@ -106,7 +106,7 @@ const waitZip = () => page.waitForFunction(
 const waitAddr = () => page.waitForFunction(
   () => (window.__HS_SITES || []).some(s => s.n5_feature_id), null, { timeout: 30000 });
 
-await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await waitZip(); await page.waitForTimeout(400);
 const vis = () => page.evaluate(() => {
   const w = document.getElementById('saveAddr'), b = document.getElementById('saveAddrBtn');

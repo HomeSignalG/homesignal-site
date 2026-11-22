@@ -62,7 +62,7 @@ function loadSeedRefs() {
 }
 
 async function loadLiveSamples(n) {
-  const html = readFileSync(join(root, 'homesignalmap.html'), 'utf8');
+  const html = readFileSync(join(root, 'development-map.html'), 'utf8');
   const endpoint = html.match(/var ENDPOINT\s*=\s*"([^"]+)"/)?.[1];
   const apikey = html.match(/var APIKEY\s*=\s*"([^"]+)"/)?.[1];
   if (!endpoint || !apikey) return;

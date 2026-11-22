@@ -28,7 +28,7 @@ const shellHtml = strip(read('partials/shell.html'));
 const VIEWED = '84301';
 
 console.log('--- the ZIP-scoped page set ---');
-for (const p of ['alerts.html', 'development.html', 'homesignalmap.html', 'community.html'])
+for (const p of ['alerts.html', 'development.html', 'development-map.html', 'community.html'])
   ok(ZIP_NAV_PAGES.indexOf(p) >= 0, 'ZIP_NAV_PAGES includes ' + p);
 // ACCOUNT-WIDE SURFACES ARE NOT ZIP NAVIGATION TARGETS. My Places manages every Address and
 // ZIP; scoping it to one ZIP would hide the rest of the resident's places behind whichever
@@ -44,7 +44,7 @@ ok(ZIP_NAV_PAGES.length === 4, 'ZIP_NAV_PAGES is exactly those four', ZIP_NAV_PA
 
 console.log('--- moving between tools keeps 84301 ---');
 // 84301 Dashboard -> Alerts -> Development -> Map 1 : the tool changes, the place does not.
-for (const dest of ['alerts.html', 'development.html', 'homesignalmap.html'])
+for (const dest of ['alerts.html', 'development.html', 'development-map.html'])
   ok(navHref(dest, VIEWED) === dest + '?zip=' + VIEWED,
     'tool nav to ' + dest + ' carries the viewed ZIP');
 ok(navHref('development.html', VIEWED).indexOf('78617') < 0,

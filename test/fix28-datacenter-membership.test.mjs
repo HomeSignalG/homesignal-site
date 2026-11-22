@@ -27,7 +27,7 @@ await import('../lib/project-type.js');
 await import('../lib/map.js');
 const HS = global.window.HS;
 
-// The page's own normalizer + FRS id reader, verbatim from homesignalmap.html:
+// The page's own normalizer + FRS id reader, verbatim from development-map.html:
 //   HS.resolveTrackerMarker(s, frsRid)  ·  frsRid(s) = String(s.registry_id).trim()
 const frsRid = (s) => (s && s.registry_id != null) ? String(s.registry_id).trim() : '';
 const isDataCenterType = (site) => HS.resolveTrackerMarker(site, frsRid).typeKey === 'datacenter';

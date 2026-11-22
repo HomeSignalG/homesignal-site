@@ -244,7 +244,7 @@ console.log('\n--- §6 ROUTING TO THE EXISTING SURFACES ------------------------
 // is the one management surface.
 ok(/pageHref\('development\.html', \{ id: c\.id, zip: c\.zip \}\)/.test(dash),
   'a card routes to the existing Development dossier by canonical id');
-ok(!/following[\s\S]{0,400}(homesignalmap|alerts\.html|property\.html)/i.test(dash.slice(dash.indexOf('A.followingCards('), dash.indexOf('A.followingCards(') + 1400)),
+ok(!/following[\s\S]{0,400}(development-map|alerts\.html|property\.html)/i.test(dash.slice(dash.indexOf('A.followingCards('), dash.indexOf('A.followingCards(') + 1400)),
   'Following invents no new destination');
 // The route moved into the view-model (railHref) with the consolidation, so it is asserted
 // where it now lives. The value itself is unchanged: resident-facing "Developments", internal

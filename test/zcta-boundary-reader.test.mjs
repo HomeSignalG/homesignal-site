@@ -120,7 +120,7 @@ ok(!/revoke all on function public\.app_zcta_boundary\(text\) from anon;/.test(d
 // INVERTED TWICE, and the second inversion is the point. These first asserted the reader had
 // no caller (PCM-3). PCM-4 then made the caller lib/community-page.js, which drew the polygon
 // itself with HS.buildLive. That widget is deleted: Place maps are Map 1, so the reader is now
-// consumed inside homesignalmap.html's embed path — the document that already draws pins,
+// consumed inside development-map.html's embed path — the document that already draws pins,
 // types, statuses and the regulatory layer.
 //
 // The GATE did not move, it relocated: the ZIP page still renders the block only for
@@ -128,7 +128,7 @@ ok(!/revoke all on function public\.app_zcta_boundary\(text\) from anon;/.test(d
 // only thing that calls the reader. anon has no EXECUTE on it (proved live in PCM-3), so an
 // ungated call would be a guaranteed console error on the protected public document.
 const cpjs = read('lib/community-page.js').replace(/^\s*\/\/.*$/gm, '');
-const m1js = read('homesignalmap.html').replace(/^\s*\/\/.*$/gm, '').replace(/<!--[\s\S]*?-->/g, '');
+const m1js = read('development-map.html').replace(/^\s*\/\/.*$/gm, '').replace(/<!--[\s\S]*?-->/g, '');
 
 ok(!/lib\/map\.js\?v=/.test(read('scripts/gen_zip_pages.py')) && !/lib\/map\.js\?v=/.test(read('community.html')),
   '5a NEITHER ZIP host loads map code any more — PCM-4\'s public-byte exception is reverted');
@@ -156,10 +156,10 @@ ok(/frame-src 'self'/.test(read('community.html')) && /frame-src \\'self\\'/.tes
   '5c what replaces it is frame-src \'self\' on BOTH ZIP hosts — same-origin, and the only '
   + 'public-byte change this work leaves behind');
 ok(/rpc\("app_zcta_boundary", \{ p_zip: zip \}\)/.test(m1js),
-  '5d the reader is called by name, with a ZIP, from homesignalmap.html');
+  '5d the reader is called by name, with a ZIP, from development-map.html');
 // 2026-10-02: the ZIP page embed is shown to every visitor (founder). Since 2026-11-09 the
 // READER is open to anon too (§4c), so a signed-out visitor's embed draws the outline.
-ok(/var zipContextMap =/.test(cpjs) && /homesignalmap\.html\?embed=1/.test(cpjs),
+ok(/var zipContextMap =/.test(cpjs) && /development-map\.html\?embed=1/.test(cpjs),
   '5e ...reached only through the Map 1 embed the ZIP page renders');
 ok(!/app_zcta_boundary/.test(cpjs) && !/HS\.buildLive/.test(cpjs),
   '5f the ZIP runtime itself neither calls the reader nor draws a map — one implementation');

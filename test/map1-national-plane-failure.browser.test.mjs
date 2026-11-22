@@ -111,7 +111,7 @@ async function load(natl) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
     return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
   });
-  await page.goto(base + '/homesignalmap.html?zip=20147', { waitUntil: 'domcontentloaded' });
+  await page.goto(base + '/development-map.html?zip=20147', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 })
     .catch(() => {});
   await page.waitForFunction(() => window.__HS_NATIONAL_PLANE !== undefined, null, { timeout: 30000 })

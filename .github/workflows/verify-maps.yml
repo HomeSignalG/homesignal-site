@@ -2,7 +2,7 @@ name: verify-maps
 
 # Live end-to-end check of the APP MAP page (maps.html) — dedicated to the facility-slot
 # reservation. Runs where network egress works (GitHub-hosted runner), the piece the build
-# sandbox cannot do. Separate from verify-development (which drives homesignalmap.html).
+# sandbox cannot do. Separate from verify-development (which drives development-map.html).
 # Hard check: the reserve floor min(4, #facilities) holds on the real 78617 default view.
 # Soft check: DALFEN present (logged, never fails the run).
 
