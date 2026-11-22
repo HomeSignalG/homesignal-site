@@ -75,7 +75,7 @@ const USE_TYPES = new Set(['Industrial', 'Development', 'Residential', 'Utility'
   'Civic/Public', 'other project']);
 {
   const vals = Object.keys(ENTRY.type_map);
-  ok(vals.length === 238, `type_map carries all 238 live PER_TYPE_DESC values (got ${vals.length})`);
+  ok(vals.length === 241, `type_map carries all 241 live PER_TYPE_DESC values (got ${vals.length})`);
   const bad = Object.entries(ENTRY.type_map).filter(([, v]) => !USE_TYPES.has(v));
   ok(bad.length === 0, 'every mapped value is one of the canonical use_types',
     JSON.stringify(bad.slice(0, 5)));
@@ -150,6 +150,29 @@ ok(!coverageMatches(ENTRY.coverage, [{ state: 'TX', county: 'Maricopa' }]), 'gat
   );
   ok(sites.length === 0 && calls.length === 0,
     'a Pima (Tucson) ZIP emits nothing AND never fetches the Phoenix layer');
+}
+
+// ── 2026-11-22: fire-code EQUIPMENT is not an industrial USE ─────────────────────
+// Regression: PER_NUM 2605036 ("INSTALL 500GAL A/G LPG TANK", a residential lot in 85083)
+// was typed Industrial and drafted as "an industrial project". Equipment and storage
+// permits state no land use, so they sit in the terminal 'other project' bucket with
+// their FP-prefixed twins; Industrial is reserved for permits naming an industrial operation.
+{
+  const T = ENTRY.type_map;
+  for (const k of ['LIQ PROPANE GAS SYS ABOVE GROUND INSTALL', 'LP GAS CONTAINER < 125 GAL INSTALL OTC',
+    'CO2 LIQUID BEV SYS STORE/USE/HANDLE', 'MEDICAL GAS INSTALL', 'GAS DETECTION SYSTEM INSTALL',
+    'HAZARDOUS MATERIAL TANK INSTALLATION', 'HIGH PILED COMB STORAGE INDOOR', 'LIQ PROPANE GAS EXCH PROGRAM INSTALL']) {
+    ok(T[k] === 'other project', `equipment/storage permit is not Industrial: ${k} (got ${T[k]})`);
+  }
+  for (const k of ['WRECKING YARDS, SALVAGE, AND JUNK YARDS', 'TIRE REBUILDING OPERATION', 'INDUSTRIAL OVEN',
+    'WOOD PRODUCTS, PALLETS', 'HMP (HAZARDOUS MATERIALS PRODUCTION) FAC']) {
+    ok(T[k] === 'Industrial', `an industrial OPERATION stays Industrial: ${k}`);
+  }
+  const ind = Object.entries(T).filter(([, v]) => v === 'Industrial').length;
+  ok(ind === 12, `exactly 12 Industrial types remain (got ${ind})`);
+  // Twin consistency: an equipment type and its FP-prefixed twin land in the same bucket.
+  ok(T['FLAM/COMB LIQ TANK MOD OTC'] === T['FP FLAMM/COMBUST LIQ TANK INSTALL'],
+    'a flammable-liquid tank permit has one bucket, FP-prefixed or not');
 }
 
 console.log(fails ? `\n${fails} phoenix-connector assertion(s) FAILED.` : '\nAll phoenix-connector assertions passed.');
