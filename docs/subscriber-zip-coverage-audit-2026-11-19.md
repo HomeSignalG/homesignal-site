@@ -99,35 +99,46 @@ Why PARTIALLY_COMPLETE (not COMPLETE, not BLOCKED): connected sources demonstrab
 **Coverage for ZIP 85083 remains NOT ESTABLISHED.** The pilot validates only the declared Phoenix building-permit scope (`phoenix-building-permits`, City of Phoenix Planning_Permit layer 1, `PER_ENT_DATE >= 2025-11-19`). It is a diagnostic. Nothing was recorded as source- or ZIP-level verification, and no other Phoenix layer or source was assessed.
 
 ## Corrected receipt (ingest run `44914623904`, commit `62f79adb371a5d39d08357012184c4f932ec3a0d`, one run, no rerun)
-Figures below are as supplied by the founder from the full receipt. My earlier figures (53 matched, 1,174 outside polygon, 58 unplaced) came from a partial log read and are **withdrawn**; I did not read the full receipt myself.
+Figures are as supplied by the founder from the full receipt. My earlier figures (53 matched, 1,174 outside polygon, 58 unplaced) came from a partial log read and are **withdrawn**; I did not read the full receipt myself.
 - Retrieval complete: 1,728 of 1,728 rows, 5 of 8 requests.
-- 114 qualifying official records: 112 MATCHED, 2 MISSING_FROM_JODY (`2605036`, `2605046`), 1 MISSING_TIMING_UNRESOLVED (`2605045`). None unplaced. 1,609 OUTSIDE_POLYGON.
-- JODY-only: `T165773`, `T165906`, both NOT_FOUND_ON_SOURCE. 4 duplicate official keys, none conflicting.
-- ARITHMETIC NOTE: 112 + 2 + 1 = 115, not 114. The frozen JODY member set is 114 (`member_n`), and 112 matched + 2 JODY-only = 114. So "114" reads as the JODY-side count; the official qualifying count looks like 115. Unresolved until the receipt is re-read.
+- 115 in-polygon official keys: 112 MATCHED, 2 MISSING_FROM_JODY (`2605036`, `2605046`), 1 MISSING_TIMING_UNRESOLVED (`2605045`). 1,609 OUTSIDE_POLYGON. 115 + 1,609 = 1,724 distinct official keys (1,728 rows; 4 duplicate official keys, none conflicting).
+- The receipt's `qualifying_official: 114` counts only decidable keys (112 + 2). It is not the in-polygon count. (My earlier "arithmetic unresolved" note is replaced by this.)
+- JODY-only: `T165773`, `T165906`, both NOT_FOUND_ON_SOURCE.
 - `2605045` stays unresolved by design (filed 2026-11-19, inside the 3-day timing window).
 
-## Findings (JODY data and repo only; no new official request)
-**2605036** (INSTALL 500GAL A/G LPG TANK, 28012 N 37TH AVE, Approved, JODY `submitted_at` 2026-11-13, point 0.62 mi from the 85083 centre).
-- Not the radius: 0.62 mi inside the 3-mi scope. Not permit type or window: Industrial, filed inside the window, kept by the registry filter.
-- Ingest timing explains the snapshot gap. The frozen set (as of 2026-11-19 21:36Z) predates every JODY copy. First copies: 85085 and 85310 at 2026-11-20 19:26Z; the 85083 copy at 2026-11-22 06:01Z (85083 report refreshed 2026-11-22 01:20Z). It is now present in JODY and in the cached 85083 report.
-- Not explained: why it reached JODY 7 days after its filing date. Permits filed 11-12 to 11-14 in these five ZIPs first appeared on 11-14 (7 keys), 11-16 (1), 11-18 (2), 11-20 (1) and 11-22 (4), so the lag is not unique to this key. Whether the delay is source publication or refresh cadence needs the publisher's side, which this pass did not request.
+## Classification
+| Key | Class |
+|---|---|
+| 2605036 | Ingest delay; now present in JODY. **Not a coverage gap.** |
+| 2605046 | **The one confirmed miss** (see the official lookup below). |
+| 2605045 | Unresolved (timing). |
+| T165906 | N5 member with no `app_projects` row: the stale-reference defect **A1** of the development-source coverage audit (homesignal-site#3111). Cross-referenced there; no separate fix opened. |
+| T165773 | Not an 85083 record in JODY (rows only on 85310 and 85383). |
 
-**2605046** — **unexplained.** It has no row in `app_projects` in any ZIP and is not in the cached report of 85083, 85085, 85086, 85310 or 85383. Its filing date, type and location are not in repo or JODY data (the receipt carries outcome only), so radius, date and type cannot be tested. The pilot's rule classed it MISSING_FROM_JODY, meaning filed before 2026-11-16, yet its number follows 2605045 (filed 11-19).
+## Findings (JODY data and repo, plus one approved official lookup)
+**2605036** (INSTALL 500GAL A/G LPG TANK, 28012 N 37TH AVE, Approved, JODY `submitted_at` 2026-11-13, 0.62 mi from the 85083 centre). Not the radius, date or type. The frozen set (2026-11-19 21:36Z) predates every JODY copy: first copies 85085 and 85310 at 2026-11-20 19:26Z, 85083 at 2026-11-22 06:01Z. Why it reached JODY 7 days after filing is not explained (permits filed 11-12 to 11-14 in these five ZIPs first appeared between 11-14 and 11-22), so the lag is not unique to this key and was not traced to the publisher.
 
-**T165773** — in JODY, but no longer on 85083.
-- 6.48 KW AC PV, 6512 W EAGLE TALON TRL, Proposed, filed 2026-11-06, Utility. Rows exist only for 85310 (first created 11-07 15:45Z, last seen 11-20 19:27Z) and 85383 (first created 11-07 15:45Z, last seen 11-20 23:01Z). No 85083 row; the 85083 report does not carry it.
-- No other record at that address in 85383, so a renumbering is not supported by JODY data.
-- The 85310/85383 copies have not refreshed since 11-20, so they are probably stale copies the next refresh will drop. This is inference, not tested.
+**2605046: one official GET approved by the founder** (`PER_NUM = '2605046'`, Planning_Permit layer 1, 2026-11-22, HTTP 200, 1 feature, nothing else requested):
+- Permit type F193, "SOLAR PHOTOVOLTAIC SYSTEM OTC", name "6.48 KW AC PV", status **OPEN**, 6512 W EAGLE TALON TRL, company DOBIS ENERGY, LLC.
+- Entered (`PER_ENT_DATE`) **2026-11-06 16:55Z**; issued (`PER_ISSUE_DATE`) **2026-11-20 13:06Z**; expires 2028-11-19.
+- Point (-112.19937, 33.73848).
+- **It is the same permit JODY holds as `T165773`**: same name ("6.48 KW AC PV"), same address, same coordinates, same filing date (2026-11-06). The publisher's number changed from `T165773` to `2605046` when the permit was issued. This is the one case where renumbering is confirmed; it is not confirmed for T165906, T969035 or T970655.
+- Does radius, date, type or ingest timing explain the miss?
+  - **Date:** no. Filed 11-06, inside the window.
+  - **Type:** no. Solar PV is kept (JODY already holds the T-number copy as Utility, Proposed).
+  - **Radius: yes, contributing.** The point is 4.03 mi from the 85083 pinned centre (33.7352, -112.1294), beyond the 3-mi ingest radius, although it lies inside the ZIP polygon (and inside its bounding box). The 85083 refresh cannot reach this part of the polygon. JODY holds the permit only through neighbouring ZIPs' refreshes (85310, 85383).
+  - **Ingest timing: yes, contributing.** Those two ZIPs last refreshed on 2026-11-20 (18:12Z and 18:22Z), about 5 hours after the 13:06Z issue, and still carried `T165773`. Neither has refreshed since, so the renumbered record has not been ingested.
+- Net: 2605046 is not a lost permit. It is the renumbered version of a permit JODY already has under its old number, and it is missing because (a) 85083's own radius does not cover the west of the ZIP polygon and (b) the covering ZIPs have not refreshed since the renumbering.
 
-**T165906** — still a member in `geo.n5_serving_membership` (85083, generation `n5-national-2026-11-22`) but has **no `app_projects` row in any ZIP** and is absent from the cached reports checked. First and last seen cannot be shown: the row is gone, and the one table that might hold it (`preservation.app_project_identity`) timed out at 12 s and was not probed again.
+**T165773** — in JODY under the old number: 6.48 KW AC PV, 6512 W EAGLE TALON TRL, Proposed, filed 2026-11-06, Utility. Rows only for 85310 (first created 11-07 15:45Z, last seen 11-20 19:27Z) and 85383 (first created 11-07 15:45Z, last seen 11-20 23:01Z). No 85083 row. It is the superseded number of 2605046 and NOT_FOUND_ON_SOURCE is consistent with that.
 
-**Pattern with T969035 and T970655** (homesignal-site#3111, REPORT-round2 C1: both N5 radius keys with no `app_projects` row, not found at the publisher).
-- All four vanished keys are T-prefixed Phoenix numbers, and none has a surviving sibling at the same address (checked for T165773 only).
-- It is not "all T-keys vanish": 8 of the 10 T-prefixed member keys matched, and the 85083 membership holds 116 Phoenix keys, 115 with rows (105 numeric all with rows, 10 T-keys with rows, 1 T-key without). Numeric keys: 0 vanished.
-- So: a possible pattern (T-keys withdrawn or replaced at the source), small sample, **not established**. No record was deleted or hidden.
+**T165906** — still a member in `geo.n5_serving_membership` (85083, generation `n5-national-2026-11-22`) but has no `app_projects` row in any ZIP and is absent from the cached reports of 85083, 85085, 85086, 85310 and 85383. Its first and last seen cannot be shown: the row is gone, and `preservation.app_project_identity` timed out at 12 s and was not retried. This is defect A1 (stale reference); a renumbering cause is plausible but untested.
 
-## Proposed fixes (none made)
-1. Confirm whether Phoenix withdraws or renumbers T-prefixed applications. This needs one bounded official lookup by key, which needs explicit approval.
-2. Reconcile the membership/row gap: N5 membership can hold a key (T165906) whose `app_projects` row has been reaped. The next generation will drop it; an alarm on "membership keys without a row" would surface it.
-3. Measure ingest lag per source (filing date to first JODY copy). 2605036's 7-day lag is the unexplained part.
-4. Re-run the reconciliation only after 1 and 3, never as a coverage claim.
+**Pattern with T969035 and T970655** (#3111, REPORT-round2 C1: N5 radius keys with no `app_projects` row, not found at the publisher). All four vanished keys are T-prefixed Phoenix numbers, and one (T165773) is now confirmed renumbered. 8 of the 10 T-prefixed 85083 member keys matched; 0 of 105 numeric keys vanished. Hypothesis only for the other three: the same renumbering on issuance. No record was deleted or hidden, and no T-key or address search was run.
+
+## Recommendations for the fix session (not built)
+1. **Alarm for N5 members with no project row** (keys in `geo.n5_serving_membership` that have no `app_projects` row), which would have surfaced T165906.
+2. **Ingest lag per source** (filing or issue date to first JODY copy), which would size the 2605036 delay.
+3. Decide how a renumbered key (T-number to permit number on issuance) should be reconciled, since it currently looks like one vanished record plus one missing record. This needs the publisher's rule, which has been confirmed for one key only.
+4. Consider whether a ZIP whose polygon extends beyond the 3-mi radius from its pinned centre should be refreshed through the neighbouring ZIPs it depends on, or have its own coverage, before any completeness claim.
+5. Re-run the reconciliation only after these, and never as a coverage claim.
