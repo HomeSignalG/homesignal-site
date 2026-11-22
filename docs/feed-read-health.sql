@@ -7,7 +7,7 @@
 -- Per-feed READ HEALTH from public.feed_read_outcome (written by homesignal-ingest feed_health(); one row per active feed per run).
 -- States (first match wins): NEVER_CHECKED (no outcome row) · STALE_EVIDENCE (newest outcome older than the MONITORING threshold below)
 --   · READ_FAILED (newest outcome: the read raised) · READ_OK_ZERO_ITEMS (newest outcome: a successful read returned zero items; NOT a failure)
---   · READ_OK_ITEMS (newest outcome: a successful read returned items).
+--   · READ_UNCERTAIN (newest outcome: a 2xx body the adapter could not classify; neither a failure nor a confirmed empty read) · READ_OK_ITEMS (newest outcome: a successful read returned items). Any other outcome value reads READ_UNKNOWN_OUTCOME, never READ_OK_ITEMS.
 -- The 12-hour threshold is a MONITORING threshold, not any source's publishing schedule: the full ingest run is scheduled every 4 hours,
 -- so 12 h means three runs in a row produced no outcome for the feed. An old newest_item_date is information only and never sets a state.
 create or replace function public._hs_feed_read_state()
@@ -19,8 +19,10 @@ language sql stable security definer set search_path = public as $$
   select l.feed_id,
     case when l.attempted_at < now() - interval '12 hours' then 'STALE_EVIDENCE'
          when l.outcome = 'error' then 'READ_FAILED'
+         when l.outcome = 'uncertain' then 'READ_UNCERTAIN'
          when l.outcome = 'empty' then 'READ_OK_ZERO_ITEMS'
-         else 'READ_OK_ITEMS' end,
+         when l.outcome = 'ok' then 'READ_OK_ITEMS'
+         else 'READ_UNKNOWN_OUTCOME' end,
     l.attempted_at, l.outcome, l.items_returned, l.newest_item_date, l.error, coalesce(st.n, 0), l.run_id
   from ranked l left join streak st on st.feed_id = l.feed_id where l.rn = 1;
 $$;
