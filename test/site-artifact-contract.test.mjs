@@ -145,7 +145,7 @@ const REQUIRED = [
   'property.html',         // address / property dossier
   'properties.html',
   'development.html',      // development
-  'homesignalmap.html',    // Maps
+  'development-map.html',    // Maps
   'alerts.html',           // Alerts
   'dashboard.html',
   // runtime modules the page families depend on

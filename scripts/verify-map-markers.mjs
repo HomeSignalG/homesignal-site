@@ -10,7 +10,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SITE_BASE = (process.env.SITE_BASE || 'http://localhost:8765').replace(/\/$/, '');
 const MAPS_PATH = process.env.MAPS_PATH || '/maps.html';
 const DASH_PATH = process.env.DASH_PATH || '/dashboard.html';
-const TRACKER_PATH = process.env.TRACKER_PATH || '/homesignalmap.html';
+const TRACKER_PATH = process.env.TRACKER_PATH || '/development-map.html';
 const target = SITE_BASE + MAPS_PATH;
 
 function runUnit() {

@@ -7,7 +7,7 @@
 // so every newly-cached ZIP is covered with no code change.
 //
 // WHAT IT ASSERTS, per ZIP with a cached report:
-//   1. /development/<zip> (or homesignalmap.html?zip=<zip>) loads and the map inits,
+//   1. /development/<zip> (or development-map.html?zip=<zip>) loads and the map inits,
 //      centered on the ZIP centroid.
 //   2. The rendered facility count == counts.facilities from the cached report.
 //   3. THE ANTI-FABRICATION INVARIANT: every rendered site carries a non-empty record_url.
@@ -16,7 +16,7 @@
 // treats an empty government tile.
 //
 // Config via env: SITE_BASE (default https://homesignal.net), ZIP_PATH (route template,
-// default "/development/{zip}"; set "/homesignalmap.html?zip={zip}" if that's the live route),
+// default "/development/{zip}"; set "/development-map.html?zip={zip}" if that's the live route),
 // SAMPLE (optional integer cap for a quick smoke run).
 
 import { readFileSync } from 'node:fs';
@@ -30,10 +30,10 @@ import {
 } from './lib/verify-dev-helpers.mjs';
 
 // ── Read the Supabase URL + anon key out of the shipped page so nothing is forked. ──
-const html = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const html = readFileSync(new URL('../development-map.html', import.meta.url), 'utf8');
 const grabVar = (name) => {
   const m = html.match(new RegExp(`var ${name}\\s*=\\s*["']([^"']+)["']`));
-  if (!m) throw new Error(`Could not read ${name} from homesignalmap.html`);
+  if (!m) throw new Error(`Could not read ${name} from development-map.html`);
   return m[1];
 };
 const ENDPOINT = grabVar('ENDPOINT');                 // .../functions/v1/get-address-report
@@ -444,7 +444,7 @@ async function main() {
   if (SAMPLE > 0) props = props.slice(0, SAMPLE);
   console.log(`\nVerifying ${props.length} property page(s) against ${SITE_BASE}`);
   for (const row of props) {
-    const target = `${SITE_BASE}/homesignalmap.html?addr=${encodeURIComponent(row.address)}`;
+    const target = `${SITE_BASE}/development-map.html?addr=${encodeURIComponent(row.address)}`;
     try {
       await gotoWithRetry(page, target);
       await page.waitForFunction(() => Array.isArray(window.__HS_PROP), { timeout: 15000 });

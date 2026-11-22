@@ -1299,7 +1299,7 @@ def render(p, built):
         '<meta charset="UTF-8">\n'
         # The document lives at /community/<zip>/, two levels deep, while the shared app
         # resolves several URLs RELATIVELY - shell.js fetches 'partials/shell.html' and
-        # HS.navHref emits bare 'homesignalmap.html?zip='. Without a base those resolve
+        # HS.navHref emits bare 'development-map.html?zip='. Without a base those resolve
         # under /community/<zip>/ and 404, which crashed hydration with
         # "Cannot read properties of null (reading 'addEventListener')" when the shell
         # partial came back as a 404 page. One <base> fixes every relative URL at once and
@@ -1334,7 +1334,7 @@ def render(p, built):
         "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' "
         'https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; '
         # frame-src/child-src 'self': the ZIP page's map is a same-origin iframe of
-        # homesignalmap.html, shown to every visitor since 2026-10-02 (it was signed-in
+        # development-map.html, shown to every visitor since 2026-10-02 (it was signed-in
         # only before). lib/map.js and the Esri/jsDelivr widening PCM-4 added are both gone.
         'frame-src \'self\'; child-src \'self\'; '
         'form-action \'self\'">\n'
@@ -1356,8 +1356,8 @@ def render(p, built):
         # both hosts run ONE runtime, so a dependency added to community.html alone breaks
         # this one. Fails CLOSED if absent (outcome 'unavailable', no absence claim).
         '<script src="/lib/zip-authoritative.js?v=20261029a"></script>\n'
-        '<script src="/lib/data.js?v=4033ae3a"></script>\n<script src="/lib/topic-prefs.js?v=fe87d99b"></script>\n'
-        '<script src="/lib/templates.js?v=7373e258"></script>\n<script src="/lib/impact.js"></script>\n'
+        '<script src="/lib/data.js?v=b7a48d38"></script>\n<script src="/lib/topic-prefs.js?v=fe87d99b"></script>\n'
+        '<script src="/lib/templates.js?v=9e1170b0"></script>\n<script src="/lib/impact.js"></script>\n'
         # lib/project-type.js: the canonical Development Type (pure — no DOM, no map runtime).
         # The Development & Growth Type badge reads HS.canonicalProjectType from it. Same parity
         # rule as the files around it: both hosts run ONE runtime. lib/map.js stays OFF (§5a).
@@ -1372,10 +1372,10 @@ def render(p, built):
         # one host only.
         '<script src="/lib/premium-waitlist.js?v=3cb9baaf"></script>\n'
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
-        '<script src="/shell.js?v=5d10566b"></script>\n'
+        '<script src="/shell.js?v=2b4498b5"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
         '<script src="/lib/water-rights.js?v=add4200a"></script>\n'
-        '<script src="/lib/community-page.js?v=d96cd8ab"></script>\n'
+        '<script src="/lib/community-page.js?v=2cd4d9bd"></script>\n'
         "</body>\n</html>\n")
 
 
@@ -1882,12 +1882,12 @@ GUIDE_RECENT_N = 12
 
 
 def _zip_form(label_id):
-    return (f'<form class="zsec" action="/homesignalmap.html" method="get" role="search">'
+    return (f'<form class="zsec" action="/development-map.html" method="get" role="search">'
             f'<label for="{label_id}">Your ZIP code</label> '
             f'<input id="{label_id}" name="zip" inputmode="numeric" pattern="[0-9]{{5}}" '
             f'maxlength="5" required placeholder="e.g. 78704"> '
             f'<button type="submit">Open the Development map</button></form>'
-            f'<p>Have a street address? <a href="/homesignalmap.html">Search it on the Development '
+            f'<p>Have a street address? <a href="/development-map.html">Search it on the Development '
             f'map</a> and choose how far around it to look.</p>')
 
 
@@ -2086,14 +2086,14 @@ SITEMAP_LEGACY_RE = re.compile(
 #   ?zip=78617 -> 309,689 bytes, md5 0282424d481b23d738a8dc038c0b7ee2
 #   ?zip=84302 -> 309,689 bytes, md5 0282424d481b23d738a8dc038c0b7ee2   <- identical
 # Both ship `noindex, nofollow` in their initial HTML and both canonicalise to the
-# ZIP-LESS https://homesignal.net/homesignalmap.html. homesignalmap.html flips its own
+# ZIP-LESS https://homesignal.net/development-map.html. development-map.html flips its own
 # robots-meta client-side from app_community_meta.indexable, but never rewrites the
 # canonical — so even a rendered crawl consolidates all 11,718 into one URL and not one
 # of them can rank for a ZIP. Advertising them is not a no-op: it is 11,718 "submitted
 # URL marked noindex" errors in Search Console and 59% of the crawl budget spent on
 # duplicates of one page, taken away from the real /community/<zip>/ documents.
 SITEMAP_DEV_RE = re.compile(
-    r"[ \t]*<url>\s*<loc>[^<]*homesignalmap\.html\?zip=\d{5}</loc>.*?</url>\s*", re.S)
+    r"[ \t]*<url>\s*<loc>[^<]*development-map\.html\?zip=\d{5}</loc>.*?</url>\s*", re.S)
 
 
 def _url_el(loc, lastmod=None, bare=False):
@@ -2137,7 +2137,7 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     halves of it. Only its static half reaches production; test/sitemap-static-half.test.mjs
     keeps that half equal to gen_sitemap.py STATIC.)
 
-    The development half (`homesignalmap.html?zip=`) is REMOVED, not carried over.
+    The development half (`development-map.html?zip=`) is REMOVED, not carried over.
 
     ⚠️ THIS REVERSES THIS FUNCTION'S ORIGINAL "leave the development half alone
     (page-purpose separation)" RULE, deliberately. That rule was right about page PURPOSE
@@ -2150,7 +2150,7 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     was simply never checked on this half.
 
     This removes the ADVERTISEMENT only. It changes no document, no robots directive, and
-    nothing a resident sees: /homesignalmap.html?zip=<zip> keeps working exactly as it
+    nothing a resident sees: /development-map.html?zip=<zip> keeps working exactly as it
     does today, and stays reachable from the Place pages. Restoring the advertisement is
     the job of making those URLs real documents (`/development/<zip>/`, the pattern
     `/community/<zip>/` already uses), at which point this filter is what should be
@@ -2250,8 +2250,8 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     # are noindex and canonicalise away from the ZIP, so one surviving here is a defect —
     # and a silent one, because a sitemap full of noindex URLs still parses and still
     # returns 200. Fail the build rather than ship it.
-    if re.search(r"homesignalmap\.html\?zip=", txt):
-        sys.exit("ERROR: a noindex homesignalmap.html?zip= URL survived in the artifact sitemap")
+    if re.search(r"development-map\.html\?zip=", txt):
+        sys.exit("ERROR: a noindex development-map.html?zip= URL survived in the artifact sitemap")
     return {"removed": removed, "removed_dev": removed_dev, "added": len(zips), "cities": len(cps),
             "projects": 0, "guides": len(gps), "maps": len(mps), "developments": len(dps),
                 "fact_checks": len(fps)}
@@ -2424,7 +2424,7 @@ def build(pages, out_dir, canonical, built, state=None):
             "max": mx, "max_zip": mxz}
 
 
-MAP_TEMPLATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "homesignalmap.html")
+MAP_TEMPLATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "development-map.html")
 MAP_ASSET_DIR = "map1"          # the shared runtime of every /map/<zip>/ document, content-addressed
 
 
@@ -2432,7 +2432,7 @@ class MapTemplate:
     """Map 1 as ONE shared implementation, rendered once per ZIP (founder, 2026-10-22: the address
     people see is /map/<zip>, and it must be a real page a search engine can list).
 
-    homesignalmap.html stays the only source. The build reads it, moves its two large inline
+    development-map.html stays the only source. The build reads it, moves its two large inline
     blocks (the page <style> and the page runtime <script>) into content-addressed files under
     /map1/, and gives each ZIP a small document with its own title, description, canonical and
     robots. The runtime is byte-identical to the inline one; the page reads its ZIP from the path
@@ -2489,8 +2489,8 @@ class MapTemplate:
         "<title>HomeSignal Development Map — What Is Built, Approved and Proposed Near You</title>",
         '<meta name="robots" content="index, follow" id="robots-meta"/>',
         '<meta name="description" content="Search a street address or ZIP code on the HomeSignal Development Map',
-        '<link rel="canonical" href="https://homesignal.net/homesignalmap.html"/>',
-        '<meta property="og:url" content="https://homesignal.net/homesignalmap.html"/>',
+        '<link rel="canonical" href="https://homesignal.net/development-map.html"/>',
+        '<meta property="og:url" content="https://homesignal.net/development-map.html"/>',
         '<meta property="og:title" content="HomeSignal Development Map — What Is Built, Approved and Proposed Near You"/>',
     )
 
@@ -2884,7 +2884,7 @@ def main():
     print(f"avg html bytes : {stats['avg']}")
     print(f"max html bytes : {stats['max']} (zip {stats['max_zip']})")
     print(f"sitemap        : -{sm['removed']} legacy community.html?zip= URLs, "
-          f"-{sm['removed_dev']} noindex homesignalmap.html?zip= URLs, "
+          f"-{sm['removed_dev']} noindex development-map.html?zip= URLs, "
           f"+{sm['added']} /community/<zip>/ URLs, +{sm['cities']} /city/ URLs, "
           f"+{sm['projects']} /project/ URLs, +{sm['guides']} /guides/ URLs, "
           f"+{sm['maps']} /map/ URLs")

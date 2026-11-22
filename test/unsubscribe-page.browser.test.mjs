@@ -60,7 +60,7 @@ const m = await render({ status: 'unsubscribed', maps_only: true, zip: '97702' }
 ok(m.title === FOUNDER_TITLE, '1 title', m.title);
 ok(JSON.stringify(m.paras) === JSON.stringify(FOUNDER_LINES('97702')), '1 the three lines, verbatim and in order', m.paras);
 ok(m.cta === FOUNDER_CTA('97702'), '1 link text', m.cta);
-ok(m.href === 'https://homesignal.net/homesignalmap.html?zip=97702', '1 link opens Map 1 for the ZIP', m.href);
+ok(m.href === 'https://homesignal.net/development-map.html?zip=97702', '1 link opens Map 1 for the ZIP', m.href);
 ok(m.asked === FN + '?t=a%20b%2Fc', '1 the token is sent encoded', m.asked);
 ok(!m.overflow, '1 no sideways scroll at 1280px');
 const phone = await render({ status: 'unsubscribed', maps_only: true, zip: '97702' }, { width: 390 });

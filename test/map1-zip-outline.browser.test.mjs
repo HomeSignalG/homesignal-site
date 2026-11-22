@@ -148,23 +148,23 @@ async function load(path) {
 }
 
 // 1. full Development page, ZIP mode, signed out (the stub has no session)
-await load('/homesignalmap.html?zip=20171');
+await load('/development-map.html?zip=20171');
 let o = await outline();
 ok(o.calls.includes('20171'), '1: the full ZIP page asks for the outline', JSON.stringify(o.calls));
 ok(o.zip === '20171' && o.paths >= 1, '1b: ...and draws it on the 2D map, signed out', JSON.stringify(o));
 
 // 2. the ZIP embed still draws it
-await load('/homesignalmap.html?embed=1&zip=20171');
+await load('/development-map.html?embed=1&zip=20171');
 o = await outline();
 ok(o.zip === '20171' && o.paths >= 1, '2: the ZIP embed draws it', JSON.stringify(o));
 
 // 3. a ZIP with no Census area draws nothing, and no stand-in
-await load('/homesignalmap.html?zip=99999');
+await load('/development-map.html?zip=99999');
 o = await outline();
 ok(o.calls.includes('99999') && !o.zip && o.paths === 0, '3: not_measured draws nothing', JSON.stringify(o));
 
 // 4. an address search draws the address's own ZIP
-await load('/homesignalmap.html?zip=20171');
+await load('/development-map.html?zip=20171');
 await page.fill('#addr', ADDR_TEXT);
 await page.evaluate(() => document.getElementById('form').requestSubmit());
 await page.waitForFunction(() => window.__HS_VERIFY && window.__HS_VERIFY.zipBoundary === '20170', null, { timeout: 20000 }).catch(() => {});
@@ -173,13 +173,13 @@ o = await outline();
 ok(o.zip === '20170' && o.calls.includes('20170') && o.paths >= 1, '4: an address search draws the geocoder\'s ZIP outline', JSON.stringify(o));
 
 // 5. the address embed (Place page) draws the ZIP the host names
-await load('/homesignalmap.html?embed=1&lat=38.9506&lng=-77.3645&radius=2&outline=20170');
+await load('/development-map.html?embed=1&lat=38.9506&lng=-77.3645&radius=2&outline=20170');
 o = await outline();
 ok(o.zip === '20170' && o.paths >= 1, '5: the address embed draws the ?outline= ZIP', JSON.stringify(o));
 
 // 6. satellite view. Headless Chromium has no satellite tiles, so the page uses its Leaflet
 // imagery fallback within the grace period; the outline must be on that map too.
-await load('/homesignalmap.html?zip=20171');
+await load('/development-map.html?zip=20171');
 await page.click('#viewSeg button[data-v="gl"]');
 await page.waitForFunction(() => document.querySelectorAll('#mapgl .leaflet-overlay-pane path').length > 0
   || !!document.querySelector('#mapgl canvas.maplibregl-canvas'), null, { timeout: 15000 }).catch(() => {});

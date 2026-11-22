@@ -215,7 +215,7 @@ ok(view.viewed === SAVED.zip,
   '2 on the return visit the viewed ZIP is the resident’s own ' + SAVED.zip + ' (positive control)', view);
 ok(reads.length === 1 && reads[0].zip === '98335' && reads[0].kind === 'development',
   '2 the homepage made exactly one development read, for the sample ZIP 98335, not the resident’s ' + SAVED.zip, reads);
-ok(view.frame === 'homesignalmap.html?embed=1&preview=1&zip=98335', '2 the sample map names 98335 too', view.frame);
+ok(view.frame === 'development-map.html?embed=1&preview=1&zip=98335', '2 the sample map names 98335 too', view.frame);
 const heading = await D.page.evaluate(() => document.getElementById('homeResultsHeading').textContent.trim());
 ok(heading === 'See an example: 98335 · Gig Harbor, Washington', '2 the sample heading names 98335 · Gig Harbor, Washington', heading);
 // loading the sample must not alter the resident's saved Places, active property or browser ZIP context (positive control: they are set before)
@@ -239,7 +239,7 @@ console.log('--- 3. every page lights the section it belongs to ---');
 const MATRIX = [
   ['/index.html', ['explore']],
   ['/community.html?zip=78617', ['explore']],
-  ['/homesignalmap.html?zip=78617', ['explore']],
+  ['/development-map.html?zip=78617', ['explore']],
   ['/development.html?zip=78617', ['explore']],
   ['/reports.html', ['explore']],
   ['/property.html?id=' + SAVED.id, ['explore']],
@@ -357,7 +357,7 @@ ok(ent.robots === 'index, follow', '7 development-activity.html is index, follow
 ok(JSON.stringify(ent.lit) === JSON.stringify(['enterprise']), '7 ...and lights Enterprise', ent.lit);
 
 // ═══ 8. The Explore dropdown (founder, 2026-10-02) ═══
-// "Quality of Life Impact" (development.html), "Development Map" (homesignalmap.html) and
+// "Quality of Life Impact" (development.html), "Development Map" (development-map.html) and
 // "Activity" (community.html), under Explore in the header. Wide: hovering Explore opens it
 // ("if you hover over explore the drop down should be obvious"); the chevron beside Explore
 // opens it too, and then an entry, Escape or a click outside closes it. The current page's
@@ -389,7 +389,7 @@ const dropdown = (page) => page.evaluate(() => {
 });
 const away = () => D.page.mouse.move(640, 700);
 const zipOf = (h) => ((h || '').match(/[?&]zip=(\d{5})/) || [])[1] || null;
-for (const [path, want] of [['/development.html?zip=78617', 'qol'], ['/homesignalmap.html?zip=78617', 'map'], ['/community.html?zip=78617', 'activity']]) {
+for (const [path, want] of [['/development.html?zip=78617', 'qol'], ['/development-map.html?zip=78617', 'map'], ['/community.html?zip=78617', 'activity']]) {
   await away();
   await D.page.goto(base + path, { waitUntil: 'domcontentloaded' });
   await waitReady(D.page);
@@ -401,7 +401,7 @@ for (const [path, want] of [['/development.html?zip=78617', 'qol'], ['/homesigna
   d = await dropdown(D.page);
   ok(d.open, '8 ' + path + ': hovering Explore opens it', d);
   ok(d.labels.join('|') === 'Quality of Life Impact|Development Map|Activity', '8 ' + path + ': ...listing the three pages by their names', d.labels);
-  ok(d.hrefs.map((h) => h.split('?')[0]).join('|') === 'development.html|homesignalmap.html|community.html'
+  ok(d.hrefs.map((h) => h.split('?')[0]).join('|') === 'development.html|development-map.html|community.html'
      && d.hrefs.every((h) => zipOf(h) === '78617'),
     '8 ' + path + ': ...each opening its page for the viewed ZIP 78617', d.hrefs);
   ok(d.navs.every((n) => n === null) && JSON.stringify(d.lit) === JSON.stringify(['explore']),

@@ -10,7 +10,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const src = readFileSync(join(root, 'homesignalmap.html'), 'utf8');
+const src = readFileSync(join(root, 'development-map.html'), 'utf8');
 const community = readFileSync(join(root, 'lib/community-page.js'), 'utf8');
 const failures = [];
 

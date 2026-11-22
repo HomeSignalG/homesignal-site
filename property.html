@@ -20,18 +20,18 @@
      HS.zipAuthOutcome, and this page renders HS.zipAuthUnmeasuredFact instead of a
      verified-absence claim. Fails CLOSED if absent (outcome 'unavailable', no claim). -->
 <script src="lib/zip-authoritative.js?v=20261029a"></script>
-<script src="lib/data.js?v=4033ae3a"></script>
+<script src="lib/data.js?v=b7a48d38"></script>
 <script src="lib/topic-prefs.js?v=fe87d99b"></script>
-<script src="lib/templates.js?v=7373e258"></script>
+<script src="lib/templates.js?v=9e1170b0"></script>
 <script src="lib/impact.js"></script>
 <!-- NO MAP LIBRARIES ON THIS PAGE. The Address context map is an IFRAME of
-     homesignalmap.html, so lib/map.js, lib/residential-qualify.js and lib/n5-radius.js
+     development-map.html, so lib/map.js, lib/residential-qualify.js and lib/n5-radius.js
      load inside THAT document, which already loads all three. PCM-1 needed them here
      because it drew the map itself; nothing on this page draws a map any more, and
      carrying them would be a second copy of a runtime that lives one frame away. -->
 <script src="lib/premium-waitlist.js?v=3cb9baaf"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
-<script src="shell.js?v=5d10566b"></script>
+<script src="shell.js?v=2b4498b5"></script>
 <script>
 HS.onReady(async function () {
   var S = HS.state;
@@ -128,7 +128,7 @@ HS.onReady(async function () {
   // verdict through; without consulting it the "Nearby projects" vital printed a confident
   // 0 over a ZIP nobody has measured. Map 1 already settled the presentation for exactly
   // this state — it prints an em dash rather than a number it cannot stand behind
-  // (homesignalmap.html: `$("cDev").textContent = DEV_UNMEASURED ? "—"`). Fail closed:
+  // (development-map.html: `$("cDev").textContent = DEV_UNMEASURED ? "—"`). Fail closed:
   // the test is for the VALUE 'complete', never for the absence of a failure.
   var devReadComplete = projects.complete === true
     && ((projects && projects.outcome) || 'unavailable') === 'complete';
@@ -163,7 +163,7 @@ HS.onReady(async function () {
   }).length;
 
   // ── ADDRESS CONTEXT MAP — Map 1, embedded ─────────────────────────────────────────────
-  // PLACE MAPS ARE MAP 1. The iframe loads homesignalmap.html itself, chrome-stripped, so
+  // PLACE MAPS ARE MAP 1. The iframe loads development-map.html itself, chrome-stripped, so
   // this Address gets Map 1's pins and Map 1's type/status/regulatory rows rather than an
   // orientation widget with none of them. The PCM-1 helpers that used to live here —
   // pcmRows / pcmSites / pcmNote / pcmPaint and their HS.buildLive call — are deleted, not
@@ -185,7 +185,7 @@ HS.onReady(async function () {
     return !!x && typeof x.lat === 'number' && typeof x.lng === 'number'
         && isFinite(x.lat) && isFinite(x.lng);
   }
-  // The handoff. homesignalmap.html?zip=<the ADDRESS's ZIP> is the only Development deep link
+  // The handoff. development-map.html?zip=<the ADDRESS's ZIP> is the only Development deep link
   // that exists today: Map 1's address mode is entered by form submit and never changes the
   // URL, and ?addr= is the property_reports dossier (1 cached row), not address mode.
   // Inventing an address-mode parameter would mean touching Map 1 and is not authorized.
@@ -215,12 +215,12 @@ HS.onReady(async function () {
     ? '<div class="block" id="propContext">'
       + '<div class="bt-row place-changing">'
       + (placeHeading ? '<h2 id="propPlaceHeading">' + HS.esc(placeHeading) + '</h2>' : '')
-      + '<a href="' + HS.esc(HS.navHref('homesignalmap.html', p.zip)) + '" id="propMapOpen">Open in Development →</a></div>'
+      + '<a href="' + HS.esc(HS.navHref('development-map.html', p.zip)) + '" id="propMapOpen">Open in Development →</a></div>'
       + '<iframe id="propMapFrame" title="Development within ' + PCM_RADIUS_MI + ' miles of this address" '
         + 'loading="lazy" '
         + 'style="width:100%;height:clamp(560px,58vw,720px);border:1px solid var(--line);'
         + 'border-radius:12px;display:block" '
-        + 'src="homesignalmap.html?embed=1&amp;lat=' + encodeURIComponent(p.lat)
+        + 'src="development-map.html?embed=1&amp;lat=' + encodeURIComponent(p.lat)
         + '&amp;lng=' + encodeURIComponent(p.lng)
         + '&amp;radius=' + PCM_RADIUS_MI
         + (/^\d{5}$/.test(String(p.zip || '').slice(0, 5)) ? '&amp;outline=' + encodeURIComponent(String(p.zip).slice(0, 5)) : '')

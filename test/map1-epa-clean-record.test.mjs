@@ -1,6 +1,6 @@
 // MAP 1 AND THE ZIP PAGE CLAIM A CLEAN EPA RECORD ONLY ON EPA'S OWN "NO VIOLATION IDENTIFIED" (2026-11-09).
 //
-// WHY THIS FILE EXISTS. homesignalmap.html's envSignals used to print
+// WHY THIS FILE EXISTS. development-map.html's envSignals used to print
 // "no recorded EPA violations" for any FRS facility that lacked a stronger
 // signal. That is a positive fact about EPA compliance. It is true ONLY while
 // ECHO data is present AND compliance tracking is on — the rule HS.fac.signals
@@ -25,10 +25,10 @@ const ok = (c, name, detail) => {
   if (!c) fails++;
 };
 
-const pageSrc = readFileSync(join(root, 'homesignalmap.html'), 'utf8');
+const pageSrc = readFileSync(join(root, 'development-map.html'), 'utf8');
 const grabFn = (name) => {
   const i = pageSrc.indexOf('function ' + name + '(');
-  if (i === -1) throw new Error('not found in homesignalmap.html: ' + name);
+  if (i === -1) throw new Error('not found in development-map.html: ' + name);
   let depth = 0, j = pageSrc.indexOf('{', i);
   for (let k = j; k < pageSrc.length; k++) {
     if (pageSrc[k] === '{') depth++;

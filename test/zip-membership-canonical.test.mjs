@@ -66,7 +66,7 @@ ok(/bb\.y0 and bb\.y1/.test(NATL) && /ST_XMin\(geom\)/.test(NATL),
   'A7 national candidates are retrieved by the ZCTA polygon\'s own extent, not a circle');
 
 // ── B. THE PAGE: ZIP mode has one door and reads only membership reads ─────────────────────
-const PAGE = read('homesignalmap.html');
+const PAGE = read('development-map.html');
 const z0 = PAGE.indexOf('function loadZip(zip){'), z1 = PAGE.indexOf('function render(data){');
 const LOADZIP = stripJs(PAGE.slice(z0, z1));
 ok(z0 > 0 && z1 > z0 && /app_zip_projects_markers|ZIP_AUTH_RPC_URL/.test(LOADZIP),

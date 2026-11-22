@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Read-only check of the PUBLIC Development Map landing page (stdlib only; writes nothing, holds no secret).
 
-GETs the public host and prints what a crawler is given for /homesignalmap.html and for the states that must NOT be
+GETs the public host and prints what a crawler is given for /development-map.html and for the states that must NOT be
 indexed, then exits 1 if any expectation fails. The sandbox that wrote this change cannot reach the host, so this is
 how production is verified: dispatch .github/workflows/verify-map-landing-live.yml after a deploy.
 
 It reads the RAW response (what a crawler sees before rendering): status, redirect target, X-Robots-Tag, the robots
 meta, the canonical, the title, whether the About copy is in the initial HTML, sitemap membership, and the homepage's
 plain link. It does NOT read Google Search Console (that needs the property owner's login): check "URL inspection" for
-https://jodytracks.com/homesignalmap.html there, then request indexing.
+https://jodytracks.com/development-map.html there, then request indexing.
 """
 import argparse
 import re
@@ -42,7 +42,7 @@ def main():
     ap.add_argument("--zip", default="98335", help="a ZIP whose /map/<zip>/ page is compared (not asserted either way)")
     a = ap.parse_args()
     o = a.origin.rstrip("/")
-    landing = o + "/homesignalmap.html"
+    landing = o + "/development-map.html"
     bad = []
     rows = []
 
@@ -63,7 +63,7 @@ def main():
     check("landing: About copy is in the initial HTML, outside the <template>", 'id="hs-map-about"' in tpl_free
           and "/guides/what-is-being-built-near-me/" in tpl_free)
 
-    for label, path in (("ZIP route", "/homesignalmap.html?zip=" + a.zip), ("address route", "/homesignalmap.html?addr=1+Main+St")):
+    for label, path in (("ZIP route", "/development-map.html?zip=" + a.zip), ("address route", "/development-map.html?addr=1+Main+St")):
         s2, _, h2, b2 = get(o + path)
         check(f"{label}: canonicalises to the landing page", canonical(b2) == [landing], canonical(b2))
         # Raw HTML says index; the head script lowers it on render. Report, and require the guard to be present.
@@ -75,11 +75,11 @@ def main():
 
     ss, _, _, sm = get(o + "/sitemap.xml")
     check("sitemap.xml: lists the landing page once", sm.count(f"<loc>{landing}</loc>") == 1, ss)
-    check("sitemap.xml: lists no homesignalmap.html?… URL", "homesignalmap.html?" not in sm)
+    check("sitemap.xml: lists no development-map.html?… URL", "development-map.html?" not in sm)
     sr, _, _, rb = get(o + "/robots.txt")
-    check("robots.txt: does not disallow the landing page", not re.search(r"^Disallow:\s*/(?:homesignalmap\.html)?\s*$", rb, re.M), sr)
+    check("robots.txt: does not disallow the landing page", not re.search(r"^Disallow:\s*/(?:development-map\.html)?\s*$", rb, re.M), sr)
     sh, _, _, hp = get(o + "/")
-    check("homepage: plain crawlable link to the landing page", re.search(r'href="(?:/|https://[^"/]+/)?homesignalmap\.html"', hp) is not None, sh)
+    check("homepage: plain crawlable link to the landing page", re.search(r'href="(?:/|https://[^"/]+/)?development-map\.html"', hp) is not None, sh)
 
     for r in rows:
         print(f"{r[0]:5} {r[1]}" + (f"  [{r[2]}]" if r[2] != "" else ""))

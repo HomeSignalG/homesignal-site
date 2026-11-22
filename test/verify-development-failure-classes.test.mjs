@@ -159,7 +159,7 @@ const repFac = (n, unavailable) => ({
 // So the verifier was asserting an equality the product had already measured as false and
 // deliberately removed. Pinned because the day the page stops deleting them, the reasoning
 // behind reconciling counts against rep.sites needs re-reading.
-const mapPage = readFileSync(join(root, 'homesignalmap.html'), 'utf8');
+const mapPage = readFileSync(join(root, 'development-map.html'), 'utf8');
 ok(/delete zipCounts\.development; delete zipCounts\.proposed; delete zipCounts\.comment_open;/.test(mapPage),
    'C: the page still DELETES the cached development counters in ZIP mode (its own repudiation)');
 ok(/facUnavailable:!!row\.facilities_unavailable/.test(mapPage),

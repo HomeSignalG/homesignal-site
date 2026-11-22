@@ -19,7 +19,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const src = readFileSync(join(root, 'homesignalmap.html'), 'utf8');
+const src = readFileSync(join(root, 'development-map.html'), 'utf8');
 const failures = [];
 
 // ── 1. The chip is built from a dot, and the dot's only job is to carry the stage colour ──

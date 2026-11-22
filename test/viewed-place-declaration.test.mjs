@@ -23,7 +23,7 @@ const ok = (c, name, d) => {
 const shell  = fs.readFileSync(new URL('../shell.js', import.meta.url), 'utf8');
 const cpage  = fs.readFileSync(new URL('../lib/community-page.js', import.meta.url), 'utf8');
 const alerts = fs.readFileSync(new URL('../alerts.html', import.meta.url), 'utf8');
-const map1   = fs.readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const map1   = fs.readFileSync(new URL('../development-map.html', import.meta.url), 'utf8');
 
 const SAVED = { id: 'h1', address: '13313 COOMES DR', city: 'Del Valle', state: 'TX', zip: '78617' };
 
@@ -160,7 +160,7 @@ ok(/HS\.setViewPlaceType\('address'\);/.test(dev),
 
 // EVERY page that renders the chip must DECLARE a Place or be exempt FOR A WRITTEN REASON.
 // FAIL-CLOSED AND DERIVED, never a typed list. The first version of this check named three
-// files — alerts/development/homesignalmap — which is the same shape as the defect it
+// files — alerts/development/development-map — which is the same shape as the defect it
 // guards: an instrument that only sees the cases someone typed into it. A ZIP-scoped page
 // added later would have declared nothing and nothing would have failed. The page set is
 // now read off disk, so a NEW page is in scope the moment it exists.

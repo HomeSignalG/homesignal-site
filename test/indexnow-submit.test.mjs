@@ -33,7 +33,7 @@ const J = (code, env) => { const r = py(code, env); try { return { ...r, v: JSON
 const bad = J(`
 res = {}
 for label, path in [
-  ('map_query', '/homesignalmap.html?zip=84302'), ('legacy_query', '/community.html?zip=84302'),
+  ('map_query', '/development-map.html?zip=84302'), ('legacy_query', '/community.html?zip=84302'),
   ('query_on_canonical', '/community/84302/?utm_source=x'), ('fragment', '/community/84302/#a'),
   ('other_host_path', '//evil.example/community/84302/'), ('plain_root', '/'), ('zip_list', '/community/84302/projects/'),
   ('tracking', '/community/84302/?cb=1')]:
@@ -44,7 +44,7 @@ for label, path in [
 for label, url in [('http', 'http://jodytracks.com/community/84302/'), ('www', 'https://www.jodytracks.com/community/84302/'),
                    ('supabase', 'https://qwnnmljucajnexpxdgxr.supabase.co/community/84302/'),
                    ('github_pages', 'https://homesignalg.github.io/homesignal-site/community/84302/'),
-                   ('map_url', 'https://jodytracks.com/homesignalmap.html?zip=84302'),
+                   ('map_url', 'https://jodytracks.com/development-map.html?zip=84302'),
                    ('legacy_url', 'https://jodytracks.com/community.html?zip=84302')]:
     try:
         ix.check_url(url); res[label] = 'ACCEPTED'
@@ -326,7 +326,7 @@ const c5 = carry([R(201, 1), R(150, 24 * 8)], { 201: jb('failure'), 150: jb('fai
 ok(c5 && JSON.stringify(c5.got) === '["/community/00001/"]', 'B5 anything older than 7 days is not carried (the sitemap lastmod covers it)');
 const c6 = carry([R(201, 1)], { 201: jb('failure') }, {}).v;
 ok(c6 && c6.got.length === 0, 'B6 an expired delta artifact is skipped with a warning, not a crash');
-const c7 = carry([R(201, 1)], { 201: jb('failure') }, { 201: { submit: ['/community/00001/', '/homesignalmap.html?zip=1', '/x/'] } }).v;
+const c7 = carry([R(201, 1)], { 201: jb('failure') }, { 201: { submit: ['/community/00001/', '/development-map.html?zip=1', '/x/'] } }).v;
 ok(c7 && JSON.stringify(c7.got) === '["/community/00001/"]', 'B7 only canonical paths survive the carry-over');
 const big = Array.from({ length: 1500 }, (_, i) => `/community/${String(10000 + i)}/`);
 const c7b = carry([R(203, 1), R(202, 2), R(201, 3), R(199, 9)],

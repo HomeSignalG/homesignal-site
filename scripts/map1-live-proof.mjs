@@ -57,7 +57,7 @@ info('base', BASE); info('address', ADDRESS); info('initial radius', R1 + ' mi')
 console.log('='.repeat(78));
 
 // ═══════════ 4. THE DEPLOYED PAGE CARRIES THE NEW IMPLEMENTATION ═══════════
-const html = await (await fetch(BASE + '/homesignalmap.html', { cache: 'no-store' })).text();
+const html = await (await fetch(BASE + '/development-map.html', { cache: 'no-store' })).text();
 ok(/functions\/v1\/geocode-address/.test(html), '4 — the deployed page calls geocode-address');
 ok(/rpc\/n5_projects_within_radius/.test(html), '4 — the deployed page calls the N5 radius RPC');
 ok(/st_?y|marker_lat/i.test(html) && /HS\.n5SitesFrom/.test(html),
@@ -65,7 +65,7 @@ ok(/st_?y|marker_lat/i.test(html) && /HS\.n5SitesFrom/.test(html),
 const lib = await (await fetch(BASE + '/lib/n5-radius.js', { cache: 'no-store' })).text();
 ok(/n5SitesFrom/.test(lib) && /marker_lat/.test(lib), '4 — lib/n5-radius.js is deployed');
 
-await page.goto(BASE + '/homesignalmap.html', { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.goto(BASE + '/development-map.html', { waitUntil: 'domcontentloaded', timeout: 60000 });
 await page.waitForSelector('#addr', { timeout: 30000 });
 ok(errors.length === 0, '4 — the page loads with no fatal client error', errors.slice(0, 3));
 
@@ -216,7 +216,7 @@ if (rows2.some(r => r.has_more === true)) {
 
 // ═══════════ 8. LIVE ZIP REGRESSION ═══════════
 calls.length = 0;
-await page.goto(BASE + '/homesignalmap.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.goto(BASE + '/development-map.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 60000 });
 await page.waitForTimeout(4000);
 s = await sites();
@@ -238,15 +238,15 @@ ok(s.length >= 0, '8 — the ZIP page renders');
 // The retired page must not be a second map experience, must not be a 404, and must not
 // silently drop the ZIP an old bookmark carried.
 const retired = await (await fetch(BASE + '/maps.html', { cache: 'no-store' })).text();
-ok(/location\.replace\('\/homesignalmap\.html'/.test(retired),
+ok(/location\.replace\('\/development-map\.html'/.test(retired),
   '10 — the retired map URL serves a redirect to the primary map');
 ok(!/<template id="hs-content">/.test(retired) && retired.length < 8000,
   '10 — it is a stub, not a second map experience', retired.length + ' bytes');
 
 await page.goto(BASE + '/maps.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
 // Map 1 shows /map/<zip> in the address bar (founder, 2026-10-22), so either address is the primary map.
-await page.waitForURL(/homesignalmap\.html|\/map\/\d{5}/, { timeout: 30000 });
-ok(page.url().indexOf('homesignalmap.html') >= 0 || page.url().indexOf('/map/' + ZIP) >= 0,
+await page.waitForURL(/development-map\.html|\/map\/\d{5}/, { timeout: 30000 });
+ok(page.url().indexOf('development-map.html') >= 0 || page.url().indexOf('/map/' + ZIP) >= 0,
   '10 — a resident on the old URL lands on the primary map: ' + page.url());
 ok(page.url().indexOf('zip=' + ZIP) >= 0 || page.url().indexOf('/map/' + ZIP) >= 0,
   '10 — the old URL keeps its ZIP across the forward, so the bookmark still works');
@@ -255,7 +255,7 @@ ok((await page.locator('#map, #mapInner').count()) >= 1, '10 — and the primary
 
 // The normal user path: no live page may still offer the retired map as a destination.
 for (const path of ['/partials/shell.html', '/dashboard.html', '/today.html',
-                    '/development.html', '/homesignalmap.html', '/lib/onboarding.js']) {
+                    '/development.html', '/development-map.html', '/lib/onboarding.js']) {
   const body = await (await fetch(BASE + path, { cache: 'no-store' })).text();
   ok(!/href="maps\.html"|'maps\.html'|"maps\.html"/.test(body),
     '10 — ' + path + ' offers no route to the retired map');
@@ -267,7 +267,7 @@ const navItems = [...nav.matchAll(/<a href="([^"]+)"\s+data-nav="([^"]+)"/g)].ma
 ok(navItems.join('|') === 'explore=index.html|props=properties.html|enterprise=development-activity.html',
   '10 — the global nav is Explore, My Places, Enterprise', navItems);
 const devList = await (await fetch(BASE + '/development.html', { cache: 'no-store' })).text();
-ok(/data-znav="homesignalmap\.html"/.test(devList),
+ok(/data-znav="development-map\.html"/.test(devList),
   '10 — the development list links the primary map');
 
 // ═══════════ 11. ZIP MODE IS THE WHOLE ZIP — no centroid, no radius ═══════════
@@ -276,11 +276,11 @@ ok(/data-znav="homesignalmap\.html"/.test(devList),
 const zlib = await (await fetch(BASE + '/lib/zip-authoritative.js', { cache: 'no-store' })).text();
 ok(/zipAuthSitesFrom/.test(zlib) && /not_measured/.test(zlib),
   '11 — lib/zip-authoritative.js is deployed');
-const zpage = await (await fetch(BASE + '/homesignalmap.html', { cache: 'no-store' })).text();
+const zpage = await (await fetch(BASE + '/development-map.html', { cache: 'no-store' })).text();
 ok(/rpc\/app_zip_projects_markers/.test(zpage),
   '11 — the deployed page reads authoritative whole-ZIP geography');
 
-await page.goto(BASE + '/homesignalmap.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.goto(BASE + '/development-map.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 60000 });
 await page.waitForTimeout(4000);
 const zsites = await page.evaluate(() => (window.__HS_SITES || []).map(s => ({
@@ -311,7 +311,7 @@ ok(/whole of ZIP|whole ZIP|not measured yet/i.test(zipLine || ''),
   '11 — the page states what was measured across the WHOLE ZIP', zipLine);
 
 // ...and address mode still gets its radius back, on the same deployed page.
-await page.goto(BASE + '/homesignalmap.html', { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.goto(BASE + '/development-map.html', { waitUntil: 'domcontentloaded', timeout: 60000 });
 await page.waitForSelector('#addr', { timeout: 30000 });
 await page.fill('#addr', ADDRESS);
 await page.click('#go');

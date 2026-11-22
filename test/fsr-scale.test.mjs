@@ -124,7 +124,7 @@ const page = read('future-surroundings-report.html');
 ok(/data-view="coverage"/.test(page) && /data-view="listing"/.test(page), '14a page has coverage and listing views');
 ok(/data-view="portfolio"/.test(page) && /data-view="usage"/.test(page), '14b page has portfolio and usage views');
 ok(/lib\/fsr-scale\.js/.test(page), '14c page loads the scale library');
-ok(!/get-address-report|homesignalmap|openstreetmap|value_outlook|Effect at this address/.test(page),
+ok(!/get-address-report|development-map|openstreetmap|value_outlook|Effect at this address/.test(page),
   '14d page source stays off HOLD/EXCLUDE surfaces');
 // The pilot count and verdict are HomeSignal's own bookkeeping (audit Step 15). They are
 // not client copy, so the customer report must not carry them. They still live in the

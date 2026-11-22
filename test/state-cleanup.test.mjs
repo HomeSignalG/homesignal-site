@@ -81,7 +81,7 @@ ok(zs.length === 1 && zs[0] === s, 'C1 ZIP mode admits only the member', zs.leng
 ok(HS.zipModeSites([], null, []).length === 0, 'C2 the old three-argument call still works');
 
 // ── D ── the page
-const PAGE = read('homesignalmap.html');
+const PAGE = read('development-map.html');
 ok(/<script src="lib\/state-cleanup\.js\?v=[^"]+"><\/script>/.test(PAGE), 'D1 the page loads the module');
 ok(PAGE.indexOf('<script src="lib/state-cleanup.js') > PAGE.indexOf('<script src="lib/map.js'), 'D2 after lib/map.js');
 const fn = (name) => { const i = PAGE.indexOf('function ' + name + '('); return PAGE.slice(i, PAGE.indexOf('\n  }', i)); };

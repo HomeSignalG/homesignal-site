@@ -192,7 +192,7 @@ for (const z of MOD) {
   ok(c.body.every((p) => text(h).includes(p.replace('{zip}', z))), `5i ${z} shows the whole approved body`);
   ok(h.includes('id="zcovAddress"') && h.includes(c.primary_cta) && h.includes('id="zcovNearby"') && h.includes(c.secondary_cta) && h.includes('id="zip-nearby"'),
     `5j ${z} has both CTAs and the nearby-ZIPs anchor they point to`);
-  ok(!/homesignalmap\.html\?zip=|zipMapFrame|<iframe|application\/ld\+json|\bschema\.org/i.test(h), `5k ${z} links to no ZIP map, embeds none, carries no map-based structured data`);
+  ok(!/development-map\.html\?zip=|zipMapFrame|<iframe|application\/ld\+json|\bschema\.org/i.test(h), `5k ${z} links to no ZIP map, embeds none, carries no map-based structured data`);
   ok(!/\b\d+\s+(development )?(projects?|records?)\b|0 projects|no projects|No permit or planning/i.test(text(h)),
     `5l ${z} states no ZIP-wide project/record count and no empty-search sentence`, text(h).match(/.{30}(projects?|records?).{30}/i));
   const robots = /name="robots" content="([^"]+)"/.exec(h)[1];

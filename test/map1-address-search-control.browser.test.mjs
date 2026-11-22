@@ -123,7 +123,7 @@ const waitZip = () => page.waitForFunction(
 const waitAddr = () => page.waitForFunction(
   () => (window.__HS_SITES || []).some(s => s.n5_feature_id), null, { timeout: 30000 });
 
-await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await waitZip(); await page.waitForTimeout(400);
 
 // ══════════════ 1. THE CONTROL ITSELF ════════════════════════════════════════════════════════
@@ -218,7 +218,7 @@ ok(await page.evaluate(() => !document.getElementById('go').disabled),
    '3c ...and the button is re-enabled when the search finishes');
 
 // ══════════════ 4. ENTER RUNS IT TOO ═════════════════════════════════════════════════════════
-await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await waitZip(); await page.waitForTimeout(400);
 geocodeCalls = [];
 await page.fill('#addr', '2200 Caldwell Ln, Del Valle, TX 78617');
@@ -263,7 +263,7 @@ ok(back.shown && /Back to all development in ZIP 78617/.test(back.text || ''),
 ok(/[?&]zip=78617\b/.test(back.href || ''), '5d ...and pointing at the ZIP-wide view', back.href);
 
 // (b) ZIP mode — where the link was a self-link, and the redundancy the removal is about.
-await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await waitZip(); await page.waitForTimeout(400);
 const gone2 = await page.evaluate(zipAllGone);
 ok(gone2.el, '5e #zipAllLink is absent from the DOM in ZIP mode');
@@ -274,7 +274,7 @@ ok(gone2.copy, '5f ...and the ZIP page never prints the self-link copy', gone2);
 const p2 = await ctx.newPage();
 p2.on('pageerror', e => pageErrors.push(String(e).slice(0, 200)));
 await p2.route('**/*', r => routeHandler(r));
-await p2.goto(base + '/homesignalmap.html', { waitUntil: 'domcontentloaded' });
+await p2.goto(base + '/development-map.html', { waitUntil: 'domcontentloaded' });
 await p2.waitForTimeout(700);
 const gone3 = await p2.evaluate(zipAllGone);
 ok(gone3.el && gone3.copy, '5g ...and it is absent on the bare page with no ZIP anywhere', gone3);
@@ -317,7 +317,7 @@ const ADDRESS_CTA = guardPat ? eval(guardPat) : /$^/;
 
 // Back to ZIP mode: section 4 left this page in ADDRESS mode, and the guard's subject is the
 // ZIP page. Asserting it here without navigating would have measured the wrong mode.
-await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await waitZip(); await page.waitForTimeout(400);
 const zipHero = await page.evaluate(() => ({
   placeholder: (document.getElementById('addr') || {}).placeholder || '',

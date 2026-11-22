@@ -1,6 +1,6 @@
 name: verify-map-landing-live
 # Read-only. GETs the public host and prints what a crawler is given for the Development Map landing page
-# (/homesignalmap.html) and for the states that must stay out of the index. Writes nothing, holds no secret,
+# (/development-map.html) and for the states that must stay out of the index. Writes nothing, holds no secret,
 # notifies nobody. Dispatch it after a deploy. It is dispatch-only on purpose: it checks PRODUCTION, so on a pull
 # request it would be red until the change is live.
 on:

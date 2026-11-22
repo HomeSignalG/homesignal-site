@@ -58,7 +58,7 @@
 // tabs_quarantined. Address-mode behavior unchanged. v17 = PROPERTY REPORTS: canonicalAddr()
 // (the ONE address normalizer, engine-side — case-study §4.3) stamps canonical_addr on every
 // point record with a FILED street address, and the ZIP-mode refresh collapses those records
-// into per-address property_reports rows (the dossier cache behind homesignalmap.html?addr=…).
+// into per-address property_reports rows (the dossier cache behind development-map.html?addr=…).
 // sources_checked lists ONLY sources this refresh actually queried that came back empty at
 // that address — never an assumed check.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -264,7 +264,7 @@ async function devSites(supabase: ReturnType<typeof createClient>, homeLat: numb
     supabase.from("alerts").select("title,category,agency_name,geographic_reference,source_url,comment_deadline").in("community_id", communityIds).eq("pipeline_type", "government_notice").in("category", DEV_CATEGORIES).order("published_at", { ascending: false }).order("id"));
   // AREA (jurisdiction-level) notices have NO trustworthy point — a county/city notice applies
   // county- or city-WIDE, not to one address. The page never trusts these coordinates: all three
-  // map views position area items synthetically around the report anchor (homesignalmap.html
+  // map views position area items synthetically around the report anchor (development-map.html
   // placeAreaSites / siteLL / siteEN). So the engine anchors every area item at the REPORT
   // CENTROID (homeLat/homeLng) and never at a hardcoded place.
   //   Why this changed (v18 backbone fix): the old code geocoded area items against a

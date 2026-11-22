@@ -420,9 +420,9 @@ print("LOADED")`;
   for (const [p, g] of [[W, gw], [C, gc]]) {
     ok(/<meta name="robots" content="index, follow">/.test(g) && g.includes(`<link rel="canonical" href="https://jodytracks.com${p}">`),
        `${p} is indexable and self-canonical`);
-    ok(g.includes('<form class="zsec" action="/homesignalmap.html" method="get" role="search">') &&
+    ok(g.includes('<form class="zsec" action="/development-map.html" method="get" role="search">') &&
        /<input id="[a-zA-Z]+" name="zip"/.test(g), `${p} has a ZIP lookup that works with no script`);
-    ok(g.includes('<a href="/homesignalmap.html">Search it on the Development map</a>'),
+    ok(g.includes('<a href="/development-map.html">Search it on the Development map</a>'),
        `${p} points to the address search`);
     ok(!/<script[\s>]/i.test(g) && g.includes("script-src 'none'"), `${p} ships no script`);
   }

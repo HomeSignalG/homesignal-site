@@ -8,7 +8,7 @@
 // "reconcile" them with the RPC's four, when Maps is folded out of nav, or when Map 1 grows a
 // link back into the list. This file is the thing that fails.
 //
-// SCOPE NOTE, deliberate: this does NOT ban the word "Export" on homesignalmap.html. #propExport
+// SCOPE NOTE, deliberate: this does NOT ban the word "Export" on development-map.html. #propExport
 // IS A-016 — the sanctioned single-address evidence snapshot. What is pinned is WHAT it
 // produces (text/html, one address), never whether the word appears. Applying the Alerts-style
 // export ban here would fail on the feature it is supposed to protect.
@@ -20,13 +20,13 @@ let fails = 0;
 const ok = (c, name, d) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + name
   + (!c && d !== undefined ? '  detail: ' + JSON.stringify(d).slice(0, 220) : '')); if (!c) fails++; };
 const read = (f) => fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8');
-// ⚠️ The block-comment strip must not fire inside a URL: homesignalmap.html's CSP carries
+// ⚠️ The block-comment strip must not fire inside a URL: development-map.html's CSP carries
 // `https://*.tile.openstreetmap.org`, whose `/*` opened a phantom comment swallowing 2,297
 // bytes of that file's head — so an absence-pin over the CSP or the head scripts passed by
 // reading nothing. Requiring the opener not to follow `:` or `/` keeps every real comment.
 const strip = (x) => x.replace(/^\s*\/\/.*$/gm, '').replace(/<!--[\s\S]*?-->/g, '').replace(/(^|[^:/])\/\*[\s\S]*?\*\//g, '$1');
 
-const map   = strip(read('homesignalmap.html'));
+const map   = strip(read('development-map.html'));
 const dev   = strip(read('development.html'));
 const legacy= strip(read('maps.html'));
 const dash  = strip(read('dashboard.html'));
@@ -35,12 +35,12 @@ const shellHtml = strip(read('partials/shell.html'));
 const shellJs   = strip(read('shell.js'));
 
 // ---- A-008: TWO surviving surfaces, both reachable (as Explore children since v3) ----
-for (const f of ['homesignalmap.html', 'development.html', 'maps.html'])
+for (const f of ['development-map.html', 'development.html', 'maps.html'])
   ok(fs.existsSync(new URL('../' + f, import.meta.url)), 'A-008 ' + f + ' still exists');
 // v3 (founder navigation plan, 2026-09-30): Development LEFT the primary nav. Like Map 1 in
 // A-021, the PAGE stays and stays reachable (ZIP_NAV_PAGES below, the map's list link, the
 // Address dossier's "All projects"); only its sidebar entry went, and it now lights Explore.
-// The Explore DROPDOWN (founder, 2026-10-02) links development.html and homesignalmap.html as
+// The Explore DROPDOWN (founder, 2026-10-02) links development.html and development-map.html as
 // sub-entries, never as primary items, so the two checks below read the header nav WITHOUT it,
 // and the dropdown is pinned on its own.
 const exploreSub = (shellHtml.match(/<div class="hs-navsub" id="hs-explore-sub">[\s\S]*?<\/div>/) || [''])[0];
@@ -58,19 +58,19 @@ ok(/<body data-nav="explore"/.test(dev), 'v3 ...and development.html declares "e
 // DESIGN — and the thing it was really protecting (Map 1 continues to exist and stay
 // reachable) is asserted below and by the `still exists` / ZIP_NAV_PAGES lines around it.
 // Everything else in this file is byte-identical to Phase 6.
-ok(!/href="homesignalmap\.html"/.test(shellPrimary) && /<a href="homesignalmap\.html"\s+data-sub="map">Development Map<\/a>/.test(exploreSub),
+ok(!/href="development-map\.html"/.test(shellPrimary) && /<a href="development-map\.html"\s+data-sub="map">Development Map<\/a>/.test(exploreSub),
   'A-021 Maps is NO LONGER a primary nav item; the Explore dropdown lists it as "Development Map"',
-  (shellHtml.match(/.{0,40}homesignalmap\.html.{0,40}/) || [])[0]);
+  (shellHtml.match(/.{0,40}development-map\.html.{0,40}/) || [])[0]);
 ok(/<body data-nav="explore"/.test(map),
   'v3 ...and Map 1 declares "explore", so visiting it lights Explore');
-ok(/HS\.MAP_PAGES = \['homesignalmap\.html'\];/.test(shellJs),
+ok(/HS\.MAP_PAGES = \['development-map\.html'\];/.test(shellJs),
   'A-008 Map 1 is still in MAP_PAGES — the PAGE was not retired, only its sidebar entry');
-for (const p of ['development.html', 'homesignalmap.html'])
+for (const p of ['development.html', 'development-map.html'])
   ok(new RegExp("'" + p + "'").test(shellJs), 'A-008 ZIP_NAV_PAGES still carries ' + p);
 
 // ---- A-008: maps.html is a REDIRECT that carries the query string ----
-ok(/window\.location\.replace\('\/homesignalmap\.html' \+ q\)/.test(legacy),
-  'A-008 maps.html replaces to /homesignalmap.html');
+ok(/window\.location\.replace\('\/development-map\.html' \+ q\)/.test(legacy),
+  'A-008 maps.html replaces to /development-map.html');
 ok(/var q = window\.location\.search \|\| '';/.test(legacy),
   'A-008 ...carrying the query string, so ?zip= survives the forward');
 
@@ -89,7 +89,7 @@ ok(!/Open full map/.test(dash), 'Fix 8 the "Open full map →" preview CTA went 
 for (const ctl of ['id="viewSeg"', 'id="radSel"', 'stagechip', 'typechip', 'regchip'])
   ok(!dash.includes(ctl), 'A-008 Map 1 control ' + ctl + ' is NOT on Dashboard');
 // Map 1 itself is untouched by Fix 8 — it is still the one place these live.
-ok(/id="radSel"/.test(read('homesignalmap.html')),
+ok(/id="radSel"/.test(read('development-map.html')),
   'Fix 8 Map 1 still owns the radius control — only the Dashboard preview was removed');
 
 // ---- A-008: the radius contract — THREE facts that must all stay true together ----
@@ -122,7 +122,7 @@ for (const fam of ['stagechip', 'typechip', 'regchip'])
 // back link is removed and must not return.
 ok(!/devlist-back/.test(map) && !/Back to Quality of Life/.test(map),
   'A-008 Map 1 carries no back link (navigation is the Explore dropdown)');
-ok(/See it on the map/.test(dev) && /homesignalmap\.html/.test(dev),
+ok(/See it on the map/.test(dev) && /development-map\.html/.test(dev),
   'A-008 list -> map ("See it on the map") is the direction that DOES exist');
 
 // ---- A-016: the HTML snapshot is HTML, one address, and is NOT renamed ----

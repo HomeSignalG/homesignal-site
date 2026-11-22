@@ -90,7 +90,7 @@ ok(isDuplicateDbError({ code: '23505' }), 'duplicate db error detected');
 ok(!isDuplicateDbError({ code: '42501' }), 'non-duplicate error not treated as duplicate');
 
 // --- destinations ---
-eq(destinationHref('development', '78617'), 'homesignalmap.html?zip=78617', 'development destination href');
+eq(destinationHref('development', '78617'), 'development-map.html?zip=78617', 'development destination href');
 // The 'qol' destination (Quality of Life Map -> maps.html) was removed 2026-09-04 with the
 // retirement of the second map. An unknown key must return null, and shell.js::finishOnboarding
 // guards on that, so a stale stored choice is a safe no-op rather than a broken navigation.
@@ -98,7 +98,7 @@ ok(!destinationHref('qol', '78617'), 'retired qol destination resolves to nothin
 ok(!Object.prototype.hasOwnProperty.call(DESTINATIONS, 'qol'),
   'the onboarding chooser no longer offers the retired map');
 eq(destinationHref('updates', '78617'), 'alerts.html?zip=78617', 'updates destination href');
-eq(destinationHref('development', '78617', (p, z) => p + '?zip=' + z), 'homesignalmap.html?zip=78617', 'custom navHref builder');
+eq(destinationHref('development', '78617', (p, z) => p + '?zip=' + z), 'development-map.html?zip=78617', 'custom navHref builder');
 ok(!destinationHref('development', 'bad'), 'invalid zip -> no destination href');
 
 // Account switch: User A's stale local ZIP must not skip onboarding for User B.

@@ -962,7 +962,7 @@ LAND_REF_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 def land_index(dossiers):
     """Which land assembly has a published development page: {land ref: {path, name}}.
 
-    Map 1's land card (homesignalmap.html) reads this to link the land to its page. It is derived
+    Map 1's land card (development-map.html) reads this to link the land to its page. It is derived
     from the same published snapshot as the pages themselves, so it can only name a page this
     build writes, and only through a land link a reviewer approved (the snapshot carries no other
     links). A land assembly linked from two pages is left out rather than guessed between."""

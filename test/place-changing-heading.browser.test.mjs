@@ -92,7 +92,7 @@ const pageErrors = [];
 page.on('pageerror', e => {
   const msg = String(e);
   const stack = e && e.stack ? String(e.stack) : '';
-  if (/homesignalmap\.html|leaflet|maplibre|MapLibre|L is not defined/i.test(msg + stack)) return;
+  if (/development-map\.html|leaflet|maplibre|MapLibre|L is not defined/i.test(msg + stack)) return;
   pageErrors.push(msg.slice(0, 240));
 });
 

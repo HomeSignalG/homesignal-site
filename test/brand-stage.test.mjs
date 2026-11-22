@@ -68,10 +68,10 @@ check('3e shipped host allowlists name the Jody host AND keep the legacy one (an
   const { createRequire } = await import('node:module');
   const st = createRequire(import.meta.url)(join(j, 'lib/share-text.js'));
   const ok = (u) => st.model('?u=' + encodeURIComponent(u)).ok;
-  check('3e2 the Jody share-text page accepts a link from an old e-mail (homesignal.net) and from the new host', ok('https://homesignal.net/homesignalmap.html?zip=84302') && ok('https://jodytracks.com/community/84302/'), 'refused');
+  check('3e2 the Jody share-text page accepts a link from an old e-mail (homesignal.net) and from the new host', ok('https://homesignal.net/development-map.html?zip=84302') && ok('https://jodytracks.com/community/84302/'), 'refused');
   check('3e3 …and still refuses lookalikes, other schemes, userinfo and ports (not an open relay)', !ok('https://jodytracks.com.evil.io/') && !ok('https://evil.io/?x=homesignal.net') && !ok('http://jodytracks.com/') && !ok('https://u:p@jodytracks.com/') && !ok('https://jodytracks.com:444/') && !ok('https://notjodytracks.com/') && !ok('https://homesignal.net.evil.io/'), 'accepted');
 }
-check('3f the file names stay (homesignalmap.html is still linked)', all.some(([, t]) => t.includes('homesignalmap.html')) && jfiles.includes('homesignalmap.html'), 'renamed');
+check('3f the file names stay (development-map.html is still linked)', all.some(([, t]) => t.includes('development-map.html')) && jfiles.includes('development-map.html'), 'renamed');
 // F2 (Step 16 audit): the ONLY @jodytracks.com mailbox in the Jody tree is the customer-support one (info@), and only on the
 // contact + legal pages; every other address stays on the existing domain until Step 6.
 const jMail = all.flatMap(([f, t]) => (t.match(/[A-Za-z0-9._%+\-]+@jodytracks\.com/g) || []).map((m) => [f, m]));

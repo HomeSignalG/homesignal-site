@@ -4,7 +4,7 @@
 // TWO INDEPENDENT READS PER ZIP:
 //   backend — public.source_freshness_for_zip(zip), fetched here with the page's public anon key, turned into
 //             the expected lines by the SHIPPED wording (lib/templates.js, evaluated in node).
-//   page    — /community/<zip>/ and homesignalmap.html?zip=<zip> in a real browser: the text of every
+//   page    — /community/<zip>/ and development-map.html?zip=<zip> in a real browser: the text of every
 //             [data-source] row the page drew.
 // Fails when a page shows no box, when a source line differs from the backend's, when a "This ZIP" line is
 // missing, or when the box says current / fresh / stale. Read-only: no secret, no write.
@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { chromium } from 'playwright';
 
-const html = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const html = readFileSync(new URL('../development-map.html', import.meta.url), 'utf8');
 const grab = (n) => { const m = html.match(new RegExp(`var ${n}\\s*=\\s*["']([^"']+)["']`)); if (!m) throw new Error('could not read ' + n); return m[1]; };
 const APIKEY = grab('APIKEY');
 const SUPABASE_URL = grab('ENDPOINT').replace(/\/functions\/v1\/.*$/, '');
@@ -52,7 +52,7 @@ for (const zip of ZIPS) {
   const want = HS.sourceFreshnessEntries(rows, LABELS);
   console.log(`\n== ZIP ${zip}: backend returns ${rows.length} source(s)`);
   for (const [where, url, sel] of [['ZIP page', `${SITE_BASE}/community/${zip}/`, '#dev-source-freshness'],
-                                   ['Map 1', `${SITE_BASE}/homesignalmap.html?zip=${zip}`, '#srcFresh']]) {
+                                   ['Map 1', `${SITE_BASE}/development-map.html?zip=${zip}`, '#srcFresh']]) {
     const got = await pageRows(page, url, sel);
     if (!rows.length) { ok(!got || !got.length, `${zip} ${where}: no sources read for this ZIP, no box`); continue; }
     ok(Array.isArray(got) && got.length > 0, `${zip} ${where}: the box is drawn`, url);

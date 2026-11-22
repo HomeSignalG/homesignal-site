@@ -7,7 +7,7 @@
 // which only means HomeSignal has not reviewed them here.
 //
 // This suite (a) forbids a project_key / project-name literal in the land-card code, (b) runs the
-// shipped landCardTitle / landCardHTML / renderAnchors from homesignalmap.html on an Eagle
+// shipped landCardTitle / landCardHTML / renderAnchors from development-map.html on an Eagle
 // Mountain fixture and a Stratos fixture, and (c) proves every row for a ZIP gets its own card.
 //
 // Run: node test/map1-land-card-from-data.test.mjs
@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const html = readFileSync(join(root, 'homesignalmap.html'), 'utf8');
+const html = readFileSync(join(root, 'development-map.html'), 'utf8');
 
 let fails = 0;
 const ok = (c, name, d) => {

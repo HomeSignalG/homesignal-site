@@ -96,7 +96,7 @@ ok(/grant execute on function public\.hs_map1_project_document_decide\(uuid, tex
 ok(!/to anon[^;]*map1_project_document_propose|map1_project_document_propose[^;]*to anon/.test(sql), '4i only the service role proposes');
 
 console.log('\n5. the page');
-const page = read('homesignalmap.html');
+const page = read('development-map.html');
 ok(page.indexOf('src="lib/map1-project-panel.js') > page.indexOf('src="lib/map.js'), '5a the module loads after lib/map.js');
 ok(/focusPendingProject\(\);\n  \}/.test(page), '5b the focus runs after every render');
 const reveal = page.slice(page.indexOf('function ppReveal'), page.indexOf('function focusPendingProject'));

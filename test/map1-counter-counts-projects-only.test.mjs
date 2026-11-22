@@ -3,7 +3,7 @@
 // are not counted.
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-const src = fs.readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8')
+const src = fs.readFileSync(new URL('../development-map.html', import.meta.url), 'utf8')
   .replace(/\/\/.*$/gm, '');
 const m = src.match(/var propPoints = permits\.filter[\s\S]*?var propActive = [^;]+;/);
 assert.ok(m, 'propActive must be computed from propPoints');

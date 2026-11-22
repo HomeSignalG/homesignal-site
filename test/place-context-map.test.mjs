@@ -6,7 +6,7 @@
 // gate and fitted a bbox of project points. PCM-1/PCM-4 then over-corrected into a pair of
 // HS.buildLive ORIENTATION widgets with no type, no status and no regulatory layer — a second
 // and a third implementation of "the development map", neither of them Map 1. This unit
-// deletes both widgets and iframes homesignalmap.html instead.
+// deletes both widgets and iframes development-map.html instead.
 //
 // So the load-bearing pins here are the ones that keep the count at ONE: the Place hosts must
 // carry an embed URL and no map-drawing code, and the filter rows a resident touches must be
@@ -26,7 +26,7 @@ const read = (p) => readFileSync(join(root, p), 'utf8');
 // Comments describe the contract and quote the things it forbids, so a string pin that swept
 // them would fire on its own explanation. Strip them before matching, everywhere.
 // ⚠️ THE BLOCK-COMMENT STRIP MUST NOT FIRE INSIDE A URL, AND THIS FILE IS WHERE THAT WAS
-// MEASURED. homesignalmap.html's CSP contains `https://*.tile.openstreetmap.org`, whose `/*`
+// MEASURED. development-map.html's CSP contains `https://*.tile.openstreetmap.org`, whose `/*`
 // opened a phantom comment that ran 2,297 bytes to the first real `*/` in the page CSS —
 // swallowing the CSP, the stylesheet links and the embed-mode <script> in the head. A pin
 // asserting something is ABSENT from that region would have passed by reading nothing, which
@@ -39,7 +39,7 @@ const propRaw = read('property.html');
 const prop    = code(propRaw);
 const cpRaw   = read('lib/community-page.js');
 const cp      = code(cpRaw);
-const m1Raw   = read('homesignalmap.html');
+const m1Raw   = read('development-map.html');
 const m1       = code(m1Raw);
 const mapJs   = read('lib/map.js');
 
@@ -55,16 +55,16 @@ for (const [label, src, raw] of [['property.html', prop, propRaw], ['lib/communi
 }
 // The three Map 1 libraries left property.html with the widget that needed them.
 for (const lib of ['lib/n5-radius.js', 'lib/residential-qualify.js']) {
-  ok(!prop.includes(lib), '1c property.html no longer loads ' + lib + ' — homesignalmap.html already does',
+  ok(!prop.includes(lib), '1c property.html no longer loads ' + lib + ' — development-map.html already does',
     (propRaw.match(new RegExp('.{0,40}' + lib.replace(/[./]/g, '\\$&') + '.{0,40}')) || [])[0]);
 }
 ok(/src="lib\/n5-radius\.js\?v=/.test(m1) && /src="lib\/map\.js\?v=/.test(m1),
-  '1d ...and homesignalmap.html — the one document that draws — still loads them');
+  '1d ...and development-map.html — the one document that draws — still loads them');
 
 // ── §2 the ADDRESS embed URL ────────────────────────────────────────────────────────────
 const propFrame = (prop.match(/<iframe id="propMapFrame"[\s\S]*?<\/iframe>'/) || [''])[0];
 ok(propFrame.length > 0, '2a property.html renders an iframe for the context map');
-ok(/homesignalmap\.html\?embed=1/.test(propFrame), '2b ...pointed at homesignalmap.html in EMBED mode');
+ok(/development-map\.html\?embed=1/.test(propFrame), '2b ...pointed at development-map.html in EMBED mode');
 ok(/lat=' \+ encodeURIComponent\(p\.lat\)/.test(propFrame) && /lng=' \+ encodeURIComponent\(p\.lng\)/.test(propFrame),
   '2c ...carrying the SAVED point verbatim — never re-geocoded, so a Place\'s pin cannot move between visits');
 ok(/radius=' \+ PCM_RADIUS_MI/.test(propFrame) && /var PCM_RADIUS_MI = 2;/.test(prop),
@@ -89,7 +89,7 @@ ok(!/geocode/i.test(prop), '2f the Address host runs no geocoder',
 // outline reader stays authenticated-only (test/zcta-boundary-reader.test.mjs §4d).
 const zipFrame = (cp.match(/<iframe id="zipMapFrame"[\s\S]*?<\/iframe>'/) || [''])[0];
 ok(zipFrame.length > 0, '3a the shared ZIP runtime renders an iframe for the context map');
-ok(/homesignalmap\.html\?embed=1/.test(zipFrame) && /zip=' \+ encodeURIComponent\(zip\)/.test(zipFrame),
+ok(/development-map\.html\?embed=1/.test(zipFrame) && /zip=' \+ encodeURIComponent\(zip\)/.test(zipFrame),
   '3b ...in EMBED mode, carrying the ZIP');
 ok(!/[?&]addr=/.test(zipFrame) && !/lat=/.test(zipFrame),
   '3c ...and neither an address nor a point — a ZIP Place is an AREA');
@@ -110,15 +110,15 @@ ok(!!devH && devH === zipH, '3g the ZIP map is the Development page preview\'s s
 
 // ── §4 the full-map link sits on the PARENT, never inside the frame ────────────────────
 // A link inside an iframe navigates the iframe. The handoff belongs on the PARENT.
-ok(!/<a[^>]*homesignalmap/.test(zipFrame), '4a the ZIP frame markup carries no link of its own');
-ok(/HS\.navHref\('homesignalmap\.html', p\.zip\)/.test(prop) && /id="propMapOpen"/.test(prop),
+ok(!/<a[^>]*development-map/.test(zipFrame), '4a the ZIP frame markup carries no link of its own');
+ok(/HS\.navHref\('development-map\.html', p\.zip\)/.test(prop) && /id="propMapOpen"/.test(prop),
   '4b property.html keeps its parent-level "Open in Development →"');
 ok(!/data-znav/.test(prop),
   '4c ...with NO data-znav, which would let the shell re-stamp it with the app\'s ACTIVE zip',
   (propRaw.match(/.{0,60}data-znav.{0,60}/) || [])[0]);
 ok(/View Development Map/.test(cpRaw), '4d the ZIP page keeps its parent-level "View Development Map →"');
 const fullLink = (zipBlockDecl.match(/<a class="inlinebtn" id="zipMapFull"[\s\S]*?<\/a>/) || [''])[0];
-ok(/HS\.navHref\('homesignalmap\.html', zip\)/.test(fullLink) && /View full Development Map →/.test(fullLink),
+ok(/HS\.navHref\('development-map\.html', zip\)/.test(fullLink) && /View full Development Map →/.test(fullLink),
   '4e under the map, "View full Development Map →" opens Map 1 for THIS zip, like development.html', fullLink);
 ok(zipBlockDecl.indexOf('</iframe>') < zipBlockDecl.indexOf('id="zipMapFull"'),
   '4f ...placed after the frame closes — a sibling of the iframe, not a child of it');

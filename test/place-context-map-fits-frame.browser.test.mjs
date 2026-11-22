@@ -108,7 +108,7 @@ async function open(width, height, embed) {
         body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64') });
     return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
   });
-  await page.goto(base + '/homesignalmap.html?' + (embed ? 'embed=1&' : '') + 'zip=78617', { waitUntil: 'domcontentloaded' });
+  await page.goto(base + '/development-map.html?' + (embed ? 'embed=1&' : '') + 'zip=78617', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
   await page.waitForTimeout(700);
   return page;

@@ -1,7 +1,7 @@
 // test/decision-page-surfaces.test.mjs
 //
 // The decision has to reach a RESIDENT, not just the payload. This pins the surfaces on
-// homesignalmap.html — the page all 12,722 canonical /community/<zip>/ documents and the
+// development-map.html — the page all 12,722 canonical /community/<zip>/ documents and the
 // address view share — plus the community-page and N5 surfaces that read the same rows.
 //
 // Structural, because these are inline-script surfaces with no module boundary to drive.
@@ -20,8 +20,8 @@ const ok = (c, name, detail) => {
   if (!c) fails++;
 };
 
-const MAP = readFileSync(join(root, 'homesignalmap.html'), 'utf8');
-ok(MAP.length > 100000, `homesignalmap.html read (${MAP.length} bytes — control)`);
+const MAP = readFileSync(join(root, 'development-map.html'), 'utf8');
+ok(MAP.length > 100000, `development-map.html read (${MAP.length} bytes — control)`);
 
 // ── the notation reaches the two places a record is read ────────────────────────
 ok(/function decisionNoteHTML\(/.test(MAP), 'the page has ONE notation renderer, not one per surface');

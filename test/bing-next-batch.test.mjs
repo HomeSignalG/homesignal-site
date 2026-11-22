@@ -10,7 +10,7 @@ const done = join(dir, 'done.txt');
 const loc = (p) => `<url><loc>https://www.jodytracks.com${p}</loc></url>`;
 writeFileSync(sm, '<urlset>' + [
   '/community/11111/', '/community/22222/', '/community/22222/', '/community/33333/projects/',
-  '/homesignalmap.html?zip=44444', '/community/55555/', '/community/66666/',
+  '/development-map.html?zip=44444', '/community/55555/', '/community/66666/',
 ].map(loc).join('') + '</urlset>');
 writeFileSync(done, '# c\n11111\n  \nnot-a-zip\n');
 const run = (...a) => execFileSync('python3', ['scripts/bing_next_batch.py', '--sitemap-file', sm, '--submitted', done, ...a], { encoding: 'utf8' });

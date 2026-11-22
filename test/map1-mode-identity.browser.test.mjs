@@ -132,7 +132,7 @@ const waitAddr = (p) => p.waitForFunction(
   () => (window.__HS_SITES || []).some(s => s.n5_feature_id), null, { timeout: 30000 });
 
 // ══════════════ 1. ZIP MODE — the hero names the ZIP, and that is correct here ══════════════
-await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await waitZip(); await page.waitForTimeout(600);
 const z = await hero(page);
 ok(/Development map/i.test(z.kicker || ''), '1a ZIP mode kicker names the map', z.kicker);
@@ -195,7 +195,7 @@ const fresh = await browser.newContext({ viewport: { width: 1280, height: 1000 }
 const p2 = await fresh.newPage();
 p2.on('pageerror', e => pageErrors.push('fresh: ' + String(e).slice(0, 200)));
 await p2.route('**/*', r => routeHandler(r));
-await p2.goto(base + '/homesignalmap.html', { waitUntil: 'domcontentloaded' });
+await p2.goto(base + '/development-map.html', { waitUntil: 'domcontentloaded' });
 await p2.waitForSelector('#addr');
 ok((await p2.evaluate(() => document.body.classList.contains('zipmode'))) === false,
   '5a the control case really is a first visit with no ZIP view');

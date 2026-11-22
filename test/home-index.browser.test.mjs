@@ -160,10 +160,10 @@ console.log('--- 1. signed out: stays on Explore; the approved header and ONE fo
   ok(/home-report-example-desktop\.webp\?v=\d{8}\|true\|1600$/.test(h.img || ''), '1 the example-report preview loads (1600px wide)', h.img);
 
   console.log('--- 2. the sample map is Map 1 in preview mode ---');
-  await waitForMap(page, /homesignalmap\.html\?embed=1&preview=1&zip=98335/);
+  await waitForMap(page, /development-map\.html\?embed=1&preview=1&zip=98335/);
   await page.waitForTimeout(600);
   const f = await frameInfo(page);
-  ok(f.src === 'homesignalmap.html?embed=1&preview=1&zip=98335', '2 initial src is exactly the preview shape', f.src);
+  ok(f.src === 'development-map.html?embed=1&preview=1&zip=98335', '2 initial src is exactly the preview shape', f.src);
   ok(f.loading === 'lazy' && f.tabindex === '-1' && f.title === 'Sample HomeSignal development map', '2 lazy, tabindex -1, meaningful title', f);
   ok(f.sample && f.pointer === 'none', '2 the sample is pointer-locked', f.pointer);
   ok(f.preview === true && f.embed === true, '2 the frame document is in embed + preview mode', f);
@@ -192,7 +192,7 @@ console.log('--- 1. signed out: stays on Explore; the approved header and ONE fo
   ok(r.cards.every((c, i) => c.href === 'development.html?id=' + PROJECTS_78657[i].id && c.source === PROJECTS_78657[i].source_ref),
     '3 each card links its project page and its official record', r.cards);
   const s1 = await ui(page);
-  ok(s1.recordsHeading === 'Recent development records in 98335' && s1.seeAllHref === 'development.html?zip=98335' && s1.ctaHref === 'homesignalmap.html?zip=98335' && s1.cta === 'Explore this ZIP →',
+  ok(s1.recordsHeading === 'Recent development records in 98335' && s1.seeAllHref === 'development.html?zip=98335' && s1.ctaHref === 'development-map.html?zip=98335' && s1.cta === 'Explore this ZIP →',
     '3 sample heading, "Explore this ZIP →" and "See all development →" point at 98335', s1);
   ok(s1.viewZip === null, '10 the sample map did not write the tab\'s viewed ZIP', s1.viewZip);
   ok(s1.storage.length === 0 || s1.storage.every((k) => !/myZip|myCommunities|follows|activeProp/.test(k)), '3 loading the homepage saved no place', s1.storage);
@@ -204,10 +204,10 @@ console.log('--- 1. signed out: stays on Explore; the approved header and ONE fo
   console.log('--- 4. a search never turns the sample into results; it leaves for Map 1 ---');
   const before = await ui(page);
   let went = null;
-  await page.route('**/homesignalmap.html?zip=*', (route) => { if (route.request().frame() !== page.mainFrame()) return route.fallback(); went = new URL(route.request().url()).search; return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>map</title>' }); });
+  await page.route('**/development-map.html?zip=*', (route) => { if (route.request().frame() !== page.mainFrame()) return route.fallback(); went = new URL(route.request().url()).search; return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>map</title>' }); });
   await search(page, '78657');
-  await page.waitForFunction(() => location.pathname === '/homesignalmap.html', null, { timeout: 8000 }).catch(() => {});
-  ok(went === '?zip=78657', '4 a ZIP search opens homesignalmap.html?zip=78657', went);
+  await page.waitForFunction(() => location.pathname === '/development-map.html', null, { timeout: 8000 }).catch(() => {});
+  ok(went === '?zip=78657', '4 a ZIP search opens development-map.html?zip=78657', went);
   ok(before.heading === 'See an example: 98335 · Gig Harbor, Washington' && before.sub === null && before.records, '4 before it, the homepage still shows only the static example', before);
 
   ok(errors.length === 0, '1–4 no page or console errors across load and a search', errors);
@@ -225,12 +225,12 @@ console.log('--- 4b. #address= is searched once, taken out of the URL, and hande
   const ADDR = '742 Evergreen Terrace, Springfield, OR 97477';
   const { ctx, page } = await open(browser, base, '/index.html', { stub: STUB });
   let mapRequests = 0;
-  await page.route('**/homesignalmap.html', (route) => { if (route.request().frame() !== page.mainFrame()) return route.fallback(); mapRequests++; return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>map</title>' }); });
+  await page.route('**/development-map.html', (route) => { if (route.request().frame() !== page.mainFrame()) return route.fallback(); mapRequests++; return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>map</title>' }); });
   await page.goto('about:blank');
   await page.goto(base + '/index.html#address=' + encodeURIComponent(ADDR), { waitUntil: 'commit' });
-  await page.waitForURL((u) => u.pathname === '/homesignalmap.html', { timeout: 20000 }).catch(() => {});
+  await page.waitForURL((u) => u.pathname === '/development-map.html', { timeout: 20000 }).catch(() => {});
   const arrived = await page.evaluate(() => ({ path: location.pathname, url: location.href, handed: sessionStorage.getItem('hs.homeSearchAddress') })).catch((e) => ({ error: String(e).slice(0, 200) }));
-  ok(arrived.path === '/homesignalmap.html' && arrived.handed === ADDR && mapRequests === 1, '4b the address from the fragment is searched once: Map 1 opens with the address handed over in sessionStorage', arrived);
+  ok(arrived.path === '/development-map.html' && arrived.handed === ADDR && mapRequests === 1, '4b the address from the fragment is searched once: Map 1 opens with the address handed over in sessionStorage', arrived);
   ok(!/address|Evergreen|%20/.test(String(arrived.url)), '4b and it is in no URL on the way (the hand-off is sessionStorage, never a query or fragment)', arrived.url);
   await ctx.close();
 }
@@ -241,7 +241,7 @@ console.log('--- 4b2. a slow map page never shows the homepage in between ---');
 {
   const ADDR = '742 Evergreen Terrace, Springfield, OR 97477';
   const { ctx, page } = await open(browser, base, '/index.html', { stub: STUB });
-  await page.route('**/homesignalmap.html', async (route) => { if (route.request().frame() !== page.mainFrame()) return route.fallback(); await new Promise((r) => setTimeout(r, 1500)); return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>map</title>' }).catch(() => {}); });
+  await page.route('**/development-map.html', async (route) => { if (route.request().frame() !== page.mainFrame()) return route.fallback(); await new Promise((r) => setTimeout(r, 1500)); return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>map</title>' }).catch(() => {}); });
   // Every frame the browser paints on the homepage is recorded with the document's visibility; none may be visible.
   const frames = [];
   await page.exposeFunction('__hsFrame', (v) => { frames.push(v); });
@@ -251,10 +251,10 @@ console.log('--- 4b2. a slow map page never shows the homepage in between ---');
   });
   await page.goto('about:blank');
   await page.goto(base + '/index.html#address=' + encodeURIComponent(ADDR), { waitUntil: 'commit' });
-  await page.waitForURL((u) => u.pathname === '/homesignalmap.html', { timeout: 20000 }).catch(() => {});
+  await page.waitForURL((u) => u.pathname === '/development-map.html', { timeout: 20000 }).catch(() => {});
   const mid = { samples: frames.length, shown: frames.filter((v) => v !== 'hidden').length };
   ok(mid.samples > 0 && mid.shown === 0, '4b2 while the map page is slow the document is hidden, so no homepage shows', mid);
-  ok(new URL(page.url()).pathname === '/homesignalmap.html', '4b2 and it then arrives at Map 1', page.url());
+  ok(new URL(page.url()).pathname === '/development-map.html', '4b2 and it then arrives at Map 1', page.url());
   await ctx.close();
 }
 {
@@ -349,14 +349,14 @@ console.log('--- 8. signed in with a saved Address: avatar, and Explore still st
 // ────────────────────────────────────────────────────── 9: Map 1's own embed and full page ──
 console.log('--- 9. Map 1 embed hides the site chrome; preview needs embed ---');
 {
-  const { ctx, page } = await open(browser, base, '/homesignalmap.html?embed=1&zip=78657', { stub: STUB });
+  const { ctx, page } = await open(browser, base, '/development-map.html?embed=1&zip=78657', { stub: STUB });
   const e = await page.evaluate(() => ({
     header: getComputedStyle(document.getElementById('hs-top')).display, footer: getComputedStyle(document.getElementById('hs-footer')).display,
     preview: document.documentElement.classList.contains('hs-preview')
   }));
   ok(e.header === 'none' && e.footer === 'none' && !e.preview, '9 the plain embed shows no site header or footer, and is not a preview', e);
   await ctx.close();
-  const { ctx: c2, page: p2 } = await open(browser, base, '/homesignalmap.html?preview=1&zip=78657', { stub: STUB });
+  const { ctx: c2, page: p2 } = await open(browser, base, '/development-map.html?preview=1&zip=78657', { stub: STUB });
   const f = await p2.evaluate(() => ({
     preview: document.documentElement.classList.contains('hs-preview'), embed: document.documentElement.classList.contains('hs-embed'),
     header: getComputedStyle(document.getElementById('hs-top')).display, footers: document.querySelectorAll('footer').length,

@@ -30,7 +30,7 @@ on:
     # trigger runs the workflow from the pushed ref, so the branch is proven before it merges.
     branches: [main, claude/homesignal-zip-forensics-13xkmw]
     paths:
-      - 'homesignalmap.html'
+      - 'development-map.html'
       - 'lib/zip-authoritative.js'
       - 'scripts/probe-map1-card-grain.mjs'
       - '.github/workflows/verify-map1-card-grain.yml'
@@ -50,8 +50,8 @@ jobs:
         if: ${{ inputs.site_base == '' }}
         run: |
           python3 -m http.server 8099 >/tmp/http.log 2>&1 &
-          for i in $(seq 1 30); do curl -sf http://localhost:8099/homesignalmap.html >/dev/null && break; sleep 1; done
-          curl -sf -o /dev/null http://localhost:8099/homesignalmap.html
+          for i in $(seq 1 30); do curl -sf http://localhost:8099/development-map.html >/dev/null && break; sleep 1; done
+          curl -sf -o /dev/null http://localhost:8099/development-map.html
       # Markers may exceed projects - that is geography. Cards may not. This measures the two
       # SEPARATELY, on whatever build it is pointed at, and never infers one from the other.
       - name: Probe the card grain (one project = one card)

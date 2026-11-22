@@ -1,6 +1,6 @@
 // verify-maps.mjs — live end-to-end check of the APP MAP page (maps.html), dedicated to
 // the facility-slot reservation (HS.reserveFacilitySlots). Separate from verify-development
-// (which drives homesignalmap.html, a different stack). Runs where egress works (GitHub
+// (which drives development-map.html, a different stack). Runs where egress works (GitHub
 // Actions); the build sandbox cannot reach homesignal.net.
 //
 // WHAT IT ASSERTS on maps.html signed-out (which defaults to CFG.DEFAULT_ZIP = 78617):

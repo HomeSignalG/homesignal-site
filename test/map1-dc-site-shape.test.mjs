@@ -111,7 +111,7 @@ const AUTH = { zip: '00000', mode: 'development', status: 'boundary_complete', p
 }
 
 // ── §2 THE RAILS: bucketOf(s.type) WITH NO SITE, AND stageOf(s) ────────────────────────────
-// homesignalmap.html builds its Approved/Proposed rails from bucketOf(s.type) — a bare {type}
+// development-map.html builds its Approved/Proposed rails from bucketOf(s.type) — a bare {type}
 // with no site — and stageOf(s) reads s.bucket first. Both must see the lifecycle.
 {
   const wrong = [];
@@ -223,7 +223,7 @@ const AUTH = { zip: '00000', mode: 'development', status: 'boundary_complete', p
   const normUses = (body.match(/normalized_status/g) || []).length;
   ok(!/type:\s*'datacenter'/.test(body) && normUses === 2 && /normalized_status: r\.normalized_status,/.test(body),
     '§7c no Type literal in the lifecycle slot, and normalized_status is only passed through, never used for the lifecycle', normUses);
-  const P = stripJs(read('homesignalmap.html'));
+  const P = stripJs(read('development-map.html'));
   ok((P.match(/\.map\(HS\.map1DcSite\)/g) || []).length === 1 && /resolveTrackerMarker/.test(P),
     '§7d the page maps the contract rows through HS.map1DcSite once and classifies through resolveTrackerMarker');
   // The mapping fails closed to `unknown` when the lifecycle vocabulary is absent (§5c). That is
@@ -232,7 +232,7 @@ const AUTH = { zip: '00000', mode: 'development', status: 'boundary_complete', p
   const pages = readdirSync(ROOT).filter((f) => f.endsWith('.html'));
   const callers = pages.filter((f) => /HS\.map1DcSite/.test(stripJs(read(f))));
   const missing = callers.filter((f) => !/<script[^>]+src="\/?lib\/project-type\.js/.test(read(f)));
-  ok(callers.length >= 1 && callers.includes('homesignalmap.html') && missing.length === 0,
+  ok(callers.length >= 1 && callers.includes('development-map.html') && missing.length === 0,
     '§7e every page that maps contract rows loads the lifecycle vocabulary', { callers, missing });
 }
 

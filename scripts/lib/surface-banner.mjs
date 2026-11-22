@@ -7,7 +7,7 @@
 // What was missing is that no verification declared which surface it spoke about. On 2026-08-03
 // `app_projects` held ZERO saint-paul rows while `development_reports` held 20,000 on a single ZIP
 // — at the same moment, for five days, with every verifier green. Every "what do residents see"
-// check had been run against `app_projects`; `homesignalmap.html` reads `development_reports`
+// check had been run against `app_projects`; `development-map.html` reads `development_reports`
 // DIRECTLY and uncapped, so residents saw the retired data anyway.
 //
 // So: a verifier states its surface and its table in its own output header, and any claim about
@@ -32,29 +32,29 @@ export const SURFACES = {
         + 'the data a dossier would read. The rendered dossier itself is NOT covered.',
   },
   'verify-development': {
-    surface: 'map page (homesignalmap.html?zip=)',
+    surface: 'map page (development-map.html?zip=)',
     tables: ['development_reports', 'app_community_meta', 'property_reports'],
     capped: false,
     note: 'reads the UNCAPPED cache the map page itself reads — says nothing about app_projects',
   },
   'verify-representative-zips': {
-    surface: 'map page (homesignalmap.html?zip=)',
+    surface: 'map page (development-map.html?zip=)',
     tables: ['development_reports'],
     capped: false,
   },
   'audit-official-links': {
-    surface: 'map page (homesignalmap.html?zip=)',
+    surface: 'map page (development-map.html?zip=)',
     tables: ['development_reports'],
     capped: false,
   },
   'verify-geocodes': {
-    surface: 'map page (homesignalmap.html?zip=)',
+    surface: 'map page (development-map.html?zip=)',
     tables: ['development_reports'],
     capped: false,
     note: 'reads via the page; source-supplied geometry is never fenced',
   },
   'verify-maps': {
-    surface: 'map page (homesignalmap.html?zip=)',
+    surface: 'map page (development-map.html?zip=)',
     tables: ['development_reports'],
     capped: false,
   },
@@ -160,7 +160,7 @@ export const SURFACES = {
     capped: null,
   },
   'verify-map1-zip-states': {
-    surface: 'Map 1 ZIP mode (homesignalmap.html?zip=) — the geography-state contract',
+    surface: 'Map 1 ZIP mode (development-map.html?zip=) — the geography-state contract',
     tables: ['app_projects', 'development_reports'],
     capped: null,
     note: 'Spans BOTH content layers, and that is the point of it. ZIP-mode DEVELOPMENT comes '

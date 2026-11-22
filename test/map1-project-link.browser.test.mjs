@@ -1,6 +1,6 @@
 // MAP 1 PROJECT LINK — /map/<zip>/?project=<key> opens the project and its panel, on the real page.
 //
-// homesignalmap.html runs in Chromium with public.map1_dc_zip_members answering the REAL production rows of the
+// development-map.html runs in Chromium with public.map1_dc_zip_members answering the REAL production rows of the
 // deterministic sample (test/fixtures/map1-dc-zip-sample-2026-09-27.json). public.map1_project_locate and
 // public.map1_project_documents are stubbed with the shapes docs/map1-project-link.sql returns.
 //
@@ -112,7 +112,7 @@ const enc = encodeURIComponent(KEY);
 
 console.log('\n1. the link opens the project, its popup and its panel (desktop)');
 {
-  const { page, pageErrors, calls } = await open('/homesignalmap.html?zip=20187&project=' + enc, { locate: found('20187') });
+  const { page, pageErrors, calls } = await open('/development-map.html?zip=20187&project=' + enc, { locate: found('20187') });
   ok(pageErrors.length === 0, '1a no page errors', pageErrors[0]);
   ok(calls.length === 1 && calls[0].p_key === KEY && calls[0].p_zip === '20187', '1b the key is looked up once, with the ZIP', calls);
   const focus = await page.evaluate(() => window.__HS_PROJECT_FOCUS || null);
@@ -134,7 +134,7 @@ console.log('\n1. the link opens the project, its popup and its panel (desktop)'
 
 console.log('\n2. a project the reader\'s filters hide is still opened, without changing the link');
 {
-  const { page } = await open('/homesignalmap.html?zip=20187&stages=operating&project=' + enc, { locate: found('20187') });
+  const { page } = await open('/development-map.html?zip=20187&stages=operating&project=' + enc, { locate: found('20187') });
   const vis = await page.evaluate((name) => Array.from(document.querySelectorAll('#map .leaflet-marker-icon [title]'))
     .map((m) => m.getAttribute('title')), VINT.project_name);
   ok(vis.some((t) => /Proposed/i.test(t)), '2a the proposed pin is drawn although the link\'s page had only Operating on', vis);
@@ -148,7 +148,7 @@ console.log('\n3. a project now drawn on another ZIP opens there');
 {
   const OTHER = FIX.rows.find((r) => r.zip === '23150' && r.publication_basis === 'canonical');
   const locate = { key: KEY, kind: 'dcrec', state: 'found', map_key: OTHER.source_key, zips: ['23150'], zip: '23150' };
-  const { page } = await open('/homesignalmap.html?zip=20187&project=' + enc, { locate, docs: [] });
+  const { page } = await open('/development-map.html?zip=20187&project=' + enc, { locate, docs: [] });
   const url = await page.evaluate(() => location.pathname + location.search);
   ok(url === '/map/23150?project=' + enc, '3a the address bar names the ZIP that draws it now', url);
   const p = await panel(page);
@@ -157,7 +157,7 @@ console.log('\n3. a project now drawn on another ZIP opens there');
 
 console.log('\n4. a key the map does not draw says so (and never shows a different project)');
 {
-  const { page } = await open('/homesignalmap.html?zip=20187&project=' + enc,
+  const { page } = await open('/development-map.html?zip=20187&project=' + enc,
     { locate: { key: KEY, kind: 'dcrec', state: 'not_on_map', map_key: VINT.source_key, zips: [], zip: null } });
   const p = await panel(page);
   ok(p && !p.hidden && /not on JODY's map right now/.test(p.text), '4a the panel says the project is not on the map', p && p.text);
@@ -167,14 +167,14 @@ console.log('\n4. a key the map does not draw says so (and never shows a differe
 
 console.log('\n5. documents that cannot be read are not shown as "none"');
 {
-  const { page } = await open('/homesignalmap.html?zip=20187&project=' + enc, { locate: found('20187'), docsFail: true });
+  const { page } = await open('/development-map.html?zip=20187&project=' + enc, { locate: found('20187'), docsFail: true });
   const p = await panel(page);
   ok(p && /could not be loaded/.test(p.text) && !/No official government document/.test(p.text), '5a a failed read is named', p && p.text);
 }
 
 console.log('\n6. phone width, and "Details & documents" from any pin');
 {
-  const { page, pageErrors } = await open('/homesignalmap.html?zip=20187&project=' + enc, { locate: found('20187'), viewport: { width: 390, height: 844 } });
+  const { page, pageErrors } = await open('/development-map.html?zip=20187&project=' + enc, { locate: found('20187'), viewport: { width: 390, height: 844 } });
   ok(pageErrors.length === 0, '6a no page errors');
   const geo = await page.evaluate(() => {
     const el = document.getElementById('projPanel'); const r = el.getBoundingClientRect();
@@ -202,7 +202,7 @@ console.log('\n6. phone width, and "Details & documents" from any pin');
 
 console.log('\n8. a lookup that cannot be read never says the project is absent');
 {
-  const { page } = await open('/homesignalmap.html?zip=20187&project=' + enc, { locate: null, locateStatus: 404 });
+  const { page } = await open('/development-map.html?zip=20187&project=' + enc, { locate: null, locateStatus: 404 });
   const p = await panel(page);
   ok(p && !p.hidden && /could not be looked up just now/.test(p.text), '8a the panel says the lookup failed', p && p.text);
   ok(p && !/not on JODY's map/.test(p.text), '8b and never that the project is not on the map');
@@ -211,14 +211,14 @@ console.log('\n8. a lookup that cannot be read never says the project is absent'
 }
 {
   // a stub or changed function answering without a state is not an answer either
-  const { page } = await open('/homesignalmap.html?zip=20187&project=' + enc, { locate: { ok: true } });
+  const { page } = await open('/development-map.html?zip=20187&project=' + enc, { locate: { ok: true } });
   const p = await panel(page);
   ok(p && /could not be looked up just now/.test(p.text), '8d an answer with no state is treated as unavailable', p && p.text);
 }
 
 console.log('\n9. found by the lookup, but the map data failed: "could not be shown", not "not on the map"');
 {
-  const { page } = await open('/homesignalmap.html?zip=20187&project=' + enc, { locate: found('20187'), dcStatus: 500 });
+  const { page } = await open('/development-map.html?zip=20187&project=' + enc, { locate: found('20187'), dcStatus: 500 });
   const p = await panel(page);
   ok(p && !p.hidden && /could not be shown just now/.test(p.text) && !/not on JODY's map/.test(p.text), '9a', p && p.text);
 }
@@ -227,7 +227,7 @@ console.log('\n10. a link to the old key of a merged project, after it moved fro
 {
   const APPR = FIX.rows.find((r) => r.zip === '20187' && r.map_status === 'Approved');
   const locate = { key: KEY, kind: 'dcrec', state: 'found', map_key: APPR.source_key, zips: ['20187'], zip: '20187' };
-  const { page } = await open('/homesignalmap.html?zip=20187&stages=proposed&project=' + enc, { locate, docs: [] });
+  const { page } = await open('/development-map.html?zip=20187&stages=proposed&project=' + enc, { locate, docs: [] });
   const focus = await page.evaluate(() => window.__HS_PROJECT_FOCUS || null);
   ok(focus && focus.mapKey === APPR.source_key, '10a the same link opens the project under its current map key', focus);
   const p = await panel(page);
@@ -236,7 +236,7 @@ console.log('\n10. a link to the old key of a merged project, after it moved fro
 
 console.log('\n7. a page with no ?project= is unchanged');
 {
-  const { page, calls } = await open('/homesignalmap.html?zip=20187', { locate: found('20187') });
+  const { page, calls } = await open('/development-map.html?zip=20187', { locate: found('20187') });
   ok(calls.length === 0, '7a no lookup is made');
   const p = await panel(page);
   ok(p && p.hidden, '7b no panel opens by itself');

@@ -23,7 +23,7 @@ on:
         default: ''
   pull_request:
     paths:
-      - 'homesignalmap.html'
+      - 'development-map.html'
       - 'lib/data.js'
       - 'lib/map.js'
       - 'lib/project-type.js'
@@ -47,8 +47,8 @@ jobs:
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.site_base == '' }}
         run: |
           python3 -m http.server 8099 >/tmp/http.log 2>&1 &
-          for i in $(seq 1 30); do curl -sf http://localhost:8099/homesignalmap.html >/dev/null && break; sleep 1; done
-          curl -sf -o /dev/null http://localhost:8099/homesignalmap.html
+          for i in $(seq 1 30); do curl -sf http://localhost:8099/development-map.html >/dev/null && break; sleep 1; done
+          curl -sf -o /dev/null http://localhost:8099/development-map.html
       - name: Probe data-centre Type and lifecycle on the sample ZIPs
         env:
           SITE_BASE: ${{ (github.event_name == 'workflow_dispatch' && inputs.site_base != '') && inputs.site_base || 'http://localhost:8099' }}

@@ -7,7 +7,7 @@
 // What was missing is that no verification declared WHICH SURFACE it spoke about. On 2026-08-03
 // `app_projects` held ZERO saint-paul rows while `development_reports` held 20,000 on a single ZIP
 // — same moment, five days, every verifier green. Every "what do residents see" check had been run
-// against `app_projects`; homesignalmap.html reads `development_reports` DIRECTLY and uncapped, so
+// against `app_projects`; development-map.html reads `development_reports` DIRECTLY and uncapped, so
 // residents saw the retired data anyway. A clean materialized layer is NOT evidence about a
 // surface that bypasses it.
 //
@@ -86,7 +86,7 @@ console.log('\n4) the surfaces with NO verifier are named — that is where the 
   }
   // The one that actually bit: the map page reads the uncapped cache, and it IS verified.
   ok('the map page has at least one verifier',
-    Object.values(SURFACES).some((s) => /homesignalmap/.test(s.surface)));
+    Object.values(SURFACES).some((s) => /development-map/.test(s.surface)));
 }
 
 console.log('\n5) PARTIALLY covered surfaces must name their RESIDUAL, not just their verifier');

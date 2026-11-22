@@ -12,7 +12,7 @@
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://homesignal.net/homesignalmap.html</loc>
+    <loc>https://homesignal.net/development-map.html</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>

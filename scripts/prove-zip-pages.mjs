@@ -198,14 +198,14 @@ const main = async () => {
      'every ZIP page is advertised (index-all policy): no document is noindex');
   // INVERTED 2026-09-19 — same rule the two assertions above state: the advertised set must
   // BE the index-eligible set. Page-purpose separation assumed the two halves were two sets
-  // of documents; they are not. Measured against production: every homesignalmap.html?zip=
+  // of documents; they are not. Measured against production: every development-map.html?zip=
   // URL serves a byte-identical document (Pages selects by PATH, ignoring the query string),
   // ships `noindex, nofollow`, and canonicalises to the ZIP-less URL. Advertising 11,718 of
   // them contradicted this proof's own premise. Restoring the advertisement means making
   // those URLs real documents (/development/<zip>/), and this line is what changes then.
   // ⚠️ Its DEPLOYED twin is scripts/prove-zip-pages-live.mjs — move the two together, or the
   // daily live verifier goes red the day after this merges.
-  ok(!/homesignalmap\.html\?zip=/.test(sm),
+  ok(!/development-map\.html\?zip=/.test(sm),
      'the sitemap no longer advertises the noindex development URLs');
 
   // ---- JavaScript must not reverse the build-time decision -------------------------------

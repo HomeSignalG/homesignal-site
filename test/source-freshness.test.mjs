@@ -120,7 +120,7 @@ ok(JSON.stringify(HS.sourceFreshnessIds([{ registry_id: '110000488767', layer: '
 ok(regIds.size > 0 && [...regIds].every((id) => /[a-z]/.test(id)), 'every source registry id contains a letter (the rule above depends on it)');
 
 // 5. Wiring.
-const map1 = read('homesignalmap.html');
+const map1 = read('development-map.html');
 ok(/<div id="srcFresh"><\/div>\s*<div class="foot" id="foot">/.test(map1), 'Map 1 has the block above its footer');
 ok(/HS\.mountSourceFreshness\(\$\("srcFresh"\), \{ zip: ZIP_MODE \? ZIP_CODE : null, ids: HS\.sourceFreshnessIds\(sites\) \}\)/.test(map1),
   'Map 1 mounts from the rendered sites, with a ZIP only in ZIP mode');

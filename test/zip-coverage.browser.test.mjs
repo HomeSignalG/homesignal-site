@@ -172,14 +172,14 @@ for (const [z, mode] of [[SPEC, 'specialized_zip'], [PEND, 'verification_pending
 
 // ── §3 the ZIP map pages ────────────────────────────────────────────────────────────────
 console.log('§3 map pages show the panel instead of a map');
-for (const path of [`/homesignalmap.html?zip=${SPEC}`, `/development.html?zip=${PEND}`]) {
+for (const path of [`/development-map.html?zip=${SPEC}`, `/development.html?zip=${PEND}`]) {
   const z = path.match(/zip=(\d{5})/)[1], mode = MODEL.zips[z].page_mode;
   const r = await open(path);
   ok(r.panels === 1 && r.mode === mode && r.panelZip === z, `${path} → the ${mode} panel`, { panels: r.panels, mode: r.mode });
   ok(!r.leaflet && !r.mapFrame, `${path} → no map was drawn`, { leaflet: r.leaflet });
   // INDEX-ALL (2026-10-26): the map page rewrites ?zip= to the ZIP's own /map/<zip>/ page, which is index, follow
   // and self-canonical; development.html?zip= remains a non-public alias (noindex, canonical to the document).
-  const ownMap = path.startsWith('/homesignalmap.html');
+  const ownMap = path.startsWith('/development-map.html');
   ok(ownMap ? (/^index/.test(r.robots || '') && r.canonical === `/map/${z}/`)
             : (/noindex/.test(r.robots || '') && r.canonical === `/community/${z}/`),
      `${path} → ${ownMap ? 'its own /map/<zip>/ page: index, self-canonical' : 'noindex, canonical to the document'}`, { robots: r.robots, canonical: r.canonical });
@@ -189,18 +189,18 @@ for (const path of [`/homesignalmap.html?zip=${SPEC}`, `/development.html?zip=${
 
 // ── §4 address search is not replaced ───────────────────────────────────────────────────
 console.log('§4 address search near one of these ZIPs stays address search');
-for (const path of [`/homesignalmap.html?lat=32.91&lng=-96.72&radius=2`, `/homesignalmap.html?zip=${SPEC}&lat=30.31&lng=-97.72&radius=2`]) {
+for (const path of [`/development-map.html?lat=32.91&lng=-96.72&radius=2`, `/development-map.html?zip=${SPEC}&lat=30.31&lng=-97.72&radius=2`]) {
   const r = await open(path, { sessionZip: SPEC });
   ok(r.panels === 0 && r.retiredPage === false, `${path} (session ZIP ${SPEC}) → no panel; Map 1 loads as an address search`, { panels: r.panels });
 }
 {
-  const r = await open('/homesignalmap.html', { sessionZip: SPEC });
+  const r = await open('/development-map.html', { sessionZip: SPEC });
   ok(r.panels === 0, 'a map page with no ?zip= ignores a session ZIP in the model', { panels: r.panels });
 }
 
 // ── §5 controls ─────────────────────────────────────────────────────────────────────────
 console.log('§5 controls');
-for (const path of [`/community/${OPEN}/`, `/community.html?zip=${OPEN}`, `/homesignalmap.html?zip=${OPEN}`, `/development.html?zip=${OPEN}`]) {
+for (const path of [`/community/${OPEN}/`, `/community.html?zip=${OPEN}`, `/development-map.html?zip=${OPEN}`, `/development.html?zip=${OPEN}`]) {
   const r = await open(path);
   ok(r.panels === 0 && r.retiredPage === false, `${path} (standard ZIP) → no panel`, { panels: r.panels });
   if (path.startsWith('/community')) ok(r.commPage > 0 || r.ssr, `${path} → still renders its page`, { commPage: r.commPage });
@@ -215,7 +215,7 @@ for (const path of [`/community/${OPEN}/`, `/community.html?zip=${OPEN}`, `/home
 }
 {
   modelStatus = 500;
-  const r = await open(`/homesignalmap.html?zip=${SPEC}`);
+  const r = await open(`/development-map.html?zip=${SPEC}`);
   modelStatus = 200;
   ok(r.panels === 0 && r.retiredPage === false && r.errors.length === 0, 'a model that cannot be read fails OPEN: the page draws as a standard page, no error', { panels: r.panels, errors: r.errors });
 }
@@ -228,7 +228,7 @@ console.log('§6 a confirmed-retired ZIP');
   m.copy.retired = INTERNAL.copy.retired;                          // and ships its copy only then; the dormant text lives in the internal record
   m.zips['48391'] = { ...m.zips['48391'], page_mode: 'mystery' };  // a mode the page cannot place
   modelBody = JSON.stringify(m);
-  for (const path of [`/community.html?zip=${PEND}`, `/alerts.html?zip=${PEND}`, `/homesignalmap.html?zip=${PEND}`]) {
+  for (const path of [`/community.html?zip=${PEND}`, `/alerts.html?zip=${PEND}`, `/development-map.html?zip=${PEND}`]) {
     const r = await open(path);
     ok(r.retiredPage === 'retired' && r.panels === 1 && r.mode === 'retired', `${path} → the neutral unavailable page`, { page: r.retiredPage, mode: r.mode });
     ok(/noindex/.test(r.robots || '') && r.canonical === null, `${path} → noindex, no canonical`, { robots: r.robots, canonical: r.canonical });
@@ -251,7 +251,7 @@ console.log('§7 the two calls to action');
   } });
   ok(r.extra.addr === `/?near=${SPEC}#homeSearch`, 'primary CTA → the existing address search, carrying the ZIP as context', r.extra.addr);
   ok(r.extra.near === `/community/${SPEC}/#zip-nearby` && r.extra.hash === '#zip-nearby' && r.extra.anchor && r.extra.path === `/community/${SPEC}/`, 'secondary CTA → lands on the nearby-ZIPs section of the same page', r.extra);
-  const m = await open(`/homesignalmap.html?zip=${SPEC}`, { keep: async (page) => ({ near: await page.getAttribute('#zcovNearby', 'href') }) });
+  const m = await open(`/development-map.html?zip=${SPEC}`, { keep: async (page) => ({ near: await page.getAttribute('#zcovNearby', 'href') }) });
   ok(m.extra.near === `/community/${SPEC}/#zip-nearby`, 'on a map page the secondary CTA goes to the ZIP document\'s nearby section', m.extra);
   const h = await open(`/?near=${SPEC}`, { keep: async (page) => ({
     hint: await page.evaluate(() => { const e = document.getElementById('homeNearHint'); return e && !e.hidden ? e.textContent : null; }),
@@ -263,7 +263,7 @@ console.log('§7 the two calls to action');
 // ── §9 ZIPs whose existence is unverified (84684, 84685) ─────────────────────────────────
 console.log('§9 an unverified ZIP has no page: a noindex notice that says only that');
 for (const z of ['84684', '84685']) {
-  for (const path of [`/community.html?zip=${z}`, `/homesignalmap.html?zip=${z}`, `/alerts.html?zip=${z}`, `/homesignalmap.html?zip=${z}&lat=40.3&lng=-111.8&radius=2`]) {
+  for (const path of [`/community.html?zip=${z}`, `/development-map.html?zip=${z}`, `/alerts.html?zip=${z}`, `/development-map.html?zip=${z}&lat=40.3&lng=-111.8&radius=2`]) {
     const r = await open(path, { keep: async (page) => ({
       cta: await page.getAttribute('#zcovAddress', 'href'),
       nearby: await page.evaluate(() => !!document.getElementById('zcovNearby')),
@@ -282,7 +282,7 @@ for (const z of ['84684', '84685']) {
   }
 }
 for (const z of ['84651', '84653']) {
-  const r = await open(`/homesignalmap.html?zip=${z}`);
+  const r = await open(`/development-map.html?zip=${z}`);
   ok(r.panels === 0 && r.retiredPage === false, `${z} (the real neighbour) → drawn normally, never the notice`, { panels: r.panels });
 }
 

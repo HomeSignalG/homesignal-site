@@ -135,7 +135,7 @@ ok(/requireAuth = function \(thenLabel, afterAuth\)[\s\S]{0,300}HS\.openAuth\(af
   '§4 requireAuth passes the action through to the sign-in');
 
 // ---------------------------------------------------------------- §5 Map 1
-const page = read('homesignalmap.html');
+const page = read('development-map.html');
 const head = (page.match(/<div class="head">[\s\S]*?<div class="status" id="status">/) || [''])[0];
 ok(head.length > 0, '§5 the Map 1 hero (.head) is locatable (positive control)');
 ok(head.includes('<button type="button" class="zip-email-btn" id="zipEmailBtn">' + BUTTON_LABEL + '</button>'),

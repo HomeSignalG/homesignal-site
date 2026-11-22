@@ -1,7 +1,7 @@
 {
   "_note": "2026-10-29: title, status_tracks, unresolved_count, land_cards, titles and status_not_reviewed were edited BY HAND to the output expected after the land-card change (branch claude/map1-land-card-from-data), assuming docs/resolved-projects-display-name.sql has been applied. They are NOT re-measured. Every other field is still the 2026-07-06 recording. Regenerate with verify-dev-tracker.yml after deploy.",
   "zip": "84307",
-  "url": "http://localhost:8080/homesignalmap.html?zip=84307",
+  "url": "http://localhost:8080/development-map.html?zip=84307",
   "at": "2026-07-06T02:04:53.869Z",
   "assertions": {
     "resolved_parcels_total": 82,

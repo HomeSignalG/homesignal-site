@@ -168,7 +168,7 @@ for (const [kind, base] of identities) {
 }
 
 // ── §7 the visible surfaces ──────────────────────────────────────────────────────────────
-const PAGE = read('homesignalmap.html');
+const PAGE = read('development-map.html');
 const kl = PAGE.slice(PAGE.indexOf('function kindLabel(s){'), PAGE.indexOf('var MARKER_TITLE_STAGE'));
 ok(kl.length > 200 && !/operating now/i.test(code(kl)) && /mk\.lifecycleLabel/.test(kl),
   '7a Map 1 popup: no "operating now" literal; the facility line reads the resolver\'s lifecycleLabel');
@@ -287,7 +287,7 @@ for (const [kind, base] of identities) {
   ok(JSON.stringify(a) === JSON.stringify(b),
     `11a ${kind}: the cached type:'built' element and the new producer element resolve to the IDENTICAL marker`);
 }
-// The page's own bucketOf / siteVisible / rail, evaluated from homesignalmap.html's source.
+// The page's own bucketOf / siteVisible / rail, evaluated from development-map.html's source.
 const grab = (src, head) => {
   const i = src.indexOf(head); if (i < 0) return null;
   let d = 0, j = src.indexOf('{', i);

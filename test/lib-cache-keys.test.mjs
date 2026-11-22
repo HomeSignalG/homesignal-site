@@ -9,7 +9,7 @@
 // Every one of those fixes lives in lib/map.js, and that cache key had not moved since
 // 20 July while the file changed four times in an hour — so browsers kept serving a
 // July copy. lib/templates.js, which holds the neutral, carried NO key at all on any of
-// its 14 call sites. Meanwhile edits to homesignalmap.html itself DID appear, because an
+// its 14 call sites. Meanwhile edits to development-map.html itself DID appear, because an
 // HTML document revalidates; that contrast is what made the deploys look successful.
 //
 // THE KEY IS NOW THE CONTENT, NOT A DATE. A dated key is a promise a human has to keep

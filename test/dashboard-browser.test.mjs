@@ -287,12 +287,12 @@ try {
     var real = window.HS.realHome();
     window.__HS_TEST = {
       realHomeId: real && real.id,
-      mapHref: window.HS.pageHref('homesignalmap.html', { zip: window.HS.state.zip, place: real && real.id })
+      mapHref: window.HS.pageHref('development-map.html', { zip: window.HS.state.zip, place: real && real.id })
     };
   });
   const inj = await page.evaluate(() => window.__HS_TEST);
   ok(inj.realHomeId === 'coomes', 'real home detected for Coomes Dr in active ZIP');
-  ok(inj.mapHref === 'homesignalmap.html?zip=78617&place=coomes', 'place included for real home in ZIP');
+  ok(inj.mapHref === 'development-map.html?zip=78617&place=coomes', 'place included for real home in ZIP');
   await page.evaluate(function () {
     window.HS.state.activePropId = 'p2';
     var real = window.HS.realHome();
@@ -328,7 +328,7 @@ try {
 // deep-link params; the primary map ignores them, which must not break the page.
 await page.goto(base + '/maps.html?data=seed&zip=78617&place=p1&id=proj-datacenter', { waitUntil: 'networkidle', timeout: 60000 });
 // Map 1 shows /map/<zip> in the address bar (founder, 2026-10-22), so either address is the primary map.
-ok(page.url().indexOf('homesignalmap.html') >= 0 || page.url().indexOf('/map/78617') >= 0, 'the retired map URL forwards to the primary map');
+ok(page.url().indexOf('development-map.html') >= 0 || page.url().indexOf('/map/78617') >= 0, 'the retired map URL forwards to the primary map');
 ok(page.url().indexOf('zip=78617') >= 0 || page.url().indexOf('/map/78617') >= 0, 'the forward preserves the ZIP from the old URL');
 ok(await page.locator('#map, #mapInner').count() >= 1, 'the primary map renders its map surface');
 

@@ -132,10 +132,10 @@ export function classifyPoint(p, reverse) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function getConfig() {
-  const html = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../development-map.html', import.meta.url), 'utf8');
   const grab = (name) => {
     const m = html.match(new RegExp(`var ${name}\\s*=\\s*["']([^"']+)["']`));
-    if (!m) throw new Error(`Could not read ${name} from homesignalmap.html`);
+    if (!m) throw new Error(`Could not read ${name} from development-map.html`);
     return m[1];
   };
   const ENDPOINT = grab('ENDPOINT');

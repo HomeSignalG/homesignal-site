@@ -5,7 +5,7 @@
 //   - historical docs / test descriptions of legacy behavior
 //   - the frozen mock homesignalphase1_13.html
 //   - marketing / SEO / acquisition copy explicitly excluded from Fix 9
-//     (index.html, homesignalmap.html title/H1/OG, how-it-works.html, share.js)
+//     (index.html, development-map.html title/H1/OG, how-it-works.html, share.js)
 //
 // The shipped in-app UI may describe the CURRENT geography as "Viewing" and a
 // stored address/ZIP as Address / ZIP Code. It must not assume ownership or
@@ -167,7 +167,7 @@ console.log('--- in-app map / alerts / property operational copy ---');
 const alerts = stripScripts(read('alerts.html'));
 ok(/What needs your attention in this area/.test(alerts),
   'alerts H1 is "in this area", not "near home"');
-const mapPage = strip(read('homesignalmap.html'));
+const mapPage = strip(read('development-map.html'));
 ok(/>👁 From this place</.test(mapPage),
   '3D re-frame control is "From this place"');
 ok(/mi from this address/.test(mapPage),
@@ -191,8 +191,8 @@ ok(!/Saved Place/.test(dash + stripScripts(read('properties.html')) + stripScrip
 console.log('--- marketing / SEO / acquisition copy is out of scope and left intact ---');
 ok(/See what's being planned around your home/.test(read('index.html')),
   'index.html marketing title left intact');
-ok(/Development around your home/.test(read('homesignalmap.html')),
-  'homesignalmap.html marketing title/H1 left intact');
+ok(/Development around your home/.test(read('development-map.html')),
+  'development-map.html marketing title/H1 left intact');
 ok(/around your home/.test(read('how-it-works.html')),
   'how-it-works.html marketing copy left intact');
 ok(/around your home/.test(read('share.js')),

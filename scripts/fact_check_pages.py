@@ -162,7 +162,7 @@ def render(c, built, head, base=""):
             f'<li>{esc(day(x.get("at")))}: {"Retraction" if x.get("kind") == "retract" else "Correction"}: {esc(x.get("note"))}</li>'
             for x in corrections) + "</ul>\n" if corrections else "")
         + '<p><a class="btn" href="/development-activity.html">Track development near a home</a>'
-        ' · <a href="/homesignalmap.html">See the Development Map</a></p>\n'
+        ' · <a href="/development-map.html">See the Development Map</a></p>\n'
         f'<p class="quiet">Built {esc(built)}.</p>\n</main>\n</body>\n</html>\n')
     return doc + body
 

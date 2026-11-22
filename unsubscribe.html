@@ -46,7 +46,7 @@
         msg.appendChild(p);
       });
       cta.textContent = "Return to the " + zip + " map";
-      cta.href = "https://homesignal.net/homesignalmap.html?zip=" + zip;
+      cta.href = "https://homesignal.net/development-map.html?zip=" + zip;
     }
     function isMapsAnswer(d) {
       return !!d && d.status === "unsubscribed" && d.maps_only === true && /^\d{5}$/.test(String(d.zip));

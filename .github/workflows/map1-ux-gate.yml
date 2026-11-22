@@ -85,9 +85,9 @@ jobs:
           set -euo pipefail
           echo "repo HEAD: $(git rev-parse HEAD)"
           curl -sS -o /tmp/live.html -w 'live page HTTP %{http_code}, %{size_download} bytes\n' \
-            "$BASE/homesignalmap.html"
+            "$BASE/development-map.html"
           echo "live page sha256: $(sha256sum /tmp/live.html | cut -d' ' -f1)"
-          echo "repo  page sha256: $(sha256sum homesignalmap.html | cut -d' ' -f1)"
+          echo "repo  page sha256: $(sha256sum development-map.html | cut -d' ' -f1)"
 
       - name: LIVE PROOF - one address search, one radius change, one ZIP regression
         id: proof

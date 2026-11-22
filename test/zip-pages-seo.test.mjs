@@ -37,7 +37,7 @@ const STAGED_SITEMAP = `<?xml version="1.0" encoding="UTF-8"?>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://jodytracks.com/homesignalmap.html?zip=01002</loc>
+    <loc>https://jodytracks.com/development-map.html?zip=01002</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -141,7 +141,7 @@ ok(/HS\.data\.news\(/.test(runtime), 'the hydrated page READS local news');
 ok(/Local news/.test(runtime), '...and renders a Local news section too');
 
 // ---- 7. INDEX = Rule F OR Rule D --------------------------------------------------------
-// app_community_meta.indexable still governs homesignalmap.html and is NOT Rule D.
+// app_community_meta.indexable still governs development-map.html and is NOT Rule D.
 // Rule D is the compact Development SEO plane: ≥3 publishable entities in the HTML.
 const st = (zip) => read(out1, zip).includes('content="index, follow"');
 ok(st('01001') === true,  'A  Alerts PASS + development flag PASS  -> index, follow');
@@ -190,14 +190,14 @@ ok(smZips.includes('01002'), 'a Rule-D-only ZIP is advertised');
 ok(smZips.includes('02543'), 'a ZIP that fails both rules is advertised too (index-all policy)');
 // REVERSED 2026-09-19, deliberately. This used to assert the development half was
 // "untouched (page-purpose separation)". Measured against production that day: every
-// homesignalmap.html?zip= URL serves a byte-identical document (Pages ignores the query
+// development-map.html?zip= URL serves a byte-identical document (Pages ignores the query
 // string), ships `noindex, nofollow`, and canonicalises to the ZIP-less URL — so the
 // sitemap was advertising 11,718 noindex duplicates of one page, 59% of its entries.
 // A sitemap entry contradicting its own URL's robots value is the one thing this
 // generator's docstring forbids; the rule had only ever been checked on the community
 // half. Restoring the advertisement means making those URLs real documents, not
 // reverting this line.
-ok(!/homesignalmap\.html\?zip=/.test(sm),
+ok(!/development-map\.html\?zip=/.test(sm),
    'the noindex development URLs are dropped from the artifact sitemap');
 ok(man.sitemap_dev_urls_removed === 1,
    'the manifest records how many development URLs were dropped (fixture stages 1)');

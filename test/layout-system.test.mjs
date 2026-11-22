@@ -61,7 +61,7 @@ ok(outer.length === 0, '4a no page or inline style sets its own outer max-width 
 // Tier choice per page
 const body = (f) => (read(f).match(/<body[^>]*>/) || [''])[0];
 ok(/data-layout="workspace"/.test(body('development-activity-reports.html')), '5a the Development Activity Reports workspace is the workspace tier');
-ok(/data-layout="full"/.test(body('homesignalmap.html')), '5b Map 1 is the full-bleed tier');
+ok(/data-layout="full"/.test(body('development-map.html')), '5b Map 1 is the full-bleed tier');
 ok(!/data-layout/.test(body('about.html')) && !/data-layout/.test(body('development-activity.html')), '5c prose and landing pages take the default reading tier');
 ok(/class="in hs-container"/.test(read('development-activity-reports.html')) && /<main class="wrap hs-container">/.test(read('development-activity-reports.html')),
   '5d the workspace page\'s site bar, title row and main are all containers of the same tier (logo, title and cards share one left edge)');
