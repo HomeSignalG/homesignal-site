@@ -21,7 +21,8 @@
 // browser suites by text-matching the TEST FILE for a playwright import, which cannot see a
 // transitive one.
 import { classifyMembers, chooseControls, publishedControls, membersFromPublished,
-         CONTROLS_FILE, countWeatherZips, weatherThinMaySkip } from '../scripts/lib/zip-page-controls.mjs';
+         CONTROLS_FILE, countWeatherZips, weatherThinMaySkip,
+         weatherZipEvidence, renderedNonWeatherItems } from '../scripts/lib/zip-page-controls.mjs';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail) => {
@@ -258,6 +259,64 @@ const main = async () => {
     ok('NO skip when weather_thin is not empty', weatherThinMaySkip([], 0) === false);
     ok('a mixed empty set still skips only because weather_thin is in it (the others stay hard failures in the caller)',
       weatherThinMaySkip(['weather_thin', 'local_news'], 0) === true);
+  }
+
+  console.log('\n10) weather_thin MAY BE EMPTY ONLY IF EVERY WEATHER PAGE PASSES RULE F ON ITS OWN RENDERED NON-WEATHER ITEMS');
+  {
+    // Real section markup (gen_zip_pages._items): <section class="zsec"><h2>..</h2><ul><li>..</li></ul>[<details class="zall">..</details>]</section>
+    const sec = (h, n, rest = 0) => `<section class="zsec"><h2>${h}</h2><ul>` + '<li>x</li>'.repeat(n) + '</ul>'
+      + (rest ? '<details class="zall"><summary>Show all</summary><ul>' + '<li>r</li>'.repeat(rest) + '</ul></details>' : '') + '</section>';
+    const wx = (n) => sec('Weather alerts', n);
+    const page = (o) => (o.wx ? wx(o.wx) : '') + sec('Government notices', o.gn || 0, o.gnRest || 0)
+      + sec('Upcoming public meetings', o.um || 0) + sec('Local news', o.ln || 0);
+    const run = async (files, ruleF) => {
+      const d = { readdir: async () => Object.keys(files).map((name) => ({ name, isDirectory: () => true })),
+                  readFile: async (p) => files[String(p).match(/(\d{5})/)[1]] };
+      const ev = await weatherZipEvidence('_site', { rule_f_zips: ruleF }, d);
+      return { ev, skip: weatherThinMaySkip(['weather_thin'], ev) };
+    };
+    ok('renderedNonWeatherItems counts the three sections and the "show all" rest list, never weather',
+      renderedNonWeatherItems(page({ wx: 9, gn: 1, gnRest: 2, um: 1, ln: 1 })) === 5);
+
+    // (c) every weather ZIP legitimately passes Rule F -> SKIP, with the count of checked pages
+    {
+      const files = { '90001': page({ wx: 2, gn: 2, ln: 2 }), '90002': page({ wx: 1, um: 1, ln: 3 }), '90003': page({ ln: 3 }) };
+      const r = await run(files, ['90001', '90002', '90003']);
+      ok('(c) every weather ZIP is Rule F with >=3 rendered non-weather items: SKIP', r.skip === true, JSON.stringify(r.ev));
+      ok('(c) it reports exactly the weather pages it checked (2, not 3)', r.ev.checked === 2 && r.ev.failures.length === 0);
+    }
+    // (a) weather counted toward Rule F: a weather ZIP is in the Rule F set but its page shows only 1 non-weather item
+    {
+      const files = { '90001': page({ wx: 5, ln: 1 }), '90002': page({ wx: 1, gn: 2, ln: 2 }) };
+      const r = await run(files, ['90001', '90002']);
+      ok('(a) weather would be what carries Rule F (5 alerts + 1 item, listed as passing): FAIL', r.skip === false);
+      ok('(a) the offending ZIP is named with its rendered count',
+        r.ev.failures.length === 1 && r.ev.failures[0].zip === '90001' && r.ev.failures[0].items === 1, JSON.stringify(r.ev.failures));
+    }
+    // (b) a weather ZIP with <3 rendered non-weather items and NOT in the Rule F set (the original thin case)
+    {
+      const files = { '90001': page({ wx: 1, ln: 2 }), '90002': page({ wx: 1, gn: 3 }) };
+      const r = await run(files, ['90002']);
+      ok('(b) a weather ZIP under Rule F (2 items, not in the set): FAIL', r.skip === false);
+      ok('(b) only the thin one is reported', r.ev.failures.length === 1 && r.ev.failures[0].zip === '90001');
+    }
+    // (b2) a ZIP the generator flagged Rule F but whose page renders <3 non-weather items
+    {
+      const r = await run({ '90001': page({ wx: 1, gn: 1, ln: 1 }) }, ['90001']);
+      ok('(b2) flagged Rule F but only 2 rendered non-weather items: FAIL (the flag is not trusted)', r.skip === false);
+    }
+    // (d) zero weather pages -> the original skip still works, as number 0 and as evidence
+    {
+      const r = await run({ '90001': page({ ln: 3 }), '90002': page({}) }, ['90001']);
+      ok('(d) zero weather pages: SKIP', r.skip === true && r.ev.checked === 0);
+      ok('(d) bare numeric 0 still skips; numeric >0 and null still do not',
+        weatherThinMaySkip(['weather_thin'], 0) === true && weatherThinMaySkip(['weather_thin'], 3) === false
+        && weatherThinMaySkip(['weather_thin'], null) === false);
+    }
+    ok('never "skip whenever empty": no evidence object, no skip; other empties never skip',
+      weatherThinMaySkip(['weather_thin'], undefined) === false
+      && weatherThinMaySkip(['local_news'], { checked: 2, failures: [] }) === false
+      && weatherThinMaySkip([], { checked: 2, failures: [] }) === false);
   }
 
   console.log(fail ? `\n${fail} check(s) FAILED` : `\nAll ${pass} control-resolution checks passed.`);

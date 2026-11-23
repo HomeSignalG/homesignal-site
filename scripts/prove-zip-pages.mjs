@@ -25,7 +25,7 @@ import { execFileSync } from 'node:child_process';
 // The origin the generated documents canonicalise to is the contract's CURRENT identity (brand_host.py), never a literal.
 const SITE_ORIGIN = execFileSync('python3', ['scripts/brand_host.py', '--origin'], { encoding: 'utf8' }).trim().replace(/\/$/, '');
 import { CLASSIFY, PINNED_ONLY, CONTROLS_FILE, classifyMembers, chooseControls,
-         publishedControls, countWeatherZips, weatherThinMaySkip } from './lib/zip-page-controls.mjs';
+         publishedControls, weatherZipEvidence, weatherThinMaySkip } from './lib/zip-page-controls.mjs';
 import { appendFileSync } from 'node:fs';
 
 const SITE = process.env.SITE_DIR || '_site';
@@ -58,19 +58,26 @@ const get = (base, z, ua) =>
 async function resolveControls(SITE, man, pins) {
   const members = await classifyMembers(SITE, man);
   const { controls, empties, notes } = chooseControls(pins, members);
-  // The one narrow exception: weather_thin is skipped only when VERIFIABLY no ZIP page shows weather.
-  const weatherZips = empties.includes('weather_thin') ? await countWeatherZips(SITE) : null;
-  if (weatherThinMaySkip(empties, weatherZips)) {
+  // weather_thin may be skipped only when it is empty AND the invariant it stands in for is verified on
+  // EVERY page that shows weather: Rule F pass, and >= 3 non-weather items counted from the RENDERED page.
+  const ev = empties.includes('weather_thin') ? await weatherZipEvidence(SITE, man) : null;
+  if (weatherThinMaySkip(empties, ev)) {
     WEATHER_THIN_SKIPPED = true;
-    const msg = 'weather_thin SKIPPED: 0 ZIPs with weather alerts (0 of the built ZIP documents show a Weather alerts section). '
-      + 'This check runs again as soon as any ZIP shows weather; if weather appears and no control resolves it FAILS.';
+    const msg = ev.checked === 0
+      ? 'weather_thin SKIPPED: 0 ZIPs with weather alerts (0 of the built ZIP documents show a Weather alerts section). '
+        + 'This check runs again as soon as any ZIP shows weather.'
+      : `weather_thin SKIPPED: the class is empty because all ${ev.checked} ZIP page(s) that show weather alerts ALSO pass Rule F, `
+        + `each carrying at least 3 non-weather items counted from the rendered page (${ev.checked} checked, 0 failing). `
+        + 'Weather did not carry Rule F on any of them. If any weather page is under Rule F or has fewer than 3 rendered items, this FAILS.';
     console.log('\n!!!!! ' + msg + ' !!!!!\n');
     console.log('::warning title=weather_thin skipped::' + msg);
     if (process.env.GITHUB_STEP_SUMMARY) {
       try { appendFileSync(process.env.GITHUB_STEP_SUMMARY, '### ⚠️ ' + msg + '\n'); } catch { /* summary is best-effort */ }
     }
   } else if (empties.includes('weather_thin')) {
-    console.error(`weather_thin is EMPTY but ${weatherZips} ZIP page(s) show weather alerts: NOT skipping (real misclassification)`);
+    const bad = (ev && ev.failures || []).slice(0, 10).map((f) => `${f.zip} (${f.why})`).join('; ');
+    console.error(`weather_thin is EMPTY and the invariant is NOT verified: ${ev ? ev.checked : '?'} weather page(s) checked, `
+      + `${ev ? ev.failures.length : '?'} failing${bad ? ' — ' + bad : ''}: NOT skipping (real misclassification)`);
   }
   for (const k of Object.keys(CLASSIFY)) {
     if (PINNED_ONLY.has(k)) continue;

@@ -137,9 +137,75 @@ export async function countWeatherZips(SITE, deps = {}) {
   return n;
 }
 
-/** PURE decision: skip `weather_thin` only if it is empty and `weatherZips` is exactly 0. */
-export function weatherThinMaySkip(empties, weatherZips) {
-  return Array.isArray(empties) && empties.includes('weather_thin') && weatherZips === 0;
+// ── THE SKIP, MADE CONDITIONAL ON THE INVARIANT IT STANDS IN FOR (founder, 2026-11-23) ───
+//
+// `weather_thin` exists to prove "weather never counts toward Rule F". An EMPTY class is not itself a
+// defect: weather alerts are live NWS data, and on 2026-11-22/23 they landed on 757 ZIPs that all pass
+// Rule F on their own non-weather content (mostly 9xxx and 3xxx), while the day before 19 thin ZIPs
+// showed weather. The class is therefore data-dependent, and a build that fails on it stops EVERY site
+// update over where the weather happens to be.
+//
+// So an empty class may be skipped ONLY after the invariant itself is checked on every weather page:
+// each ZIP that shows a weather section must pass Rule F (be in the manifest's Rule F set) AND its
+// RENDERED page must carry at least RULE_F_MIN_RENDERED non-weather items, counted here from the page's
+// own HTML. Nothing from gen_zip_pages.py's counts or flag is reused for that count: if the generator
+// ever let weather carry Rule F, the page would show fewer than 3 real items and this fails.
+//
+// ⛔ NOT "skip whenever empty". Zero weather pages is the other (older) skip and is unchanged.
+export const RULE_F_MIN_RENDERED = 3;
+// The three sections whose items Rule F counts. Weather is its own section and is never in these lists.
+export const NON_WEATHER_SECTIONS = ['Government notices', 'Upcoming public meetings', 'Local news'];
+
+/** Count the <li> items a rendered ZIP document carries in the three non-weather sections. Pure. */
+export function renderedNonWeatherItems(html) {
+  let n = 0;
+  for (const head of NON_WEATHER_SECTIONS) {
+    const m = new RegExp(`<section class="zsec"><h2>${head}</h2>([\\s\\S]*?)</section>`).exec(html);
+    if (m) n += (m[1].match(/<li>/g) || []).length;
+  }
+  return n;
+}
+
+/**
+ * For every ZIP document that shows a weather section, read the page and decide whether it meets the
+ * invariant. Same directory read as classifyMembers/countWeatherZips. Returns
+ * { checked, failures: [{zip, why, items}] }.
+ */
+export async function weatherZipEvidence(SITE, man, deps = {}) {
+  const rd = deps.readdir || (await import('node:fs/promises')).readdir;
+  const rf = deps.readFile || readFile;
+  const idx = new Set(man.rule_f_zips || man.indexable_zips);
+  const dirs = (await rd(join(SITE, 'community'), { withFileTypes: true }))
+    .filter((d) => d.isDirectory() && /^\d{5}$/.test(d.name)).map((d) => d.name).sort();
+  let checked = 0;
+  const failures = [];
+  for (const z of dirs) {
+    let h; try { h = await rf(join(SITE, 'community', z, 'index.html'), 'utf8'); } catch { continue; }
+    if (!WEATHER_SECTION.test(h)) continue;
+    checked++;
+    const items = renderedNonWeatherItems(h);
+    if (!idx.has(z)) failures.push({ zip: z, why: 'not in the Rule F set', items });
+    else if (items < RULE_F_MIN_RENDERED) {
+      failures.push({ zip: z, why: `Rule F pass but only ${items} rendered non-weather item(s)`, items });
+    }
+  }
+  return { checked, failures };
+}
+
+/**
+ * PURE decision: skip `weather_thin` only if it is empty AND
+ *   - the evidence says zero ZIP pages show weather (the original skip), or
+ *   - every weather page was checked and none fails the invariant (`checked > 0`, no failures).
+ * A bare number keeps the original meaning (the count of weather pages); `null`/unknown never skips.
+ */
+export function weatherThinMaySkip(empties, evidence) {
+  if (!Array.isArray(empties) || !empties.includes('weather_thin')) return false;
+  if (evidence === 0) return true;
+  if (evidence && typeof evidence === 'object' && Array.isArray(evidence.failures)
+      && Number.isInteger(evidence.checked)) {
+    return evidence.checked === 0 || evidence.failures.length === 0;
+  }
+  return false;
 }
 
 // ── PUBLISHING THE MEMBERSHIP, SO THE DEPLOYED TWIN RESOLVES THE SAME CONTROLS ─────────
