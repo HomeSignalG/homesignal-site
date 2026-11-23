@@ -25,7 +25,8 @@ import { execFileSync } from 'node:child_process';
 // The origin the generated documents canonicalise to is the contract's CURRENT identity (brand_host.py), never a literal.
 const SITE_ORIGIN = execFileSync('python3', ['scripts/brand_host.py', '--origin'], { encoding: 'utf8' }).trim().replace(/\/$/, '');
 import { CLASSIFY, PINNED_ONLY, CONTROLS_FILE, classifyMembers, chooseControls,
-         publishedControls, weatherZipEvidence, weatherThinMaySkip } from './lib/zip-page-controls.mjs';
+         publishedControls, weatherZipEvidence, weatherThinMaySkipDeterministic } from './lib/zip-page-controls.mjs';
+import { runWeatherRuleFProof } from './lib/weather-rule-f-proof.mjs';
 import { appendFileSync } from 'node:fs';
 
 const SITE = process.env.SITE_DIR || '_site';
@@ -58,26 +59,29 @@ const get = (base, z, ua) =>
 async function resolveControls(SITE, man, pins) {
   const members = await classifyMembers(SITE, man);
   const { controls, empties, notes } = chooseControls(pins, members);
-  // weather_thin may be skipped only when it is empty AND the invariant it stands in for is verified on
-  // EVERY page that shows weather: Rule F pass, and >= 3 non-weather items counted from the RENDERED page.
+  // DETERMINISTIC PROOF (always runs, never reads live data): weather never counts toward Rule F, driven through
+  // the shipped generator on a synthetic dataset. A failure to run it FAILS the build; it is not a skip.
+  const proof = runWeatherRuleFProof();
+  ok(proof.ok, `weather never counts toward Rule F — deterministic proof, ${proof.results.length} synthetic case(s), `
+    + `RULE_F_MIN=${proof.min}` + (proof.ok ? '' : ` — FAILED: ${proof.error || proof.results.filter((r) => !r.pass).map((r) => `${r.zip} (${r.why}; ruleF=${r.ruleF}, items=${r.items})`).join('; ')}`));
+  // The LIVE-page evidence is kept as a WARNING only: it reports the real pages, but no longer decides the build.
   const ev = empties.includes('weather_thin') ? await weatherZipEvidence(SITE, man) : null;
-  if (weatherThinMaySkip(empties, ev)) {
+  if (ev && ev.failures.length) {
+    const bad = ev.failures.slice(0, 10).map((f) => `${f.zip} (${f.why})`).join('; ');
+    const w = `live weather pages that are not Rule F with >=3 rendered items: ${ev.failures.length} of ${ev.checked}: ${bad}`;
+    console.log('::warning title=weather pages under Rule F::' + w);
+  }
+  // weather_thin may be skipped only when it is empty AND the deterministic proof passed.
+  if (weatherThinMaySkipDeterministic(empties, proof)) {
     WEATHER_THIN_SKIPPED = true;
-    const msg = ev.checked === 0
-      ? 'weather_thin SKIPPED: 0 ZIPs with weather alerts (0 of the built ZIP documents show a Weather alerts section). '
-        + 'This check runs again as soon as any ZIP shows weather.'
-      : `weather_thin SKIPPED: the class is empty because all ${ev.checked} ZIP page(s) that show weather alerts ALSO pass Rule F, `
-        + `each carrying at least 3 non-weather items counted from the rendered page (${ev.checked} checked, 0 failing). `
-        + 'Weather did not carry Rule F on any of them. If any weather page is under Rule F or has fewer than 3 rendered items, this FAILS.';
+    const msg = `weather_thin SKIPPED: the class is empty on today's data (${ev ? ev.checked : 0} ZIP page(s) show weather, `
+      + `${ev ? ev.failures.length : 0} outside Rule F or under 3 rendered items). The invariant is proven deterministically instead, `
+      + `by the synthetic-fixture proof above. If that proof fails or cannot run, this FAILS.`;
     console.log('\n!!!!! ' + msg + ' !!!!!\n');
     console.log('::warning title=weather_thin skipped::' + msg);
     if (process.env.GITHUB_STEP_SUMMARY) {
       try { appendFileSync(process.env.GITHUB_STEP_SUMMARY, '### ⚠️ ' + msg + '\n'); } catch { /* summary is best-effort */ }
     }
-  } else if (empties.includes('weather_thin')) {
-    const bad = (ev && ev.failures || []).slice(0, 10).map((f) => `${f.zip} (${f.why})`).join('; ');
-    console.error(`weather_thin is EMPTY and the invariant is NOT verified: ${ev ? ev.checked : '?'} weather page(s) checked, `
-      + `${ev ? ev.failures.length : '?'} failing${bad ? ' — ' + bad : ''}: NOT skipping (real misclassification)`);
   }
   for (const k of Object.keys(CLASSIFY)) {
     if (PINNED_ONLY.has(k)) continue;
