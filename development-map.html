@@ -762,7 +762,7 @@
       <div class="sub">Enter a Box Elder County address to see what's built and what's proposed nearby —
         industrial facilities, data-center activity, planning hearings and open comment windows —
         every item linked to its official public record.</div>
-      <label class="search-label" for="addr">Address</label>
+      <label class="search-label" for="addr">Street address or ZIP code</label>
       <form class="search" id="form" role="search">
         <!-- No `required`: the browser's own validity bubble PREEMPTS the submit event, so with
              it the page could never show its own inline message. Emptiness is checked in the
@@ -2256,14 +2256,20 @@ HS.onReady(function(){
     var a = $("addr"); if(a){ a.setAttribute("aria-invalid","true"); try{ a.focus(); }catch(_e){} }
   }
 
-  // ONE submit path for every way the search can start — the icon button (type="submit")
-  // and the Enter key. Exactly the path the old green button used; only the control's
-  // appearance changed.
+  // ONE submit path for both Enter and the icon. A bare five-digit ZIP is an AREA,
+  // not a street address. Route it through the existing ZIP page/loader (also used by
+  // the homepage) instead of sending it to the Census address geocoder. Navigating
+  // here gives the newly selected ZIP a fresh document, so old address/ZIP records
+  // cannot remain on screen under the next area's heading.
   $("form").addEventListener("submit", function(e){
     e.preventDefault();
     var address = $("addr").value.trim();
     if(!address){ showAddrError(); return; }   // never run an empty search
     clearAddrError();
+    if(/^\d{5}$/.test(address)){
+      window.location.assign("/development-map.html?zip=" + encodeURIComponent(address));
+      return;
+    }
     run(address);
   });
   // Typing is the resident correcting the thing the message complained about, so the message
