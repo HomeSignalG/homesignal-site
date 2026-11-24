@@ -51,16 +51,16 @@ function submit(value) {
   submissions++;
 }
 submit('52638');
-assert.deepEqual(visits, ['development-map.html?zip=52638'],
+assert.deepEqual(visits, ['/development-map.html?zip=52638'],
   'Middletown ZIP goes through the canonical ZIP page, not the address geocoder');
 assert.deepEqual(addressSearches, [], 'no address lookup for a ZIP');
 
 submit('07001');
-assert.equal(visits.at(-1), 'development-map.html?zip=07001',
+assert.equal(visits.at(-1), '/development-map.html?zip=07001',
   'leading-zero ZIP is preserved exactly');
 
 submit(' 85083 ');
-assert.equal(visits.at(-1), 'development-map.html?zip=85083',
+assert.equal(visits.at(-1), '/development-map.html?zip=85083',
   'ZIP input is trimmed before navigation');
 
 submit('17571 DMC Highway 79, Middletown, IA 52638');
