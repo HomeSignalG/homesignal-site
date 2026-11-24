@@ -2267,7 +2267,7 @@ HS.onReady(function(){
     if(!address){ showAddrError(); return; }   // never run an empty search
     clearAddrError();
     if(/^\d{5}$/.test(address)){
-      window.location.assign("development-map.html?zip=" + encodeURIComponent(address));
+      window.location.assign("/development-map.html?zip=" + encodeURIComponent(address));
       return;
     }
     run(address);
