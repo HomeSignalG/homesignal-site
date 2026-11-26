@@ -142,3 +142,20 @@ Figures are as supplied by the founder from the full receipt. My earlier figures
 3. Decide how a renumbered key (T-number to permit number on issuance) should be reconciled, since it currently looks like one vanished record plus one missing record. This needs the publisher's rule, which has been confirmed for one key only.
 4. Consider whether a ZIP whose polygon extends beyond the 3-mi radius from its pinned centre should be refreshed through the neighbouring ZIPs it depends on, or have its own coverage, before any completeness claim.
 5. Re-run the reconciliation only after these, and never as a coverage claim.
+
+# ZIP 78681 (Round Rock TX): new Local News subscriber audit (2026-11-23, read-only)
+
+**Coverage for ZIP 78681 is NOT ESTABLISHED.** No source reconciliation was performed for any tile. Evidence is database reads, the registry file and one fetch of the public page. The subscriber signed up for Local News (two explicit, subscribed news-stream subscriptions, no unsubscribe), not Development map emails, so no MAPS post is expected. Whether a digest has gone out was not checked. (Subscriber identity is deliberately not recorded here.)
+
+- **Page:** `https://jodytracks.com/community/78681/` answers HTTP 200, `index, follow`, self-canonical, with real content in its first HTML. It is in the registry, data quality `pass`, coverage state `populated`, Map 1 status `boundary_complete` (6 members, generation `n5-national-2026-11-23`), report refreshed 2026-11-23 11:02Z. Live and indexable does not establish coverage.
+- **Hierarchy:** ZIP, then Williamson County; Round Rock city and Austin (1.1% of the land) are also read.
+- **No development source:** the 18 development records are all TxDOT road projects (newest filing date 2026-07-30; the registry's only TX source covering Williamson is statewide `txdot-projects-info-all`). There is no Round Rock or Williamson building or planning source. A missing source is not evidence of no development.
+- **Stale EPA count:** 39 facilities are stored, but the EPA read is flagged unavailable and the last confirmation was **2026-11-03**, so the count is not confirmed current.
+- **Polygon beyond the radius:** the ZIP polygon spans about 9.4 mi north to south and its farthest vertex is **6.86 mi** from the report centre, past the 3-mi ingest radius.
+- Other tiles (not established): county notices 58 stored (newest 11-21); county meetings 19 stored (one upcoming, 11-24); Round Rock city meetings 32 stored (newest 11-19, none upcoming listed; whether the next one is simply unposted was not checked); no Round Rock city notices (its feed is meetings only); Local News on the page is mostly county-wide (Georgetown, Hutto, Cedar Park).
+
+# Systemic findings for the fix session
+Recommendations only. Nothing is built or changed. Cross-reference: homesignal-site#3111 (development-source coverage audit, round 2).
+1. **Permit renumbering breaks identity.** Phoenix permit `2605046` is the renumbered `T165773` (same name, address, coordinates and filing date; renumbered when issued 2026-11-20). JODY sees one vanished record plus one missing record. Same class as KCMO A4 in #3111 (the same permit number appearing under a changed key). Needs a rule for reconciling a key that changes on issuance, from the publisher's side; confirmed for one key only.
+2. **The 3-mi ingest radius does not cover large ZCTA polygons.** 85083: the point of `2605046` is 4.03 mi from the report centre but inside the polygon. 78681: the farthest vertex is 6.86 mi from the report centre. A ZIP's own refresh cannot reach its outer edges, so records there depend on neighbouring ZIPs refreshing.
+3. **Stale N5 references with no `app_projects` row.** `T165906` is still an N5 member of 85083 (generation `n5-national-2026-11-22`) with no `app_projects` row in any ZIP. This is defect A1 in #3111. A recommended alarm: N5 members with no project row.
