@@ -352,12 +352,12 @@ const asOf2 = gen(inputs({ mutate: (d) => { for (const pr of Object.values(d.pro
   { baseline: asOf.stateText, now: '2026-10-05T06:40:00' });
 const asOfDoc1 = readFileSync(join(asOf.out, ...projPath.split('/').filter(Boolean), 'index.html'), 'utf8');
 const asOfDoc2 = readFileSync(join(asOf2.out, ...projPath.split('/').filter(Boolean), 'index.html'), 'utf8');
-ok(asOfDoc1 !== asOfDoc2 && asOfDoc2.includes('Oct 4, 2026'), 'S0 control: the written page really shows the new "Status as of" day');
+ok(asOfDoc1 !== asOfDoc2 && asOfDoc2.includes('Oct 4, 2026'), 'S0 control: the written page really shows the new "Last updated" day');
 ok(asOf2.status === 0 && touched(asOf2.delta).length === 0 && asOf2.delta.submit.length === 0,
    `S  a tracked project\'s daily as_of advance is ZERO delta (it would otherwise re-announce every project page each morning)`);
 const lost = gen(inputs({ mutate: (d) => { for (const pr of Object.values(d.projectsDoc.projects)) { pr.tracked = false; pr.as_of = '2026-09-27'; } } }),
   { baseline: DEV_STATE });
-ok(lost.delta.changed.includes(projPath), 'S1 a project that stops being tracked IS a change (the page now says HomeSignal no longer tracks it)');
+ok(lost.delta.changed.includes(projPath), 'S1 a project that stops being tracked IS a change (its Last updated day freezes)');
 // determinism: two same-day, same-title rows must not make the page flip with row order
 const tie = (order) => alertInputs({ mutate: (d) => {
   const rows = [{ zip: '99999', community_id: 'c-h', category: 'Government & civic', title: 'Flood Warning', source_ref: 'https://gov.example/fw-1', occurred_at: '2026-09-27' },

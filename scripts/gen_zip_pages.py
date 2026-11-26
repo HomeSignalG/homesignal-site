@@ -1357,7 +1357,7 @@ def render(p, built):
         # this one. Fails CLOSED if absent (outcome 'unavailable', no absence claim).
         '<script src="/lib/zip-authoritative.js?v=20261029a"></script>\n'
         '<script src="/lib/data.js?v=b7a48d38"></script>\n<script src="/lib/topic-prefs.js?v=fe87d99b"></script>\n'
-        '<script src="/lib/templates.js?v=9e1170b0"></script>\n<script src="/lib/impact.js"></script>\n'
+        '<script src="/lib/templates.js?v=56e322de"></script>\n<script src="/lib/impact.js"></script>\n'
         # lib/project-type.js: the canonical Development Type (pure — no DOM, no map runtime).
         # The Development & Growth Type badge reads HS.canonicalProjectType from it. Same parity
         # rule as the files around it: both hosts run ONE runtime. lib/map.js stays OFF (§5a).
@@ -1545,6 +1545,26 @@ def human_day(day):
     return f"{MONTHS[int(m) - 1]} {int(d)}, {y}"
 
 
+LAST_UPDATED_LABEL = "Last updated"
+
+
+def last_updated(day, tag=False):
+    """THE one way a project's verification date is worded on every generated page:
+    'Last updated: Sep 28, 2026' (a <time> element when tag=True). `day` is the project plane's
+    `as_of`, the day the record was last read from its official source. It is frozen when the
+    source cannot be read, so it is never the build, deploy or attempt date. Empty when unknown.
+    Mirror: HS.lastUpdated in lib/templates.js (test/last-updated-standard.test.mjs)."""
+    if not DAY_RE.match(str(day or "")):
+        return ""
+    try:
+        datetime.strptime(day, "%Y-%m-%d")
+    except ValueError:
+        return ""
+    shown = human_day(day)
+    v = f'<time datetime="{esc(day)}">{esc(shown)}</time>' if tag else esc(shown)
+    return f"{LAST_UPDATED_LABEL}: {v}"
+
+
 def project_list_path(z):
     return f"/community/{z}/projects/"
 
@@ -1570,12 +1590,12 @@ def related_projects(pr, pages, projects, cap=RELATED_CAP):
     return out[:cap], len(out)
 
 
-def render_project(pr, pages, built, projects=None):
+def render_project(pr, pages, built, projects=None, neutral_related=False):
     """One project page. Static HTML; its only script element is inert structured data.
     Everything it states is in the plane: the source's own name, address, record number,
     date and status, labelled by lib/project-type.js, and the official record it came from.
     Location is the ZIP pages the project is on. `as_of` is the day the status was read;
-    a project HomeSignal no longer tracks says so, and shows the last status it had."""
+    a project whose source can no longer be read keeps its last status and its Last updated day."""
     zips = [z for z in pr["zips"] if z in pages]
     first = pages[zips[0]]
     where = f"{first['name']}, {first['state']}" if first.get("state") else first["name"]
@@ -1585,13 +1605,12 @@ def render_project(pr, pages, built, projects=None):
     named = pr["title"]
     if addr and addr.lower() not in named.lower():
         named = f"{named}, {addr}"
-    title = f"{named} — {kind} in {where}" + (f" ({year})" if year else "") + " | HomeSignal"
+    title = f"{named} — {kind} in {where}" + (f" ({year})" if year else "") + " | JODY"
     when = f" Date on record: {pr['date']}" + (f" ({pr['date_kind']})" if pr["date_kind"] else "") \
         + "." if pr["date"] else ""
     at = f" at {addr}" if addr else ""
-    status_word = "last recorded as" if not pr["tracked"] else ""
     desc = (f"{pr['title']}: {kind.lower()}{at} in {where}, "
-            f"{(status_word + ' ') if status_word else ''}{pr['lifecycle'].lower()}.{when} "
+            f"{pr['lifecycle'].lower()}.{when} "
             f"Linked to its source record.")
     canon = f"{BASE}{pr['path']}"
     as_of = human_day(pr["as_of"])
@@ -1605,12 +1624,11 @@ def render_project(pr, pages, built, projects=None):
     if pr.get("status") == "Decided":
         # A decided application browses as Proposed (lib/project-type.js); say a decision exists.
         stands += ' <span class="quiet">(a decision is on record; see the agency\'s own status)</span>'
-    facts.append(("Where it stands" if pr["tracked"] else "Last recorded status", stands))
+    facts.append(("Where it stands", stands))
     if pr.get("agency_status"):
-        facts.append(("Agency's own status" if pr["tracked"] else "Agency's status when last seen",
-                      esc(pr["agency_status"])))
+        facts.append(("Agency's own status", esc(pr["agency_status"])))
     if as_of_el:
-        facts.append(("Status as of" if pr["tracked"] else "Last seen", as_of_el))
+        facts.append((LAST_UPDATED_LABEL, as_of_el))
     if pr["date"]:
         d = f'<time datetime="{esc(pr["date"])}">{esc(pr["date"])}</time>'
         if pr["date_kind"]:
@@ -1638,7 +1656,7 @@ def render_project(pr, pages, built, projects=None):
     city_nav = (f'<nav class="zcity" aria-label="City development">{" · ".join(cli)}</nav>'
                 if cli else "")
     # Home > City > ZIP > Project, the same path the page's own links follow.
-    crumbs = [("HomeSignal", "/")]
+    crumbs = [("JODY", "/")]
     if city_crumb:
         crumbs.append(city_crumb)
     crumbs.append((first["name"], f"/community/{zips[0]}/"))
@@ -1650,25 +1668,14 @@ def render_project(pr, pages, built, projects=None):
                  + " › ".join(f'<a href="{esc(u)}">{esc(n)}</a>' for n, u in crumbs[:-1])
                  + '</nav>')
     status_line = f'<p>{esc(kind)} · {esc(pr["lifecycle"])}' + (
-        f' <span class="quiet">as of {as_of_el}</span>' if (as_of_el and pr["tracked"]) else "") + '</p>'
+        f' <span class="quiet">{last_updated(pr["as_of"], True)}</span>' if as_of_el else "") + '</p>'
     # A reviewed development dossier that links this record (scripts/development_pages.py).
     status_line += "".join(f'<p>Part of <a href="{esc(u)}">{esc(n)}</a></p>' for n, u in (pr.get("part_of") or []))
-    notice = ""
-    if not pr["tracked"]:
-        # Inline style: app.css is shared and frozen ("do not restyle"); the page CSP allows
-        # inline styles. The notice must read as a status change, not as body text.
-        notice = (f'<p class="notice" role="note" style="border-left:4px solid #b45309;'
-                  f'background:#fff7ed;padding:12px 14px;margin:14px 0">'
-                  f'HomeSignal no longer tracks this project. '
-                  f'Its last recorded status was <strong>{esc(pr["lifecycle"])}</strong>'
-                  + (f', as of {as_of_el}' if as_of_el else "")
-                  + f'. <a href="{esc(pr["url"])}" rel="nofollow noopener">Check the official '
-                    f'record</a> for its current status.</p>')
+    notice = ""   # no tracked/untracked wording is customer-facing; Last updated carries it
     src = esc(pr["source"])
-    footer = (f'Status as of {as_of_el}, from {src}\'s public records. ' if pr["tracked"] and as_of_el
-              else f'Last seen in {src}\'s public records on {as_of_el}. ' if as_of_el else "")
+    footer = (f'{last_updated(pr["as_of"], True)}, from {src}\'s public records. ' if as_of_el else "")
     body = (
-        f'<main id="hs-ssr">{crumb_nav}<header><p class="eyebrow"><a href="/">HomeSignal</a> · '
+        f'<main id="hs-ssr">{crumb_nav}<header><p class="eyebrow"><a href="/">JODY</a> · '
         f'Development project</p>'
         f'<h1>{esc(pr["title"])}</h1>'
         + (f'<p class="addr">{esc(addr)}, {esc(where)}</p>' if addr else "")
@@ -1677,16 +1684,16 @@ def render_project(pr, pages, built, projects=None):
         + f'<section class="zsec"><h2>On the record</h2><dl>{dl}</dl></section>'
         + _history_section(pr)
         + f'<section class="zsec"><h2>Where it is</h2>'
-        f'<p>On the HomeSignal page for {"these ZIP codes" if len(zips) > 1 else "this ZIP code"}:</p>'
+        f'<p>On the JODY page for {"these ZIP codes" if len(zips) > 1 else "this ZIP code"}:</p>'
         f'<ul>{zli}</ul>'
         f'<p><a href="/map/{esc(zips[0])}/">See it on the Development map</a></p>'
         f'</section>'
-        + _related_section(pr, zips, first, pages, projects)
+        + _related_section(pr, zips, first, pages, projects, neutral_related)
         + city_nav
         + f'<p class="quiet">{footer}The name, address, record number, date '
           f'and status are the source\'s own; nothing on this page is generated or inferred.</p>'
-        + '<nav class="zsec"><a href="/">HomeSignal home</a> · '
-          '<a href="/how-it-works.html">How HomeSignal works</a> · '
+        + '<nav class="zsec"><a href="/">JODY home</a> · '
+          '<a href="/how-it-works.html">How JODY works</a> · '
           f'<a href="{GUIDE_CHECK}">How to check proposed development near a house</a></nav>'
         + '</main>')
     return (_head(title, desc, canon, og_type="article", ld=ld)
@@ -1694,7 +1701,7 @@ def render_project(pr, pages, built, projects=None):
 
 
 def _history_section(pr):
-    """Status history from the change ledger. Each line is dated by the day HomeSignal
+    """Status history from the change ledger. Each line is dated by the day JODY
     OBSERVED it, which is said on the page: it is not the agency's own decision date. A record
     whose ledger was not read gets no section; one read with no change says only what was seen."""
     if not pr.get("history_read"):
@@ -1705,7 +1712,7 @@ def _history_section(pr):
     for ev in pr.get("history") or []:
         d = f'<time datetime="{esc(ev["day"])}">{esc(human_day(ev["day"]))}</time>'
         if ev["kind"] == "first_detected":
-            what = "First seen by HomeSignal"
+            what = "First seen by JODY"
             if ev["to_stage"]:
                 what += f'; agency status: <strong>{esc(ev["to_stage"])}</strong>'
             elif ev["to_label"]:
@@ -1716,7 +1723,7 @@ def _history_section(pr):
                 bits.append(f'Agency status changed from <strong>{esc(ev["from_stage"] or "not stated")}</strong> '
                             f'to <strong>{esc(ev["to_stage"] or "not stated")}</strong>')
             if ev["from_label"] != ev["to_label"] and (ev["from_label"] or ev["to_label"]):
-                bits.append(f'HomeSignal status {esc(ev["from_label"] or "not stated")} → '
+                bits.append(f'JODY status {esc(ev["from_label"] or "not stated")} → '
                             f'{esc(ev["to_label"] or "not stated")}')
             if not bits:
                 continue
@@ -1727,17 +1734,17 @@ def _history_section(pr):
     total = pr.get("history_total") or len(rows)
     more = (f'<p class="quiet">Showing the {len(rows)} newest of {total} recorded changes.</p>'
             if total > len(rows) else "")
-    since = (f'<p>HomeSignal has watched this record since {ws_el}.</p>' if ws_el else "")
+    since = (f'<p>JODY has watched this record since {ws_el}.</p>' if ws_el else "")
     body = (f"<ol>{''.join(rows)}</ol>{more}" if rows
             else "<p>No status change recorded since then.</p>")
     return (f'<section class="zsec"><h2>Status history</h2>{since}{body}'
-            f'<p class="quiet">Each date is the day HomeSignal saw the change in the agency\'s '
+            f'<p class="quiet">Each date is the day JODY saw the change in the agency\'s '
             f'public records, not necessarily the day the agency acted. Not every project moves '
             f'through every stage: an application can be withdrawn, denied, revised or paused, '
             f'and the agency\'s own status word is shown as published.</p></section>')
 
 
-def _related_section(pr, zips, first, pages, projects):
+def _related_section(pr, zips, first, pages, projects, neutral_related=False):
     if not projects:
         return ""
     rel, total = related_projects(pr, pages, projects)
@@ -1754,8 +1761,10 @@ def _related_section(pr, zips, first, pages, projects):
             inner += f' <span class="quiet">{esc(" · ".join(bits))}</span>'
         if o["date"]:
             inner += f' <time datetime="{esc(o["date"])}">{esc(o["date"])}</time>'
-        if not o["tracked"]:
-            inner += ' <span class="quiet">(no longer tracked)</span>'
+        if o.get("as_of"):
+            # a tracked neighbour's as_of advances daily (bookkeeping): the fingerprint read holds it
+            day = ps.NEUTRAL_AS_OF if (neutral_related and o["tracked"]) else o["as_of"]
+            inner += f' <span class="quiet">{last_updated(day, True)}</span>'
         li.append(f"<li>{inner}</li>")
     more = ""
     if total > len(rel):
@@ -1784,20 +1793,20 @@ def render_project_list(z, keys, projects, pages):
             inner += f' <span class="quiet">{esc(" · ".join(bits))}</span>'
         if pr["date"]:
             inner += f' <time datetime="{esc(pr["date"])}">{esc(pr["date"])}</time>'
-        if not pr["tracked"]:
-            inner += ' <span class="quiet">(no longer tracked)</span>'
+        if pr.get("as_of"):
+            inner += f' <span class="quiet">{last_updated(pr["as_of"], True)}</span>'
         li.append(f"<li>{inner}</li>")
-    title = f"Development projects on record in {z} · {label} | HomeSignal"
-    desc = (f"Every development project HomeSignal has a page for in ZIP {z} ({label}), "
+    title = f"Development projects on record in {z} · {label} | JODY"
+    desc = (f"Every development project JODY has a page for in ZIP {z} ({label}), "
             f"newest first, each linked to its official record.")
-    body = (f'<main id="hs-ssr"><header><p class="eyebrow"><a href="/">HomeSignal</a> · '
+    body = (f'<main id="hs-ssr"><header><p class="eyebrow"><a href="/">JODY</a> · '
             f'<a href="/community/{esc(z)}/">{esc(z)}</a></p>'
             f'<h1>Development projects on record in {esc(z)} · {esc(label)}</h1>'
             f'<p>{len(rows)} project{"s" if len(rows) != 1 else ""}, newest first.</p></header>'
             f'<section class="zsec"><ul>{"".join(li)}</ul></section>'
             f'<nav class="zsec"><a href="/community/{esc(z)}/">Back to {esc(z)} · {esc(label)}</a> · '
             + (f'<a href="{esc(map_path(z))}">Development map for {esc(z)}</a> · ' if p.get("map_summary") else "")
-            + f'<a href="/">HomeSignal home</a></nav></main>')
+            + f'<a href="/">JODY home</a></nav></main>')
     return (_head(title, desc, f"{BASE}{project_list_path(z)}", robots="index, follow")
             + static_body("project-list", project_list_path(z), body))
 
@@ -1819,7 +1828,7 @@ def build_projects(projects, pages, out_dir, built, state=None):
             # its sitemap lastmod); it is also the only source-derived time that can seed it.
             # A tracked project's as_of advances daily and is bookkeeping, not a fact (see
             # page_semantics.NEUTRAL_AS_OF): its fingerprint reads the page rendered with it held.
-            sem = (render_project({**pr, "as_of": ps.NEUTRAL_AS_OF}, pages, ps.BUILD_DAY_TOKEN, projects)
+            sem = (render_project({**pr, "as_of": ps.NEUTRAL_AS_OF}, pages, ps.BUILD_DAY_TOKEN, projects, True)
                    if pr["tracked"] and pr["as_of"] else None)
             state.add(pr["path"], doc, pr.get("changed_on") or None, sem)
         h = doc.replace(ps.BUILD_DAY_TOKEN, built).encode("utf-8")

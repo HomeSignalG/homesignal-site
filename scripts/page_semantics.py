@@ -58,7 +58,7 @@ FAMILIES = ("zip", "city", "project", "guide", "map", "development", "fact-check
 # bluesky/lib/development-seo-plane.mjs) and it advances daily for every tracked project. Read as
 # content it would re-announce ~14,000 project pages every morning. The renderer therefore renders
 # a tracked project a second time with this constant for the FINGERPRINT only; the written page
-# keeps the real day. An untracked project's as_of ("Last seen") is a frozen fact and is not
+# keeps the real day. An untracked project's as_of ("Last updated") is a frozen fact and is not
 # neutralized.
 NEUTRAL_AS_OF = "2000-01-01"
 # The canonical URL shape of every family that is tracked. A tracked page is index-eligible or

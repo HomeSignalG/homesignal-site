@@ -252,18 +252,17 @@ ok([...pg1.matchAll(/<script[\s>][^>]*>/gi)].map((m) => m[0]).join() === '<scrip
   ok(b.r.status === 0, `a document with the new fields builds (${(b.r.stderr || '').trim().slice(-200)})`);
   const pk = read(b.out, expectedPath('phoenix-building-permits', 'T971680', KK));
   const pa = read(b.out, p1);
-  ok(/<title>Olympia Place Apartments, 1 Olympia Dr — [^<]+ \(2026\) \| HomeSignal<\/title>/.test(pa),
+  ok(/<title>Olympia Place Apartments, 1 Olympia Dr — [^<]+ \(2026\) \| JODY<\/title>/.test(pa),
      'the title carries the address and the year of the date on record');
   ok(pa.includes('<p class="addr">1 Olympia Dr, ') && pa.includes('<dt>Address</dt><dd>1 Olympia Dr</dd>'),
      'the address is under the name and in the facts');
-  ok(/<p>[^<]*·[^<]*<span class="quiet">as of <time datetime="2026-09-28">Sep 28, 2026<\/time><\/span><\/p>/.test(pa) &&
-     pa.includes('<dt>Status as of</dt><dd><time datetime="2026-09-28">Sep 28, 2026</time></dd>'),
-     'a tracked page shows the day its status was read, beside the status');
-  ok(!pa.includes('no longer tracks'), 'a tracked page carries no notice');
-  ok(/<p class="notice" role="note" style="[^"]+">HomeSignal no longer tracks this project\./.test(pk) &&
-     pk.includes('<dt>Last recorded status</dt>') && pk.includes('<dt>Last seen</dt><dd><time datetime="2026-08-02">Aug 2, 2026</time></dd>') &&
-     !pk.includes('<dt>Where it stands</dt>'),
-     'a page no longer tracked says so and shows its last recorded status and when it was seen');
+  ok(/<p>[^<]*·[^<]*<span class="quiet">Last updated: <time datetime="2026-09-28">Sep 28, 2026<\/time><\/span><\/p>/.test(pa) &&
+     pa.includes('<dt>Last updated</dt><dd><time datetime="2026-09-28">Sep 28, 2026</time></dd>'),
+     'a tracked page shows Last updated, the day its status was read, beside the status');
+  ok(!/no longer tracks|Not tracked|Last seen/i.test(pa), 'no page carries tracked/untracked wording');
+  ok(!/no longer tracks|no longer tracked|Not tracked|Last seen/i.test(pk) && !pk.includes('class="notice"') &&
+     pk.includes('<dt>Where it stands</dt>') && pk.includes('<dt>Last updated</dt><dd><time datetime="2026-08-02">Aug 2, 2026</time></dd>'),
+     'a paused page keeps its last status and shows the frozen Last updated day, with no tracking wording');
   ok(/<meta name="robots" content="index, follow">/.test(pk), 'and stays indexable');
   ok(pk.includes('<dt>Source</dt><dd>City of Phoenix <span class="quiet">(phoenix-building-permits)</span></dd>') &&
      pa.includes('<dt>Source</dt><dd>town-permits</dd>'),
@@ -289,8 +288,8 @@ ok([...pg1.matchAll(/<script[\s>][^>]*>/gi)].map((m) => m[0]).join() === '<scrip
   ok(!/<loc>https:\/\/jodytracks\.com\/community\/[^<]+<\/loc>\n    <lastmod>/.test(sm2),
      'ZIP pages carry no lastmod (no honest per-page change date exists for them yet)');
   const list = read(b.out, '/community/01002/projects/');
-  ok(list.includes('(no longer tracked)') && list.includes('<span class="addr">27 W Lewis Ave</span>'),
-     'the list marks a page no longer tracked and shows addresses');
+  ok(!list.includes('no longer tracked') && list.includes('Last updated: <time datetime="2026-08-02">') && list.includes('<span class="addr">27 W Lewis Ave</span>'),
+     'the list shows Last updated for each project (frozen for a paused one) and addresses');
   for (const [what, m] of [
     ['a non-boolean tracked flag', (r) => { r.tracked = 'no'; }],
     ['a malformed as_of', (r) => { r.as_of = '28/09/2026'; }],
@@ -337,9 +336,8 @@ ok([...pg1.matchAll(/<script[\s>][^>]*>/gi)].map((m) => m[0]).join() === '<scrip
   const po = read(bs.out, expectedPath('town-permits', other[1].case, other[0]));
   const items = [...po.matchAll(/<li><a href="\/project\/[^"]+">[^<]*<\/a>[\s\S]*?<\/li>/g)].map((m) => m[0]);
   const gone = items.findIndex((x) => x.includes('Gone Project'));
-  ok(gone >= 0 && items.slice(gone + 1).every((x) => x.includes('(no longer tracked)')) &&
-     items.slice(0, gone).every((x) => !x.includes('(no longer tracked)')),
-     'projects no longer tracked come after tracked ones, even when newer');
+  ok(gone >= 0 && items.every((x) => x.includes('Last updated: ')) && !items.some((x) => x.includes('no longer tracked')),
+     'every related project shows Last updated and none shows tracking wording; paused ones still sort last');
 }
 
 {
@@ -497,10 +495,10 @@ print("LOADED")`;
   const a = read(hb.out, pathOf('https://permits.example.gov/r/1'));
   ok(a.includes('<h2>Status history</h2>'), 'a page with ledger history has a Status history section');
   ok(a.includes('<dt>Agency\'s own status</dt><dd>Completed</dd>'), 'the agency\'s own status word is shown as published');
-  ok(a.includes('<time datetime="2026-11-12">Nov 12, 2026</time>: Agency status changed from <strong>Issued</strong> to <strong>Completed</strong>; HomeSignal status Approved → Operating / built'),
+  ok(a.includes('<time datetime="2026-11-12">Nov 12, 2026</time>: Agency status changed from <strong>Issued</strong> to <strong>Completed</strong>; JODY status Approved → Operating / built'),
      'a status change names both words and the day it was seen, labelled by the one lifecycle authority');
   ok(a.indexOf('2026-11-12') < a.indexOf('2026-10-02'), 'newest first');
-  ok(a.includes('First seen by HomeSignal; agency status: <strong>Issued &lt;b&gt;</strong>'), 'source words are escaped');
+  ok(a.includes('First seen by JODY; agency status: <strong>Issued &lt;b&gt;</strong>'), 'source words are escaped');
   ok(a.includes('Showing the 2 newest of 3 recorded changes.'), 'a capped history says so');
   ok(a.includes('not necessarily the day the agency acted') && a.includes('withdrawn, denied, revised or paused'),
      'the page says the dates are observation dates and that projects need not follow every stage');
