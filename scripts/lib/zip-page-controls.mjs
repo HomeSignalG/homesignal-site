@@ -208,6 +208,18 @@ export function weatherThinMaySkip(empties, evidence) {
   return false;
 }
 
+// ── THE DETERMINISTIC REPLACEMENT FOR THE LIVE-DATA DEPENDENCY (founder, 2026-11-23) ─────
+//
+// The invariant "weather never counts toward Rule F" is proven by scripts/lib/weather-rule-f-proof.mjs on a
+// SYNTHETIC dataset through the shipped generator, so it does not depend on whether any NWS alert is live.
+// An empty `weather_thin` class may be skipped ONLY when that proof ran and passed. If it could not run
+// (`proof` missing, `ok` not exactly true), nothing is skipped and the empty class fails the build.
+// The live-page evidence (weatherZipEvidence) is kept, but only as a WARNING.
+export function weatherThinMaySkipDeterministic(empties, proof) {
+  return Array.isArray(empties) && empties.includes('weather_thin')
+    && !!proof && proof.ok === true && Array.isArray(proof.results) && proof.results.length > 0;
+}
+
 // ── PUBLISHING THE MEMBERSHIP, SO THE DEPLOYED TWIN RESOLVES THE SAME CONTROLS ─────────
 //
 // ⚖️ WHY THIS EXISTS (2026-09-15). The derivation above shipped to the BUILD twin only.
