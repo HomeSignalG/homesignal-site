@@ -66,6 +66,19 @@ DC_LISTING_CAP = 12                          # listings printed; the rest are na
 SIB_CAP = 10                                 # sibling ZIP links per page (see link_siblings)
 WEATHER_AGENCY = "api.weather.gov"
 GN_CATEGORIES = ("Government & civic", "Planning & zoning")
+
+# ZIPs that span more than one county while the page's sources come from ONE county's government
+# (founder, 2026-11-26). The page must not say the records "apply to the whole of" the ZIP, and its sibling
+# list must not imply the ZIP belongs only to that county. Data is untouched: no county ownership, feed or
+# source is changed here. Keyed by ZIP so another ZIP needs its own measured entry (80021: about 69%
+# Jefferson / 31% Broomfield by ZCTA area, founder-stated).
+ZIP_PARTIAL_COUNTY_NOTES = {
+    "80021": {
+        "disclosure": ("ZIP 80021 spans Jefferson and Broomfield counties. The government notices and meetings "
+                       "currently shown are from Jefferson County and may not cover the entire ZIP code."),
+        "sibling_heading": "Other ZIP codes with Jefferson County coverage",
+    },
+}
 ZIP_RE = re.compile(r"^[0-9]{5}$")
 
 # A build that HANGS is worse than a build that fails: the job burns its whole
@@ -1242,8 +1255,10 @@ def render(p, built):
         items = "".join(f'<li><a href="/community/{esc(s["zip"])}/">{esc(s["name"])}</a></li>'
                         for s in sibs)
         nearby_id = ' id="zip-nearby"' if cov else ""
+        sib_note = ZIP_PARTIAL_COUNTY_NOTES.get(z)
+        sib_head = esc(sib_note["sibling_heading"]) if sib_note else f"More ZIP codes in {where}"
         links += (f'<nav class="zsib"{nearby_id} aria-label="More ZIP codes in this county">'
-                  f'<h2>More ZIP codes in {where}</h2><ul>{items}</ul></nav>')
+                  f'<h2>{sib_head}</h2><ul>{items}</ul></nav>')
     elif cov:
         # The panel's "Search nearby ZIPs" link needs somewhere to land even when the county
         # offers no sibling ZIP.
@@ -1276,8 +1291,11 @@ def render(p, built):
         f'<h1>{esc(z)} · {esc(plabel)}</h1>'
         + (f'<p>{lead} ZIP {esc(z)}{county_bit}.</p></header>' + coverage_panel(p)
            if cov else
-           f'<p>{lead} that apply to the whole of '
-           f'ZIP {esc(z)}{county_bit}.</p></header>')
+           (f'<p>{lead} for ZIP {esc(z)}.</p>'
+            f'<p class="quiet zspan">{esc(ZIP_PARTIAL_COUNTY_NOTES[z]["disclosure"])}</p></header>'
+            if z in ZIP_PARTIAL_COUNTY_NOTES else
+            f'<p>{lead} that apply to the whole of '
+            f'ZIP {esc(z)}{county_bit}.</p></header>'))
         + ("" if cov else _dev_items(p.get("dev_entities") or []))
         + ("" if cov else _dc_listing_items(p.get("dc_listings") or [], z))
         + _items(gn_shown, "Government notices",

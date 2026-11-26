@@ -82,6 +82,7 @@ on:
       - 'test/zip-pages-seo.test.mjs'
       - 'test/zip-pages-no-point.test.mjs'
       - 'test/zip-pages-weather-rule-f.test.mjs'
+      - 'test/zip-80021-partial-county.test.mjs'
       - 'scripts/lib/weather-rule-f-proof.mjs'
       - 'test/community-page-contract.test.mjs'
       - 'test/site-artifact-contract.test.mjs'
@@ -124,6 +125,7 @@ on:
       - 'test/zip-pages-seo.test.mjs'
       - 'test/zip-pages-no-point.test.mjs'
       - 'test/zip-pages-weather-rule-f.test.mjs'
+      - 'test/zip-80021-partial-county.test.mjs'
       - 'scripts/lib/weather-rule-f-proof.mjs'
       - 'test/community-page-contract.test.mjs'
       - 'test/fixtures/zip-pages.json'
@@ -594,7 +596,7 @@ jobs:
         run: |
           set -euo pipefail
           exec > >(tee -a "$RUNNER_TEMP/receipts.txt") 2>&1
-          for t in zip-pages-seo zip-pages-no-point zip-pages-weather-rule-f community-page-contract city-pages project-pages; do
+          for t in zip-pages-seo zip-pages-no-point zip-pages-weather-rule-f zip-80021-partial-county community-page-contract city-pages project-pages; do
             echo "--- test/$t.test.mjs"
             node "test/$t.test.mjs" | tail -3
           done
