@@ -3331,7 +3331,8 @@ HS.onReady(function(){
       if(live){
         ZIP_BOUNDARY_LAYER = L.geoJSON(ZIP_BOUNDARY.fc, { style: ZIP_LINE, interactive:false }).addTo(map);
         try { ZIP_BOUNDARY_LAYER.bringToBack(); } catch(e){}
-        if(ZIP_MODE && (IS_EMBED || !MAP_SITES.length)){
+        var emptyZip = ZIP_MODE && !IS_EMBED && !MAP_SITES.length;   // no records to frame: frame the ZIP itself
+        if((IS_EMBED && ZIP_MODE) || emptyZip){
           var b = ZIP_BOUNDARY.bounds;
           map.fitBounds([[b.south, b.west], [b.north, b.east]], { padding:[24,24] });
         }
