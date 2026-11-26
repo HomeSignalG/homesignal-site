@@ -112,7 +112,7 @@ ok(!('return_centroid' in E),
 ok(E.spatial_zip_radius_mi === 3, 'spatial ZIP scoping at 3 mi (the layer has no ZIP column)');
 
 // ── use_type + record precision ────────────────────────────────────────────────
-ok(E.use_type_const === 'Utility', 'DOT road work → Utility (Caltrans/ODOT/GDOT/TDOT precedent)');
+ok(E.use_type_const === 'Roads & infrastructure', 'DOT road work → Utility (Caltrans/ODOT/GDOT/TDOT precedent)');
 ok(!('type_map' in E),
   'no type_map — use_type_const covers it; a bare type_source would fall through to keyword guessing');
 ok(E.record_url_precision === 'dataset',

@@ -10845,7 +10845,7 @@
         "operating": [],
         "exclude": []
       },
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "incremental_field": "StartDate",
       "record_url_precision": "dataset",
       "_receipts": "2026-07-31 FL STATEWIDE wire, on the STATE-DOT pattern that produced all three Live states. TX, NV and UT each reached 90% via a statewide DOT layer (txdot-projects-info-all, nvdot-project-boundaries, udot-active-projects); workbook row 420 records the statewide path as exhausted, but that list is the WORKBOOK'S six candidates -- the state-DOT CLASS was never enumerated for the other 47 states. FDOT is the first of that sweep. LIVE PROBE: gis.fdot.gov root 200, service 'Active FDOT Construction Project Feature Service', POLYLINE (rides featurePoint()'s path-midpoint). NOTE layer index is 1, not 0 -- layer 0 returns HTTP 200 carrying {'error':{'code':500,'message':'json'}}; the service doc lists exactly one layer, id 1 'Construction Projects'. 2,428 rows. Fields: ContractId, Item, District, County, RoadwayId, BeginMP, EndMP, Description, StartDate, EstEndDate, Cost, FinProjNum, Vendor, ProjectMgr, Website. NO status column and NO type column, so both are constants, matched to the three proven DOT entries rather than guessed: every one of them maps project types to 'Utility', so use_type_const='Utility'; and the layer is by definition ACTIVE CONSTRUCTION, which is exactly UDOT's 'Active'/'Under Construction' -> approved, so status_const='approved'. spatial_zip_radius_mi=3 and record_url_precision='dataset' both follow UDOT/TxDOT. Website is present per row but its populated-ness was NOT measured, so precision stays 'dataset' -- upgrade to 'record' only after confirming it is non-null across the layer. NOT YET DEPLOYED OR MEASURED: FL has 413 dark pages of 441 and zero permit sources today. Whether 2,428 polylines at a 3-mile radius reach those pages is UNVERIFIED -- run the envelope count against dark FL ZIPs before claiming coverage (the Charlotte lesson)."
@@ -12686,7 +12686,7 @@
         "case_number": "JOBNET_ID"
       },
       "file_date_kind": "scheduled",
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_to_bucket": {
         "proposed": [
           "Programmed"
@@ -12732,7 +12732,7 @@
       },
       "file_date_kind": "filed",
       "status_const": "Programmed",
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_to_bucket": {
         "proposed": [
           "Programmed"
@@ -12770,7 +12770,7 @@
         "case_number": "pin"
       },
       "file_date_kind": "estimated",
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_to_bucket": {
         "proposed": [
           "1 - Awaiting Kick-Off",
@@ -12815,7 +12815,7 @@
         "case_number": "pin"
       },
       "file_date_kind": "estimated",
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_to_bucket": {
         "proposed": [
           "1 - Awaiting Kick-Off",
@@ -12875,7 +12875,7 @@
         "case_number": "PROJECT_NUMBER"
       },
       "file_date_kind": "awarded",
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_to_bucket": {
         "proposed": [
           "New"
@@ -12919,7 +12919,7 @@
         "case_number": "PROJECT_NUMBER"
       },
       "file_date_kind": "awarded",
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_to_bucket": {
         "proposed": [
           "New"
@@ -12987,7 +12987,7 @@
         "case_number": "ProjectNumber"
       },
       "file_date_kind": "estimated",
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_to_bucket": {
         "proposed": [],
         "approved": [
@@ -13031,7 +13031,7 @@
         "case_number": "ProjectNumber"
       },
       "file_date_kind": "estimated",
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_to_bucket": {
         "proposed": [],
         "approved": [
@@ -13287,7 +13287,7 @@
         "lng": "__lng"
       },
       "file_date_kind": "scheduled",
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_to_bucket": {
         "proposed": [
           "01_Planning",
@@ -13339,7 +13339,7 @@
         "lng": "__lng"
       },
       "file_date_kind": "awarded",
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_to_bucket": {
         "proposed": [],
         "approved": [
@@ -13383,7 +13383,7 @@
         "lng": "__lng"
       },
       "file_date_kind": "awarded",
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_to_bucket": {
         "proposed": [],
         "approved": [
@@ -13423,7 +13423,7 @@
         "lng": "Longitude"
       },
       "file_date_kind": "scheduled",
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_const": "Not Yet Advertised",
       "status_to_bucket": {
         "proposed": [
@@ -13464,7 +13464,7 @@
         "lng": "Longitude"
       },
       "file_date_kind": "scheduled",
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_const": "Advertised, Not Yet Complete",
       "status_to_bucket": {
         "proposed": [],
@@ -13505,7 +13505,7 @@
         "lng": "Longitude"
       },
       "file_date_kind": "completed",
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_const": "Operationally Complete",
       "status_to_bucket": {
         "proposed": [],
@@ -13544,7 +13544,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_const": "Adopted in the FY2026-2030 Transportation Improvement Program",
       "status_to_bucket": {
         "proposed": [],
@@ -13585,7 +13585,7 @@
         "lng": "__lng"
       },
       "file_date_kind": "scheduled",
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_const": "Programmed in WisDOT's 6-Year Highway Improvement Program \u2014 contract not yet let",
       "status_to_bucket": {
         "proposed": [
@@ -13627,7 +13627,7 @@
         "lng": "__lng"
       },
       "file_date_kind": "estimated",
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_to_bucket": {
         "proposed": [
           "Planning",
@@ -13668,7 +13668,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_to_bucket": {
         "proposed": [
           "Draft"
@@ -13711,7 +13711,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_to_bucket": {
         "proposed": [
           "Design",
@@ -14524,7 +14524,7 @@
         ],
         "exclude": []
       },
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "extra_where": "IS_TEN_YEAR = 'YES'",
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "record",
@@ -14615,7 +14615,7 @@
         "operating": [],
         "exclude": []
       },
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "[VERIFIED 2026-08-13 via pg_net against the live endpoint, in the connector's own scope] RIDOT's RHODE RESTORE (Municipal Roads & Bridges Fund) projects-as-points layer. ORG IDENTITY: ridot.maps.arcgis.com/sharing/rest/portals/self -> id JfTJE9T2RFfUZzVx, name 'Rhode Island Department of Transportation', urlKey RIDOT. DECOYS REJECTED under the Michigan standing answer (an unknown <guess>.maps.arcgis.com returns the GENERIC anonymous portal): rigis.maps.arcgis.com and ridemo.maps.arcgis.com both returned HTTP 200 with id=null and name=null. DISCOVERY: orgid-scoped search of the org's 107 Feature/Map Services; 105 are per-project tile packages (SPL_*/PL_*/PLAT_*), street-sweeping route layers, bridge/pavement condition and survey123 forms. Two items in the org are cross-state training leftovers and were ignored ('Environmental Equity in Allegheny County', 'DC Embassies'). MRBF_Projects is the only project register. ITEM: 96bf61d06a09474bac1427df39290ca5, owner DOT_AGOL.Admin, orgId JfTJE9T2RFfUZzVx, extent [-71.8298,41.1508]..[-71.1328,42.01] (Rhode Island); item description states it is 'the replacement for the Muni Roads and bridge Fund Public Layer'. LAYER: FeatureServer/0 'MRBF_Points', esriGeometryPoint, 1,380 rows (returnCountOnly), editingInfo.lastEditDate 2026-07-31 -> FRESH. STATUS VOCABULARY, COMPLETE WITH A POSITIVE CONTROL: groupBy StatusAdmin returns exactly one value, 'Approved' = 1,380, which sums EXACTLY to the layer count -> 0 unclassified. Mapped verbatim to approved; the other three buckets are declared empty so the lookup fails closed. WHY StatusAdmin AND NOT Status: the separate 'Status' column is the APPLICATION state (Submitted 1,379 + Draft 1 = 1,380, also an exact control), not the decision. Bucketing on it would render 1,379 awarded projects as 'proposed'. KNOWN LIMIT, RECORDED RATHER THAN PAPERED OVER: TotalProjectPercentComplete groups as 100 -> 876, 0 -> 397, 5/90/99 -> 17 each, 50 -> 6, 75 -> 5, null -> 13. So 876 of 1,380 are physically COMPLETE and would ideally read 'operating', but the layer publishes NO string vocabulary that separates complete from underway - the only discriminator is a numeric percent, and '100'/'0' in status_to_bucket would be exactly the opaque-coded value the autonomy grant bars. Every row is truthfully an approved MRBF award, so 'approved' is the honest coarse bucket; this is a known understatement of lifecycle, not an unclassified value. DATE COLUMN - Application_Date REJECTED for DecisionDate: min/max on Application_Date is 2023-10-16T14:29:52Z..2026-07-16T18:39:31Z, i.e. it varies (an earlier read of three same-batch rows wrongly suggested a constant), but its values carry sub-second precision -> system write timestamps. DecisionDate's min/max is 1688947200000..1780963200000 = 2023-07-10 and 2026-06-09, BOTH exactly 00:00:00 UTC -> a human-entered civic date. DecisionDate is populated on 1,379 of 1,380 (the single null is the one Draft row). file_date_kind 'decided' matches StatusAdmin=Approved. COLUMN POPULATION: Project_Name 1,380/1,380, Municipality 1,380/1,380 (both returnCountOnly with IS NOT NULL, against the 1,380 control). GEOGRAPHIC SPREAD: groupBy Municipality returns ~39 values covering essentially every RI municipality - Narragansett 203, North Providence 125, East Providence 84, Portsmouth 82, Cranston 73, Exeter 72, Warwick 71, Cumberland 66, Johnston 62, Coventry 49 ... Warren 4. SAMPLE ROWS (outSR=4326): 'Douglas Cir' / Smithfield / SM25-19 / 'Mill/overlay' at 41.8748,-71.5514; 'Page St (CIP Road Paving)' / Providence / PR26-10 at 41.8213,-71.4117; 'Old Raccoon Hill Road' / West Greenwich / WG26-2 - all inside Rhode Island. record_url_precision 'dataset': the layer publishes no per-record URL column, so the connector falls back to dataset_url (the AGO item page) rather than templating a URL that was never verified to discriminate a real id from a bogus one (San Diego standing answer). use_type_const 'Utility': municipal roadway/bridge paving and reconstruction, the same closed-vocabulary member the other statewide DOT entries use. recency_days deliberately ABSENT - 1,380 rows statewide is far under any row-size ceiling, and windowing would drop awarded projects that have not yet been built. spatial_zip_radius_mi 3: the layer has no ZIP column; records place by their OWN point geometry."
@@ -14658,7 +14658,7 @@
         "operating": [],
         "exclude": []
       },
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "[VERIFIED 2026-08-13 via pg_net against the live endpoint, in the connector's own scope] INDOT's SPMS (Scheduling & Project Management System) active-lettings register. Indiana was the largest county-only state at 196 dark of 198 ZIP pages (1.0% live). SERVER DISCOVERY: INDOT's AGO org could NOT be used - both ridot-style probes returned access='private' with null id and empty name (indot.maps.arcgis.com urlKey='indot', in.maps.arcgis.com urlKey='IN'). NEW STANDING ANSWER: a urlKey echoed back with access='private' and null id/name means the org EXISTS but is PRIVATE - which is a different finding from the Michigan generic-anonymous-portal decoy (that returns no urlKey). Anonymous orgid: search is unavailable either way. The real server was recovered from an unscoped AGO search result that referenced gis.indot.in.gov/ro/... - note the path is /ro/, NOT /arcgis/, so gis.indot.in.gov/arcgis/rest/services 404s (the Frisco recovery pattern). FIRST-PARTY: most AGO hits for 'INDOT projects' are CONSULTANT copies (HNTB rD2ylXRs80UroD90, Corradino zkfscBHttPaQwR4x) and were rejected on the first-party rule; this is INDOT's own host. LAYER: DOT/SPMS_ACTIVE_LET/FeatureServer/0, service name 'Active SPMP Projects', layer 'SPMS_INDOT', esriGeometryPolyline, 3,966 rows (returnCountOnly). Polyline rides the existing featurePoint() path-midpoint centroid path - no connector change. STATUS VOCABULARY, COMPLETE WITH A POSITIVE CONTROL: groupBy PROGRESS returns exactly 3 values - Plan 3,288 + Const 599 + Let 79 = 3,966, which sums EXACTLY to the layer count -> 0 unclassified. Plan -> proposed; Let (contract let/awarded) and Const (under construction) -> approved. 'operating' is deliberately EMPTY: this is the ACTIVE register, so nothing in it is complete, and under-construction is greenlit-not-finished. exclude is empty; the lookup fails closed. WHY PROGRESS AND NOT PHASE OR WORKCAT - both obvious columns are unusable: PHASE is the single opaque letter 'A' on all 3,966 rows (no discrimination AND an opaque code), and WORKCAT is opaque numeric codes (912=1020, 962=616, 931=468, 943=319, 210=228 ... plus TMS/LTAP/DTP). Either would have violated the 'every value self-describing, never an opaque code' rule - the San Jose planningpermits30 rejection class. PROGRESS and WORKDESC are the sibling columns carrying real text, the same shape as the RI StatusAdmin-vs-Status finding. TYPE: WORKDESC enumerates 133 self-describing values also summing EXACTLY to 3,966 (Bridge Deck Overlay 379, Bridge Thin Deck Overlay 373, Small Structures and Drains Construction 369, Bridge Replacement 361, Small Structure Replacement 301 ...). Every one is highway/bridge/traffic infrastructure, so use_type_const 'Utility' is used rather than a 133-key type_map - the same closed-vocabulary member every other statewide DOT entry uses. DATE: LETTING_DATE is esriFieldTypeDate, populated 3,966/3,966, spanning 2025-09-10 to 2035-10-17 - all scheduled lettings, hence file_date_kind 'scheduled' (the NHDOT AD_DATE precedent). DES (INDOT designation number) is also populated 3,966/3,966. GEOGRAPHIC SPREAD: groupBy COUNTY returns 94 values covering ALL 92 Indiana counties plus a 'Various' bucket (212) - Allen 174, Marion 156, Lake 142, Hendricks 101, Delaware 99 ... down to LaGrange 9, Martin 8, Ohio 4. No Indiana county is unrepresented. SAMPLE ROWS (outSR=4326, real paths geometry): DES 1401291 'Road Reconstruction (3R/4R Standards)' / Tippecanoe / PROGRESS Plan at -86.903,40.457; DES 1500082 'HMA Overlay, Minor Structural' / Knox / PROGRESS Const at -87.470,38.674 - both inside Indiana. record_url_precision 'dataset': the layer publishes no per-record URL column, and INDOT's public app host entapps.indot.in.gov/dotmaps/ returns 403, so the connector falls back to dataset_url (the verified-live service endpoint) rather than templating a URL never proven to discriminate a real id from a bogus one (the San Diego standing answer). recency_days deliberately ABSENT - 3,966 rows statewide is far under any row-size ceiling, and a window would drop scheduled lettings, which are the whole point of this register. spatial_zip_radius_mi 3: no ZIP column; records place by their OWN polyline-derived point. RISK, STATED NOT ASSUMED: every probe here is pg_net. Per the governance doc, a pg_net 200 does NOT prove the Deno edge runtime can reach this host (the Tampa / Caltrans / Dayton failure class). gis.indot.in.gov is a state WAF-fronted host and entapps.indot.in.gov already 403s us, so edge reachability is UNVERIFIED until the post-deploy smoke. If the edge is blocked the entry yields 0 records and must be rejected with that receipt - it will not yield wrong data."
@@ -14695,7 +14695,7 @@
         "operating": [],
         "exclude": []
       },
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "2026-11-06 REPLACEMENT: the DRAFT_STIP_Locations service was removed from MoDOT's ArcGIS Online org (layer answers 'Invalid URL'; the org's service list no longer carries it). MoDOT's own public STIP map (datazoneapps.modot.mo.gov/bi/apps/publicmaps/Home/MapConfig/STIP) reads mapping.modot.org/arcgis/rest/services/BusinessInt/STIP/MapServer/0 ('Datazone STIP'): 3,533 polyline features, SFY 2027-2031 (distinct values 2027,2028,2029,2030,2031), fields JOB_NO, SFY, DESCRIPTION, ROUTE, BEGIN_COUNTY_NAME, ESTIMATED_COST, IS_BRIDGE. 54 of a random 60 of the job numbers this entry had stored are present by JOB_NO (pg_net 30677). The layer has no status column; every row is a project programmed in the STIP, so status_const 'Programmed in STIP 2027-2031' in the approved bucket (the old entry mapped ACCEPTED and ONEDOT APPROVED to approved; the generated publisher file marks the stage as not published by the agency). Not used: the org's STIP_26_30 / MapSTIP layers (the 2026-2030 program, edited 2025-07, PROJECT_STATUS is an undocumented integer code 15207/15209) and mapping.modot.mo.gov TMS_SIMS_STIP (Token Required). || [VERIFIED 2026-08-13 via pg_net against the live endpoint, in the connector's own scope] MoDOT's Statewide Transportation Improvement Program (STIP) accepted-locations register. Missouri was the 2nd-largest county-only state at 176 dark of 264 ZIP pages (33.3% live). ORG IDENTITY / FIRST-PARTY: services2.arcgis.com/bjUoZiotEHKudso3 is MoDOT's own AGO org - an orgid-scoped search returns 104 items whose owners include BURNSJ_MODOTNW, barscb1, halle1, doylew1 and whose titles include 'MoDOT Statewide Transportation Improvement Program (STIP)', 'MoDOT Districts', 'MoDOT New Madrid Models', 'MoDOT Field Check Photos'. The same unscoped search also returned an HNTB-owned item (rD2ylXRs80UroD90, the Route 47 survey), rejected on the first-party rule - the same consultant org that shadowed INDOT. DECOY AND DEAD HOSTS RULED OUT FIRST: modot.maps.arcgis.com returns id=null, name empty AND **no urlKey**, which is the Michigan generic-anonymous-portal signature meaning NO SUCH ORG - distinct from the Indiana case where a private org DID echo a urlKey. gis.modot.mo.gov and data.modot.mo.gov both fail DNS ('Couldn't resolve host name'), so both host guesses were wrong. LAYER SELECTION - the obviously-named service is NOT the fuller one: STIP_Locations_Accepted/FeatureServer/0 ('STIP Locations - Accepted') carries an IDENTICAL field list but only 859 rows and splits Accepted/Approved across layers 0 and 1, whereas DRAFT_STIP_Locations/FeatureServer/1 - also named 'STIP Locations - Accepted' - carries BOTH statuses in one layer at 892 rows. The 'DRAFT' service name is the SERVICE's name; the LAYER is the accepted register. Wired the 892-row combined layer. esriGeometryPolyline, spatial reference wkid 32615 (UTM 15N, not 4326 - the connector requests outSR=4326), lastEditDate 2026-06-04. STATUS VOCABULARY, COMPLETE WITH A POSITIVE CONTROL: groupBy PROJECT_STATUS returns exactly 2 values - ACCEPTED 820 + ONEDOT APPROVED 72 = 892, summing EXACTLY to the layer count -> 0 unclassified. Both are affirmative acceptance-into-the-program states, so both map to approved, matching the sibling precedent (akdot-stip-24-27 'Approved' -> approved; adot-tip-fy2026-2030 'Adopted in the FY2026-2030 Transportation Improvement Program' -> approved). The merely- programmed STIP entries that map to proposed (okdot 'Programmed', nysdot 'Capital Program', idot 'Proposed Improvement') are a different semantic and were not copied. proposed/operating/exclude are declared empty so the lookup fails closed. STIP_26_30 REJECTED: its PROJECT_STATUS is an esriFieldTypeInteger - an opaque numeric code, the same class that barred INDOT's PHASE/WORKCAT and San Jose's planningpermits30. NO DATE COLUMN - DELIBERATE, WITH PRECEDENT. The schema has no date field at all: STIP_YEAR is a Double reading 2027 on ALL 892 rows (the STIP publication year, a constant, not a per-project date) and SFY is likewise a fiscal-year number. file_date and file_date_kind are therefore OMITTED. This is an established shape, not a new exception - 18 of the 192 pre-existing registry entries carry no file_date, including the closest analogues akdot-stip-24-27, adot-tip-fy2026-2030, okdot-workplan-roadways, nysdot-capital-program-projects and idot-annual-program-construction/bridges. Records render with status, route, county, description and a link, but no date. TYPE: DESCRIPTION is free text up to 601 chars and is not an enumerable vocabulary, so use_type_const 'Utility' is used rather than a type_map - the same closed-vocabulary member akdot and adot use for statewide DOT programs. record_url_precision 'dataset': no per-record URL column; falls back to the verified-live service endpoint rather than templating an unproven URL (the San Diego standing answer). recency_days ABSENT - 892 rows statewide, and there is no date column to window on anyway. spatial_zip_radius_mi 3: no ZIP column; records place by their OWN polyline-derived point. \u26a0\ufe0f COVERAGE EXPECTATION, STATED HONESTLY: 892 rows is far thinner than INDOT's 3,966 (which reached 96%). Per the density finding, Missouri should be expected to land WELL BELOW Indiana - closer to the UDOT shape (358 rows -> 35%). The rollout measurement, not this note, is the answer. \u26a0\ufe0f RISK: every probe is pg_net; a pg_net 200 does NOT prove the Deno edge runtime can reach services2.arcgis.com, though that host is already used by other wired entries, so the risk is materially lower than INDOT's WAF-fronted state host was."
@@ -14735,7 +14735,7 @@
         "operating": [],
         "exclude": []
       },
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "[VERIFIED 2026-08-13 via pg_net against the live endpoint, in the connector's own scope] SCDOT's public Project Viewer line register. South Carolina was the 3rd-largest county-only state at 162 dark of 192 ZIP pages (15.6% live). ORG IS PUBLIC (unlike IN and MO): scdot.maps.arcgis.com/sharing/rest/portals/self returns id=VaY7cY9pvUYUP1Lf, name='South Carolina Department of Transportation', urlKey=SCDOT, access=public - so orgid-scoped search WAS available here. It was still not enough: the AGO org holds 1,498 feature services but its project content is StoryMaps and Web Maps, and its only project FEATURE services are interstate-scoped or empty. Rejected with counts: AllProjects 68 rows (fields Interstate/BMP/EMP/StudyArea - Interstate Program only), existingprojects (same interstate shape), 2014_Present_InterstateProjects 17 rows, ProjectTracking 0 rows (an empty Survey123 environmental-permit form), Announced_Projects_Job_Numbers 517 rows but it is ECONOMIC-DEVELOPMENT announcements (investment/jobs__anno/date__anno), not road work. SERVER PATH WAS THE BLOCKER, FOR THE THIRD STATE RUNNING: gis.scdot.org/arcgis/rest/services 404s and info2.scdot.org/arcgis 404s, so both host guesses looked dead. The live server is gis.scdot.org**/hosting/**rest/services - recovered by walking the '2027 Pavement Improvement Program' WEB MAP's operationalLayers (the Frisco pattern). Compare INDOT (/ro/, not /arcgis/) and MoDOT (both host guesses DNS-dead). **Walk a live web map's operationalLayers rather than guessing /arcgis/.** LAYER INDEX IS 1, NOT 0: Project_Viewer_Lines/FeatureServer/0 returns no fields and its count query errors HTTP 500; the layer is id 1, named 'Lines'. (Project_Viewer_Points is id 0.) Same trap as MoDOT's DRAFT_STIP_Locations layer 1. LAYER: 3,958 polyline rows, esriGeometryPolyline. STATUS VOCABULARY, COMPLETE WITH A POSITIVE CONTROL: groupBy projectact returns exactly 3 values - Construction 1,892 + Design/Development 1,823 + Pre-Award 243 = 3,958, summing EXACTLY to the layer count -> 0 unclassified. Construction (physically under way) -> approved; Design/Development and Pre-Award (programmed, contract not yet awarded) -> proposed. operating/exclude declared empty so the lookup fails closed. TYPE: projecttyp enumerates 29 self-describing values ALSO summing exactly to 3,958 (Rehabilitation 1,427, Intersection Improvement 407, Signal 376, Preservation 348, Reconstruction 279, Bridge Replacement 229, Enhancement 176 ...). All are highway/bridge/traffic infrastructure, so use_type_const 'Utility' rather than a 29-key type_map, consistent with the other statewide DOT entries. PAVEMENT LAYER REJECTED ON THE STATUS RULE - and this one is a trap worth recording: Hosted/PavementList2027_commission has 429 rows and a promising-looking `status1` column, but its values are '' (426) and 'Event Located.  Event distance is out of range and has been truncated.' (3) - an LRS GEOCODING DIAGNOSTIC MESSAGE, not a project status. A column named `status*` is not necessarily a status. NO DATE COLUMN - same shape as modot-stip-locations-accepted: `dateofcurr` is free text reading 'Currently Undetermined', and con_year/row_year are Integers containing 0 for unscheduled work. file_date/file_date_kind are OMITTED; 18 of the pre-existing entries already do this, including akdot-stip-24-27, adot-tip-fy2026-2030, okdot-workplan-roadways and nysdot-capital-program-projects. ONE ROW PER ROUTE SEGMENT, NOT PER PROJECT: a projectid can legitimately repeat across segments (sample: 0012506X appears twice). That is real per-segment geometry, not duplication - and the engine's exact-identity dedup keeps case_number AND coordinates in the key, so distinct segments survive while true duplicates collapse. \u26a0\ufe0f Project_Viewer_Points (layer 0, 960 rows, IDENTICAL schema) is DELIBERATELY NOT WIRED IN THIS ENTRY. It may be disjoint (point-located work such as intersections/signals) or it may overlap the line register; that was NOT proven either way. Wiring both without proving disjointness is the houston-plat-applications double-emit hazard, which exact-identity dedup cannot catch across two source_registry_ids. Prove the projectid overlap first, then wire it as a second entry. record_url_precision 'dataset': no per-record URL column; falls back to the verified-live service endpoint. recency_days ABSENT - no date column to window on. spatial_zip_radius_mi 3: no ZIP column; records place by their OWN polyline-derived point. \u26a0\ufe0f RISK: every probe is pg_net; edge-runtime reachability of gis.scdot.org is UNVERIFIED until the post-deploy smoke. If blocked it yields 0 records, never wrong data."
@@ -14780,7 +14780,7 @@
           "CANC"
         ]
       },
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "recency_days": 1825,
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
@@ -14818,7 +14818,7 @@
         "operating": [],
         "exclude": []
       },
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "STIP ROADWAY (layer 22, 534 rows, FY2026-2029 = the COMMITTED four-year program -> status_const 'Approved'). [VERIFIED 2026-08-14 via pg_net against the live endpoint, in the connector's own scope] MnDOT's 2026-2035 Capital Highway Investment Plan. Minnesota was the largest county-only state with NO statewide source: 140 dark of 174 ZIP pages (19.5% live). ORG IS PUBLIC: mndot.maps.arcgis.com/sharing/rest/portals/self returns id=qWbGMYB49y8mLbRt, name='Minnesota Department of Transportation', urlKey=mndot, access=public, so orgid-scoped search WAS available. gis.dot.state.mn.us fails DNS outright ('Couldn't resolve host name') - the 5th consecutive state where a guessed server host was dead; the service was found through the OWNER ACCOUNT 'MnDOT_GIS' (the OregonDOTGIS / KanDOT move). THE SERVICE CARRIES FOUR LAYERS AND THEY ARE NOT INTERCHANGEABLE: 0 'CHIP Bridge Projects' (500), 13 'STIP Bridge Projects' (271), 22 'STIP Roadway Projects' (534), 23 'CHIP Roadway Projects' (431). DISJOINTNESS WAS PROVEN, NOT ASSUMED - this is the houston-plat-applications double-emit hazard, which exact-identity dedup CANNOT catch across two source_registry_ids. groupBy Fiscal_Yea, both layers, live: STIP Roadway = 2026:160 + 2027:149 + 2028:141 + 2029:84 = 534 (sums exactly); CHIP Roadway = 2030:54 + 2031:62 + 2032:65 + 2033:84 + 2034:73 + 2035:93 = 431 (sums exactly). ZERO fiscal-year overlap: MnDOT PARTITIONS the ten-year plan (STIP = committed years 1-4, CHIP = planned years 5-10) rather than nesting STIP inside CHIP. That is why both roadway layers are wired as SEPARATE entries and why doing so is safe. NEITHER LAYER HAS A STATUS COLUMN (fields: SP_Number, Descriptio, County, Route_Name, Fiscal_Yea, Estimated_, Area_Trans, Project_Le/Se/We, Score|Project_Score) - so status_const is used, the detroit-building-permits pattern, and the FY partition supplies the semantics honestly: the committed 4-year STIP is Approved, the longer-range CHIP tail is Proposed. Both values are self-describing; no opaque code is published. COLUMN POPULATION VERIFIED BEFORE MAPPING (the arlington/harris-county-permits failure class - config that looks complete and silently emits nothing): on BOTH layers Descriptio IS NULL -> 0 and SP_Number IS NULL -> 0. Real sampled rows: ISANTI / 3006-39 / 'Rebuild Hwy 95 from Fern St to Fillmore St in Cambridge, install fiber optic cable from CR 14 to Alabama St, and improve accessibility to meet modern standards' / MN 95; HENNEPIN / 2783-168 / 'Replace bridges on University and 4th St over I-35W in Minneapolis'; ST LOUIS / 6918-104 / 'Fiber extension and camera installation at select locations along Hwy 53 and Hwy 169'. NO file_date: Fiscal_Yea is a YEAR (Integer 2026), not a date, and there is no date column - file_date and file_date_kind are OMITTED rather than fabricated from a year. 18 pre-existing entries already omit them, including akdot-stip-24-27, adot-tip-fy2026-2030, okdot-workplan-roadways, nysdot-capital-program-projects, modot-stip-locations-accepted and scdot-project-viewer-lines. recency_days is therefore ABSENT - nothing to window on. esriGeometryPolyline, so records ride the existing featurePoint() polyline-centroid path. use_type_const 'Utility' rather than a type_map: every row is highway/bridge/traffic infrastructure, and use_type is a CLOSED six-value vocabulary (lib/map.js::TYPE_EXACT). record_url_precision 'dataset': no per-record URL column, so it falls back to the verified-live service endpoint (the Boulder/Philadelphia precedent). spatial_zip_radius_mi 3: no ZIP column; records place by their OWN polyline-derived point. STALE/SCOPED SIBLINGS REJECTED WITH RECEIPTS: 'MnDOT 2020 Construction Projects' (modified 2020-04-30), 'MnDOT 2021 Construction Projects District Feature Layers' (2023-09-18), 'STIP Bridge Projects on Tribal Nations' and 'STIP Pavement Projects on Tribal Nations' (both 2024-05-24 AND scoped to tribal nations, not statewide), '2025-2034 Capital Highway Investment Plan' (the SUPERSEDED prior edition). \u26a0\ufe0f BRIDGE LAYERS 0 AND 13 (771 rows) ARE DELIBERATELY NOT WIRED HERE. The FY partition almost certainly holds for them too, but 'almost certainly' is an assumption and this is exactly the class where assuming costs a double-emit. Run the same groupBy Fiscal_Yea test on layers 0 and 13 first, then wire them as two more entries. \u26a0\ufe0f RISK: every probe is pg_net; edge-runtime reachability of services.arcgis.com is well established by the other AGO-hosted entries, but this specific service is UNVERIFIED until the post-deploy smoke. If blocked it yields 0 records, never wrong data."
@@ -14855,7 +14855,7 @@
         "operating": [],
         "exclude": []
       },
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "CHIP ROADWAY (layer 23, 431 rows, FY2030-2035 = the longer-range plan years 5-10 -> status_const 'Proposed'). [VERIFIED 2026-08-14 via pg_net against the live endpoint, in the connector's own scope] MnDOT's 2026-2035 Capital Highway Investment Plan. Minnesota was the largest county-only state with NO statewide source: 140 dark of 174 ZIP pages (19.5% live). ORG IS PUBLIC: mndot.maps.arcgis.com/sharing/rest/portals/self returns id=qWbGMYB49y8mLbRt, name='Minnesota Department of Transportation', urlKey=mndot, access=public, so orgid-scoped search WAS available. gis.dot.state.mn.us fails DNS outright ('Couldn't resolve host name') - the 5th consecutive state where a guessed server host was dead; the service was found through the OWNER ACCOUNT 'MnDOT_GIS' (the OregonDOTGIS / KanDOT move). THE SERVICE CARRIES FOUR LAYERS AND THEY ARE NOT INTERCHANGEABLE: 0 'CHIP Bridge Projects' (500), 13 'STIP Bridge Projects' (271), 22 'STIP Roadway Projects' (534), 23 'CHIP Roadway Projects' (431). DISJOINTNESS WAS PROVEN, NOT ASSUMED - this is the houston-plat-applications double-emit hazard, which exact-identity dedup CANNOT catch across two source_registry_ids. groupBy Fiscal_Yea, both layers, live: STIP Roadway = 2026:160 + 2027:149 + 2028:141 + 2029:84 = 534 (sums exactly); CHIP Roadway = 2030:54 + 2031:62 + 2032:65 + 2033:84 + 2034:73 + 2035:93 = 431 (sums exactly). ZERO fiscal-year overlap: MnDOT PARTITIONS the ten-year plan (STIP = committed years 1-4, CHIP = planned years 5-10) rather than nesting STIP inside CHIP. That is why both roadway layers are wired as SEPARATE entries and why doing so is safe. NEITHER LAYER HAS A STATUS COLUMN (fields: SP_Number, Descriptio, County, Route_Name, Fiscal_Yea, Estimated_, Area_Trans, Project_Le/Se/We, Score|Project_Score) - so status_const is used, the detroit-building-permits pattern, and the FY partition supplies the semantics honestly: the committed 4-year STIP is Approved, the longer-range CHIP tail is Proposed. Both values are self-describing; no opaque code is published. COLUMN POPULATION VERIFIED BEFORE MAPPING (the arlington/harris-county-permits failure class - config that looks complete and silently emits nothing): on BOTH layers Descriptio IS NULL -> 0 and SP_Number IS NULL -> 0. Real sampled rows: ISANTI / 3006-39 / 'Rebuild Hwy 95 from Fern St to Fillmore St in Cambridge, install fiber optic cable from CR 14 to Alabama St, and improve accessibility to meet modern standards' / MN 95; HENNEPIN / 2783-168 / 'Replace bridges on University and 4th St over I-35W in Minneapolis'; ST LOUIS / 6918-104 / 'Fiber extension and camera installation at select locations along Hwy 53 and Hwy 169'. NO file_date: Fiscal_Yea is a YEAR (Integer 2026), not a date, and there is no date column - file_date and file_date_kind are OMITTED rather than fabricated from a year. 18 pre-existing entries already omit them, including akdot-stip-24-27, adot-tip-fy2026-2030, okdot-workplan-roadways, nysdot-capital-program-projects, modot-stip-locations-accepted and scdot-project-viewer-lines. recency_days is therefore ABSENT - nothing to window on. esriGeometryPolyline, so records ride the existing featurePoint() polyline-centroid path. use_type_const 'Utility' rather than a type_map: every row is highway/bridge/traffic infrastructure, and use_type is a CLOSED six-value vocabulary (lib/map.js::TYPE_EXACT). record_url_precision 'dataset': no per-record URL column, so it falls back to the verified-live service endpoint (the Boulder/Philadelphia precedent). spatial_zip_radius_mi 3: no ZIP column; records place by their OWN polyline-derived point. STALE/SCOPED SIBLINGS REJECTED WITH RECEIPTS: 'MnDOT 2020 Construction Projects' (modified 2020-04-30), 'MnDOT 2021 Construction Projects District Feature Layers' (2023-09-18), 'STIP Bridge Projects on Tribal Nations' and 'STIP Pavement Projects on Tribal Nations' (both 2024-05-24 AND scoped to tribal nations, not statewide), '2025-2034 Capital Highway Investment Plan' (the SUPERSEDED prior edition). \u26a0\ufe0f BRIDGE LAYERS 0 AND 13 (771 rows) ARE DELIBERATELY NOT WIRED HERE. The FY partition almost certainly holds for them too, but 'almost certainly' is an assumption and this is exactly the class where assuming costs a double-emit. Run the same groupBy Fiscal_Yea test on layers 0 and 13 first, then wire them as two more entries. \u26a0\ufe0f RISK: every probe is pg_net; edge-runtime reachability of services.arcgis.com is well established by the other AGO-hosted entries, but this specific service is UNVERIFIED until the post-deploy smoke. If blocked it yields 0 records, never wrong data."
@@ -14892,7 +14892,7 @@
         "operating": [],
         "exclude": []
       },
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "\u26a0\ufe0f THREE-WAY ACRONYM COLLISION \u2014 READ BEFORE ASSUMING A STATE. NDOT = NEBRASKA Department of Transportation (this entry, registry_id \"ndot-*\", coverage NE). NVDOT = NEVADA (registry_id \"nvdot-*\", coverage NV) \u2014 note Nevada's agency ALSO self-abbreviates NDOT, which is why that entry's own receipts say \"NDOT's own ArcGIS Server\" while meaning Nevada. NDDOT = NORTH DAKOTA, which is a DIFFERENT agency and is NOT wired by this entry or any other. A session skimming for \"ND\" can read this row as North Dakota and wrongly conclude that state is covered; North Dakota carried 152 dark ZIP pages when this note was added (2026-08-24). [VERIFIED 2026-08-15 via pg_net against the live endpoint, in the connector's own scope] NDOT's Program Book (segment register). Nebraska was a county-only state at 138 dark of 174 ZIP pages (20.7% live). \u26a0\ufe0f CROSS-STATE ACRONYM COLLISION - THE MOST DANGEROUS FINDING HERE, AND IT LOOKS HEALTHY IF MISSED: ndot.maps.arcgis.com is **NEVADA** Department of Transportation (id 9Y4hSlLf13E9S0Eo, urlKey NDOT, access public) - a LIVE PUBLIC ORG for the WRONG STATE, and Nevada is already wired here as nvdot-project-boundaries. Wiring from it would have published Nevada roadwork on Nebraska ZIP pages with clean invariants and a plausible count, ~1,200 miles wrong. The `_ndor` owner suffix is ALSO Nevada (jsekanovich_ndor = Nevada Division of Outdoor Recreation, OHV grants/trails). Nebraska's own NDOR account (munn_ndor, Nebraska Dept of Roads, the pre-2017 name) holds only 4 Grant-Portal items from 2024-10-03 - not projects. Same class as the Michigan recon's `Kent` hits resolving to Delaware and Rhode Island, but with a live public org behind it. **Confirm the ORG NAME, never the acronym.** SERVER PATH WAS THE BLOCKER FOR THE SIXTH STATE RUNNING: maps.dot.nebraska.gov fails DNS; gis.ne.gov/portal returns HTTP 500 'Application Error'; gis.ne.gov/arcgis 404s; dot-nebraska.opendata.arcgis.com does not exist. The live path is **gis.ne.gov/dot/rest/services/**, found by resolving nebraska.maps.arcgis.com -> org 'State of Nebraska' (Sj9eBhzWwOMzQCfI, urlKey nebraska, access PUBLIC), then an orgid-scoped search that surfaced ProgramBook_NDOT and reading the item's own url field. Eight dead ends preceded the live one. \u26a0\ufe0f POINTS AND SEGMENTS ARE **NOT** DISJOINT - THIS IS THE HOUSTON-PLAT CASE, NOT THE MINNESOTA CASE. The service has two layers with IDENTICAL field sets: 0 'Program Book Points' (337 rows, esriGeometryPoint) and 1 'Program Book Segments' (558 rows, esriGeometryPolyline). Measured live by pulling every ProjectNo from BOTH and comparing: Points carry 130 distinct ProjectNo, Segments 437, and **28 ProjectNo values appear in BOTH**. Wiring both entries would double-emit those 28 projects on every page, which exact-identity dedup CANNOT catch across two source_registry_ids. Only the SEGMENT layer is wired (larger: 558 rows / 437 distinct projects). **ACCEPTED COST, STATED PLAINLY: the 102 ProjectNo values unique to the POINTS layer are NOT represented.** The obvious fix - an extra_where excluding the 28 shared numbers - was REJECTED because it means hand-transcribing a 28-item list into config, the founder rule against transcribing a list rather than computing it. Compare mndot-stip/chip-roadway-projects, where groupBy Fiscal_Yea proved a TRUE partition (zero overlap) and two entries were therefore safe. **Identical schemas in one service prove nothing either way - run the id-overlap test.** NO STATUS COLUMN (fields: ProjectName, ProjectNo, ControlNo, County, District, Hwy, BeginRP, EndRP, Length, Estimate, ProgramYear, TypeImprovement, ID_1year) so status_const is used - the detroit-building-permits pattern, and 'Programmed' describes the record rather than restating a bucket (the ratchet in status-const-must-be-mapped.test.mjs, which caught the Minnesota draft). **IT MAPS TO `proposed`, DELIBERATELY THE CONSERVATIVE DIRECTION.** ProgramYear on the segment layer is '2027' (87) and '2028-2032' (the remainder); on the point layer '2027' 76 + '2028-2032' 261 = 337 exactly. The large majority is future-year programming, so mapping the whole register to `approved` would overstate what NDOT has committed to. `proposed` understates at worst - fail-closed in spirit. NO file_date: ProgramYear is a STRING and one of its two values is the RANGE '2028-2032', not a date or even a single year - unusable as a date and never fabricated into one. recency_days absent for the same reason. 18 pre-existing entries already omit file_date, including modot-stip-locations-accepted and scdot-project-viewer-lines. COLUMN POPULATION VERIFIED ON THE WIRED LAYER BEFORE MAPPING (the arlington/harris-county-permits failure class): ProjectName IS NULL -> 0, ProjectNo IS NULL -> 0, Hwy IS NULL -> 0. Real sampled rows: 'Giltner East' / NH-80-7(176) / Hwy 080 / Hamilton / 'Crack Seal'; 'Jct N-13 - Jct N-98' / NH-81-4(131) / Pierce / 'Mill, Resurf.'; 'Niobrara East & West' / S-12-5(1011) / Knox. Every string column is heavily RIGHT-PADDED upstream (char columns); the connector trims both sides - the harris-county-plats precedent. address maps Hwy ALONE, not [Hwy, County] - column_map arrays JOIN their values, they do NOT fall back (the UDOT standing answer). use_type_const 'Utility' rather than a TypeImprovement map: every value is highway/bridge/traffic infrastructure (Br. 76, Intersection 39, Cameras & RWIS 34, DMS Retrofit 24, Closure Signs 21 ...) and use_type is a CLOSED six-value vocabulary (lib/map.js::TYPE_EXACT). record_url_precision 'dataset': no per-record URL column (Boulder/Philadelphia precedent). spatial_zip_radius_mi 3: no ZIP column; records place by their OWN polyline-derived point via featurePoint(). \u26a0\ufe0f RISK: every probe is pg_net; edge-runtime reachability of gis.ne.gov is UNVERIFIED until the post-deploy smoke - and note gis.ne.gov/portal already 500s, so this host is not uniformly healthy. If blocked it yields 0 records, never wrong data."
@@ -14929,7 +14929,7 @@
         "operating": [],
         "exclude": []
       },
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": {
@@ -15154,7 +15154,7 @@
         "case_number": "ProjectCtrlNbr"
       },
       "status_const": "Programmed",
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_to_bucket": {
         "proposed": [
           "Programmed"
@@ -15199,7 +15199,7 @@
       },
       "yields_to": "sd-stip-safety-lines",
       "status_const": "Programmed",
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_to_bucket": {
         "proposed": [
           "Programmed"
@@ -15244,7 +15244,7 @@
         "case_number": "ProjectCtrlNbr"
       },
       "status_const": "Programmed",
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_to_bucket": {
         "proposed": [
           "Programmed"
@@ -15289,7 +15289,7 @@
         "case_number": "ProjectCtrlNbr"
       },
       "status_const": "Programmed",
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_to_bucket": {
         "proposed": [
           "Programmed"
@@ -15334,7 +15334,7 @@
         "case_number": "ProjectCtrlNbr"
       },
       "status_const": "Programmed",
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_to_bucket": {
         "proposed": [
           "Programmed"
@@ -15379,7 +15379,7 @@
         "case_number": "ProjectCtrlNbr"
       },
       "status_const": "Programmed",
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_to_bucket": {
         "proposed": [
           "Programmed"
@@ -15424,7 +15424,7 @@
         "case_number": "ProjectCtrlNbr"
       },
       "status_const": "Programmed",
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "status_to_bucket": {
         "proposed": [
           "Programmed"
@@ -16817,7 +16817,7 @@
         "operating": [],
         "exclude": []
       },
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "[VERIFIED 2026-08-28 via pg_net against the live endpoint, in the connector's own scope] NDDOT Special Road Fund 2025-2026, 47 point records, the first NDDOT source of any kind (ND was 152/155 dark). Real named projects, e.g. 'Arnegard - Ball Diamond Road Improvements' with PROJLOC 'Arnegard' - not a type-only layer. IMPROVE vocabulary is COMPLETE: 20 distinct values whose groupBy counts sum EXACTLY to 47 with 0 blank/null; PROJCAT is 3 values (Historical/Recreational/Tourist Areas); SRF_Year is a SINGLE value '2025-2026', so every row is the current program. use_type_const 'Utility' rather than a 20-row type_map that would all map to one value - the NE/MT/UT/TX DOT precedent for road work, and it cannot fail closed on a 21st IMPROVE value. status_const 'Programmed' -> proposed, matching ndot-program-book-segments / mt-mdt-stip-lines / sd-stip-*. NO DATE FIELD EXISTS on this layer, which is acceptable: file_date is optional and five wired entries omit it (the rule that made the original AK rejection wrong). record_url: BOTH guessed NDDOT program pages (dot.nd.gov/business/special-road-fund and /special-road-fund) return a real 'Page not found | NDDOT' 404, so no page URL was templated - dataset precision on the service URL instead (Boulder/MT/NE machine-URL precedent). Measured lift BEFORE wiring: 6 of ND's 152 dark pages have a centroid within the connector's own 3-mi envelope of any of the 47 points. REJECTED alongside, with receipts: TA_FY2028 is a service described 'Transportation Alternatives webmap to be used by committee' (an internal working layer, not a public register); the NDDOT Bridge Inventory layers are ASSET REGISTERS, not projects (the North Richland Hills rejection class); Flex Fund Approved Projects is real but only 14 rows and is left unwired pending need. NOTE: Bismarck was ALREADY WIRED as bismarck-building-permits (PR #878, 'North Dakota's first source, with owner PII fenced out'); this SRF entry is the SECOND ND source, not the first. Check the registry for existing state coverage BEFORE starting a recon pass - that check would have saved this one."
@@ -16903,7 +16903,7 @@
         "operating": [],
         "exclude": []
       },
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "extra_where": "PROJ_PHASE_CURRENT_STIP_YR_NO >= 2026",
       "spatial_zip_radius_mi": 3,
       "out_fields": [
@@ -16944,7 +16944,7 @@
         "operating": [],
         "exclude": []
       },
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "extra_where": "PROJ_PHASE_CURRENT_STIP_YR_NO >= 2026",
       "spatial_zip_radius_mi": 3,
       "out_fields": [
@@ -17599,7 +17599,7 @@
           "CLOSED"
         ]
       },
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "extra_where": "PROJECT_STATUS IN ('ACTIVE','LET') AND SCOPE_OF_WORK IS NOT NULL",
       "spatial_zip_radius_mi": 3,
       "out_fields": [
@@ -17664,7 +17664,7 @@
         "operating": [],
         "exclude": []
       },
-      "use_type_const": "Utility",
+      "use_type_const": "Roads & infrastructure",
       "spatial_zip_radius_mi": 3,
       "out_fields": [
         "OBJECTID",

@@ -52,7 +52,7 @@ for (const e of ENTRIES) {
   ok(e.status_const === 'Programmed' && e.status_to_bucket.proposed[0] === 'Programmed'
       && e.status_to_bucket.approved.length === 0 && e.status_to_bucket.operating.length === 0,
     `${id}: STIP shape — Programmed → proposed only`);
-  ok(e.use_type_const === 'Utility' && !('type_map' in e),
+  ok(e.use_type_const === 'Roads & infrastructure' && !('type_map' in e),
     `${id}: use_type_const Utility (ImproveDesc is free-text prose — the Douglas-NV class)`);
   ok(!('file_date' in e.column_map) && !('recency_days' in e),
     `${id}: no file_date, no recency — LettingDate/ReadyDate are forecasts (founder rider)`);
@@ -108,7 +108,7 @@ function stubFetch(calls, fixture) {
     'L2: every polyline pinned from its OWN geometry (featurePoint midpoint)');
   ok(sites.every((s) => s.lat > 42.4 && s.lat < 46 && s.lng > -104.1 && s.lng < -96.4),
     'L2: pins land inside South Dakota');
-  ok(sites.every((s) => s.bucket === 'proposed' && s.use_type === 'Utility' && s.file_date == null),
+  ok(sites.every((s) => s.bucket === 'proposed' && s.use_type === 'Roads & infrastructure' && s.file_date == null),
     'L2: proposed bucket, Utility, no fabricated file_date');
   ok(sites.some((s) => s.title.includes('US18') && s.title.includes('Grading, Interim Surfacing')),
     'L2: titles join LocDesc + ImproveDesc');
