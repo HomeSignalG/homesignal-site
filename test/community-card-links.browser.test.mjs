@@ -5,7 +5,7 @@
 import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
 import { readFileSync } from './lib/serve-page.mjs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -120,6 +120,17 @@ const cardOf = (page, marker) => page.evaluate((m) => {
            label: lab ? lab.textContent.replace(/\s+/g, ' ').trim() : null, srOnly: [].slice.call(c.querySelectorAll('.sr-only')).map(x => x.textContent).join(' '), nestedLinks: c.querySelectorAll('a').length };
 }, marker);
 
+// ── LAST UPDATED on the dynamically loaded cards (lib/community-page.js + the build's project index) ──
+// The index the build publishes: p1 tracked (live day), p2 paused (frozen day), p3 has no project page.
+// p3 also carries last_seen_at (a write time) to prove it is never shown as "Last updated".
+mkdirSync(join(out, 'lib', 'generated'), { recursive: true });
+writeFileSync(join(out, 'lib', 'generated', 'project-page-zips.json'), JSON.stringify({ v: 1, zips: ['01001'] }));
+mkdirSync(join(out, 'community', '01001', 'projects'), { recursive: true });
+writeFileSync(join(out, 'community', '01001', 'projects', 'pages.json'), JSON.stringify({ v: 1, zip: '01001',
+  pages: { p1: '/project/fixture-dataset/a-1a2b3c4d/', p2: '/project/fixture-dataset/b-2b3c4d5e/' },
+  updated: { p1: '2026-11-20', p2: '2026-08-02' } }));
+FULL.rpc_development[2].last_seen_at = '2026-11-26T20:00:09Z';
+
 const ZIP = '01001';
 const { page, errors } = await hydrate(ZIP);
 ok(errors.length === 0, 'no uncaught page error', errors);
@@ -139,6 +150,12 @@ ok(wx.label && /Weather\.gov forecast for this ZIP \(may not list this alert\)/.
 ok(news.n === 1 && news.tag === 'A' && news.href === 'https://gazette.example.test/library' && news.label === null, 'an ordinary news card is a link with no label', news);
 ok(gov.n === 1 && gov.tag === 'A' && gov.href === 'https://gov.example.test/n1' && gov.label === null, 'a government notice card is a link with no label', gov);
 
+const cardText = (marker) => page.evaluate((m) => { const c = [].slice.call(document.querySelectorAll('#commPage .card.mini')).find(x => x.textContent.indexOf(m) >= 0); return c ? c.textContent.replace(/\s+/g, ' ') : null; }, marker);
+const t1 = await cardText('DATASETCARD'), t2 = await cardText('RECORDCARD'), t3 = await cardText('NOLINKCARD');
+ok(t1 && t1.includes('Last updated: Nov 20, 2026'), 'dynamic card, tracked project: shows the index day', t1);
+ok(t2 && t2.includes('Last updated: Aug 2, 2026'), 'dynamic card, paused project: shows its frozen day', t2);
+ok(t3 && !/Last updated/.test(t3), 'dynamic card, record with no project page: no date (last_seen_at is never shown as Last updated)', t3);
+ok(!/Nov 26, 2026/.test((t1 || '') + (t2 || '') + (t3 || '')), 'no card shows a write/ingest day');
 const html = await page.evaluate(() => document.getElementById('commPage').innerHTML);
 ok(!/api\.weather\.gov/i.test(html), 'the raw api.weather.gov URL appears nowhere in the rendered page');
 

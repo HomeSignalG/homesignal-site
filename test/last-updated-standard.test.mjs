@@ -14,4 +14,6 @@ for (const d of ['', null, 'nope', '2026-13-01']) ok(js(d) === '' && py(String(d
 const card = ctx.HS.tpl.lastUpdatedLine({ last_updated: '2026-09-28' });
 ok(card.includes('Last updated: Sep 28, 2026'), 'the card line carries the label');
 ok(ctx.HS.tpl.lastUpdatedLine({}) === '', 'a record with no verified date shows nothing (never the build day)');
+ok(ctx.HS.tpl.lastUpdatedLine({ record_kind: 'national_project', last_seen_at: '2026-11-26T20:00:09Z' }) === '',
+   'a national listing\'s last_seen_at (a row-insert time) is never shown as Last updated');
 process.exit(fails ? 1 : 0);
