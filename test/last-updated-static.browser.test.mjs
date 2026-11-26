@@ -29,8 +29,8 @@ for (const c of Object.values(plane.cities)) for (const e of c.representative_en
 const keys = Object.keys(projects).sort();
 // k0 tracked (live day), k1 paused (frozen day), k2 has NO project page (removed from the plane's project list)
 const TRACKED = '2026-09-20', FROZEN = '2026-08-02';
-projects[keys[0]].as_of = TRACKED; projects[keys[0]].tracked = true;
-projects[keys[1]].as_of = FROZEN; projects[keys[1]].tracked = false;
+projects[keys[0]].verified_on = TRACKED; projects[keys[0]].as_of = '2026-11-26'; projects[keys[0]].tracked = true;   // as_of = plane run day, never shown
+projects[keys[1]].verified_on = FROZEN; projects[keys[1]].as_of = '2026-11-26'; projects[keys[1]].tracked = false;
 const noPageName = projects[keys[2]].name, trackedName = projects[keys[0]].name, frozenName = projects[keys[1]].name;
 delete projects[keys[2]];
 
