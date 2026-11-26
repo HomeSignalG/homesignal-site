@@ -638,12 +638,14 @@ def link_projects(pages, cities, projects):
             pr = projects.get(it.get("key"))
             if pr:
                 it["project"] = pr["path"]
+                it["updated"], it["updated_live"] = pr["as_of"], pr["tracked"]
                 inbound.add(pr["key"])
     for c in cities.values():
         for it in c["reps"]:
             pr = projects.get(it.get("key"))
             if pr:
                 it["project"] = pr["path"]
+                it["updated"], it["updated_live"] = pr["as_of"], pr["tracked"]
                 inbound.add(pr["key"])
     from_cards = len(inbound)
     for k, pr in projects.items():
@@ -890,6 +892,12 @@ def link_siblings(pages):
 
 
 # ---------------------------------------------------------------- render
+def _card_updated(it):
+    """' · Last updated: <day>' for a card whose project has a page (the plane's as_of)."""
+    lu = last_updated(it.get("updated"), True, bool(it.get("updated_live")))
+    return f' <span class="quiet">{lu}</span>' if lu else ""
+
+
 def _card_title(it, t, u):
     """A card with a project page links its name there (a real, crawlable link); the
     official record stays one click away beside it. Without a page, the name links to the
@@ -922,7 +930,7 @@ def _dev_items(items):
             inner += f' <span class="quiet">{esc(" · ".join(bits))}</span>'
         if when:
             inner += f" <time>{when}</time>"
-        inner += _card_source(it, u)
+        inner += _card_updated(it) + _card_source(it, u)
         li.append(f"<li>{inner}</li>")
     if not li:
         return ""
@@ -1375,7 +1383,8 @@ def render(p, built):
         '<script src="/shell.js?v=2b4498b5"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
         '<script src="/lib/water-rights.js?v=add4200a"></script>\n'
-        '<script src="/lib/community-page.js?v=2cd4d9bd"></script>\n'
+        '<script src="/lib/project-page-link.js?v=20261126a"></script>\n'
+        '<script src="/lib/community-page.js?v=1ec16efe"></script>\n'
         "</body>\n</html>\n")
 
 
@@ -1423,7 +1432,7 @@ def render_city(c, pages, built):
             inner += f' <span class="quiet">{esc(" · ".join(bits))}</span>'
         if it.get("date"):
             inner += f' <time>{esc(it["date"])}</time>'
-        inner += _card_source(it, it["url"])
+        inner += _card_updated(it) + _card_source(it, it["url"])
         if it.get("zip") and it["zip"] in pages:
             inner += f' <a href="/community/{esc(it["zip"])}/">ZIP {esc(it["zip"])}</a>'
         reps.append(f"<li>{inner}</li>")
@@ -1548,7 +1557,7 @@ def human_day(day):
 LAST_UPDATED_LABEL = "Last updated"
 
 
-def last_updated(day, tag=False):
+def last_updated(day, tag=False, live=False):
     """THE one way a project's verification date is worded on every generated page:
     'Last updated: Sep 28, 2026' (a <time> element when tag=True). `day` is the project plane's
     `as_of`, the day the record was last read from its official source. It is frozen when the
@@ -1561,7 +1570,8 @@ def last_updated(day, tag=False):
     except ValueError:
         return ""
     shown = human_day(day)
-    v = f'<time datetime="{esc(day)}">{esc(shown)}</time>' if tag else esc(shown)
+    mark = ' data-lu="live"' if live else ""
+    v = f'<time datetime="{esc(day)}"{mark}>{esc(shown)}</time>' if tag else esc(shown)
     return f"{LAST_UPDATED_LABEL}: {v}"
 
 
@@ -1872,11 +1882,14 @@ def project_page_index(z, keys, projects):
     Map 1 links a pin or list row to its page only through this file, so it never guesses a
     URL. Two pages for one source_key (an old seq kept beside a re-keyed one): the tracked
     page wins, then the lower key, so the choice is deterministic."""
-    out = {}
+    out, upd = {}, {}
     for k in sorted(keys, key=lambda k: (0 if projects[k]["tracked"] else 1, k)):
         sk = k.rsplit("|", 1)[0]
-        out.setdefault(sk, projects[k]["path"])
-    return {"v": 1, "zip": z, "pages": out}
+        if sk not in out:
+            out[sk] = projects[k]["path"]
+            if DAY_RE.match(str(projects[k].get("as_of") or "")):
+                upd[sk] = projects[k]["as_of"]   # Last updated, same day the project page shows
+    return {"v": 1, "zip": z, "pages": out, "updated": upd}
 
 
 # ---------------------------------------------------------------- guide pages (plan step 13)

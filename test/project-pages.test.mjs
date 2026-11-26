@@ -207,6 +207,12 @@ ok([...pg1.matchAll(/<script[\s>][^>]*>/gi)].map((m) => m[0]).join() === '<scrip
   const po = expectedPath('town-permits', 'ORPHAN-1', 'arcgis:town-permits:ORPHAN-1|1');
   ok(b.r.status === 0 && existsSync(join(b.out, ...po.split('/').filter(Boolean), 'index.html')),
      'a project no card links to keeps its page');
+  const zdoc = read(b.out, '/community/01002/');
+  ok(/<li><a href="\/project\/[^"]+">[^<]*<\/a>[^]*?Last updated: <time datetime="\d{4}-\d{2}-\d{2}"/.test(zdoc),
+     'a ZIP page card with a project page shows Last updated');
+  const pj = JSON.parse(readFileSync(join(b.out, 'community/01002/projects/pages.json'), 'utf8'));
+  ok(pj.updated && Object.keys(pj.updated).length > 0 && Object.keys(pj.updated).every((k) => pj.pages[k] && /^\d{4}-\d{2}-\d{2}$/.test(pj.updated[k])),
+     'pages.json carries a Last updated day for the records that have a page (Map 1 pop-ups and rows read it)');
   const list = read(b.out, '/community/01002/projects/');
   ok(list.includes(`<a href="${po}">Nobody Links Here</a>`) && list.includes(`<a href="${p1}">`),
      "the ZIP's project list links every project page on that ZIP, kept or featured");

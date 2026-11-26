@@ -94,6 +94,10 @@ _INFRA_TAGS = (
     re.compile(r"<meta\s+charset=[^>]*>\s*", re.I),
     re.compile(r"<link\s+rel=\"stylesheet\"[^>]*>\s*", re.I),
 )
+# A tracked project's Last updated day advances with every run (bookkeeping, see NEUTRAL_AS_OF).
+# Wherever a card prints it, the <time> carries data-lu="live"; the fingerprint ignores that one
+# element. A paused project's frozen day has no such mark and still counts as content.
+_LIVE_DAY = re.compile(r"<time\b[^>]*data-lu=\"live\"[^>]*>.*?</time>", re.S | re.I)
 _ROBOTS = re.compile(r"<meta\s+name=\"robots\"\s+content=\"([^\"]*)\"", re.I)
 
 
@@ -104,7 +108,7 @@ def projection(html):
     s = _TEMPLATE.sub("", s)
     for rx in _INFRA_TAGS:
         s = rx.sub("", s)
-    return s
+    return _LIVE_DAY.sub("", s)
 
 
 def fingerprint(html):
