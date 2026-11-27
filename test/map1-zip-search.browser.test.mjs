@@ -55,6 +55,10 @@ const COMMUNITIES = { '52638': [{ name: 'Middletown (52638)', level: 'zip', coun
   '64166': [{ name: 'Kansas City (64166)', level: 'zip', county: 'Clay', state: 'Missouri' }],
   '48854': [{ name: 'Mason (48854)', level: 'zip', county: 'Ingham', state: 'Michigan' }] };
 for (const z of Object.keys(COMMUNITIES)) COMMUNITIES[z].forEach(r => { r.zip_codes = [z]; });
+// Production invariant (N5 Fix 3, D11): a ZIP WITH a polygon is never reported not_measured, so its
+// serving read is boundary_complete (here with zero projects). A ZIP WITHOUT one is not_measured.
+const POLYGON_ZIPS = ['52638', '85083', '64166', '98684', '19475', '07001', '48854'];
+COMMUNITIES['96799'] = [{ name: 'Pago Pago (96799)', level: 'zip', county: 'Eastern', state: 'American Samoa', zip_codes: ['96799'] }];
 const DELAY = {};          // zip -> ms the communities answer is held back (stale-response test)
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const ZIP_AUTH = { '20171': { zip: '20171', mode: 'development', status: 'boundary_complete',
@@ -108,7 +112,9 @@ await page.route('**/*', async (route) => {
     let z = '';
     try { z = String(JSON.parse(route.request().postData() || '{}').p_zip || ''); } catch (e) { z = ''; }
     return route.fulfill({ status: 200, contentType: 'application/json',
-      body: JSON.stringify(ZIP_AUTH[z] || { zip: z, mode: 'development', status: 'not_measured', projects: null, markers: null }) });
+      body: JSON.stringify(ZIP_AUTH[z] || (POLYGON_ZIPS.includes(z)
+        ? { zip: z, mode: 'development', status: 'boundary_complete', projects: [], markers: [] }
+        : { zip: z, mode: 'development', status: 'not_measured', projects: null, markers: null })) });
   }
   if (url.includes('/rpc/map1_state_cleanup_zip_members')) {
     let z = '';
@@ -206,6 +212,9 @@ ok(o.center === '52638' && /Middletown/.test(o.h1) && !/Herndon/.test(o.h1) && o
 const pins = await page.evaluate(() => document.querySelectorAll('#map .leaflet-marker-icon, #map .leaflet-marker-pane > *').length);
 ok(pins === 0, '3c: no old pins on the map', String(pins));
 
+ok(!/no mapped area/.test(o.status) && !/no mapped area/.test(await page.evaluate(() => document.body.innerText)),
+  '3d: a ZIP WITH a polygon never shows the "no mapped area" line');
+
 // 4. the search icon (the real click) and a suggestion click both work
 await typeZip('85083');
 await page.click('#go');
@@ -263,6 +272,14 @@ ok(o.center === '07001' && /Avenel/.test(o.h1) && o.sites === 0 && geocodeCalls.
 await page.fill('#addr', '48854'); await submitEnter(); await waitBoundary('48854');
 o = await st();
 ok(o.center === '48854' && /Mason/.test(o.h1), '9c: ZIP -> ZIP (48854)', JSON.stringify(o));
+
+// 9d. the "no mapped area" line is for a ZIP WITHOUT a polygon (a ZIP page, no Census area)
+await page.fill('#addr', '96799'); await submitEnter(); await page.waitForTimeout(1000);
+const bodyText = await page.evaluate(() => document.body.innerText);
+o = await st();
+ok(o.center === null && /no mapped area/.test(bodyText), '9d: a ZIP without a polygon shows "no mapped area" and draws no outline', JSON.stringify(o));
+ok(!/no mapped area/.test(await (async () => { await page.fill('#addr', '07001'); await submitEnter(); await waitBoundary('07001'); await page.waitForTimeout(400); return page.evaluate(() => document.body.innerText); })()),
+  '9e: switching to a polygon ZIP removes that line');
 
 // 10. address no-match clears old results (the original defect)
 await page.route('**/functions/v1/geocode-address', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"match":null}' }));
