@@ -127,6 +127,8 @@ branch is **additive** — address mode (`{address, radius_mi}`) is byte-for-byt
 ZIP mode **filters to sourced sites only** (a site with no `url`/`record_url` is neither
 counted nor returned), so the cache is anti-fabrication-clean at the engine.
 
+> **SUPERSEDED 2026-11-27 (founder rule, repeated):** ZIP mode now uses ZCTA polygons. A ZIP with no polygon is `not_measured` and is never approximated. A stored ZIP point is only a viewport/page anchor, never a home or a data scope. See `lib/zip-authoritative.js` and `docs/app-zcta-boundary.sql`. The text above is kept as the 2026-07-04 record.
+
 ---
 
 ## 4. RUNBOOK — build the per-ZIP development pages (standing authority, no questions)
@@ -140,6 +142,8 @@ Analog of alerts §3/§7. For each ZIP in scope:
    loads, centers on the ZIP centroid, renders the aggregate counts, and every rendered
    site carries a `record_url`. No facilities is expected for some ZIPs; that is done, not
    broken.
+
+> **SUPERSEDED 2026-11-27 (founder rule, repeated):** ZIP mode now uses ZCTA polygons. A ZIP with no polygon is `not_measured` and is never approximated. A stored ZIP point is only a viewport/page anchor, never a home or a data scope. See `lib/zip-authoritative.js` and `docs/app-zcta-boundary.sql`. The text above is kept as the 2026-07-04 record.
 3. **Confirm the address box works on that page** — typing a covered address returns the
    live 1-mile view (address mode, unchanged).
 4. **Commit the cache seed** — `docs/<place>-development-reports-seed.sql` (idempotent,
@@ -189,12 +193,16 @@ These convert every foreseeable "should I ask?" into "no — do this." Add to th
 - **A ZIP with NO records at all → still ship a valid page.** It shows the ZIP centroid map,
   zeroed counts, the honest empty-state copy already in the page ("No EPA-registered facility
   within a mile"), and the address box. Empty is valid.
+
+> **SUPERSEDED 2026-11-27 (founder rule, repeated):** ZIP mode now uses ZCTA polygons. A ZIP with no polygon is `not_measured` and is never approximated. A stored ZIP point is only a viewport/page anchor, never a home or a data scope. See `lib/zip-authoritative.js` and `docs/app-zcta-boundary.sql`. The text above is kept as the 2026-07-04 record.
 - **ZIP centroid vs a resident's home → the centroid is a page anchor, not a home pin.**
   No "this address" marker until the resident searches. Never treat the centroid as an
   address-mode result.
 - **A cross-county / multi-place ZIP → one ZIP page.** Label it with every place; center on
   the ZIP centroid; include all points that fall in it. Don't split it or pick one city.
   (Mirrors the alerts multi-city-ZIP rule.)
+
+> **SUPERSEDED 2026-11-27 (founder rule, repeated):** ZIP mode now uses ZCTA polygons. A ZIP with no polygon is `not_measured` and is never approximated. A stored ZIP point is only a viewport/page anchor, never a home or a data scope. See `lib/zip-authoritative.js` and `docs/app-zcta-boundary.sql`. The text above is kept as the 2026-07-04 record.
 - **A facility that geocodes outside the ZIP boundary → exclude from ZIP mode, keep for
   address mode.** ZIP mode contains only points inside the ZIP; address mode is radius-based
   and legitimately crosses ZIP lines. Not a stop.
