@@ -49,7 +49,14 @@ const ZIP_ROW = { '20171': [{ zip: '20171', home_lat: 38.9506, home_lng: -77.364
   counts: { facilities: 2, development: 1 }, sites: [DUAL, PLAIN_FAC, DC_PROJECT],
   refreshed_at: '2026-09-06T00:00:00Z', facilities_unavailable: false }] };
 const COMMUNITIES = { '52638': [{ name: 'Middletown (52638)', level: 'zip', county: 'Des Moines', state: 'Iowa' }],
-  '19475': [{ name: 'Spring City (19475)', level: 'zip', county: 'Chester', state: 'PA' }], '20171': [{ name: 'Herndon (20171)', level: 'zip', county: 'Fairfax', state: 'VA' }] };
+  '19475': [{ name: 'Spring City (19475)', level: 'zip', county: 'Chester', state: 'PA' }], '20171': [{ name: 'Herndon (20171)', level: 'zip', county: 'Fairfax', state: 'VA' }],
+  '07001': [{ name: 'Avenel (07001)', level: 'zip', county: 'Middlesex', state: 'New Jersey' }],
+  '85083': [{ name: 'Phoenix (85083)', level: 'zip', county: 'Maricopa', state: 'Arizona' }],
+  '64166': [{ name: 'Kansas City (64166)', level: 'zip', county: 'Clay', state: 'Missouri' }],
+  '48854': [{ name: 'Mason (48854)', level: 'zip', county: 'Ingham', state: 'Michigan' }] };
+for (const z of Object.keys(COMMUNITIES)) COMMUNITIES[z].forEach(r => { r.zip_codes = [z]; });
+const DELAY = {};          // zip -> ms the communities answer is held back (stale-response test)
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const ZIP_AUTH = { '20171': { zip: '20171', mode: 'development', status: 'boundary_complete',
   projects: [{ source_key: 'arcgis:fairfax:P-1', project_ref: 'arcgis:fairfax:P-1',
     name: 'Pennhurst Data Centers', type: 'Data Center', status: 'Approved',
@@ -115,8 +122,20 @@ await page.route('**/*', async (route) => {
   if (url.includes('/rpc/zip_mode_report_sites')) return fulfillZipModeReport(route, (z) => ZIP_ROW[z] || []);
   if (url.includes('/rest/v1/development_reports'))
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ZIP_ROW[zipOf(url)] || []) });
-  if (url.includes('/rest/v1/communities'))
-    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(COMMUNITIES[zipOf(url)] || []) });
+  if (url.includes('/rest/v1/app_community_meta') && /zip=like\./.test(url)) {
+    const pre = (url.match(/zip=like\.(\d+)\*/) || [])[1] || '';
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify(Object.keys(COMMUNITIES).filter(z => z.startsWith(pre)).sort().map(z => ({ zip: z }))) });
+  }
+  if (url.includes('/rest/v1/communities') && url.includes('zip_codes=ov.')) {
+    const zs = decodeURIComponent((url.match(/zip_codes=ov\.(%7B[^&]*%7D)/) || [])[1] || '').replace(/[{}]/g, '').split(',');
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify(zs.flatMap(z => COMMUNITIES[z] || [])) });
+  }
+  if (url.includes('/rest/v1/communities')) {
+    const z = zipOf(url); if (DELAY[z]) await sleep(DELAY[z]);
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(COMMUNITIES[z] || []) });
+  }
   if (url.includes('/rest/v1/') || url.includes('/rpc/'))
     return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
   if (url.includes('leaflet@1.9.4/dist/leaflet.js') || url.includes('leaflet@1.9.4/dist/leaflet.css')) {
@@ -129,7 +148,7 @@ await page.route('**/*', async (route) => {
   if (url.includes('cdn.jsdelivr.net')) {
     const kind = url.endsWith('.css') ? 'text/css' : 'text/javascript';
     return route.fulfill({ status: 200, contentType: kind, body: kind === 'text/css' ? '' :
-      'window.supabase=window.supabase||{createClient:function(){var q={select:function(){return q;},eq:function(){return q;},in:function(){return q;},order:function(){return q;},limit:function(){return q;},then:function(r){return Promise.resolve({data:[],error:null}).then(r);}};return{from:function(){return q;},rpc:function(n,a){if(n==="app_zcta_boundary"){window.__ZCTA_CALLS=(window.__ZCTA_CALLS||[]).concat([a&&a.p_zip]);var z=a&&a.p_zip;var sq=function(x,y){return[[[x-0.03,y-0.02],[x+0.03,y-0.02],[x+0.03,y+0.02],[x-0.03,y+0.02],[x-0.03,y-0.02]]];};if(z==="52638")return Promise.resolve({data:{zip:z,status:"boundary_complete",srid:4326,geometry:{type:"Polygon",coordinates:sq(-91.0,40.8)}},error:null});if(z==="20171")return Promise.resolve({data:{zip:z,status:"boundary_complete",srid:4326,geometry:{type:"Polygon",coordinates:sq(-77.3645,38.9506)}},error:null});if(z==="20170")return Promise.resolve({data:{zip:z,status:"boundary_complete",srid:4326,geometry:{type:"MultiPolygon",coordinates:[sq(-77.38,38.97)]}},error:null});return Promise.resolve({data:{zip:z,status:"not_measured",geometry:null},error:null});}return Promise.resolve({data:null,error:null});},auth:{getSession:function(){return Promise.resolve({data:{session:null}});},onAuthStateChange:function(){return {data:{subscription:{unsubscribe:function(){}}}};}}};}};' });
+      'window.supabase=window.supabase||{createClient:function(){var q={select:function(){return q;},eq:function(){return q;},in:function(){return q;},order:function(){return q;},limit:function(){return q;},then:function(r){return Promise.resolve({data:[],error:null}).then(r);}};return{from:function(){return q;},rpc:function(n,a){if(n==="app_zcta_boundary"){window.__ZCTA_CALLS=(window.__ZCTA_CALLS||[]).concat([a&&a.p_zip]);var z=a&&a.p_zip;var PZ={"98684":[-122.52,45.63],"07001":[-74.27,40.58],"85083":[-112.16,33.74],"64166":[-94.52,39.32],"48854":[-84.46,42.58],"19475":[-75.57,40.18]};var sq=function(x,y){return[[[x-0.03,y-0.02],[x+0.03,y-0.02],[x+0.03,y+0.02],[x-0.03,y+0.02],[x-0.03,y-0.02]]];};if(PZ[z])return Promise.resolve({data:{zip:z,status:"boundary_complete",srid:4326,geometry:{type:"Polygon",coordinates:sq(PZ[z][0],PZ[z][1])}},error:null});if(z==="52638")return Promise.resolve({data:{zip:z,status:"boundary_complete",srid:4326,geometry:{type:"Polygon",coordinates:sq(-91.0,40.8)}},error:null});if(z==="20171")return Promise.resolve({data:{zip:z,status:"boundary_complete",srid:4326,geometry:{type:"Polygon",coordinates:sq(-77.3645,38.9506)}},error:null});if(z==="20170")return Promise.resolve({data:{zip:z,status:"boundary_complete",srid:4326,geometry:{type:"MultiPolygon",coordinates:[sq(-77.38,38.97)]}},error:null});return Promise.resolve({data:{zip:z,status:"not_measured",geometry:null},error:null});}return Promise.resolve({data:null,error:null});},auth:{getSession:function(){return Promise.resolve({data:{session:null}});},onAuthStateChange:function(){return {data:{subscription:{unsubscribe:function(){}}}};}}};}};' });
   }
   if (url.includes('tile.openstreetmap'))
     return route.fulfill({ status: 200, contentType: 'image/png',
@@ -146,7 +165,7 @@ const st = () => page.evaluate(() => ({
   h1: document.querySelector('.head h1').textContent,
   status: document.getElementById('status').textContent,
   center: window.__HS_VERIFY && window.__HS_VERIFY.zipBoundary,
-  sugg: (function(){ var b = document.getElementById('zipSuggest'); return b && !b.hidden ? b.textContent : null; })() }));
+  sugg: null }));
 async function load(path) {
   await page.goto(base + path, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
@@ -159,57 +178,114 @@ await load('/development-map.html?zip=20171');
 let o = await st();
 ok(o.sites > 0 && /Herndon/.test(o.h1), '1: starting place (20171) shows its records', JSON.stringify(o));
 
-// 2. typing a ZIP offers "52638 — Middletown, IA"
-await page.fill('#addr', '52638');
-await page.waitForFunction(() => { var b = document.getElementById('zipSuggest'); return b && !b.hidden; }, null, { timeout: 5000 }).catch(() => {});
-o = await st();
-ok(o.sugg === '52638 \u2014 Middletown, IA', '2: suggestion reads "52638 — Middletown, IA"', String(o.sugg));
+const submitEnter = () => page.evaluate(() => document.getElementById('form').requestSubmit());
+const waitBoundary = (z) => page.waitForFunction((zz) => window.__HS_VERIFY && window.__HS_VERIFY.zipBoundary === zz, z, { timeout: 15000 }).catch(() => {});
+const note = () => page.evaluate(() => { var n = document.getElementById('zipNote'); return n && !n.hidden ? n.textContent : null; });
+const suggList = () => page.evaluate(() => { var b = document.getElementById('zipSuggest'); return b && !b.hidden ? Array.from(b.querySelectorAll('button')).map(x => x.textContent) : null; });
+async function typeZip(v) {
+  await page.fill('#addr', v);
+  await page.waitForFunction(() => { var b = document.getElementById('zipSuggest'); return b && !b.hidden; }, null, { timeout: 5000 }).catch(() => {});
+}
+
+// 2. type-ahead from three digits; ZIPs stay strings (leading zero kept)
+await typeZip('526');
+ok(JSON.stringify(await suggList()) === JSON.stringify(['52638 — Middletown, IA']), '2: "526" suggests "52638 — Middletown, IA"', JSON.stringify(await suggList()));
+await typeZip('070');
+ok(JSON.stringify(await suggList()) === JSON.stringify(['07001 — Avenel, NJ']), '2b: "070" suggests 07001 with its leading zero', JSON.stringify(await suggList()));
+await page.fill('#addr', '52');
+await page.waitForTimeout(300);
+ok(await suggList() === null, '2c: two digits offer nothing');
 
 // 3. Enter locates the ZIP, never calls the address geocoder, and clears the old place
-await page.evaluate(() => document.getElementById('form').requestSubmit());
-await page.waitForFunction(() => window.__HS_VERIFY && window.__HS_VERIFY.zipBoundary === '52638', null, { timeout: 15000 }).catch(() => {});
-await page.waitForTimeout(800);
+await typeZip('52638');
+await submitEnter();
+await waitBoundary('52638'); await page.waitForTimeout(500);
 o = await st();
 ok(geocodeCalls.length === 0, '3: a ZIP never goes to the address geocoder', String(geocodeCalls.length));
-ok(o.center === '52638', '3b: the 52638 outline is drawn', JSON.stringify(o));
-ok(/Middletown/.test(o.h1) && !/Herndon/.test(o.h1), '3c: heading names Middletown, not the old place', o.h1);
-ok(o.sites === 0, '3d: no previous-place records remain (zero-record ZIP)', String(o.sites));
+ok(o.center === '52638' && /Middletown/.test(o.h1) && !/Herndon/.test(o.h1) && o.sites === 0, '3b: 52638 outline drawn, heading names Middletown, zero records, old place gone', JSON.stringify(o));
 const pins = await page.evaluate(() => document.querySelectorAll('#map .leaflet-marker-icon, #map .leaflet-marker-pane > *').length);
-ok(pins === 0, '3e: no old pins on the map', String(pins));
-const zoomed = await page.evaluate(() => { var m = document.querySelector('#mapInner'); return !!m && !!m.querySelector('.leaflet-tile-pane'); });
-ok(zoomed, '3f: the map is present for a zero-record ZIP');
+ok(pins === 0, '3c: no old pins on the map', String(pins));
 
-// 4. clicking the suggestion works, and switching back to a ZIP with records works
-await page.fill('#addr', '20171');
-await page.waitForFunction(() => { var b = document.getElementById('zipSuggest'); return b && !b.hidden; }, null, { timeout: 5000 }).catch(() => {});
-await page.click('#zipSuggest');
+// 4. the search icon (the real click) and a suggestion click both work
+await typeZip('85083');
+await page.click('#go');
+await waitBoundary('85083'); await page.waitForTimeout(400);
+o = await st();
+ok(o.center === '85083' && /Phoenix/.test(o.h1), '4: the search-icon click loads 85083', JSON.stringify(o));
+await typeZip('20171');
+await page.click('#zipSuggest button');
 await page.waitForFunction(() => (window.__HS_SITES || []).length > 0, null, { timeout: 15000 }).catch(() => {});
 o = await st();
-ok(o.sites > 0 && /Herndon/.test(o.h1) && o.center === '20171', '4: clicking a suggestion loads that ZIP', JSON.stringify(o));
+ok(o.sites > 0 && /Herndon/.test(o.h1) && o.center === '20171', '4b: clicking a suggestion loads that ZIP', JSON.stringify(o));
 
-// 5. an unknown ZIP clears the old place and says so
-await page.fill('#addr', '00000');
-await page.evaluate(() => document.getElementById('form').requestSubmit());
-await page.waitForTimeout(1200);
+// 5. rapid switching: a slow first search never overwrites a faster second one
+DELAY['64166'] = 1500;
+await page.fill('#addr', '64166'); await submitEnter();
+await page.fill('#addr', '19475'); await submitEnter();
+await waitBoundary('19475'); await page.waitForTimeout(2200);
 o = await st();
-ok(!o.resultsShown && o.sites === 0 && !/Herndon/.test(o.h1) && /isn't one of the ZIP codes/.test(o.status), '5: unknown ZIP clears old results and errors', JSON.stringify(o));
+ok(o.center === '19475' && /Spring City/.test(o.h1) && !/Kansas City/.test(o.h1), '5: the late 64166 answer is discarded; 19475 stays', JSON.stringify(o));
+const calls = await page.evaluate(() => window.__ZCTA_CALLS || []);
+ok(calls.lastIndexOf('19475') > calls.lastIndexOf('64166') || !calls.includes('64166'), '5b: 64166 never drew over 19475', JSON.stringify(calls.slice(-4)));
+delete DELAY['64166'];
 
-// 6. ZIP -> address still works through the geocoder
-await page.fill('#addr', ADDR_TEXT);
-await page.evaluate(() => document.getElementById('form').requestSubmit());
-await page.waitForTimeout(2000);
+// 6. no community row, but a polygon: the ZIP is located and the empty state is honest
+await page.fill('#addr', '98684'); await submitEnter();
+await waitBoundary('98684'); await page.waitForTimeout(500);
 o = await st();
-ok(geocodeCalls.length === 1 && o.sites > 0, '6: an address still geocodes and renders', JSON.stringify(o));
+ok(o.center === '98684' && o.h1 === 'Development in ZIP 98684' && o.sites === 0 && /no development records for ZIP 98684/.test(await note() || ''),
+  '6: polygon-only ZIP: heading "Development in ZIP 98684", outline, empty state', JSON.stringify(o) + ' ' + await note());
 
-// 7. address no-match clears old results (the original defect)
+// 7. no community row and no polygon: "no measured boundary", nothing from the previous ZIP
+await page.fill('#addr', '99999'); await submitEnter();
+await page.waitForTimeout(900);
+o = await st();
+ok(o.center === null && o.h1 === 'Development in ZIP 99999' && o.sites === 0 && !o.resultsShown && /no measured boundary/.test(await note() || ''),
+  '7: no polygon: heading, "no measured boundary", no outline, no stale records', JSON.stringify(o) + ' ' + await note());
+
+// 8. invalid input: a clear message and nothing stale left (4 digits, 6 digits, 00000)
+for (const [v, re] of [['5263', /five digits.*has 4/], ['526381', /five digits.*has 6/], ['00000', /not a ZIP code/]]) {
+  await page.fill('#addr', '20171'); await submitEnter(); await page.waitForTimeout(700);
+  await page.fill('#addr', v); await submitEnter(); await page.waitForTimeout(500);
+  o = await st();
+  ok(!o.resultsShown && o.sites === 0 && o.center === null && !/Herndon/.test(o.h1) && re.test(o.status), '8: "' + v + '" gives a clear message and clears the old place', JSON.stringify(o));
+}
+ok(geocodeCalls.length === 0, '8b: invalid ZIPs never reach the address geocoder', String(geocodeCalls.length));
+
+// 9. ZIP -> address -> ZIP
+await page.fill('#addr', ADDR_TEXT); await submitEnter(); await page.waitForTimeout(2000);
+o = await st();
+ok(geocodeCalls.length === 1 && o.sites > 0, '9: an address still geocodes and renders', JSON.stringify(o));
+await page.fill('#addr', '07001'); await submitEnter();
+await waitBoundary('07001'); await page.waitForTimeout(500);
+o = await st();
+ok(o.center === '07001' && /Avenel/.test(o.h1) && o.sites === 0 && geocodeCalls.length === 1, '9b: address -> ZIP shows only 07001 (leading zero kept), no address records', JSON.stringify(o));
+await page.fill('#addr', '48854'); await submitEnter(); await waitBoundary('48854');
+o = await st();
+ok(o.center === '48854' && /Mason/.test(o.h1), '9c: ZIP -> ZIP (48854)', JSON.stringify(o));
+
+// 10. address no-match clears old results (the original defect)
 await page.route('**/functions/v1/geocode-address', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"match":null}' }));
-await page.fill('#addr', 'nowhere at all');
-await page.evaluate(() => document.getElementById('form').requestSubmit());
-await page.waitForTimeout(1200);
+await page.fill('#addr', 'nowhere at all'); await submitEnter(); await page.waitForTimeout(1200);
 o = await st();
-ok(!o.resultsShown && o.sites === 0 && /couldn't find that address/.test(o.status), '7: address no-match leaves no stale results', JSON.stringify(o));
+ok(!o.resultsShown && o.sites === 0 && /couldn't find that address/.test(o.status), '10: address no-match leaves no stale results', JSON.stringify(o));
 
-ok(pageErrors.length === 0, '8: no page errors', pageErrors.join(' | '));
+// 11. layout: the suggestion list and the search icon, desktop and phone
+for (const [w, h, label] of [[1280, 900, 'desktop 1280'], [375, 800, 'phone 375']]) {
+  await page.setViewportSize({ width: w, height: h });
+  await page.goto(base + '/development-map.html', { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(800);
+  await typeZip('526');
+  const g = await page.evaluate(() => {
+    var b = document.querySelector('#zipSuggest button'), go = document.getElementById('go');
+    var rb = b && b.getBoundingClientRect(), rg = go.getBoundingClientRect();
+    return { sw: rb ? rb.right : null, sh: rb ? rb.height : null, gr: rg.right, gl: rg.left, gw: rg.width,
+      overflow: document.documentElement.scrollWidth > window.innerWidth };
+  });
+  ok(g.sw !== null && g.sw <= w && g.sh >= 44 && g.gl >= 0 && g.gr <= w && g.gw >= 40 && !g.overflow, '11: ' + label + ': suggestion inside the viewport (>=44px tall), icon visible, no sideways scroll', JSON.stringify(g));
+}
+
+ok(pageErrors.length === 0, '12: no page errors', pageErrors.join(' | '));
 await browser.close(); srv.close();
 console.log(fails ? fails + ' FAILED' : 'map1-zip-search: all checks passed');
 process.exit(fails ? 1 : 0);
