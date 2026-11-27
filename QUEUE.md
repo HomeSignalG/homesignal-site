@@ -40,6 +40,36 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-11-27 — SUBSCRIBER-ZIP FINDINGS (11 ZIPs): recorded, none built here
+
+Source: the subscriber-ZIP health audit (homesignal-ingest `docs/subscriber-zip-health-2026-11-26.md`, PRs #1170 and #1172). Each item below is
+a QUEUE item, not a change. Labels: VERIFIED = a measurement or log read this session; UNVERIFIED = stated, not re-measured.
+
+1. **07001 (Woodbridge NJ): the Government Notices tile reads empty although 45 notices are stored.** VERIFIED cause: `app_refresh_zip`
+   materializes a notice only when `a.created_at >= now() - 14 days`, so notices stored earlier never reach `app_changes`. NOT fixed, on purpose:
+   - It is a national, resident-visible change (every ZIP), not a 07001 fix.
+   - It collides with the founder's cross-stream rule (`CROSS_STREAM_WINNER = "meetings"`): a government_notice row that is also a meeting
+     already shows on the Meetings tile. Measured (alerts, `government_notice`): **865 rows across 128 communities, 746 of them also stored as
+     meetings** (control: the same query counted the 07001 rows).
+   - Needs a founder ruling on what the notices tile is for (recent writes, or open notices) before any code. 07001 is the instance, not the scope.
+2. **Local development tiles for the DOT-only ZIPs stay a work queue item (not built).** 07001, 46124, 48854, 55024, 65742 and 96740 show
+   transportation-agency records only on development. Needs a first-party permit/planning source per county, found through the shipped
+   connectors (probe, verify, dry-run). UNVERIFIED which of the six has a shipped-connector source.
+3. **46124 (Johnson IN) and 55024 (Dakota MN) Local News are empty BY THE LOCKED TAXONOMY, not broken.** VERIFIED: stored stories exist (3 and 11) and none
+   carries an authorized subtopic, so `app_refresh_zip` correctly renders none (Rule #0b: the subtopic gate stays, no bypass). 07001's one topical story
+   was created the day of the audit and waits for the sweep. Do not widen the resolver or classifier for these.
+4. **City-community prerequisites before any city meetings feed can be armed** (`zip_government_bodies`, VERIFIED 2026-11-27):
+   - **Woodbridge Township (07001):** the ZIP lists only Middlesex County (share 1.0), so no city community exists. Needs a `level=city` community
+     (parent Middlesex), a `jurisdiction_slug`, enrollment in BOTH halves of the meetings gate, and a registry row.
+   - **Farmington (55024):** 17.2% of the ZIP's land, no source. Same four prerequisites (Dakota County is the parent; Lakeville, 2.1%, is also unsourced).
+   - **Mason (48854):** 4.5%, no source. Same four prerequisites (Ingham County is the parent).
+   Source candidates found by read-only recon are in ingest `scripts/recon/subscriber-meetings-sources-*.json`; none is armed.
+5. **Hawaii County (96740): a feed repoint candidate, not done.** The county's own feed is stale (Granicus, newest item 2026-09-16; also recorded in
+   ingest CLAUDE.md). It is a county ROOT, so a repoint needs no new community. Only a shipped adapter may be used; the one calendar URL guessed
+   returned 404. Probe, verify and dry-run first.
+6. **Main was red on three checks, all unrelated to the subscriber work, all fixed 2026-11-27** (ingest #1174 `unit`: fixture-pack age against the 30-day
+   source limit; #1175 `pin`: a Bluesky handle matched the origin regex; #1176 `geography-db`: community registry snapshot 721 vs 726 rows).
+
 ### 2026-10-01 — ✅ FIX 4: the 706 no-boundary ZIPs are classified — 0 HomeSignal omissions; 704 legitimate, 2 not established
 
 **Classified before changing anything. No HomeSignal data changed.** All 706 stay `not_measured`.
