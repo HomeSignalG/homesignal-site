@@ -126,3 +126,36 @@ A revoked evaluation is terminal, and `brokerage_report_issue` refuses a revoked
 | GBRAR | outside user | 19b5a849-4ccf-4079-b3d3-f755f1135bff |
 
 **Required before `CHECKOUT_ENABLED` is set:** apply `docs/paddle-billing.sql` (so free reports are a cleared flag, not the evaluation's status), then reopen these five evaluations by an explicit, logged, exact-ID edit (status back to `active`, `revoked_at` null; the revoked-is-terminal guard must be bypassed for that one statement) and confirm `free_reports_granted` is false on each, so they hold no free reports but can pay. The "Founder Test Workspace" and "Brigham City Test Realty 2" evaluations were not touched.
+
+### 10a. Exact SQL to reopen the five evaluations (NOT RUN; run only after `docs/paddle-billing.sql` is applied and the founder says go)
+
+`evaluation_guard` makes `revoked` terminal, so the guard trigger is disabled inside one transaction for these five exact IDs only, then enabled again. `free_reports_granted` is set false so they hold no free reports. The transaction aborts unless exactly 5 rows change. The original `revoked` events stay in `evaluation_event` (it is append-only and its kind list has no "reopened", so no new event is invented).
+
+```sql
+begin;
+alter table public.evaluation disable trigger evaluation_guard_trg;
+with ids(evaluation_id) as (values
+  ('04cd5fe1-c3a9-4fea-9991-6be7ad95cef0'::uuid),
+  ('2bd665ce-e252-45e9-9498-b0ffb2fb8e53'),
+  ('5edce01f-b333-496c-a9e5-04e77b753e9d'),
+  ('6232a760-0233-4896-98d0-8d136f5bbb77'),
+  ('19b5a849-4ccf-4079-b3d3-f755f1135bff'))
+update public.evaluation e
+   set status = 'active', revoked_at = null, free_reports_granted = false
+  from ids
+ where e.evaluation_id = ids.evaluation_id and e.status = 'revoked';
+do $$ declare n int; begin
+  select count(*) into n from public.evaluation
+   where evaluation_id in ('04cd5fe1-c3a9-4fea-9991-6be7ad95cef0','2bd665ce-e252-45e9-9498-b0ffb2fb8e53','5edce01f-b333-496c-a9e5-04e77b753e9d','6232a760-0233-4896-98d0-8d136f5bbb77','19b5a849-4ccf-4079-b3d3-f755f1135bff')
+     and status = 'active' and revoked_at is null and free_reports_granted = false;
+  if n <> 5 then raise exception 'expected 5 reopened evaluations, got %', n; end if;
+end $$;
+alter table public.evaluation enable trigger evaluation_guard_trg;
+commit;
+```
+
+Read-back after: those five show `status active`, `free_reports_granted false`, trigger `evaluation_guard_trg` enabled (`tgenabled = 'O'`), and 7 accounts, 7 evaluations, 28 reports, 28 usage entries unchanged.
+
+## 11. Pre-checkout list: complimentary access for Veronica and Devin (production step, NOT DONE)
+
+Founder decision (2026-11-27): Veronica and Devin get named complimentary access, an exception, not a plan. After `docs/paddle-billing.sql` is applied, the database owner inserts one `public.billing_complimentary` row for each: the account's `brokerage_id`, a reason of at least 8 characters, `approved_by` the founder, and an expiry or an explicitly recorded "no expiry". Look up the two `brokerage_id` values first (read-only, by the accounts' own emails) and confirm them with the founder; they are not guessed here. Confirm after: `billing_complimentary_active(brokerage_id)` is true for these two and false for every other account, and `billing_gate` is unchanged.
