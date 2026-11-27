@@ -110,3 +110,19 @@ Never run the sandbox list against the production project: there a sandbox payme
 * **Deploy:** the new `payment_required` answer and the Terms version need the report function and `manage-billing` deployed together with the SQL; the order is in section 6.
 * `homesignalmap.html` still ends a paywall sentence with "Free during launch." (the older paid-map product, whose Lemon webhook this work removes). It is not a Development Activity plan and was left; say if it should go.
 * `homesignal-ingest` #1141's `step2a-isolation-db` check fails on unclassified `dc_*` objects already in the live database; it is not caused by the deletion of the Lemon function.
+
+## 10. Five free-report allowances were revoked in production on 2026-11-27 — REOPEN BEFORE CHECKOUT (founder decision "option 2")
+
+Founder instruction: the five accounts that still had free reports (two the founder's own, three real outside users) must pay to make reports, and their emails must not be blocked if they pay. In production, before this migration exists, the only removal tool was `public.evaluation_revoke`, so these five evaluations were REVOKED (nothing deleted: 7 accounts, 7 evaluations, 28 reports and 28 usage entries before and after).
+
+A revoked evaluation is terminal, and `brokerage_report_issue` refuses a revoked evaluation even with a paid plan ("a payment cannot reopen an account HomeSignal ended"). So these five cannot report, even after paying, until they are reopened.
+
+| account | owner | evaluation_id |
+|---|---|---|
+| Brigham City Test Realty | founder | 04cd5fe1-c3a9-4fea-9991-6be7ad95cef0 |
+| Cheryl | founder | 2bd665ce-e252-45e9-9498-b0ffb2fb8e53 |
+| Dinkle Properties | outside user | 5edce01f-b333-496c-a9e5-04e77b753e9d |
+| Bob Bemis | outside user | 6232a760-0233-4896-98d0-8d136f5bbb77 |
+| GBRAR | outside user | 19b5a849-4ccf-4079-b3d3-f755f1135bff |
+
+**Required before `CHECKOUT_ENABLED` is set:** apply `docs/paddle-billing.sql` (so free reports are a cleared flag, not the evaluation's status), then reopen these five evaluations by an explicit, logged, exact-ID edit (status back to `active`, `revoked_at` null; the revoked-is-terminal guard must be bypassed for that one statement) and confirm `free_reports_granted` is false on each, so they hold no free reports but can pay. The "Founder Test Workspace" and "Brigham City Test Realty 2" evaluations were not touched.
