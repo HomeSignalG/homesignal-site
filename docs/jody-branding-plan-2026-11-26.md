@@ -14,10 +14,16 @@
   `scripts/*.py` 193, `scripts/*.mjs` 95, `supabase/functions` 88, `partials` 7, `data` 4. Most script hits are
   comments, test fixtures and generator copy that the overlay already rewrites.
 
-## Decision needed first: the name's casing
-The contract says "Jody"; the request says "JODY"; other copy says "JODY Tracks". The overlay emits "Jody".
-Pick one, record it in the contract, and make every surface derive from it. Hand-editing source to "JODY" (as an
-earlier commit on #3143 did, now reverted) produces mixed casing next to the overlay's "Jody".
+## Casing: DECIDED, "JODY" (founder, 2026-11-27)
+The display name is **JODY**. The contract still says "Jody" and `brand_stage.py` emits "Jody" and the two-tone
+wordmark `Jo<span>dy</span>`, so the implementation must change those, not individual pages:
+1. Set `jody.display_name` to `JODY` in `brand-contract.v1.json`, regenerate its sha256, and update the overlay
+   test that pins "Jody".
+2. Decide the wordmark (`JO<span>DY</span>` keeps the accent split; a single-tone `JODY` drops it). This is a design
+   call, not made yet.
+3. "JODY Tracks" copy stays as is; check it against the contract in the brand-leak and casing tests.
+4. Do not hand-edit source strings to "JODY": the overlay is the single path (an earlier commit that did was reverted).
+Still undecided: the Kansas City connector approach and the `verified_on` data change (see the audit).
 
 ## Approach: one source of truth, no per-string edits
 1. **Contract first.** Add the final display string and its legal variants (wordmark, "<Name> Tracks", possessive)
