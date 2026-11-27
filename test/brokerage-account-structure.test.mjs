@@ -152,7 +152,7 @@ const acqCode = code(ACQ_SQL);
 // the verification list ask who the member is), never reads the member table, and writes no row of this spine: its tables hold prices, enrollments, partner links and unmatched events.
 const PADDLE_SQL = 'docs/paddle-billing.sql';
 const paddleCode = code(PADDLE_SQL);
-ok(sorted(naming) === sorted([SQL_FILE, L1_SQL, EVAL_READS, SAVED_SQL, HEADER_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, RATE_SQL, DA_SQL, L2_SQL, ACQ_SQL, PADDLE_SQL])
+ok(sorted(naming) === sorted([SQL_FILE, L1_SQL, EVAL_READS, SAVED_SQL, HEADER_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, RATE_SQL, DA_SQL, L2_SQL, ACQ_SQL, PADDLE_SQL, 'docs/paddle-billing-staging-seed.sql'])
    && (paddleCode.match(/brokerage_membership_of\(/g) || []).length === 6 && !/\bpublic\.brokerage_member\b/.test(paddleCode)
    && !/\b(insert\s+into|update|delete\s+from|truncate|alter\s+table|drop\s+table|create\s+table)\s+(only\s+)?public\.brokerage_(account|member)/i.test(paddleCode)
    && !/\b(insert\s+into|update|delete\s+from|truncate|alter\s+table|drop\s+table|create\s+table)\s+(only\s+)?public\.(brokerage_|evaluation)/i.test(acqCode) && !/brokerage_membership_of|evaluation_report_issue|brokerage_report_issue/.test(acqCode)

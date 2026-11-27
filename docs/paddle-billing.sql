@@ -234,11 +234,68 @@ create or replace function public.billing_gate_state() returns table (paid_requi
 language sql stable security definer set search_path = public, pg_temp
 as $$ select g.paid_required, g.honor_granted_free_reports from public.billing_gate g $$;
 
--- May this evaluation's FREE reports still be used? Only if the account was promised them and either checkout has not launched or the operator chose to honour them.
+-- NAMED COMPLIMENTARY ACCESS (founder, 2026-11-27): an exception for ONE named account, never a plan. Every row carries the reason and who approved it, may carry
+-- an expiry (null = no expiry, a founder choice recorded as such), and can only be ended by setting revoked_at (append-only otherwise). It is not a $0 Paddle
+-- checkout and it never changes billing_gate: every account without a row still has to pay. Set by the database owner in SQL (no API role can), like the gate.
+create table if not exists public.billing_complimentary (
+  id           bigint generated always as identity primary key,
+  brokerage_id uuid        not null references public.brokerage_account (id),
+  reason       text        not null,
+  approved_by  text        not null,
+  expires_at   timestamptz,
+  created_at   timestamptz not null default now(),
+  revoked_at   timestamptz,
+  constraint billing_complimentary_reason check (length(btrim(reason)) >= 8),
+  constraint billing_complimentary_approver check (length(btrim(approved_by)) >= 3)
+);
+create unique index if not exists billing_complimentary_one_open on public.billing_complimentary (brokerage_id) where revoked_at is null;
+create or replace function public.billing_complimentary_guard() returns trigger
+language plpgsql set search_path = public, pg_temp
+as $$
+begin
+  if tg_op <> 'UPDATE' then raise exception 'billing_complimentary: rows are never deleted or truncated (revoke instead)' using errcode = '55000'; end if;
+  if old.revoked_at is not null or new.revoked_at is null
+     or (new.id, new.brokerage_id, new.reason, new.approved_by, new.expires_at, new.created_at) is distinct from (old.id, old.brokerage_id, old.reason, old.approved_by, old.expires_at, old.created_at) then
+    raise exception 'billing_complimentary: the only change allowed is revoking an open row' using errcode = '55000';
+  end if;
+  return new;
+end $$;
+drop trigger if exists billing_complimentary_guard on public.billing_complimentary;
+create trigger billing_complimentary_guard before update on public.billing_complimentary for each row execute function public.billing_complimentary_guard();
+drop trigger if exists billing_complimentary_no_delete on public.billing_complimentary;
+create trigger billing_complimentary_no_delete before delete or truncate on public.billing_complimentary for each statement execute function public.billing_complimentary_guard();
+
+create or replace function public.billing_complimentary_active(p_brokerage uuid) returns boolean
+language sql stable security definer set search_path = public, pg_temp
+as $$
+  select exists (select 1 from public.billing_complimentary c
+                  where c.brokerage_id = p_brokerage and c.revoked_at is null and (c.expires_at is null or c.expires_at > now()))
+$$;
+create or replace function public.billing_complimentary_grant(p_brokerage uuid, p_reason text, p_approved_by text, p_expires_at timestamptz default null) returns bigint
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+declare v_id bigint;
+begin
+  if p_expires_at is not null and p_expires_at <= now() then raise exception 'billing_complimentary: the expiry must be in the future' using errcode = '22023'; end if;
+  insert into public.billing_complimentary (brokerage_id, reason, approved_by, expires_at) values (p_brokerage, p_reason, p_approved_by, p_expires_at) returning id into v_id;
+  return v_id;
+end $$;
+create or replace function public.billing_complimentary_revoke(p_brokerage uuid) returns integer
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+declare n integer;
+begin
+  update public.billing_complimentary c set revoked_at = now() where c.brokerage_id = p_brokerage and c.revoked_at is null;
+  get diagnostics n = row_count;
+  return n;
+end $$;
+
+-- May this evaluation's FREE reports still be used? Only if the account was promised them and either checkout has not launched or the operator chose to honour them,
+-- OR the account holds an open, unexpired named complimentary row. Nothing else widens it.
 create or replace function public.billing_free_reports_usable(p_evaluation uuid) returns boolean
 language sql stable security definer set search_path = public, pg_temp
 as $$
-  select coalesce((select e.free_reports_granted and (not g.paid_required or g.honor_granted_free_reports)
+  select coalesce((select (e.free_reports_granted and (not g.paid_required or g.honor_granted_free_reports)) or public.billing_complimentary_active(e.brokerage_id)
                      from public.evaluation e cross join public.billing_gate g where e.evaluation_id = p_evaluation), false)
 $$;
 
@@ -727,7 +784,7 @@ declare
   f record;
 begin
   foreach t in array array['billing_plan_price', 'billing_period_observation', 'paddle_unmatched_event', 'partner_brokerage', 'partner_link', 'partner_enrollment',
-                           'billing_environment', 'billing_gate', 'billing_gate_log', 'billing_terms_version', 'billing_terms_acceptance'] loop
+                           'billing_environment', 'billing_gate', 'billing_gate_log', 'billing_terms_version', 'billing_terms_acceptance', 'billing_complimentary'] loop
     execute format('alter table public.%I enable row level security', t);
     execute format('revoke all on public.%I from public, anon, authenticated, service_role', t);
   end loop;
@@ -738,13 +795,16 @@ begin
     execute format('create trigger %I before truncate on public.%I for each statement execute function public.billing_append_only()', t || '_no_truncate', t);
   end loop;
   for f in select p.oid::regprocedure::text as sig from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-            where n.nspname = 'public' and (p.proname like 'paddle\_%' or p.proname like 'partner\_%' or p.proname in ('billing_price_for', 'billing_binding_price', 'billing_summary', 'billing_portal_ref', 'billing_grants_livemode', 'billing_environment_mode', 'billing_gate_set', 'billing_gate_state', 'billing_free_reports_usable', 'billing_free_reports_review', 'billing_terms_current', 'billing_terms_accept')) loop
+            where n.nspname = 'public' and (p.proname like 'paddle\_%' or p.proname like 'partner\_%' or p.proname in ('billing_price_for', 'billing_binding_price', 'billing_summary', 'billing_portal_ref', 'billing_grants_livemode', 'billing_environment_mode', 'billing_gate_set', 'billing_gate_state', 'billing_free_reports_usable', 'billing_free_reports_review', 'billing_terms_current', 'billing_terms_accept', 'billing_complimentary_active', 'billing_complimentary_grant', 'billing_complimentary_revoke')) loop
     execute format('revoke all on function %s from public, anon, authenticated, service_role', f.sig);
     execute format('grant execute on function %s to service_role', f.sig);
   end loop;
   -- the gate and the environment are changed by the database owner in SQL, never through the API: not even service_role may call the setter, and the trigger
   -- function is not callable at all
   revoke execute on function public.billing_gate_set(boolean, boolean) from service_role;
+  revoke execute on function public.billing_complimentary_grant(uuid, text, text, timestamptz) from service_role;
+  revoke execute on function public.billing_complimentary_revoke(uuid) from service_role;
+  revoke all on function public.billing_complimentary_guard() from public, anon, authenticated, service_role;
   revoke all on function public.billing_environment_guard() from public, anon, authenticated, service_role;
   revoke execute on function public.partner_brokerage_create(text, integer) from service_role;
   revoke execute on function public.partner_brokerage_set_interval(uuid, integer) from service_role;
@@ -761,7 +821,7 @@ declare
   t   text;
 begin
   for f in select p.oid, p.oid::regprocedure::text as sig from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-            where n.nspname = 'public' and (p.proname like 'paddle\_%' or p.proname like 'partner\_%' or p.proname in ('billing_price_for', 'billing_binding_price', 'billing_summary', 'billing_portal_ref', 'billing_grants_livemode', 'billing_environment_mode', 'billing_gate_set', 'billing_gate_state', 'billing_free_reports_usable', 'billing_free_reports_review', 'billing_terms_current', 'billing_terms_accept')) loop
+            where n.nspname = 'public' and (p.proname like 'paddle\_%' or p.proname like 'partner\_%' or p.proname in ('billing_price_for', 'billing_binding_price', 'billing_summary', 'billing_portal_ref', 'billing_grants_livemode', 'billing_environment_mode', 'billing_gate_set', 'billing_gate_state', 'billing_free_reports_usable', 'billing_free_reports_review', 'billing_terms_current', 'billing_terms_accept', 'billing_complimentary_active', 'billing_complimentary_grant', 'billing_complimentary_revoke')) loop
     if exists (select 1 from pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
                 where p.oid = f.oid and a.grantee <> p.proowner
                   and (a.grantee <> (select oid from pg_roles where rolname = 'service_role') or a.privilege_type <> 'EXECUTE')) then
@@ -772,7 +832,7 @@ begin
     end if;
   end loop;
   foreach t in array array['public.billing_plan_price', 'public.billing_period_observation', 'public.paddle_unmatched_event', 'public.partner_brokerage', 'public.partner_link', 'public.partner_enrollment',
-                           'public.billing_environment', 'public.billing_gate', 'public.billing_gate_log', 'public.billing_terms_version', 'public.billing_terms_acceptance'] loop
+                           'public.billing_environment', 'public.billing_gate', 'public.billing_gate_log', 'public.billing_terms_version', 'public.billing_terms_acceptance', 'public.billing_complimentary'] loop
     if not (select c.relrowsecurity from pg_class c where c.oid = t::regclass)
        or exists (select 1 from pg_class c, aclexplode(coalesce(c.relacl, acldefault('r', c.relowner))) a where c.oid = t::regclass and a.grantee <> c.relowner) then
       raise exception 'paddle_billing: % must have row level security and no grant to any API role', t;
@@ -811,7 +871,10 @@ end $post$;
 --     public.paddle_unmatched_record(jsonb, text), public.billing_binding_price(text, boolean, text), public.billing_price_for(text, boolean);
 --   drop table if exists public.partner_enrollment, public.partner_link, public.partner_brokerage, public.paddle_unmatched_event,
 --     public.billing_period_observation, public.billing_plan_price, public.billing_gate_log, public.billing_gate, public.billing_terms_acceptance, public.billing_terms_version;
+--   drop function if exists public.billing_free_reports_usable(uuid);
+--   drop table if exists public.billing_complimentary;
+--   drop function if exists public.billing_complimentary_grant(uuid, text, text, timestamptz), public.billing_complimentary_revoke(uuid), public.billing_complimentary_active(uuid), public.billing_complimentary_guard();
 --   drop table if exists public.billing_environment;
---   drop function if exists public.billing_free_reports_usable(uuid), public.billing_environment_mode(), public.billing_grants_livemode(), public.billing_environment_guard();
+--   drop function if exists public.billing_environment_mode(), public.billing_grants_livemode(), public.billing_environment_guard();
 --   alter table public.evaluation drop column if exists free_reports_granted;
 -- ROLLBACK-END

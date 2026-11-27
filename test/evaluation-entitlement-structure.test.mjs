@@ -206,7 +206,9 @@ const ACQ_SQL = 'docs/acquisition-attribution.sql';
 const PADDLE_SQL_NAMING = 'docs/paddle-billing.sql';
 const acqCode = code(ACQ_SQL);
 const dmlTargets = (t) => { const x = t.replace(/'(?:[^']|'')*'/g, "''"); return [...x.matchAll(/\binsert\s+into\s+(?:public\.)?(\w+)/gi), ...x.matchAll(/\bupdate\s+(?:public\.)?(\w+)\s+\w*\s*set\b/gi), ...x.matchAll(/\bdelete\s+from\s+(?:public\.)?(\w+)/gi), ...x.matchAll(/\btruncate\s+(?:table\s+)?(?:public\.)?(\w+)/gi)].map((m) => m[1]).filter((t) => t !== 'on'); }; // 'on' is the trigger event of `before truncate on <table>`, not a table
-ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, SAVED_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, RATE_SQL, LIMIT_MIGRATION, LIMIT_MIGRATION_100, EVAL_READS, DA_SQL, 'docs/individual-agent-signup.sql', ACQ_SQL, PADDLE_SQL_NAMING].sort())
+ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, SAVED_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, RATE_SQL, LIMIT_MIGRATION, LIMIT_MIGRATION_100, EVAL_READS, DA_SQL, 'docs/individual-agent-signup.sql', ACQ_SQL, PADDLE_SQL_NAMING, 'docs/paddle-billing-staging-seed.sql'].sort())
+   // the staging seed (2026-11-27) clears free_reports_granted and grants one named exception; it never writes a credit and refuses outside staging
+   && !/\b(insert\s+into|delete\s+from|truncate)\s+(?:public\.)?evaluation_credit\b/i.test(code('docs/paddle-billing-staging-seed.sql')) && /billing_environment_mode\(\) <> 'staging'/.test(code('docs/paddle-billing-staging-seed.sql'))
    // docs/paddle-billing.sql (2026-11-16, founder: no free plan) adds the evaluation.free_reports_granted flag, replaces evaluation_usage to honour it, and splices the paid-plan
    // gate into brokerage_report_issue. It never writes a credit: no insert/delete on evaluation_credit.
    && !/\b(insert\s+into|delete\s+from|truncate)\s+(?:public\.)?evaluation_credit\b/i.test(code(PADDLE_SQL_NAMING))

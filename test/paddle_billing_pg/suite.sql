@@ -432,6 +432,46 @@ select pg_temp._ck('G08 every change of the gate is logged (append-only) and no 
 select pg_temp._ck('G09 reports already made are never touched by any of this: the granted account''s first free report is still stored, and the credit ledger is unchanged', exists (select 1 from public.evaluation_credit where evaluation_id = pg_temp._ev('ggra') and ordinal = 1));
 select pg_temp._ck('G10 the arming rule is a flag in the database, not a code path: arming and disarming restore the same usable answer', public.billing_free_reports_usable(pg_temp._ev('ggra')) and not public.billing_free_reports_usable(pg_temp._ev('gnew')));
 
+-- ---- K: NAMED COMPLIMENTARY ACCESS (founder, 2026-11-27): one named exception, recorded with its reason, never a free plan and never a weaker gate --------------
+select pg_temp._run('k arm', $$select public.billing_gate_set(true, false)$$);
+select pg_temp._run('k before', $$select pg_temp._iss('cx1', 33, 3303)$$);
+select pg_temp._ck('K01 ARMED, no exception: an unpaid account that was never promised free reports is refused', pg_temp._allot('cx1') like 'EV013%', pg_temp._allot('cx1'));
+select pg_temp._ck('K02 a grant needs a real reason and approver, and a future expiry (null = no expiry); only one open exception per account',
+  pg_temp._why($$select public.billing_complimentary_grant(pg_temp._bk('gnew'), 'x', 'founder', null)$$) like '23514%'
+  and pg_temp._why($$select public.billing_complimentary_grant(pg_temp._bk('gnew'), 'partner, approved by founder', 'f', null)$$) like '23514%'
+  and pg_temp._why($$select public.billing_complimentary_grant(pg_temp._bk('gnew'), 'partner, approved by founder', 'founder', now() - interval '1 day')$$) like '22023%'
+  and not exists (select 1 from public.billing_complimentary));
+select pg_temp._run('k grant', $$select public.billing_complimentary_grant(pg_temp._bk('gnew'), 'partner, approved by founder', 'founder', null)$$);
+select pg_temp._run('k comp report', $$select pg_temp._iss('cx2', 33, 3304)$$);
+select pg_temp._run('k other report', $$select pg_temp._iss('cx3', 34, 3404)$$);
+select pg_temp._ck('K03 the named account makes reports while the gate stays ARMED, and every OTHER account (even one that was promised free reports) is still refused; the gate itself is untouched',
+  pg_temp._allot('cx2') = 'trial' and pg_temp._allot('cx3') like 'EV013%' and (select paid_required and not honor_granted_free_reports from public.billing_gate)
+  and (select count(*) = 1 from public.billing_complimentary where reason = 'partner, approved by founder' and approved_by = 'founder' and expires_at is null),
+  pg_temp._allot('cx2') || '/' || pg_temp._allot('cx3'));
+select pg_temp._ck('K04 a second open exception for the same account is refused', pg_temp._why($$select public.billing_complimentary_grant(pg_temp._bk('gnew'), 'partner, approved by founder', 'founder', null)$$) like '23505%');
+select pg_temp._ck('K05 the exception cannot be rewritten or deleted; only revoking an open row is allowed',
+  pg_temp._why($$update public.billing_complimentary set reason = 'something else entirely'$$) like '55000%' and pg_temp._why($$update public.billing_complimentary set expires_at = now() + interval '1 year'$$) like '55000%'
+  and pg_temp._why($$delete from public.billing_complimentary$$) like '55000%' and pg_temp._why($$truncate public.billing_complimentary$$) like '55000%');
+select pg_temp._ck('K06 no API role can read, grant or revoke an exception, and anon/authenticated cannot ask whether one is active; service_role may only ask',
+  pg_temp._as('anon', $$select * from public.billing_complimentary$$) like '42501%' and pg_temp._as('authenticated', $$select * from public.billing_complimentary$$) like '42501%'
+  and pg_temp._as('service_role', $$select * from public.billing_complimentary$$) like '42501%'
+  and pg_temp._as('service_role', $$select public.billing_complimentary_grant(gen_random_uuid(), 'partner, approved by founder', 'founder', null)$$) like '42501%'
+  and pg_temp._as('service_role', $$select public.billing_complimentary_revoke(gen_random_uuid())$$) like '42501%'
+  and pg_temp._as('anon', $$select public.billing_complimentary_active(gen_random_uuid())$$) like '42501%' and pg_temp._as('authenticated', $$select public.billing_complimentary_active(gen_random_uuid())$$) like '42501%'
+  and pg_temp._as('service_role', $$select public.billing_complimentary_active(gen_random_uuid())$$) = 'ok');
+create temp table _rv (n1 integer, n2 integer);
+select pg_temp._run('k revoke', $$insert into _rv select public.billing_complimentary_revoke(pg_temp._bk('gnew')), 0$$);
+select pg_temp._run('k revoke again', $$update _rv set n2 = public.billing_complimentary_revoke(pg_temp._bk('gnew'))$$);
+select pg_temp._ck('K07 revoking ends it at once (the row stays as history), and a second revoke does nothing',
+  (select n1 = 1 and n2 = 0 from _rv) and (select count(*) = 1 from public.billing_complimentary where revoked_at is not null) and not public.billing_complimentary_active(pg_temp._bk('gnew')));
+select pg_temp._run('k after revoke', $$select pg_temp._iss('cx4', 33, 3305)$$);
+select pg_temp._ck('K08 after revoking, the account is refused again', pg_temp._allot('cx4') like 'EV013%', pg_temp._allot('cx4'));
+select pg_temp._run('k expired row', $$insert into public.billing_complimentary (brokerage_id, reason, approved_by, expires_at) values (pg_temp._bk('gnew'), 'partner, approved by founder', 'founder', now() - interval '1 day')$$);
+select pg_temp._run('k expired report', $$select pg_temp._iss('cx5', 33, 3306)$$);
+select pg_temp._ck('K09 an exception past its expiry grants nothing', not public.billing_complimentary_active(pg_temp._bk('gnew')) and pg_temp._allot('cx5') like 'EV013%', pg_temp._allot('cx5'));
+select pg_temp._run('k clean', $$select public.billing_complimentary_revoke(pg_temp._bk('gnew'))$$);
+select pg_temp._run('k disarm', $$select public.billing_gate_set(false, false)$$);
+
 -- ---- T: terms before purchase (decision 3) -----------------------------------------------------------------------------------------------------------
 select pg_temp._ck('T01 the current terms version is a row in the database', public.billing_terms_current() = '2026-11-16');
 select pg_temp._run('t accept', $$select public.billing_terms_accept(pg_temp._u(1), '2026-11-16', 'professional')$$);
