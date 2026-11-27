@@ -197,6 +197,17 @@ error.
 
 ---
 
+## ZIP geography — A ZIP IS ITS WHOLE ZCTA POLYGON (founder rule, restated 2026-11-27)
+
+- A ZIP search is the entire ZCTA polygon. Fit the map to the polygon bounds.
+- Never use a centroid, ZIP center, representative point, envelope, buffer or radius to scope data or stand in for the ZIP.
+- A stored ZIP point (`zip_centroids`, `app_community_meta` lat/lng) is only a viewport/page anchor. It is never a home and never a data scope.
+- A ZIP with no polygon is reported `not_measured`, honestly, with no invented shape (`docs/app-zcta-boundary.sql`).
+- Radius is valid ONLY in address mode.
+- Authority: `lib/zip-authoritative.js`. If an older doc disagrees, the doc is stale (e.g. `docs/development-tracker-source-of-truth.md`, which now carries dated SUPERSEDED notices; its "centroid + radius" fallback passage is tracked separately because some engine paths still run it).
+
+---
+
 ## Maps / ingest go-live — READ THE GOVERNANCE DOC FIRST
 
 **`docs/maps-go-live-governance.md` is binding for all Maps / ingest state work. Read it
