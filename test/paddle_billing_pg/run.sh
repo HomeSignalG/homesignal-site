@@ -24,6 +24,8 @@ A=$(fp); P -f "$SQL" >/dev/null; B=$(fp)
 out=$(P -tA -F'|' -f "$here/suite.sql"); echo "$out"
 echo "$out" | grep -q '^FAIL' && { echo "SUITE FAILED"; exit 1; }
 n=$(echo "$out" | grep -c '^PASS' || true); [ "$n" -ge 30 ] || { echo "FAIL fewer than 30 checks ran ($n)"; exit 1; }
+# the staging seed: both named partner exceptions, all or nothing, idempotent, refusing outside staging
+bash "$here/seed_check.sh"
 # rollback runs, and re-apply works
 sed -n '/^-- ROLLBACK-BEGIN$/,/^-- ROLLBACK-END$/p' "$SQL" | sed '1d;$d' | sed 's/^-- //' | P -f - >/dev/null || { echo "FAIL 3 rollback does not run"; exit 1; }
 g=$(P -tA -c "select pg_get_functiondef('public.brokerage_report_issue(uuid,uuid,text,text,text,jsonb,jsonb)'::regprocedure) like '%PAID_PLAN_REQUIRED%' or pg_get_functiondef('public.billing_check()'::regprocedure) like '%billing_grants_livemode%'")
