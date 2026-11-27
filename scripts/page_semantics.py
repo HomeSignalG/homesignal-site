@@ -58,7 +58,7 @@ FAMILIES = ("zip", "city", "project", "guide", "map", "development", "fact-check
 # bluesky/lib/development-seo-plane.mjs) and it advances daily for every tracked project. Read as
 # content it would re-announce ~14,000 project pages every morning. The renderer therefore renders
 # a tracked project a second time with this constant for the FINGERPRINT only; the written page
-# keeps the real day. An untracked project's as_of ("Last seen") is a frozen fact and is not
+# keeps the real day. An untracked project's as_of ("Last updated") is a frozen fact and is not
 # neutralized.
 NEUTRAL_AS_OF = "2000-01-01"
 # The canonical URL shape of every family that is tracked. A tracked page is index-eligible or
@@ -94,6 +94,10 @@ _INFRA_TAGS = (
     re.compile(r"<meta\s+charset=[^>]*>\s*", re.I),
     re.compile(r"<link\s+rel=\"stylesheet\"[^>]*>\s*", re.I),
 )
+# A tracked project's Last updated day advances with every run (bookkeeping, see NEUTRAL_AS_OF).
+# Wherever a card prints it, the <time> carries data-lu="live"; the fingerprint ignores that one
+# element. A paused project's frozen day has no such mark and still counts as content.
+_LIVE_DAY = re.compile(r"<time\b[^>]*data-lu=\"live\"[^>]*>.*?</time>", re.S | re.I)
 _ROBOTS = re.compile(r"<meta\s+name=\"robots\"\s+content=\"([^\"]*)\"", re.I)
 
 
@@ -104,7 +108,7 @@ def projection(html):
     s = _TEMPLATE.sub("", s)
     for rx in _INFRA_TAGS:
         s = rx.sub("", s)
-    return s
+    return _LIVE_DAY.sub("", s)
 
 
 def fingerprint(html):

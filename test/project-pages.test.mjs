@@ -202,11 +202,19 @@ ok([...pg1.matchAll(/<script[\s>][^>]*>/gi)].map((m) => m[0]).join() === '<scrip
     d.projectsDoc.projects['arcgis:town-permits:ORPHAN-1|1'] = { registry_id: 'town-permits',
       case: 'ORPHAN-1', name: 'Nobody Links Here', type: 'Residential', status: 'Proposed',
       source_url: 'https://permits.example.gov/r/99', zips: ['01002'] };
+    const p1k = d.projectsDoc.projects[keyFor('https://permits.example.gov/r/1')];
+    p1k.verified_on = '2026-09-28'; p1k.as_of = '2026-10-15';   // as_of is the plane run day: never shown
   } });
   const b = build(kept);
   const po = expectedPath('town-permits', 'ORPHAN-1', 'arcgis:town-permits:ORPHAN-1|1');
   ok(b.r.status === 0 && existsSync(join(b.out, ...po.split('/').filter(Boolean), 'index.html')),
      'a project no card links to keeps its page');
+  const zdoc = read(b.out, '/community/01002/');
+  ok(zdoc.includes('Last updated: <time datetime="2026-09-28">Sep 28, 2026</time>') && !zdoc.includes('2026-10-15') && !zdoc.includes('Oct 15, 2026'),
+     'a ZIP page card shows the project\'s verified day, never the plane run day (as_of)');
+  const pj = JSON.parse(readFileSync(join(b.out, 'community/01002/projects/pages.json'), 'utf8'));
+  ok(pj.updated && Object.keys(pj.updated).length === 1 && Object.values(pj.updated)[0] === '2026-09-28' && Object.keys(pj.updated).every((k) => pj.pages[k]),
+     'pages.json carries a Last updated day only for the record with a verified day (Map 1 pop-ups and rows read it)');
   const list = read(b.out, '/community/01002/projects/');
   ok(list.includes(`<a href="${po}">Nobody Links Here</a>`) && list.includes(`<a href="${p1}">`),
      "the ZIP's project list links every project page on that ZIP, kept or featured");
@@ -244,9 +252,10 @@ ok([...pg1.matchAll(/<script[\s>][^>]*>/gi)].map((m) => m[0]).join() === '<scrip
       name: 'Roosevelt Row Lofts </script><script>alert(1)</script>', type: 'Residential',
       status: 'Proposed', source_url: 'https://permits.example.gov/r/97', zips: ['01002'],
       address: '27 W Lewis Ave', date: '2025-03-10', date_kind: 'filed',
-      tracked: false, as_of: '2026-08-02', changed_on: '2026-08-03' };
+      tracked: false, as_of: '2026-08-02', verified_on: '2026-08-02', changed_on: '2026-08-03' };
     d.projectsDoc.projects[keyFor('https://permits.example.gov/r/1')].address = '1 Olympia Dr';
     d.projectsDoc.projects[keyFor('https://permits.example.gov/r/1')].changed_on = '2026-09-20';
+    d.projectsDoc.projects[keyFor('https://permits.example.gov/r/1')].verified_on = '2026-09-28';
   } });
   const b = build(docs2);
   ok(b.r.status === 0, `a document with the new fields builds (${(b.r.stderr || '').trim().slice(-200)})`);
@@ -256,14 +265,13 @@ ok([...pg1.matchAll(/<script[\s>][^>]*>/gi)].map((m) => m[0]).join() === '<scrip
      'the title carries the address and the year of the date on record');
   ok(pa.includes('<p class="addr">1 Olympia Dr, ') && pa.includes('<dt>Address</dt><dd>1 Olympia Dr</dd>'),
      'the address is under the name and in the facts');
-  ok(/<p>[^<]*·[^<]*<span class="quiet">as of <time datetime="2026-09-28">Sep 28, 2026<\/time><\/span><\/p>/.test(pa) &&
-     pa.includes('<dt>Status as of</dt><dd><time datetime="2026-09-28">Sep 28, 2026</time></dd>'),
-     'a tracked page shows the day its status was read, beside the status');
-  ok(!pa.includes('no longer tracks'), 'a tracked page carries no notice');
-  ok(/<p class="notice" role="note" style="[^"]+">HomeSignal no longer tracks this project\./.test(pk) &&
-     pk.includes('<dt>Last recorded status</dt>') && pk.includes('<dt>Last seen</dt><dd><time datetime="2026-08-02">Aug 2, 2026</time></dd>') &&
-     !pk.includes('<dt>Where it stands</dt>'),
-     'a page no longer tracked says so and shows its last recorded status and when it was seen');
+  ok(/<p>[^<]*·[^<]*<span class="quiet">Last updated: <time datetime="2026-09-28">Sep 28, 2026<\/time><\/span><\/p>/.test(pa) &&
+     pa.includes('<dt>Last updated</dt><dd><time datetime="2026-09-28">Sep 28, 2026</time></dd>'),
+     'a tracked page shows Last updated, the day its status was read, beside the status');
+  ok(!/no longer tracks|Not tracked|Last seen/i.test(pa), 'no page carries tracked/untracked wording');
+  ok(!/no longer tracks|no longer tracked|Not tracked|Last seen/i.test(pk) && !pk.includes('class="notice"') &&
+     pk.includes('<dt>Where it stands</dt>') && pk.includes('<dt>Last updated</dt><dd><time datetime="2026-08-02">Aug 2, 2026</time></dd>'),
+     'a paused page keeps its last status and shows the frozen Last updated day, with no tracking wording');
   ok(/<meta name="robots" content="index, follow">/.test(pk), 'and stays indexable');
   ok(pk.includes('<dt>Source</dt><dd>City of Phoenix <span class="quiet">(phoenix-building-permits)</span></dd>') &&
      pa.includes('<dt>Source</dt><dd>town-permits</dd>'),
@@ -289,8 +297,8 @@ ok([...pg1.matchAll(/<script[\s>][^>]*>/gi)].map((m) => m[0]).join() === '<scrip
   ok(!/<loc>https:\/\/jodytracks\.com\/community\/[^<]+<\/loc>\n    <lastmod>/.test(sm2),
      'ZIP pages carry no lastmod (no honest per-page change date exists for them yet)');
   const list = read(b.out, '/community/01002/projects/');
-  ok(list.includes('(no longer tracked)') && list.includes('<span class="addr">27 W Lewis Ave</span>'),
-     'the list marks a page no longer tracked and shows addresses');
+  ok(!list.includes('no longer tracked') && list.includes('Last updated: <time datetime="2026-08-02">') && list.includes('<span class="addr">27 W Lewis Ave</span>'),
+     'the list shows Last updated for each project (frozen for a paused one) and addresses');
   for (const [what, m] of [
     ['a non-boolean tracked flag', (r) => { r.tracked = 'no'; }],
     ['a malformed as_of', (r) => { r.as_of = '28/09/2026'; }],
@@ -326,7 +334,7 @@ ok([...pg1.matchAll(/<script[\s>][^>]*>/gi)].map((m) => m[0]).join() === '<scrip
     d.projectsDoc.projects[keyFor('https://permits.example.gov/r/1')].zips = ['01004'];
     d.projectsDoc.projects['arcgis:town-permits:GONE-9|1'] = { registry_id: 'town-permits', case: 'GONE-9',
       name: 'Gone Project', type: 'Residential', status: 'Proposed', source_url: 'https://permits.example.gov/r/77',
-      zips: ['01002'], date: '2026-09-27', tracked: false, as_of: '2026-09-01' };
+      zips: ['01002'], date: '2026-09-27', tracked: false, as_of: '2026-09-01', verified_on: '2026-09-01' };
   } });
   const bs = build(solo);
   if (bs.r.status !== 0) console.error(bs.r.stderr.slice(-400));
@@ -337,9 +345,9 @@ ok([...pg1.matchAll(/<script[\s>][^>]*>/gi)].map((m) => m[0]).join() === '<scrip
   const po = read(bs.out, expectedPath('town-permits', other[1].case, other[0]));
   const items = [...po.matchAll(/<li><a href="\/project\/[^"]+">[^<]*<\/a>[\s\S]*?<\/li>/g)].map((m) => m[0]);
   const gone = items.findIndex((x) => x.includes('Gone Project'));
-  ok(gone >= 0 && items.slice(gone + 1).every((x) => x.includes('(no longer tracked)')) &&
-     items.slice(0, gone).every((x) => !x.includes('(no longer tracked)')),
-     'projects no longer tracked come after tracked ones, even when newer');
+  ok(gone >= 0 && items[gone].includes('Last updated: <time datetime="2026-09-01">') &&
+     items.filter((x, i) => i !== gone).every((x) => !x.includes('Last updated')) && !items.some((x) => x.includes('no longer tracked')),
+     'a related project shows Last updated only when it has a verified day (none is inferred); paused ones still sort last');
 }
 
 {

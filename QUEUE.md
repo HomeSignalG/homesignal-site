@@ -11134,3 +11134,10 @@ is exactly the property the 101.3h-vs-113.8h measurement said elapsed time lacks
 GETs (`If-None-Match` / `If-Modified-Since`) and killing the per-endpoint `sess.warm()` — moves ahead
 of any new state expansion, per `homesignal-ingest/CLAUDE.md`'s own ordering. Every tranche of feeds
 raises the burn, so the fetch layer has to get cheaper before the footprint gets bigger.
+
+
+## Out of scope for the "Last updated" session (2026-11-27) — parked, not worked
+
+- JODY branding rename (plan only, draft PR #3148; held for the IndexNow rehearsal).
+- Kansas City connector: permits dropped when the geocode fails (audit in docs/last-updated-audit-2026-11-26.md).
+- JODY wordmark / casing decision.

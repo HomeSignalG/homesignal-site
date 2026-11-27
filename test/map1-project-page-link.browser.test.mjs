@@ -40,12 +40,17 @@ const AGENCY = { projects: [{ source_key: 'arcgis:henrico:C-1', project_ref: 'ar
   registry_id: 'henrico-building-permits', source_ref: 'https://henrico.example.gov/c1',
   submitted_at: '2026-06-01', date_kind: 'filed', impact_score: null, impact_dimensions: null }],
   markers: [{ project_ref: 'arcgis:henrico:C-1', lat: 37.505, lng: -77.255, marker_rule: 'POINT_AUTHORITATIVE', marker_seq: 0 }] };
-const IDX = { v: 1, zip: '23150', pages: { 'arcgis:henrico:C-1': PATH } };
+const IDX = { v: 1, zip: '23150', pages: { 'arcgis:henrico:C-1': PATH }, updated: { 'arcgis:henrico:C-1': '2026-11-20' } };
+const IDX_FROZEN = { v: 1, zip: '23150', pages: { 'arcgis:henrico:C-1': PATH }, updated: { 'arcgis:henrico:C-1': '2026-08-02' } };
+const IDX_NODATE = { v: 1, zip: '23150', pages: { 'arcgis:henrico:C-1': PATH } };
 const asked = [];
 const CASES = {
   unlisted: { dc: [], dev: AGENCY, index: IDX, listed: false },
   linked: { dc: DC_23150, dev: AGENCY, index: IDX },
   late: { dc: [], dev: AGENCY, index: IDX, delayMs: 2500 },
+  frozen: { dc: [], dev: AGENCY, index: IDX_FROZEN },
+  nodate: { dc: [], dev: AGENCY, index: IDX_NODATE },
+  badday: { dc: [], dev: AGENCY, index: { v: 1, zip: '23150', pages: { 'arcgis:henrico:C-1': PATH }, updated: { 'arcgis:henrico:C-1': 'yesterday' } } },
   missing: { dc: [], dev: AGENCY, index: 404 },
   unsafe: { dc: [], dev: AGENCY, index: { v: 1, zip: '23150', pages: { 'arcgis:henrico:C-1': 'https://evil.example/x' } } },
 };
@@ -56,7 +61,7 @@ const browser = await chromium.launch(launchOpts);
 
 async function open(name) {
   const c = CASES[name], zip = '23150';
-  const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+  const page = await (await browser.newContext({ viewport: (() => { const m = /^(\d+)x(\d+)$/.exec(process.env.HS_VIEWPORT || ''); return m ? { width: +m[1], height: +m[2] } : { width: 1280, height: 900 }; })() })).newPage();
   const pageErrors = [];
   page.on('pageerror', e => pageErrors.push(String(e).slice(0, 300)));
   page.on('console', m => { if (m.type() === 'error') pageErrors.push('console: ' + m.text().slice(0, 200)); });
@@ -135,9 +140,28 @@ console.log('\n1. index present');
   const dc = await popupFor(page, /data center$/);
   ok(dc && !dc.includes('pplink'), '1d a data-centre pin (no project page) gets no project link', dc);
   ok(dc && /\(third-party\)/.test(dc) && !/Official record/.test(dc), '1e and its link says it is third-party, not an official record', dc);
+  ok(l.includes('Last updated: Nov 20, 2026'), '1g the list row shows the index day as Last updated', l.slice(0, 500));
+  ok(p && p.includes('Last updated: Nov 20, 2026'), '1h the pin popup shows the index day as Last updated', p);
+  ok(dc && !/Last updated/.test(dc), '1i a data-centre pin shows NO Last updated even though its row carries last_seen_at (a write time, not a verification)', dc);
+  const dcRow = await page.evaluate(() => Array.from(document.querySelectorAll('#apprList li, #apprList .row, #apprList > *')).map((n) => n.textContent).filter((t) => /data center/i.test(t)).join(' | '));
+  ok(!/Last updated/.test(dcRow), '1j a data-centre list row shows no Last updated', dcRow.slice(0, 200));
   ok(pageErrors.length === 0, '1f no page errors', pageErrors[0]);
   if (process.env.HS_SHOT_DIR) await page.screenshot({ path: join(process.env.HS_SHOT_DIR, 'map1-project-link.png') });
   await page.context().close();
+}
+
+console.log('\n1b. frozen, undated and malformed days');
+{
+  const { page } = await open('frozen');
+  const l = await listHtml(page), p = await popupFor(page, /^Approved industrial$/);
+  ok(l.includes('Last updated: Aug 2, 2026') && p && p.includes('Last updated: Aug 2, 2026'), '1k a paused project keeps its frozen day in the list row and the popup', { l: l.slice(0, 200) });
+  await page.context().close();
+  for (const name of ['nodate', 'badday']) {
+    const o = await open(name);
+    const l2 = await listHtml(o.page), p2 = await popupFor(o.page, /^Approved industrial$/);
+    ok(l2.includes(PATH) && !/Last updated/.test(l2) && p2 && !/Last updated/.test(p2), `1l ${name}: the project link stays, no date is shown or invented`, { l2: l2.slice(0, 200) });
+    await o.page.context().close();
+  }
 }
 
 console.log('\n2. index answered after the list was drawn');
@@ -146,6 +170,7 @@ console.log('\n2. index answered after the list was drawn');
   await page.waitForTimeout(3200);
   const l = await listHtml(page);
   ok(l.includes(`href="${PATH}"`) && !l.includes('ppslot'), '2a the waiting slot is filled when the index lands', l.slice(0, 400));
+  ok(l.includes('Last updated: Nov 20, 2026'), '2c the late-filled slot also carries Last updated', l.slice(0, 400));
   ok(pageErrors.length === 0, '2b no page errors', pageErrors[0]);
   await page.context().close();
 }
