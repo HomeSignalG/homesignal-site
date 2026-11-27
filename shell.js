@@ -2346,18 +2346,117 @@
       state.topicPrefs = util.mergeCanonicalWithLocal(
         canonical, util.hydrateSignedInPrefs(localRes.data));
       cacheTopicPrefs(state.topicPrefs, uid);
+      state.pendingPicks = await computePendingPicks(uid, zip, communityId, rootRows.concat(bodyRows), localRes.data);
     } catch (e) {
       console.warn('topic-prefs hydrate', e);
       state.topicPrefs = util.hydrateSignedInFailure();
+      state.pendingPicks = null;
       cacheTopicPrefs({}, uid);
     }
   }
+  // FINISH SAVING: app-only picks (app_topic_prefs) that no subscription backs, for a ZIP the
+  // resident saved and whose community they hold no subscription on. READ-ONLY: it decides
+  // whether to ASK, and writes nothing. Any doubt (no community resolved, a failed read, a
+  // ZIP that is not one of their saved places) asks nothing.
+  async function computePendingPicks(uid, zip, communityId, placeRows, localRows) {
+    try {
+      if (!communityId || !/^\d{5}$/.test(zip)) return null;
+      // Saved places may not be loaded yet when this runs: read them (a read, never a write).
+      const places = (state.properties && state.properties.length) ? state.properties : (await HS.data.properties()) || [];
+      if (!places.some(p => p && !p.sample && String(p.zip || '') === zip)) return null;
+      const ct = await HS.data.communityGovTopics(zip);
+      if (!ct || ct.rootId !== communityId) return null;
+      const cats = HS.data.topicCategories();
+      const offered = { gov: ct.labels || [], meetings: ct.labels || [], news: (cats.news && cats.news.items) || [] };
+      return util.pendingPicks(localRows, placeRows, offered);
+    } catch (e) { return null; }
+  }
+  const declineKey = () => 'hs:finishDeclined:' + ((state.session && state.session.user && state.session.user.id) || '') + ':' + String(state.zip || '');
+  function finishDeclined() { try { return localStorage.getItem(declineKey()) === '1'; } catch (e) { return false; } }
+  const CAT_TITLE = { gov: 'Government Notices', meetings: 'Upcoming Meetings', news: 'Local News' };
   HS.paintTopicCounts = function () {
     TOPIC_PREF_CATS.forEach(k => {
       const n = util.topicCount(state.topicPrefs, k);
       const el = $('cc-' + k);
-      if (el) el.textContent = n + ' topic' + (n === 1 ? '' : 's') + ' followed';
+      if (!el) return;
+      // A pick that nothing delivers is never called "followed".
+      const pend = !n && state.pendingPicks && state.pendingPicks[k];
+      if (pend) el.textContent = pend.topics.length + ' topic' + (pend.topics.length === 1 ? '' : 's') + ' not yet active';
+      else el.textContent = n + ' topic' + (n === 1 ? '' : 's') + ' followed';
     });
+    paintFinishPrompt();
+  };
+  // The prompt: one box above the three category cards (the Alerts page). Every pick is
+  // pre-ticked and NOTHING is written until Finish saving is pressed.
+  function paintFinishPrompt() {
+    const anchor = $('cc-gov') && $('cc-gov').closest('.tcat');
+    if (!anchor || !anchor.parentNode) return;
+    let box = $('finishAlerts');
+    if (box && box.dataset.done === '1') return;   // keep the "Saved." line
+    const picks = state.pendingPicks;
+    if (!picks || finishDeclined()) { if (box) box.remove(); return; }
+    if (!box) {
+      box = document.createElement('div'); box.id = 'finishAlerts';
+      box.style.cssText = 'margin:0 0 14px;padding:12px 14px;border:1px solid #d6d3c4;border-radius:8px;font-size:14px;line-height:1.45';
+      anchor.parentNode.parentNode.insertBefore(box, anchor.parentNode);
+    }
+    if (box.dataset.busy === '1' || box.dataset.done === '1') return;
+    const zip = String(state.zip || '').trim();
+    let html = '<b>Finish saving your alerts</b><div>You picked these topics for ' + HS.esc(zip)
+      + ' on this device, but they are not active yet. Nothing is saved until you press Finish saving.</div><div id="finishList" style="margin:8px 0">';
+    Object.keys(picks).forEach(cat => {
+      picks[cat].topics.forEach(t => {
+        html += '<label style="display:block"><input type="checkbox" checked data-cat="' + HS.esc(cat) + '" data-topic="' + HS.esc(t) + '"> '
+          + '<span>' + HS.esc(CAT_TITLE[cat]) + ': ' + HS.esc(t) + '</span></label>';
+      });
+    });
+    html += '</div><div id="finishErr" role="alert" style="color:#c23b34"></div>'
+      + '<button class="mbtn" type="button" id="finishGo" onclick="HS.finishPendingAlerts()">Finish saving</button> '
+      + '<button type="button" class="linkbtn" id="finishNo" onclick="HS.declinePendingAlerts()">Not now</button>';
+    box.innerHTML = html;
+  }
+  HS.declinePendingAlerts = function () {
+    // No database write. Remembered on this device only, so it is not asked again.
+    try { localStorage.setItem(declineKey(), '1'); } catch (e) { /* asked again next visit; still no write */ }
+    const box = $('finishAlerts'); if (box) box.remove();
+  };
+  HS.finishPendingAlerts = async function () {
+    const box = $('finishAlerts'), picks = state.pendingPicks;
+    if (!box || !picks || box.dataset.busy === '1') return;
+    const err = $('finishErr'); if (err) err.textContent = '';
+    const chosen = {};
+    box.querySelectorAll('#finishList input:checked').forEach(i => {
+      (chosen[i.dataset.cat] = chosen[i.dataset.cat] || []).push(i.dataset.topic);
+    });
+    const cats = Object.keys(chosen);
+    if (!cats.length) { if (err) err.textContent = 'Tick at least one topic, or choose Not now.'; return; }
+    box.dataset.busy = '1';
+    const go = $('finishGo'); if (go) { go.disabled = true; go.textContent = 'Saving…'; }
+    // ORDER: the subscription (signup_complete) first, app_topic_prefs only after it succeeds.
+    // persistSignup reads state.topicPrefs, so the picks go in memory first and are put back
+    // exactly as they were if the write fails.
+    const prev = {};
+    cats.forEach(c => { prev[c] = state.topicPrefs[c]; state.topicPrefs[c] = { topics: chosen[c], share_consent: picks[c].share_consent }; });
+    const restore = () => cats.forEach(c => { if (prev[c] === undefined) delete state.topicPrefs[c]; else state.topicPrefs[c] = prev[c]; });
+    let coverage = null;
+    try { coverage = HS.data.meetingCoverage ? (await HS.data.meetingCoverage(state.zip)).state : null; } catch (e) { coverage = null; }
+    try {
+      const consentBox = $('tmConsent'); if (consentBox) consentBox.checked = false;
+      await persistSignup();
+    } catch (e) {
+      restore();
+      box.dataset.busy = '0';
+      if (go) { go.disabled = false; go.textContent = 'Finish saving'; }
+      if (err) err.textContent = "Couldn't save your alerts. Your picks are still not active. Please try again. (" + ((e && e.message) || 'save error') + ')';
+      return;
+    }
+    cacheTopicPrefs(state.topicPrefs, state.session && state.session.user && state.session.user.id);
+    for (const c of cats) await persistTopics(c, chosen[c], picks[c].share_consent);
+    state.pendingPicks = null;
+    box.dataset.busy = '0'; box.dataset.done = '1';
+    const counts = {}; cats.forEach(c => { counts[c] = chosen[c].length; });
+    box.textContent = util.savedMessage(counts, coverage).text;   // a promise only where delivery is verified
+    HS.paintTopicCounts();
   };
 
   // -------------------------------------------------- topic picker ------------
@@ -2527,11 +2626,12 @@
     logEvent('alert_signup_topics', { topic: TCUR });
     HS.paintTopicCounts();
     $('tmForm').classList.add('hidden');
-    $('tmDoneMsg').textContent = covNow === 'unavailable'
-      ? 'Saved. Alerts start only if verified coverage is added.'
-      : "You'll be alerted about " + chips.length + ' ' + cats[TCUR].title.toLowerCase() + ' topic' + (chips.length === 1 ? '' : 's') + '.';
+    // "You will be alerted" only for Upcoming Meetings in a community with stored meetings; every other
+    // pick (Government Notices, Local News, unverified meetings) gets the careful wording.
+    const doneMsg = util.savedMessage({ [TCUR]: chips.length }, TCUR === 'meetings' ? covNow : null);
+    $('tmDoneMsg').textContent = doneMsg.text;
     const dh = $('tmDone').querySelector('h4');
-    if (dh) dh.textContent = covNow === 'unavailable' ? 'Saved' : 'Alerts saved';
+    if (dh) dh.textContent = doneMsg.heading;
     $('tmDone').classList.remove('hidden');
   };
   // Build the COMPLETE desired subscription set across all deliverable categories

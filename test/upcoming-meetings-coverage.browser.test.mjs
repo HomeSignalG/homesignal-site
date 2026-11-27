@@ -162,7 +162,17 @@ await run('B upcoming meetings', '97702', B, async page => {
   const iPref = log.findIndex(e => e.kind === 'upsert' && e.table === 'app_topic_prefs');
   ok(iSig > -1 && iPref > iSig, 'B3 user_subscriptions write (signup_complete) comes BEFORE the app_topic_prefs save', { iSig, iPref });
   ok(!log.some(e => e.kind === 'delete' || e.kind === 'update' || (e.kind === 'rpc' && e.name === 'clear_alert_selection')), 'B4 no row is deleted, updated or cleared');
-  ok(/You'll be alerted about 1 upcoming meetings topic/.test(await page.locator('#tmDoneMsg').textContent()), 'B5 normal saved message', await page.locator('#tmDoneMsg').textContent());
+  ok((await page.locator('#tmDoneMsg').textContent()) === 'Saved. You will be alerted about 1 Upcoming Meetings topic.', 'B5 Upcoming Meetings in a community with stored meetings may say it will alert', await page.locator('#tmDoneMsg').textContent());
+  // B6. Government Notices and Local News picks NEVER promise delivery, even where meetings are stored.
+  for (const [key, chipText] of [['gov', T], ['news', 'Water Quality']]) {
+    await page.evaluate(() => HS.closeModal('topicsModal'));
+    await open(page, key);
+    await page.locator('#tmGrid .tchip', { hasText: chipText }).first().click();
+    await page.click('#tmForm .mbtn');
+    await page.waitForSelector('#tmDone:not(.hidden)', { timeout: 5000 });
+    const m = await page.locator('#tmDoneMsg').textContent();
+    ok(!/alerted/i.test(m) && m === 'Saved. Alerts start only if verified coverage is added.', 'B6 ' + key + ' pick never shows "will be alerted"', m);
+  }
 });
 
 // C. A second community with real feeds, only PAST meetings stored: coverage verified, nothing upcoming.
