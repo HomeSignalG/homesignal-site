@@ -145,7 +145,7 @@ async function trialAsk(userId, body, admin = false) {
   return { status: res.status, json: await res.json() };
 }
 async function billingAsk(userId, body, billing = BILLING) {
-  if (body && body.action === 'checkout' && body.terms_version === undefined && !billing.noTerms) body = { ...body, terms_version: '2026-11-16' };
+  if (body && body.action === 'checkout' && body.terms_version === undefined && !billing.noTerms) body = { ...body, terms_version: '2026-11-27' };
   const real = BD.makeDeps({ ...SUPABASE, paddle: { environment: billing.environment ?? 'production', clientToken: billing.clientToken, apiKey: billing.apiKey, bindingSecret: billing.bindingSecret } }, fetchToSql);
   const h = BH.makeHandler({ ...real, checkoutEnabled: () => true, authenticate: async () => ({ email: emailOf(userId), id: userId }), isAdmin: async () => false });
   const res = await h(post(body));
@@ -541,7 +541,7 @@ b = await billingAsk(AGENT, { action: 'checkout', plan: 'professional' });
 ok(b.status === 403 && count('billing_terms_acceptance') === acceptedBefore, '16h an agent cannot agree to the Terms for the account', b.json);
 b = await billingAsk(NOFREE, { action: 'checkout', plan: 'professional' });
 ok(b.status === 200 && b.json.session?.priceId === VARIANT && count('billing_terms_acceptance') === acceptedBefore + 1
-   && one("select plan_key || '|' || terms_version from public.billing_terms_acceptance where brokerage_id = :'b'::uuid", { b: nfBrokerage }) === 'professional|2026-11-16',
+   && one("select plan_key || '|' || terms_version from public.billing_terms_acceptance where brokerage_id = :'b'::uuid", { b: nfBrokerage }) === 'professional|2026-11-27',
   '16i agreeing to the CURRENT Terms is recorded (account, plan, version) and only then is the session signed', b.json);
 await billingAsk(NOFREE, { action: 'checkout_release' });
 

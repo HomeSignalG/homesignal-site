@@ -473,18 +473,18 @@ select pg_temp._run('k clean', $$select public.billing_complimentary_revoke(pg_t
 select pg_temp._run('k disarm', $$select public.billing_gate_set(false, false)$$);
 
 -- ---- T: terms before purchase (decision 3) -----------------------------------------------------------------------------------------------------------
-select pg_temp._ck('T01 the current terms version is a row in the database', public.billing_terms_current() = '2026-11-16');
-select pg_temp._run('t accept', $$select public.billing_terms_accept(pg_temp._u(1), '2026-11-16', 'professional')$$);
+select pg_temp._ck('T01 the current terms version is a row in the database', public.billing_terms_current() = '2026-11-27');
+select pg_temp._run('t accept', $$select public.billing_terms_accept(pg_temp._u(1), '2026-11-27', 'professional')$$);
 select pg_temp._ck('T02 an OWNER accepting the current version is recorded; an old or unknown version, an agent, a stranger and an unknown plan are all refused and record nothing',
-  public.billing_terms_accept(pg_temp._u(1), '2026-11-16', 'professional') = 'ACCEPTED' and public.billing_terms_accept(pg_temp._u(1), '2026-10-16', 'professional') = 'VERSION_STALE'
-  and public.billing_terms_accept(pg_temp._u(1), '2026-11-16', 'brokerage_enterprise') = 'VERSION_STALE' and public.billing_terms_accept(pg_temp._u(30), '2026-11-16', 'professional') = 'NOT_OWNER'
-  and public.billing_terms_accept(gen_random_uuid(), '2026-11-16', 'professional') = 'NOT_OWNER'
+  public.billing_terms_accept(pg_temp._u(1), '2026-11-27', 'professional') = 'ACCEPTED' and public.billing_terms_accept(pg_temp._u(1), '2026-10-16', 'professional') = 'VERSION_STALE' and public.billing_terms_accept(pg_temp._u(1), '2026-11-16', 'professional') = 'VERSION_STALE'
+  and public.billing_terms_accept(pg_temp._u(1), '2026-11-27', 'brokerage_enterprise') = 'VERSION_STALE' and public.billing_terms_accept(pg_temp._u(30), '2026-11-27', 'professional') = 'NOT_OWNER'
+  and public.billing_terms_accept(gen_random_uuid(), '2026-11-27', 'professional') = 'NOT_OWNER'
   and (select count(*) = 1 from public.billing_terms_acceptance where brokerage_id = pg_temp._bk('pro')) is not null and (select count(*) = 1 from public.billing_terms_acceptance where brokerage_id = pg_temp._bk('pro')));
 select pg_temp._ck('T03 the acceptance record is append-only and holds no person, email or text', pg_temp._why($$update public.billing_terms_acceptance set plan_key = 'professional'$$) like '55000%' and pg_temp._why($$delete from public.billing_terms_acceptance$$) like '55000%'
   and not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'billing_terms_acceptance' and column_name ~ '^(user|email|name|text|address|ip)'));
 select pg_temp._ck('T04 no API role reads the acceptances or accepts on someone''s behalf; service_role may only call the function',
-  pg_temp._as('anon', $$select * from public.billing_terms_acceptance$$) like '42501%' and pg_temp._as('authenticated', $$select public.billing_terms_accept(gen_random_uuid(), '2026-11-16', 'professional')$$) like '42501%'
-  and pg_temp._as('service_role', $$select * from public.billing_terms_acceptance$$) like '42501%' and pg_temp._as('service_role', $$select public.billing_terms_accept(gen_random_uuid(), '2026-11-16', 'professional')$$) = 'ok');
+  pg_temp._as('anon', $$select * from public.billing_terms_acceptance$$) like '42501%' and pg_temp._as('authenticated', $$select public.billing_terms_accept(gen_random_uuid(), '2026-11-27', 'professional')$$) like '42501%'
+  and pg_temp._as('service_role', $$select * from public.billing_terms_acceptance$$) like '42501%' and pg_temp._as('service_role', $$select public.billing_terms_accept(gen_random_uuid(), '2026-11-27', 'professional')$$) = 'ok');
 
 select pg_temp._ck('S99 every setup step ran without raising', not exists (select 1 from _setup where result <> 'ok' and step <> 'lem bind'), (select string_agg(step || '=' || result, '; ') from _setup where result <> 'ok'));
 

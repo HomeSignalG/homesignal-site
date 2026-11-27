@@ -372,6 +372,8 @@ create table if not exists public.billing_terms_version (
   constraint billing_terms_version_shape check (version ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
 );
 insert into public.billing_terms_version (version, effective_at) values ('2026-11-16', '2026-11-16 00:00:00+00') on conflict do nothing;
+-- 2026-11-27: refund wording changed (Paddle handles refunds and billing questions; HomeSignal does not). The earlier row stays (acceptances reference it); the newest effective row is current.
+insert into public.billing_terms_version (version, effective_at) values ('2026-11-27', '2026-11-27 00:00:00+00') on conflict do nothing;
 create or replace function public.billing_terms_current() returns text
 language sql stable security definer set search_path = public, pg_temp
 as $$ select t.version from public.billing_terms_version t where t.effective_at <= now() order by t.effective_at desc, t.version desc limit 1 $$;

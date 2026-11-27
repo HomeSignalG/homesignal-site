@@ -212,7 +212,7 @@ async function ask(d, body, { method = 'POST', auth = 'Bearer t', raw, noTerms =
   mcalls.length = 0;
   const headers = { 'content-type': 'application/json' }; if (auth) headers.authorization = auth;
   // a checkout carries the Terms version the page showed, unless a test is about its absence
-  if (body && body.action === 'checkout' && body.terms_version === undefined && !noTerms) body = { ...body, terms_version: '2026-11-16' };
+  if (body && body.action === 'checkout' && body.terms_version === undefined && !noTerms) body = { ...body, terms_version: '2026-11-27' };
   const init = { method, headers }; if (method === 'POST') init.body = raw !== undefined ? raw : JSON.stringify(body);
   const res = await MH.makeHandler(d)(new Request('https://x/functions/v1/manage-billing', init));
   const text = await res.text(); let json = null; try { json = JSON.parse(text); } catch { /* not json */ }
@@ -285,7 +285,7 @@ const CODE = 'partner-code-0123456789abcdef';
   ok(r.status === 403 && !mcalls.some((c) => c[0] === 'makeSession'), '5ad only the owner can agree for the account');
   r = await ask(mdeps(), { action: 'checkout', plan: 'professional' });
   const ta = mcalls.findIndex((c) => c[0] === 'termsAccept'), ms = mcalls.findIndex((c) => c[0] === 'makeSession');
-  ok(r.status === 200 && ta > 0 && ms > ta && mcalls[ta][2] === '2026-11-16' && mcalls[ta][3] === 'professional', '5ae the agreement is RECORDED (version and plan) BEFORE the session is signed');
+  ok(r.status === 200 && ta > 0 && ms > ta && mcalls[ta][2] === '2026-11-27' && mcalls[ta][3] === 'professional', '5ae the agreement is RECORDED (version and plan) BEFORE the session is signed');
   r = await ask(mdeps(), { action: 'checkout', plan: 'private_partner', partner_code: CODE });
   const tb = mcalls.findIndex((c) => c[0] === 'termsAccept');
   ok(r.status === 200 && tb > 0 && mcalls[tb][3] === 'private_partner', '5af the partner offer requires the same agreement');
@@ -320,11 +320,11 @@ const CODE = 'partner-code-0123456789abcdef';
     const c3 = [];
     const { f: fe } = mkFetch([[/\/rest\/v1\/rpc\/(\w+)$/, (u, init) => { const fn = u.match(/rpc\/(\w+)$/)[1]; c3.push([fn, JSON.parse(init.body)]); return json(fn === 'billing_environment_mode' ? 'staging' : fn === 'billing_gate_state' ? [{ paid_required: true, honor_granted_free_reports: false }] : 'ACCEPTED'); }]]);
     const dd = MD.makeDeps(cfg('sandbox'), fe);
-    ok(await dd.environmentMode() === 'staging' && await dd.gateArmed() === true && await dd.termsAccept(UID, '2026-11-16', 'professional') === 'ACCEPTED', '6aa the environment, the gate and the Terms agreement are each one database call and are read as the database answered');
-    ok(c3.find((c) => c[0] === 'billing_terms_accept')[1].p_user_id === UID && c3.find((c) => c[0] === 'billing_terms_accept')[1].p_version === '2026-11-16' && c3.find((c) => c[0] === 'billing_terms_accept')[1].p_plan === 'professional', '6ab the agreement names the signed-in person, the version and the plan');
+    ok(await dd.environmentMode() === 'staging' && await dd.gateArmed() === true && await dd.termsAccept(UID, '2026-11-27', 'professional') === 'ACCEPTED', '6aa the environment, the gate and the Terms agreement are each one database call and are read as the database answered');
+    ok(c3.find((c) => c[0] === 'billing_terms_accept')[1].p_user_id === UID && c3.find((c) => c[0] === 'billing_terms_accept')[1].p_version === '2026-11-27' && c3.find((c) => c[0] === 'billing_terms_accept')[1].p_plan === 'professional', '6ab the agreement names the signed-in person, the version and the plan');
     const { f: fb } = mkFetch([[/\/rest\/v1\/rpc\/(\w+)$/, () => json('weird')]]);
     let bad = 0; for (const fn of ['environmentMode', 'gateArmed']) { try { await MD.makeDeps(cfg('sandbox'), fb)[fn](); } catch (e) { bad++; } }
-    try { await MD.makeDeps(cfg('sandbox'), fb).termsAccept(UID, '2026-11-16', 'professional'); } catch (e) { bad++; }
+    try { await MD.makeDeps(cfg('sandbox'), fb).termsAccept(UID, '2026-11-27', 'professional'); } catch (e) { bad++; }
     ok(bad === 3, '6ac an answer of an unknown shape from any of the three is a failed read, never a pass');
   }
   ok(MD.isConfigured(cfg('sandbox').paddle) && MD.isConfigured(cfg('production').paddle), '6a a token of the right kind for its environment is configured');

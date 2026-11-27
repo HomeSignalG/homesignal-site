@@ -701,7 +701,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   var acctType = null;  // 'individual' | 'brokerage' | null: what the trial function says; it only changes WORDS, the database decides what is allowed
   function mine(){ return acctType === 'individual'; }
   // the Terms and Refund Policy version a purchaser agrees to; the database accepts only the CURRENT one (public.billing_terms_current), so a stale page is refused
-  var TERMS_VERSION = '2026-11-16';
+  var TERMS_VERSION = '2026-11-27';
   var freeLeft = 0;
   var plan = null, checkoutState = null, portalOk = false, subscribing = false, partnerCode = '', partnerOk = false, paddleReady = null, checkoutWatch = null; // build step 11: the brokerage's plan as the billing function tells it, whether this person may start a checkout, and a checkout being opened
   var watchFor = null, watchId = null, watchBusy = false; // build step 9: the saved report on screen that can be watched, its watch (if any), and a start or stop in flight

@@ -202,7 +202,7 @@ function world({ trial = 'active', used = 0, admin = false, untraceable = false,
     summaryOf: async () => { if (w.billingFails) throw new RH.DataUnavailable('x'); return summary(); },
     configured: () => w.configured, apiConfigured: () => true, checkoutEnabled: () => true,
     paddleEnvironment: () => 'production', environmentMode: async () => 'production', gateArmed: async () => true,
-    termsAccept: async (u, version) => { w.termsAsked = (w.termsAsked || []).concat([version]); return version === (w.termsCurrent || '2026-11-16') ? 'ACCEPTED' : 'VERSION_STALE'; },
+    termsAccept: async (u, version) => { w.termsAsked = (w.termsAsked || []).concat([version]); return version === (w.termsCurrent || '2026-11-27') ? 'ACCEPTED' : 'VERSION_STALE'; },
     partnerStart: async () => ({ outcome: 'LINK_INVALID', enrollment_id: null, brokerage_id: null }), sha256: async (t) => 'h'.repeat(8) + t.length,
     makeSession: async (brokerageId, plan2) => { if (w.checkoutFails) throw new BH.CheckoutUnavailable('x'); w.checkoutMade++; return { environment: 'production', clientToken: 'live_' + 'a'.repeat(30), priceId: PRO_PRICE, customData: { brokerage_id: brokerageId, plan: plan2, bind: '0'.repeat(64) } }; },
     // the account's single checkout slot (audit item D): held for ten minutes by whoever claimed it; nothing of a checkout is kept
@@ -1685,7 +1685,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   await page.waitForFunction(() => (window.__paddleOpens || []).length > 0, null, { timeout: 8000 }).catch(() => {});
   ok(w.checkoutMade === 1 && checkouts.length === 1 && checkouts[0].items?.[0]?.priceId === PRO_PRICE && checkouts[0].customData?.plan === 'professional' && page.url().startsWith(base + PAGE),
     '12d pressing it asks for ONE checkout and opens Paddle\'s overlay on this page with the price and signed custom data the SERVER returned (nothing is charged and no plan changes by pressing it)', [w.checkoutMade, checkouts, page.url()]);
-  ok(billingCalls.length === 2 && JSON.stringify(billingCalls[1].body) === '{"action":"checkout","plan":"professional","terms_version":"2026-11-16"}', '12d2 the checkout request carries the action and the plan only: no account id, no price and no address (the server knows whose it is, and the price comes from the database)', billingCalls.map((c) => c.body));
+  ok(billingCalls.length === 2 && JSON.stringify(billingCalls[1].body) === '{"action":"checkout","plan":"professional","terms_version":"2026-11-27"}', '12d2 the checkout request carries the action and the plan only: no account id, no price and no address (the server knows whose it is, and the price comes from the database)', billingCalls.map((c) => c.body));
   ok(foreign.length === 0 && errors.length === 0, '12d3 nothing else was fetched (Paddle.js itself is the stand-in) and the page raised no error', [foreign, errors]);
   await ctx.close();
 }
