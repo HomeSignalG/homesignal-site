@@ -125,6 +125,12 @@
      below and pushed the field narrow. Nothing about the SEARCH changed: the button kept
      its id (#go) and type="submit", so the click still goes through the form's own submit
      handler, Enter still submits, and the disabled-while-searching state still applies. */
+  .zip-suggest{display:block;width:100%;max-width:640px;box-sizing:border-box;text-align:left;margin:0 0 6px;padding:10px 14px;font:inherit;font-size:14.5px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--green-bright);border-radius:10px;cursor:pointer}
+  .zip-suggest[hidden],.zip-suggest-list[hidden]{display:none}
+  .zip-suggest-list{max-width:640px;margin:0 0 6px}
+  .zip-suggest-list .zip-suggest{margin:0 0 4px;min-height:44px}
+  .zip-note{margin:6px 0 0;font-size:14px;color:var(--ink)}
+  .zip-note[hidden]{display:none}
   form.search{position:relative;display:block;margin:0 0 4px;max-width:640px}
   .search input{width:100%;box-sizing:border-box;font-family:var(--font);font-size:15px;
     padding:13px 52px 13px 15px;border:1px solid var(--line);border-radius:11px;background:#fff}
@@ -788,6 +794,7 @@
           </svg>
         </button>
       </form>
+      <div id="zipSuggest" class="zip-suggest-list" role="listbox" aria-label="Matching ZIP codes" hidden></div>
       <!-- Nothing sits between the field and its error but the error itself. The helper
            sentence and the "See a sample" link were removed (#1111 had already removed the
            "Browse all development in ZIP NNNNN" self-link, emptying this row), because the
@@ -813,6 +820,7 @@
     </div>
 
     <div class="status" id="status"></div>
+    <div class="zip-note" id="zipNote" role="status" hidden></div>
 
     <div class="results" id="results">
       <div class="grid stacked">
@@ -2264,11 +2272,187 @@ HS.onReady(function(){
     var address = $("addr").value.trim();
     if(!address){ showAddrError(); return; }   // never run an empty search
     clearAddrError();
+    // A bare five-digit ZIP is a PLACE, not an address: it never reaches the address geocoder.
+    if(/^\d{5}$/.test(address)){ searchZip(address); return; }
+    // All digits but not five of them (4, 6, ...) is a mistyped ZIP, never an address: say so,
+    // and leave no previous place on screen.
+    if(/^\d+$/.test(address)){ invalidZip(address); return; }
     run(address);
   });
   // Typing is the resident correcting the thing the message complained about, so the message
   // clears then rather than lingering under a field that now has content in it.
   $("addr").addEventListener("input", clearAddrError);
+
+  // ---- ZIP SEARCH (founder, 2026-11-26: any valid five-digit ZIP must locate on the map) ----
+  // A typed ZIP used to go to the address geocoder, which answers "couldn't find that address"
+  // and left the PREVIOUS place's pins, counts and heading on screen. Now it takes the ZIP route
+  // (the same loadZip() every ?zip= link uses), and any search that cannot place its target
+  // clears the old place's results first, so two places can never be shown together.
+  var STATE_ABBR = {alabama:"AL",alaska:"AK",arizona:"AZ",arkansas:"AR",california:"CA",colorado:"CO",
+    connecticut:"CT",delaware:"DE",florida:"FL",georgia:"GA",hawaii:"HI",idaho:"ID",illinois:"IL",
+    indiana:"IN",iowa:"IA",kansas:"KS",kentucky:"KY",louisiana:"LA",maine:"ME",maryland:"MD",
+    massachusetts:"MA",michigan:"MI",minnesota:"MN",mississippi:"MS",missouri:"MO",montana:"MT",
+    nebraska:"NE",nevada:"NV",newhampshire:"NH",newjersey:"NJ",newmexico:"NM",newyork:"NY",
+    northcarolina:"NC",northdakota:"ND",ohio:"OH",oklahoma:"OK",oregon:"OR",pennsylvania:"PA",
+    rhodeisland:"RI",southcarolina:"SC",southdakota:"SD",tennessee:"TN",texas:"TX",utah:"UT",
+    vermont:"VT",virginia:"VA",washington:"WA",westvirginia:"WV",wisconsin:"WI",wyoming:"WY"};
+  function stateAbbr(st){
+    st = String(st||"").trim();
+    if(/^[A-Za-z]{2}$/.test(st)) return st.toUpperCase();
+    return STATE_ABBR[st.toLowerCase().replace(/[^a-z]/g,"")] || "";
+  }
+  // Leaves nothing of the previous place on screen: pins (2D, 3D, satellite), results block,
+  // counts and the ZIP outline. Called before a search that may not resolve.
+  function clearView(){
+    MAP_SITES = []; LAST_DRAW = null;
+    window.__HS_SITES = [];
+    try{ if(layerGroup) layerGroup.clearLayers(); }catch(_e){}
+    try{ if(V3.active){ build3DFacilities(); } }catch(_e){}
+    try{ if(GL.active && GL.inited){ buildGLMarkers(); } }catch(_e){}
+    paintZipBoundary(null);
+    $("results").style.display = "none";
+    setZipNote("");
+    var sub = document.querySelector(".sub"); if(sub) sub.textContent = "";
+    var h1 = document.querySelector(".head h1"); if(h1) h1.textContent = "Development map";
+    var eb = $("eyebrow"); if(eb) eb.textContent = "Development map";
+    document.title = "Development map \u2014 HomeSignal";
+    ppHide();
+  }
+  // ZIP -> { zip, label, county, state } from the communities table (the registry of ZIP pages),
+  // or null when the ZIP is not one of them. A failed lookup is { error:true }, never "not found".
+  function lookupZip(zip){
+    return fetch(SUPABASE_URL + "/rest/v1/communities?select=name,level,county,state&zip_codes=cs.%7B" + encodeURIComponent(zip) + "%7D",
+      { headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY } })
+      .then(function(r){ return r.ok ? r.json() : Promise.reject(new Error("http " + r.status)); })
+      .then(function(rows){
+        rows = rows || [];
+        if(!rows.length) return null;
+        var st = {}; rows.forEach(function(r){ var a = stateAbbr(r.state); if(a) st[a] = 1; });
+        var sk = Object.keys(st);
+        var place = zipPlaceLabel(rows, zip).replace(/\s*\(\d{5}\)\s*$/, "").replace(/^ZIP \d{5}$/, "");
+        return { zip: zip, place: place, state: sk.length === 1 ? sk[0] : "" };
+      })
+      .catch(function(){ return { error: true }; });
+  }
+  function zipSuggestText(z){ return z.zip + " — " + (z.place || "ZIP code") + (z.state ? ", " + z.state : ""); }
+  var ZIP_SUGGEST_SEQ = 0;
+  function setZipNote(msg){ var n = $("zipNote"); if(!n) return; n.textContent = msg || ""; n.hidden = !msg; }
+  function hideZipSuggest(){ var b = $("zipSuggest"); if(b){ b.hidden = true; b.textContent = ""; } }
+  // Type-ahead: from three digits, the ZIP pages that start with what was typed (zips are
+  // strings throughout, so 07001 never becomes 7001). Names come from the same communities
+  // rows searchZip uses; only ZIPs JODY has a page for are listed.
+  function lookupZipPrefix(prefix){
+    var H = { headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY } };
+    return fetch(SUPABASE_URL + "/rest/v1/app_community_meta?select=zip&order=zip&limit=8&zip=like." + encodeURIComponent(prefix) + "*", H)
+      .then(function(r){ return r.ok ? r.json() : Promise.reject(new Error("http " + r.status)); })
+      .then(function(rows){
+        var zips = (rows || []).map(function(r){ return String(r.zip); });
+        if(!zips.length) return [];
+        return fetch(SUPABASE_URL + "/rest/v1/communities?select=name,level,county,state,zip_codes&zip_codes=ov.%7B" + zips.map(encodeURIComponent).join(",") + "%7D", H)
+          .then(function(r){ return r.ok ? r.json() : []; })
+          .then(function(comms){
+            return zips.map(function(zip){
+              var mine = (comms || []).filter(function(c){ return (c.zip_codes || []).indexOf(zip) >= 0; });
+              var st = {}; mine.forEach(function(c){ var a = stateAbbr(c.state); if(a) st[a] = 1; });
+              var sk = Object.keys(st);
+              return { zip: zip, place: zipPlaceLabel(mine, zip).replace(/\s*\(\d{5}\)\s*$/, "").replace(/^ZIP \d{5}$/, ""), state: sk.length === 1 ? sk[0] : "" };
+            });
+          });
+      });
+  }
+  function updateZipSuggest(){
+    var v = $("addr").value.trim(), box = $("zipSuggest"), t = ++ZIP_SUGGEST_SEQ;
+    if(!box) return;
+    hideZipSuggest();                        // never leave the previous keystroke's list clickable
+    if(!/^\d{3,5}$/.test(v)){ hideZipSuggest(); return; }
+    lookupZipPrefix(v).then(function(list){
+      if(t !== ZIP_SUGGEST_SEQ || $("addr").value.trim() !== v) return;   // typing moved on
+      if(!list.length){ hideZipSuggest(); return; }
+      box.textContent = "";
+      list.forEach(function(z){
+        var b = document.createElement("button");
+        b.type = "button"; b.className = "zip-suggest"; b.setAttribute("role", "option");
+        b.setAttribute("data-zip", z.zip); b.textContent = zipSuggestText(z);
+        box.appendChild(b);
+      });
+      box.hidden = false;
+    }).catch(function(){ if(t === ZIP_SUGGEST_SEQ) hideZipSuggest(); });
+  }
+  // The outcome of the ONE boundary read (paintZipBoundary): "complete" | "not_measured" | "error".
+  // searchZip asks for it so a ZIP with no page can still be located by its polygon; there is no
+  // second reader of the boundary.
+  var BOUNDARY_WAITERS = {};
+  function awaitBoundary(zip){
+    return new Promise(function(res){
+      (BOUNDARY_WAITERS[zip] = BOUNDARY_WAITERS[zip] || []).push(res);
+      paintZipBoundary(zip);
+    });
+  }
+  function boundaryDone(zip, state){
+    if(BOUNDARY_ZIP !== zip) { delete BOUNDARY_WAITERS[zip]; return; }   // the page moved on
+    if(state === "not_measured") setZipNote("Boundary not measured for ZIP " + zip + ". No outline is drawn.");
+    var w = BOUNDARY_WAITERS[zip]; delete BOUNDARY_WAITERS[zip];
+    (w || []).forEach(function(f){ f(state); });
+  }
+  // A mistyped ZIP (all digits, not five) or 00000: a clear message, and nothing of the
+  // previous place left on screen.
+  function invalidZip(v){
+    ++REQ_SEQ; ++ZIP_SUGGEST_SEQ;
+    leaveLanding(); hideZipSuggest(); clearView();
+    $("go").disabled = false;
+    status(/^0+$/.test(v) && v.length === 5 ? "00000 is not a ZIP code." :
+      "A ZIP code is five digits. “" + v + "” has " + v.length + ". Check it, or search a street address.", true);
+  }
+  function noZipPage(zip){
+    $("eyebrow").textContent = "Development map";
+    var h1 = document.querySelector(".head h1"); if(h1) h1.textContent = "Development in ZIP " + zip;
+    document.title = "Development in ZIP " + zip + " — HomeSignal";
+  }
+  function searchZip(zip){
+    leaveLanding();
+    hideZipSuggest();
+    ++ZIP_SUGGEST_SEQ;
+    var token = ++REQ_SEQ;                    // a newer search owns the page from here on
+    clearView();                              // nothing of the previous place survives a ZIP search
+    ZIP_MODE = true; ZIP_CODE = zip; CUR_ADDRESS = "";
+    if(/^0{5}$/.test(zip)){ invalidZip(zip); return; }
+    $("go").disabled = true;
+    status("Finding ZIP " + zip + " …");
+    lookupZip(zip).then(function(z){
+      if(!currentReq(token)) return;          // a faster, newer search already took over
+      if(z && z.error){
+        $("go").disabled = false;
+        status("Couldn't look up ZIP " + zip + " just now. Try again.", true);
+        return;
+      }
+      if(z) return z;
+      // No ZIP page: locate it by its polygon alone.
+      return awaitBoundary(zip).then(function(state){
+        if(!currentReq(token)) return;
+        if(state === "complete") return { zip: zip, place: "" };
+        $("go").disabled = false;
+        noZipPage(zip); status("");
+        setZipNote(state === "error" ? "Couldn't read ZIP " + zip + "'s boundary just now. Try again."
+          : "ZIP " + zip + " has no measured boundary and isn\u2019t one of the ZIP codes JODY covers yet. No outline is drawn. Check the digits, or search an address.");
+      });
+    }).then(function(z){
+      if(!z || !currentReq(token)) return;
+      $("go").disabled = false;
+      status("");
+      if(window.HS && HS.state) HS.state.zip = zip;
+      if(window.HS && HS.declareRouteZipPlace) HS.declareRouteZipPlace(zip);
+      var noPage = !z.place && !z.state;
+      loadZip(zip); loadDevTracker(zip);
+      if(noPage){ noZipPage(zip); setZipNote("JODY has no development records for ZIP " + zip + " yet. The outline shows the ZIP itself."); }
+    });
+  }
+  $("addr").addEventListener("input", updateZipSuggest);
+  document.addEventListener("click", function(e){
+    var b = e.target && e.target.closest ? e.target.closest("#zipSuggest .zip-suggest") : null;
+    if(!b) return;
+    var zip = b.getAttribute("data-zip");
+    if(zip){ $("addr").value = zip; searchZip(zip); }
+  });
 
   // ADDRESS MODE, STEP 1 - the existing production geocoder. One call, no second geocoder,
   // never a ZIP centroid. Returns the endpoint's own match object, or null when it reports no
@@ -2394,6 +2578,7 @@ HS.onReady(function(){
     geocodeAddress(address).then(function(g){
       if(!currentReq(token)) return;        // a newer search already owns the page
       if(!g.ok){
+        clearView();
         $("go").disabled = false;
         status((g.body && g.body.error) ? g.body.error : ("Couldn't reach the address lookup (error " + g.status + ")."), true);
         return;
@@ -2405,6 +2590,7 @@ HS.onReady(function(){
         // The recovery hint SUGGESTS, it does not prescribe a shape: the field takes free-form
         // text and the geocoder requires no "street, city and ZIP" triple, so demanding one here
         // contradicted the field's own copy at the exact moment the resident needed help.
+        clearView();
         $("go").disabled = false;
         status("We couldn't find that address. Try a different spelling, or add the city or ZIP.", true);
         return;
@@ -2659,7 +2845,7 @@ HS.onReady(function(){
         // the small kicker above it.
         var label = zipPlaceLabel(rows, zip);
         var _eb = $("eyebrow"); if(_eb) _eb.textContent = "Development map";
-        var _h1 = document.querySelector(".head h1"); if(_h1) _h1.textContent = label;
+        var _h1 = document.querySelector(".head h1"); if(_h1) _h1.textContent = (rows && rows.length) ? label : "Development in ZIP " + zip;   // no ZIP page: say so, never a made-up place
         document.title = "Development around " + label + " — HomeSignal";
         // One canvas, two scopes - say so, in six words, rather than letting the caption
         // imply the facility pins were measured across the ZIP too.
@@ -2891,8 +3077,12 @@ HS.onReady(function(){
           // a ZIP whose whole-ZIP geography IS established and holds no qualifying development
           // is a real measurement; a ZIP nobody has measured is not. HS.zipAuthNote says which.
           window.__HS_SITES = [];
+          MAP_SITES = []; LAST_DRAW = null;
+          try{ if(layerGroup) layerGroup.clearLayers(); }catch(_e){}
           setIndexable(false);              // an empty ZIP is never indexed, either way
           $("results").style.display = "block";
+          ensureMap();
+          drawZipBoundary();                // frame the ZIP itself when it has no records to frame
           status(HS.zipAuthNote(auth, zip, []));
           focusPendingProject();            // a ?project= link still gets its answer
         }
@@ -2900,6 +3090,8 @@ HS.onReady(function(){
       .catch(function(){
         if(!currentReq(token)) return;
         window.__HS_SITES = [];
+        MAP_SITES = []; LAST_DRAW = null;
+        try{ if(layerGroup) layerGroup.clearLayers(); }catch(_e){}
         $("results").style.display = "block";
         status("Couldn't load ZIP " + zip + ". Enter your address for the live view.", true);
         focusPendingProject();
@@ -3225,7 +3417,8 @@ HS.onReady(function(){
       if(live){
         ZIP_BOUNDARY_LAYER = L.geoJSON(ZIP_BOUNDARY.fc, { style: ZIP_LINE, interactive:false }).addTo(map);
         try { ZIP_BOUNDARY_LAYER.bringToBack(); } catch(e){}
-        if(IS_EMBED && ZIP_MODE){
+        var emptyZip = ZIP_MODE && !IS_EMBED && !MAP_SITES.length;   // no records to frame: frame the ZIP itself
+        if((IS_EMBED && ZIP_MODE) || emptyZip){
           var b = ZIP_BOUNDARY.bounds;
           map.fitBounds([[b.south, b.west], [b.north, b.east]], { padding:[24,24] });
         }
@@ -3283,6 +3476,17 @@ HS.onReady(function(){
     [].forEach.call(sel.querySelectorAll("button"), function(c){
       c.classList.toggle("on", parseFloat(c.getAttribute("data-r")) === r);
     });
+  }
+  // The 2D map exists as soon as a place is on screen, even one with no records to draw, so a
+  // ZIP with zero projects is still located (the ZIP outline frames it) rather than blank.
+  function ensureMap(){
+    if(map || !window.L) return;
+    map = L.map("mapInner", { scrollWheelZoom:false });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom:19, attribution:"&copy; OpenStreetMap"
+    }).addTo(map);
+    layerGroup = L.layerGroup().addTo(map);
+    map.on("zoomend", spreadStackedMarkers);
   }
   function drawMap(data, sites){
     var home = data.home || { lat:41.5105, lng:-112.0155 };
@@ -5936,17 +6140,18 @@ HS.onReady(function(){
     if(BOUNDARY_ZIP) loadProjectPages(BOUNDARY_ZIP);       // which records here have a project page
     ZIP_BOUNDARY = null;
     drawZipBoundary();                                     // clear any previous ZIP's line
-    if(!window.HS || !HS.sb || !HS.boundaryFC) return;
     if(!BOUNDARY_ZIP) return;
+    if(!window.HS || !HS.sb || !HS.boundaryFC){ boundaryDone(BOUNDARY_ZIP, "error"); return; }
     zip = BOUNDARY_ZIP;
     // The outline is decoration on top of the map: a missing client (HS.sb() returns null
     // before supabase-js loads) or a throw must never stop the ZIP itself from loading.
     var sb = null;
     try { sb = HS.sb(); } catch(e) { sb = null; }
-    if(!sb || typeof sb.rpc !== "function") return;
+    if(!sb || typeof sb.rpc !== "function"){ boundaryDone(zip, "error"); return; }
     sb.rpc("app_zcta_boundary", { p_zip: zip }).then(function(r){
-      if(r.error || !r.data) return;
+      if(r.error || !r.data){ boundaryDone(zip, "error"); return; }
       var payload = r.data;
+      boundaryDone(zip, payload.status === "boundary_complete" ? "complete" : "not_measured");
       if(payload.status !== "boundary_complete") return;   // not_measured -> Map 1's own framing stands
       var fc = HS.boundaryFC(payload.geometry);
       var b = fc ? HS.boundaryBounds(fc) : null;
@@ -5954,7 +6159,7 @@ HS.onReady(function(){
       if(BOUNDARY_ZIP !== zip) return;                     // the page moved on to another place
       ZIP_BOUNDARY = { zip: zip, fc: fc, bounds: b };
       drawZipBoundary();                                   // in case render already ran
-    }).catch(function(){});
+    }).catch(function(){ boundaryDone(zip, "error"); });
   }
 
   // ===================== ZIP-mode boot (the crawlable landing surface) =====================
