@@ -53,7 +53,9 @@ ok('grants only postgres and service_role', count(exec, 'to postgres, service_ro
 
 // 7. nothing else moves: no category rename, no touch to the alerts path's 14-day rule
 ok('does not rename a category', !/'Planning & zoning'|'Government & civic'/.test(exec));
-ok('does not edit the alerts path', !exec.includes("interval '14 days'"));
+// This file's migration leaves the 14-day ingest window alone. The founder-approved notice window (2026-11-27) changes it in its
+// OWN migration, docs/app-refresh-zip-notice-window.sql, pinned by test/app-refresh-zip-notice-window.test.mjs.
+ok('does not edit the alerts path (this migration)', !exec.includes("interval '14 days'"));
 
 if (failures.length) { console.log(`\n${failures.length} FAILED`); process.exit(1); }
 console.log('\nall checks passed');
