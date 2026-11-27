@@ -122,7 +122,7 @@ await page.route('**/*', async (route) => {
 });
 
 const load = async (qs) => {
-  await page.goto(base + '/homesignalmap.html?zip=20171' + (qs || ''), { waitUntil: 'domcontentloaded' });
+  await page.goto(base + '/development-map.html?zip=20171' + (qs || ''), { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
   await page.waitForTimeout(600);
 };
@@ -324,7 +324,7 @@ ok(await page.evaluate(() => !!document.getElementById('regToggleBox').checked),
 // Filter clicks use replaceState on purpose, so they add no entries. What must hold is
 // that arriving at a URL through history restores the state that URL describes.
 await load('&types=data_center');
-await page.goto(base + '/homesignalmap.html?zip=20171&types=commercial', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=20171&types=commercial', { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
 await page.waitForTimeout(600);
 await page.goBack({ waitUntil: 'domcontentloaded' });

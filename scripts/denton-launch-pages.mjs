@@ -24,7 +24,7 @@ for (const z of ZIPS) {
         mentions_zip: await page.evaluate(zz => (document.body.innerText || '').includes(zz), z),
         overflow_x: await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1),
       };
-      await page.goto(`${BASE}/homesignalmap.html?zip=${z}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await page.goto(`${BASE}/development-map.html?zip=${z}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
       // wait until the page has written its site list (a property setter fires once per load)
       let n = -1;
       for (let i = 0; i < 40 && n < 0; i++) { await page.waitForTimeout(1500); n = await page.evaluate(() => Array.isArray(window.__HS_SITES) ? window.__HS_SITES.length : -1); }

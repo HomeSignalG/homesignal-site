@@ -72,7 +72,7 @@ ok(ABS.length > 400, '1d: control — the captureAbsence body was actually locat
 // ── §2 IT IS THE SAME PICTURE, MINUS THE MARKER WORK ─────────────────────────────────
 // A DIFFERENT capture would be a second implementation of "what a Map 1 screenshot is",
 // and the two would drift. Same page, same embed card, same policy, same clip, same veto.
-ok(/homesignalmap\.html\?zip=/.test(ABS), '2a: it opens the real public Map 1 ZIP page');
+ok(/development-map\.html\?zip=/.test(ABS), '2a: it opens the real public Map 1 ZIP page');
 ok(/EMBED_PARAM/.test(ABS), '2b: …in the shipped embed mode, as the project capture does');
 ok(/applyDataCenterCapturePolicy\(page, null\)/.test(ABS),
   '2c: …applies the SAME Data Center map-state policy, with a null target');

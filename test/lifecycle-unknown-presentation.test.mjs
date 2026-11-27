@@ -71,15 +71,15 @@ const epaSite = (layer, extra) => Object.assign({ label: 'EPA SITE', layer, scop
 
 // ── §6 Map 1 list bands derive from lifecycle ──────────────────────────────────────────
 {
-  const PAGE = code(read('homesignalmap.html'));
+  const PAGE = code(read('development-map.html'));
   ok(!/builtRows = [^;]*\.concat\(fac\)/.test(PAGE) && /var points = permits\.concat\(fac\);/.test(PAGE),
     '6a "Operating now" no longer appends facilities by kind (facilities join the point set and are banded by lifecycle)');
   ok(/var builtRows = points\.filter\(function\(s\)\{ return bucketOf\(s\.type, s\)==="operating"; \}\);/.test(PAGE),
     '6b "Operating now" is the points whose lifecycle is operating');
   ok(/var unknownRows = points\.concat\(dev\)\.filter\(function\(s\)\{ return bucketOf\(s\.type, s\)==="unknown"; \}\);/.test(PAGE),
     '6c "Lifecycle unknown" holds ANY record whose lifecycle is unknown — permits, facilities and notices alike');
-  ok(/unknown: unknownRows/.test(PAGE) && /listInto\("unknownList", LIST_ROWS\.unknown,/.test(PAGE) && /id="unknownList"/.test(read('homesignalmap.html'))
-     && /band-h t-unknown">Lifecycle unknown</.test(read('homesignalmap.html')),
+  ok(/unknown: unknownRows/.test(PAGE) && /listInto\("unknownList", LIST_ROWS\.unknown,/.test(PAGE) && /id="unknownList"/.test(read('development-map.html'))
+     && /band-h t-unknown">Lifecycle unknown</.test(read('development-map.html')),
     '6d the band is rendered, under the legend\'s own label');
   ok(!/operating now"/.test(PAGE), '6e no popup string asserts "operating now" for a facility');
   ok(/var lcWord = mk\.lifecycleLabel \? " · " \+ mk\.lifecycleLabel : "";/.test(PAGE),

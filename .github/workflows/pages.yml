@@ -16,7 +16,7 @@ name: pages
 #
 #   1. The push filter named the ZIP GENERATOR's inputs while "Stage the static site"
 #      rsynced the WHOLE repo minus .github/docs/test/node_modules into the artifact.
-#      339 of 344 shipped files - index.html, app.css, homesignalmap.html,
+#      339 of 344 shipped files - index.html, app.css, development-map.html,
 #      partials/shell.html, every lib/*.js - could merge to main and never deploy.
 #      (That rsync is GONE as of Fix 19 - see "Stage the static site" below - but the
 #      push filter it motivated is still the thing keeping deploys reliable.)
@@ -81,6 +81,9 @@ on:
       # itself.
       - 'test/zip-pages-seo.test.mjs'
       - 'test/zip-pages-no-point.test.mjs'
+      - 'test/zip-pages-weather-rule-f.test.mjs'
+      - 'test/zip-80021-partial-county.test.mjs'
+      - 'scripts/lib/weather-rule-f-proof.mjs'
       - 'test/community-page-contract.test.mjs'
       - 'test/site-artifact-contract.test.mjs'
       - 'test/dev-seo-ssr-type-adapter.test.mjs'
@@ -121,6 +124,9 @@ on:
       - '404.html'
       - 'test/zip-pages-seo.test.mjs'
       - 'test/zip-pages-no-point.test.mjs'
+      - 'test/zip-pages-weather-rule-f.test.mjs'
+      - 'test/zip-80021-partial-county.test.mjs'
+      - 'scripts/lib/weather-rule-f-proof.mjs'
       - 'test/community-page-contract.test.mjs'
       - 'test/fixtures/zip-pages.json'
       - 'test/fixtures/development_seo_plane.json'
@@ -408,12 +414,12 @@ jobs:
           # up: the advertised set must BE the index-eligible set. This line used to guard
           # the development half's PRESENCE under page-purpose separation, which assumed the
           # two halves were two sets of documents. They are not. Measured against production:
-          # every homesignalmap.html?zip= URL serves a byte-identical document (Pages selects
+          # every development-map.html?zip= URL serves a byte-identical document (Pages selects
           # by PATH and ignores the query string), ships `noindex, nofollow`, and canonicalises
           # to the ZIP-less URL — so advertising 11,718 of them contradicted this gate's own
           # premise. Restoring the advertisement means making those URLs real documents
           # (/development/<zip>/), and this assertion is what should be replaced then.
-          assert 'homesignalmap.html?zip=' not in sm, \
+          assert 'development-map.html?zip=' not in sm, \
               'noindex development URLs are still advertised in the sitemap'
           assert man['sitemap_dev_urls_removed'] >= 0, 'manifest must record the removal count'
           # CITY PAGES (plan step 9): every city document written is advertised, and only those.
@@ -590,7 +596,7 @@ jobs:
         run: |
           set -euo pipefail
           exec > >(tee -a "$RUNNER_TEMP/receipts.txt") 2>&1
-          for t in zip-pages-seo zip-pages-no-point community-page-contract city-pages project-pages; do
+          for t in zip-pages-seo zip-pages-no-point zip-pages-weather-rule-f zip-80021-partial-county community-page-contract city-pages project-pages; do
             echo "--- test/$t.test.mjs"
             node "test/$t.test.mjs" | tail -3
           done

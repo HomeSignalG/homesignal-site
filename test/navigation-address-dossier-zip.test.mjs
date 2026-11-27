@@ -72,7 +72,7 @@ ok(!/<a href="development\.html">/.test(prop),
   'no bare, ZIP-less development.html link survives on the dossier',
   (prop.match(/.{0,40}<a href="development\.html">.{0,20}/) || [])[0]);
 // Pre-existing and correct — must not regress.
-ok(/HS\.navHref\('homesignalmap\.html', p\.zip\)/.test(prop),
+ok(/HS\.navHref\('development-map\.html', p\.zip\)/.test(prop),
   'Map 1 "Open in Development →" still uses navHref with the ADDRESS ZIP (unregressed)');
 ok(!/\?zip='\s*\+/.test(prop),
   'the dossier hand-builds no ?zip= string — every link goes through the shared helper');

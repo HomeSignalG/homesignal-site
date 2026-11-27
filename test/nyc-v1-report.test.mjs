@@ -189,7 +189,7 @@ ok(threwIc3t, '4g the stale BIS filings view is rejected');
 
 const page = read('future-surroundings-report.html');
 ok(/data\.cityofnewyork\.us/.test(page) && !/geocoding\.geo\.census\.gov/.test(page), '5a page CSP/connect is Socrata only');
-ok(!/get-address-report|homesignalmap|openstreetmap|value_outlook|Effect at this address/.test(page),
+ok(!/get-address-report|development-map|openstreetmap|value_outlook|Effect at this address/.test(page),
   '5b page does not load HOLD/EXCLUDE surfaces');
 ok(/Download JSON/.test(page) && /Print \/ PDF/.test(page) && /Copy share link/.test(page),
   '5c page exposes JSON, print, and share');

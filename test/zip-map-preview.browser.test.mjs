@@ -111,7 +111,7 @@ for (const [w, h, label] of [[1280, 800, 'desktop'], [390, 844, 'mobile']]) {
   const n = await page.locator('iframe#zipMapFrame').count();
   ok(n === 1, label + ': a signed-out visitor sees exactly one map', n);
   const src = await page.getAttribute('#zipMapFrame', 'src');
-  ok(src === 'homesignalmap.html?embed=1&zip=' + ZIP, label + ': the map is Map 1 in embed mode for this ZIP', src);
+  ok(src === 'development-map.html?embed=1&zip=' + ZIP, label + ': the map is Map 1 in embed mode for this ZIP', src);
   const full = await page.locator('#zipMapFull');
   ok(await full.count() === 1 && /View full Development Map/.test(await full.innerText()),
     label + ': "View full Development Map →" sits under the map');
@@ -119,7 +119,7 @@ for (const [w, h, label] of [[1280, 800, 'desktop'], [390, 844, 'mobile']]) {
     const a = document.getElementById('zipMapFull');
     return a ? new URL(a.getAttribute('href'), location.href) : null;
   }).then((u) => u && { path: new URL(u).pathname, zip: new URL(u).searchParams.get('zip'), embed: new URL(u).searchParams.get('embed') });
-  ok(!!fullHref && fullHref.path === '/homesignalmap.html' && fullHref.zip === ZIP && fullHref.embed === null,
+  ok(!!fullHref && fullHref.path === '/development-map.html' && fullHref.zip === ZIP && fullHref.embed === null,
     label + ': ...and it opens the FULL Development Map for this ZIP, not the embed', fullHref);
   const geo = await page.evaluate(() => {
     const ph = document.querySelector('#commPage .ph') || document.querySelector('.ph');
@@ -200,7 +200,7 @@ for (const [w, h, label] of [[1280, 800, 'desktop'], [390, 844, 'mobile']]) {
     health: !!document.getElementById('zip-health-authed'),
   }));
   ok(s.sess, 'signed in: the visitor has a session (control)', s);
-  ok(s.frames === 1 && s.src === 'homesignalmap.html?embed=1&zip=' + ZIP, 'signed in: the same single map', s);
+  ok(s.frames === 1 && s.src === 'development-map.html?embed=1&zip=' + ZIP, 'signed in: the same single map', s);
   ok(s.health, 'signed in: ZIP health is shown', s);
   await context.close();
 }

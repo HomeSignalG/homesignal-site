@@ -1,7 +1,7 @@
 // MAP 1 — DATA-CENTRE PINS DRAW AS DATA CENTRES, IN THEIR OWN LIFECYCLE, ON THE REAL PAGE.
 //
 // The offline suite (test/map1-dc-site-shape.test.mjs) proves the mapping on the resolver.
-// This drives homesignalmap.html itself, with public.map1_dc_zip_members answering the REAL
+// This drives development-map.html itself, with public.map1_dc_zip_members answering the REAL
 // production rows of the deterministic ZIP sample (test/fixtures/map1-dc-zip-sample-2026-09-27.json,
 // fingerprinted against production), and reads what a resident gets: each pin's own words
 // (its title — "Proposed data center"), the PROJECT TYPE and STATUS filters, and the four lists.
@@ -84,7 +84,7 @@ async function open(zip) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
     return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
   });
-  await page.goto(base + '/homesignalmap.html?zip=' + zip, { waitUntil: 'domcontentloaded' });
+  await page.goto(base + '/development-map.html?zip=' + zip, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
   await page.waitForTimeout(600);
   return { page, pageErrors };
@@ -104,7 +104,7 @@ const clickStage = (page, id) => page.evaluate((want) => {
 }, id);
 const listText = (page, id) => page.evaluate((i) => { const el = document.getElementById(i); return el ? el.innerText : null; }, id);
 // 2026-11-09: an operating data center is its source's own listing (HS.isSourceOwnRecord), so its hover
-// names whose claim it is (homesignalmap.html stageWord / markerTitle).
+// names whose claim it is (development-map.html stageWord / markerTitle).
 const WORD = { Operating: 'Operating (source listing) data center', Approved: 'Approved data center', Proposed: 'Proposed data center' };
 const expectTitles = (zip) => count(FIX.rows.filter((r) => r.zip === zip).map((r) => WORD[r.map_status]));
 const BAD = /other project|lifecycle unknown/i;

@@ -1,7 +1,7 @@
 // Cross-state shell + populate spot-check (live site, GitHub runner).
 //
 // For each ZIP in $ZIPS (comma-separated), loads THREE page types on the real site —
-// community.html, homesignalmap.html, and the app's development.html — and reports, as a
+// community.html, development-map.html, and the app's development.html — and reports, as a
 // markdown table: does the shared site header render (present, across the top, nav
 // populated), is the page non-blank, and which honest state it shows — populated /
 // coverage-coming / not-covered / honest-empty — flagging anything broken or blank.
@@ -102,7 +102,7 @@ let broken = 0;
 
 for (const zip of ZIPS) {
   const comm = await inspect(page, `${SITE_BASE}/community.html?zip=${zip}`);
-  const dev = await inspect(page, `${SITE_BASE}/homesignalmap.html?zip=${zip}`);
+  const dev = await inspect(page, `${SITE_BASE}/development-map.html?zip=${zip}`);
   const app = await inspect(page, `${SITE_BASE}/development.html?zip=${zip}`);
   const shellOk = (s) => s.failed ? 'FAIL' : (s.shellPresent && s.shellTop ? 'yes' : 'NO');
   const commClass = classifyComm(comm);

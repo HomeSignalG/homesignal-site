@@ -119,7 +119,7 @@ await page.route('**/*', async (route) => {
 
 async function load() {
   try { await page.evaluate(() => { try { localStorage.clear(); sessionStorage.clear(); } catch (e) {} }); } catch (e) {}
-  await page.goto(base + '/homesignalmap.html?zip=20171', { waitUntil: 'domcontentloaded' });
+  await page.goto(base + '/development-map.html?zip=20171', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
   await page.waitForTimeout(600);
   return page.evaluate(() => ({ n: document.getElementById('cFac').textContent.trim(),

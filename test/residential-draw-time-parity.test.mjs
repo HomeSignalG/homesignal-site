@@ -232,7 +232,7 @@ ok(adapter.length > 50 && /return site\.residential_evidence;/.test(adapter),
 const measure = fs.readFileSync(new URL('../scripts/residential-measure.mjs', import.meta.url), 'utf8');
 ok(/HS\.residentialQualifySites\(after\)/.test(measure) && /RESIDENTIAL DRAW-TIME PARITY/.test(measure),
   '6e scripts/residential-measure.mjs measures the draw-time check, not only the builder');
-const page = fs.readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const page = fs.readFileSync(new URL('../development-map.html', import.meta.url), 'utf8');
 ok((page.match(/HS\.residentialQualifySites\(/g) || []).length === 2,
   '6f the page still routes both funnels through the draw-time check (render + property)');
 

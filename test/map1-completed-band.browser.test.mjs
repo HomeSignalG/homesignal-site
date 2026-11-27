@@ -92,7 +92,7 @@ async function open(name, query) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
     return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
   });
-  await page.goto(base + '/homesignalmap.html?zip=' + zip + (query || ''), { waitUntil: 'domcontentloaded' });
+  await page.goto(base + '/development-map.html?zip=' + zip + (query || ''), { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
   await page.waitForTimeout(700);
   return { page, pageErrors };

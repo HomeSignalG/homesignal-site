@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = 'supabase/functions/get-address-report/jurisdiction-registry.json';
 const OUT = 'supabase/functions/_shared/source-publishers.generated.json';
-const CONNECTORS = ['socrata', 'arcgis', 'ckan', 'csv', 'carto'];
+const CONNECTORS = ['socrata', 'arcgis', 'ckan', 'csv', 'carto', 'county_cases'];
 
 function host(u) { try { return new URL(u).host; } catch { return ''; } }
 
@@ -46,6 +46,10 @@ export function build(registry) {
       if (typeof e.status_const === 'string' && e.status_const) rec.status_const = e.status_const;
       // What the source's one date MEANS, in words, when the date kind alone would mislead (e.g. a register's publication date is not a filing date).
       if (typeof e.file_date_label === 'string' && e.file_date_label.trim()) rec.date_label = e.file_date_label.trim();
+      // What that one date IS, as the source establishes it (filing vs record created). Absent = unstated: nothing is assumed (scripts/audit-date-basis.mjs lists them).
+      if (e.file_date_basis === 'filing' || e.file_date_basis === 'record_created') rec.date_basis = e.file_date_basis;
+      // A customer-facing statement of what this source does NOT establish (e.g. a city's permits are not county coverage). Shown in the report's coverage note.
+      if (typeof e.scope_note === 'string' && e.scope_note.trim()) rec.scope_note = e.scope_note.trim();
       out[e.registry_id] = rec;
     }
   }

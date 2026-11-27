@@ -1,6 +1,6 @@
 // Map 1 links a record to its project page (/project/...) only when the build published one
 // (lib/project-page-link.js reads /community/<zip>/projects/pages.json, written by
-// scripts/gen_zip_pages.py project_page_index). Drives homesignalmap.html in Chromium:
+// scripts/gen_zip_pages.py project_page_index). Drives development-map.html in Chromium:
 //   1. index present: the list row and the pin popup link to the page; the data-centre rows
 //      (real production rows for 23150) keep no project link and say their link is third-party
 //   2. index answered late: the list row's slot is filled when it lands
@@ -103,7 +103,7 @@ async function open(name) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
     return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
   });
-  await page.goto(base + '/homesignalmap.html?zip=' + zip, { waitUntil: 'domcontentloaded' });
+  await page.goto(base + '/development-map.html?zip=' + zip, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
   await page.waitForTimeout(700);
   return { page, pageErrors };

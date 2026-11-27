@@ -81,7 +81,7 @@ async function makeWorld({ reportsA = 8 } = {}) {
   const planOf = async (u) => (brokerageOf(u) ? { brokerage_id: 'b0b0b0b0-1111-4222-8333-444444444444', role: 'owner', state: 'none', credit_limit: 100, credits_used: 0, credits_remaining: 0, period_ends_at: null } : null);
   w.report = RH.makeHandler({
     ...gate, now: () => NOW, attribution: ATTRIBUTION_AB, geocode: async (a) => geocodeStandIn(a), zipSupported: async () => true,
-    rateClaim: async () => ({ allowed: true }), radius: async () => RICH.rows, hydrate: async () => RICH.projects, ledger: async () => RICH.ledger ?? [], events: async () => RICH.events ?? [], health: async () => [],
+    rateClaim: async () => ({ allowed: true }), radius: async () => RICH.rows, hydrate: async () => RICH.projects, ledger: async () => RICH.ledger ?? [], events: async () => RICH.events ?? [], health: async () => [], jurisdictions: async () => [],
     trialOf: async (u) => state(u), planOf,
     issue: async (u, k, intelligence, ctx) => {
       w.issued++;

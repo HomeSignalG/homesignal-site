@@ -3,12 +3,12 @@
 //
 // The founder's Revised Index Design (Final Claude-Ready, 2026-09-30). What this file guards,
 // each item the kind of thing a later session could undo in good faith:
-//   1. ONE MAP. The homepage map is Map 1 itself in an iframe (homesignalmap.html?embed=1),
+//   1. ONE MAP. The homepage map is Map 1 itself in an iframe (development-map.html?embed=1),
 //      never an image, and index.html carries no map, marker, filter or classifier code.
 //   2. The sample is the dedicated preview shape, lazy, out of the tab order, pointer-locked,
 //      and never given a fixed height; preview=1 is layout-only and scoped to .hs-embed.hs-preview.
 //   3. A search hands off to the Development Map (founder, 2026-10-04): a ZIP goes to
-//      homesignalmap.html?zip=, an address is handed over once in sessionStorage and never put
+//      development-map.html?zip=, an address is handed over once in sessionStorage and never put
 //      in a URL. No follow / save / subscribe, no history change, no HS.data.isCovered gate.
 //   4. ONE ADDRESS RESOLVER: shell.js calls geocode-address exactly once, inside
 //      HS.resolveAddress, and HS.findHome and saveOnboardingAddress use it. (The homepage no
@@ -41,13 +41,13 @@ const shellNoComments = stripHtmlComments(shellHtml);
 const shellJs = read('shell.js');
 const shellCode = stripJsComments(shellJs);
 const css = read('app.css');
-const map1 = read('homesignalmap.html');
+const map1 = read('development-map.html');
 
 console.log('--- 1. one map, and it is Map 1 ---');
 const iframes = tpl.match(/<iframe[\s\S]*?<\/iframe>/g) || [];
 ok(iframes.length === 1, 'the homepage has exactly one iframe', iframes.length);
 const frame = iframes[0] || '';
-ok(/src="homesignalmap\.html\?embed=1&amp;preview=1&amp;zip=98335"/.test(frame), 'its initial src is exactly homesignalmap.html?embed=1&preview=1&zip=98335');
+ok(/src="development-map\.html\?embed=1&amp;preview=1&amp;zip=98335"/.test(frame), 'its initial src is exactly development-map.html?embed=1&preview=1&zip=98335');
 ok(/title="Sample HomeSignal development map"/.test(frame) && /loading="lazy"/.test(frame) && /tabindex="-1"/.test(frame),
   'title, loading="lazy" and tabindex="-1" are as specified');
 ok(!/\sheight=|style="[^"]*height/.test(frame), 'the sample iframe carries no fixed height');
@@ -91,14 +91,14 @@ console.log('--- 3. a search hands off to the Development Map (founder, 2026-10-
 ok(!/lib\/landing\.js/.test(idx) && !/HS\.landingFor/.test(idxNoComments), 'index.html no longer loads lib/landing.js or calls HS.landingFor');
 // The ONLY navigations the page script makes are to Map 1, and only from the submit handler.
 const navs = pageScript.match(/location\.(replace|assign)\([^)]*\)|location\.href\s*=[^;]*/g) || [];
-ok(navs.length === 3 && navs.every((n) => /homesignalmap\.html/.test(n)), 'the page script navigates only to homesignalmap.html (the ZIP, the address, and a link that arrives with an address)', navs.join(' | '));
-ok(/location\.assign\('homesignalmap\.html\?zip=' \+ q\)/.test(pageScript), 'a 5-digit ZIP goes to homesignalmap.html?zip=<zip>');
-ok(/location\.assign\('homesignalmap\.html'\)/.test(pageScript) && /sessionStorage\.setItem\(HANDOFF_KEY, q\)/.test(pageScript),
-  'an address goes to homesignalmap.html with the text handed over once in sessionStorage');
-const urls = (pageScript.match(/'homesignalmap\.html[^']*'/g) || []).join(' ');
+ok(navs.length === 3 && navs.every((n) => /development-map\.html/.test(n)), 'the page script navigates only to development-map.html (the ZIP, the address, and a link that arrives with an address)', navs.join(' | '));
+ok(/location\.assign\('development-map\.html\?zip=' \+ q\)/.test(pageScript), 'a 5-digit ZIP goes to development-map.html?zip=<zip>');
+ok(/location\.assign\('development-map\.html'\)/.test(pageScript) && /sessionStorage\.setItem\(HANDOFF_KEY, q\)/.test(pageScript),
+  'an address goes to development-map.html with the text handed over once in sessionStorage');
+const urls = (pageScript.match(/'development-map\.html[^']*'/g) || []).join(' ');
 ok(!/addr|address|lat=|lng=/i.test(urls), 'no address or coordinate is ever placed in a URL', urls);
-ok(/HANDOFF_KEY = 'hs\.homeSearchAddress'/.test(pageScript) && /sessionStorage\.getItem\("hs\.homeSearchAddress"\)/.test(read('homesignalmap.html'))
-   && /sessionStorage\.removeItem\("hs\.homeSearchAddress"\)/.test(read('homesignalmap.html')),
+ok(/HANDOFF_KEY = 'hs\.homeSearchAddress'/.test(pageScript) && /sessionStorage\.getItem\("hs\.homeSearchAddress"\)/.test(read('development-map.html'))
+   && /sessionStorage\.removeItem\("hs\.homeSearchAddress"\)/.test(read('development-map.html')),
   'Map 1 reads the same key and removes it in the same step');
 ok(!/history\.pushState|location\.hash\s*=/.test(pageScript) && (pageScript.match(/history\.replaceState/g) || []).length === 2
    && /history\.replaceState\(null, '', location\.pathname \+ location\.search\)/.test(pageScript)
@@ -121,7 +121,7 @@ ok(!/history\.pushState|location\.hash\s*=/.test(pageScript) && (pageScript.matc
   ok(/function searchKind\(q\)/.test(pageScript) && (pageScript.match(/q\.length < 8/g) || []).length === 1 && /var kind = searchKind\(q\);/.test(pageScript),
     'ONE rule decides what a query means (ZIP, address, too short): the search box and the arriving link both ask searchKind');
   const headScript = (read('index.html').match(/<script>[\s\S]*?<\/script>\s*<\/head>/) || [''])[0];
-  ok(/style\.visibility = 'hidden'/.test(headScript) && /#address=/.test(headScript) && /location\.replace\('homesignalmap\.html'\)/.test(arrival),
+  ok(/style\.visibility = 'hidden'/.test(headScript) && /#address=/.test(headScript) && /location\.replace\('development-map\.html'\)/.test(arrival),
     'the document is hidden by a script in the HEAD (before the blocking scripts, so no homepage flash), and the page moves with location.replace so Back returns to the report, not to a page that redirects again');
 }
 ok(!/HS\.data\.isCovered|HS\.findCommunity|HS\.openLoc|openModal|followCommunity|ensureAreaSubscribed|app_follows|app_properties|\.insert\(|saveHome|LS\.set|localStorage/.test(pageScript),

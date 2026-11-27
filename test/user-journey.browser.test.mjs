@@ -3,7 +3,7 @@
 // Every earlier gate tested the MAP. None tested the app around it, which is how two
 // founder-visible defects reached production on 2026-09-04:
 //
-//   D1  homesignalmap.html declared <body data-nav="dev">, so the sidebar highlighted
+//   D1  development-map.html declared <body data-nav="dev">, so the sidebar highlighted
 //       "Development & Impact" while the resident was on Maps, and Maps never lit up
 //       anywhere. Clicking Maps from Alerts looked like it bounced back to Development.
 //   D2  the global location control printed the SAVED HOME on every page regardless of
@@ -223,11 +223,11 @@ ok(c.activeTokens[0] === 'explore', '1 ...and it is Explore (plan v3)', c.active
 ok(c.activeTokens.indexOf('maps') < 0, '1 Maps is NOT active on Development & Impact', c.activeTokens);
 
 // ═══ 2. Map 1 identifies itself ═══
-await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await waitShell();
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
 c = await chrome();
-info('homesignalmap.html', c.activeTokens);
+info('development-map.html', c.activeTokens);
 ok(c.activeTokens.length === 1, '2 Map 1 highlights exactly one sidebar item', c.activeLabels);
 // ⚠️ RETARGETED TWICE. This first asserted `activeTokens[0] === 'maps'` while a Maps sidebar
 // entry existed; A-021 then folded Maps under Development and it asserted 'dev'. The founder
@@ -362,7 +362,7 @@ for (const [origin, selector, label] of [
   c = await chrome();
   info(label + ' -> Map 1', { landed: c.path + c.search, active: c.activeTokens });
   // Map 1 shows /map/<zip> in the address bar (founder, 2026-10-22).
-  ok(/\/homesignalmap\.html$/.test(c.path) || /^\/map\/\d{5}$/.test(c.path), label + ' -> lands on Map 1', c.path);
+  ok(/\/development-map\.html$/.test(c.path) || /^\/map\/\d{5}$/.test(c.path), label + ' -> lands on Map 1', c.path);
   ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'explore',
     label + ' -> Explore is the active item after the page settles', c.activeTokens);
 }
@@ -370,7 +370,7 @@ for (const [origin, selector, label] of [
 // ═══ 7. A saved home in Del Valle, a map of Denver ═══
 // The founder's exact repro. The saved home must survive, and must NOT be presented as
 // the geography on screen.
-await page.goto(base + '/homesignalmap.html?zip=80210', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=80210', { waitUntil: 'domcontentloaded' });
 await waitShell();
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
 await installSavedHome(SAVED_HOME);
@@ -395,7 +395,7 @@ ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'explore', '7 Explore is
 // in test/viewed-place-declaration.test.mjs §4, which does not need a browser.
 // The home is installed AFTER load on purpose: that is the account-hydration moment that used
 // to elect an in-ZIP address as the Place, so this proves the declaration outlives it.
-await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await waitShell();
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
 await installSavedHome(SAVED_HOME);
@@ -459,7 +459,7 @@ ok(!!(c.savedHome && c.savedHome.address && (c.locTitle || '').indexOf(c.savedHo
 // previous one left open, which silently became community.html (no #addr) the moment a ZIP-hub
 // section was inserted above it. A section that depends on its predecessor's final URL breaks
 // on insertion, not on a behaviour change — so it states its own starting point.
-await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await waitShell();
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
 // The saved place is part of this section's PRECONDITION, not decoration. paintTopbar's last
@@ -498,7 +498,7 @@ ok(a.canonical > 0, '8 canonical radius results render', a.canonical);
 ok(/CALDWELL/i.test(c.locLabel || ''), '8 the current view follows the searched address', c.locLabel);
 
 // ═══ 9. ZIP -> address -> ZIP: the label follows the active view, nothing stale ═══
-await page.goto(base + '/homesignalmap.html?zip=80210', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=80210', { waitUntil: 'domcontentloaded' });
 await waitShell();
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
 await installSavedHome(SAVED_HOME);
@@ -532,7 +532,7 @@ ok(await page.evaluate(() => HS.state.viewPlaceType) === 'zip',
 const WHOLE_ZIP_FACILITY_CLAIM = /(facilit\w*[^.]{0,80}\b(?:for|in|across)\s+(?:this|the)\s+ZIP)|((?:for|in|across)\s+(?:this|the)\s+ZIP[^.]{0,80}\bfacilit)/i;
 
 console.log('\n10. F1 — ZIP mode names its two geographic scopes');
-await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await waitShell();
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
 await page.waitForTimeout(500);
@@ -560,7 +560,7 @@ ok(/^\d+$/.test((zc.fac || '').trim()) && Number(zc.fac) > 0,
   '10i the facility counter still renders its count', zc.fac);
 
 // ═══ 11. F1 — the facilities-only state ═══
-await page.goto(base + '/homesignalmap.html?zip=84334', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=84334', { waitUntil: 'domcontentloaded' });
 await waitShell();
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
 await page.waitForTimeout(700);
@@ -580,7 +580,7 @@ ok(!WHOLE_ZIP_FACILITY_CLAIM.test(c.covNote || ''),
 ok(c.totalTileShown === false, '11d still no combined total on a facilities-only ZIP');
 
 // ═══ 12. F1 — address mode is a different contract and keeps its own labels ═══
-await page.goto(base + '/homesignalmap.html', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html', { waitUntil: 'domcontentloaded' });
 await waitShell();
 await page.fill('#addr', '2200 CALDWELL LN, DEL VALLE, TX 78617');
 await page.click('#go');
@@ -628,7 +628,7 @@ ok(homeBtnAddr === true,
 ok(bz.shown === true, '13a address mode offers a way back to the whole ZIP', bz);
 ok(/^\u2190 Back to all development in ZIP \d{5}$/.test(bz.text || ''),
   '13b ...labelled with the destination ZIP, in the founder-specified words', bz.text);
-ok(/^homesignalmap\.html\?zip=\d{5}$/.test(bz.href || ''),
+ok(/^development-map\.html\?zip=\d{5}$/.test(bz.href || ''),
   '13c ...as a real link, so browser back/forward and middle-click behave normally', bz.href);
 // It must lead to the ZIP the resident came from, not the sample default.
 // The flow reached here via ZIP 84334, so THAT is the ZIP the page was opened with. Pinned to
@@ -638,7 +638,7 @@ ok((bz.href || '').endsWith('=84334'),
   '13d ...pointing at the ZIP this page was opened with, not the sample default', bz.href);
 
 // And in ZIP mode there is nothing to go back to, so it must not be drawn.
-await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await waitShell();
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
 await page.waitForTimeout(400);
@@ -669,7 +669,7 @@ ok(bzZip.homeBtnShown === false,
 // Launch-gate task 6: a resident must be able to explain what "not measured" means. The
 // sentence is unit-tested in zip-authoritative.test.mjs, but nothing proved it REACHES THE
 // SCREEN - and an honest state nobody can read is not an honest state.
-await page.goto(base + '/homesignalmap.html?zip=84999', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=84999', { waitUntil: 'domcontentloaded' });
 await waitShell();
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
 await page.waitForTimeout(500);
@@ -710,7 +710,7 @@ ok(/^\d+$/.test((zc.dev || '').trim()),
 // Criterion B: the radius label AND the map caption must both restate the NEW radius. The
 // caption is set in run(), which a radius change re-enters - this proves that wiring rather
 // than assuming it.
-await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await waitShell();
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
 await page.fill('#addr', '2200 CALDWELL LN, DEL VALLE, TX 78617');

@@ -58,10 +58,12 @@ const C = code(SRC);
   // national-6 (2026-11-02): adds activity_window, publisher_type, records_checked and undescribed_records (the record's activity dates, the agency's own class, source freshness, the
   // undescribed-records note); `relevance`, `description` and `address` are read as plain keys (relField / p.description / p.address)
   const EXPECT = ['activity_window', 'publisher_type', 'records_checked', 'records_judged', 'temporary_ended', 'undescribed_records', 'routine_records', 'as_of', 'bearings_deg', 'by_lifecycle', 'by_stage', 'change_ready', 'detected_at', 'distances_mi', 'event_type', 'first_observed_at', 'homesignal_detected_changes', 'homesignal_observation', 'older_than_a_year', 'project_id',
-    'publisher_event', 'publisher_stage', 'publisher_status', 'radius_mi', 'recent_days', 'recent_official_activity', 'record_date', 'record_id', 'source_feed_count', 'title_cut', 'what_changed_recently'].concat(['feed_ref', 'publisher_stage_unpublished']).sort();
+    'publisher_event', 'publisher_stage', 'publisher_status', 'radius_mi', 'recent_days', 'recent_official_activity', 'record_date', 'record_id', 'title_cut', 'what_changed_recently'].concat(['feed_ref', 'publisher_stage_unpublished', 'record_dates', 'status_attribution', 'status_date', 'not_connected', 'not_established', 'source_scope_notes']).sort();
+  // report-accuracy-universal (2026-11-19) adds five, on purpose: record_dates (the agency's other dates: last modified, status updated), status_attribution and its status_date (the status is the source's own word, with a date only where the source gives one) and not_connected, not_established (which kinds of record the connected sources do not cover)
+  // 2026-11-19 (Boulder scope note) adds one, on purpose: source_scope_notes (what a source does NOT establish; the engine decides, the view prints)
   // national-5 (2026-11-02) adds one, on purpose: publisher_stage_unpublished (the source publishes no status, so none is printed as the agency's)
   // national-4 (2026-11-01) adds three, on purpose: feed_ref (where the agency publishes the data), record_id (the agency's record number) and title_cut (the source feed shortened the title)
-  ok(JSON.stringify(snake) === JSON.stringify(EXPECT), '2a the snake_case response keys it reads are exactly these thirty-three (a new one must be added here on purpose)', snake);
+  ok(JSON.stringify(snake) === JSON.stringify(EXPECT), '2a the snake_case response keys it reads are exactly these thirty-eight (a new one must be added here on purpose)', snake);
   // The ledger's first observation is NOT printed as "First detected" (for a baseline read it is a refresh sweep's time before the ledger existed).
   // The per-record observation is read in ONE function, changeBasis, only to say WHEN the history behind a "no status change" sentence starts and how
   // many records it covers; the engine's coverage flag is read once, in changeReady; and noChangeMessage joins them.
@@ -225,7 +227,11 @@ const C = code(SRC);
     // national-7 (2026-11-02): the universal report corrections suite renders the view on the Seattle sample
     'test/report-quality-national7.test.mjs', 'test/report-overview-scale.test.mjs',
     // 2026-11-03: the partner-sample review and the temporary-installation rule render the view on the Seattle sample
-    'test/report-partner-review.test.mjs', 'test/temporary-installation.test.mjs']);
+    'test/report-partner-review.test.mjs', 'test/temporary-installation.test.mjs',
+    // 2026-11-19 (report-accuracy-universal): the date, status and coverage-category suite renders the view
+    'test/report-accuracy-universal.test.mjs', 'test/report-source-dates-path.test.mjs', 'test/report-accuracy-compat.test.mjs', 'test/report-accuracy-coexistence.test.mjs',
+    // 2026-11-19: the Boulder permit scope-note suite renders the view to prove the statement is printed on a Boulder and a Lafayette ZIP
+    'test/boulder-permit-scope-note.test.mjs']);
   const stray = hits.filter((f) => !ALLOWED.has(f));
   ok(hits.includes(MOD) && hits.includes('test/da-report-view.test.mjs'), '6a (control) the walk sees the module and its own tests (' + hits.length + ' files name it)');
   ok(stray.length === 0, '6b no page, lib, script, workflow or edge function names the view except its three callers (the private review page, build step 4; the customer page, 5c; the client\'s page for a share link, 8) and the side-by-side comparison module that reads its functions (build step 10)', stray);

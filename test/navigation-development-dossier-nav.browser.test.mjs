@@ -99,7 +99,7 @@ async function chrome() {
           .find(x => /Back to development/.test(x.textContent));
         return b ? b.getAttribute('onclick') : null;
       })(),
-      mapLinks: [...document.querySelectorAll('#hs-slot a[data-znav="homesignalmap.html"]')]
+      mapLinks: [...document.querySelectorAll('#hs-slot a[data-znav="development-map.html"]')]
         .map(a => a.getAttribute('href'))
     };
   });
@@ -124,7 +124,7 @@ const qolHref = (onDossier.sub[0] || '').split('|')[1] || '';
 ok(onDossier.sub.length === 3 && /^qol\|development\.html\?/.test(onDossier.sub[0])
    && /[?&]zip=78617(&|$)/.test(qolHref) && /[?&]id=proj-datacenter(&|$)/.test(qolHref),
   'dossier: the Quality of Life Impact entry keeps the ZIP AND the dossier id', onDossier.sub);
-ok(onDossier.sub[1] === 'map|homesignalmap.html?zip=78617' && onDossier.sub[2] === 'activity|community.html?zip=78617',
+ok(onDossier.sub[1] === 'map|development-map.html?zip=78617' && onDossier.sub[2] === 'activity|community.html?zip=78617',
   'dossier: Development Map and Activity carry the viewed ZIP and nothing else', onDossier.sub);
 ok(JSON.stringify(onDossier.hrefs) === JSON.stringify(['index.html', 'properties.html', 'development-activity.html']),
   'dossier: primary sidebar hrefs are unstamped section links (no ZIP, no project id)', onDossier.hrefs);
@@ -135,13 +135,13 @@ ok(!!onDossier.back && /development\.html\?zip=78617/.test(onDossier.back) && on
 
 await page.goto(base + '/development.html?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });
 await waitReady();
-await page.waitForFunction(() => !!document.querySelector('#hs-slot a[data-znav="homesignalmap.html"]'), null, { timeout: 30000 });
+await page.waitForFunction(() => !!document.querySelector('#hs-slot a[data-znav="development-map.html"]'), null, { timeout: 30000 });
 const onList = await chrome();
 ok(onList.tokens.join('|') === 'explore|props|enterprise' && JSON.stringify(onList.lit) === JSON.stringify(['explore']),
   'list: same three items, Explore lit', onList);
-ok(JSON.stringify(onList.sub) === JSON.stringify(['qol|development.html?zip=78617', 'map|homesignalmap.html?zip=78617', 'activity|community.html?zip=78617']),
+ok(JSON.stringify(onList.sub) === JSON.stringify(['qol|development.html?zip=78617', 'map|development-map.html?zip=78617', 'activity|community.html?zip=78617']),
   'list: the dropdown entries carry the viewed ZIP, and the list link carries no record id', onList.sub);
-ok(onList.mapLinks.length > 0 && onList.mapLinks.every(h => h === 'homesignalmap.html?zip=78617'),
+ok(onList.mapLinks.length > 0 && onList.mapLinks.every(h => h === 'development-map.html?zip=78617'),
   'list: "View Development Map" carries the viewed ZIP and nothing else', onList.mapLinks);
 
 await browser.close();

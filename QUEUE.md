@@ -40,6 +40,36 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-11-27 — SUBSCRIBER-ZIP FINDINGS (11 ZIPs): recorded, none built here
+
+Source: the subscriber-ZIP health audit (homesignal-ingest `docs/subscriber-zip-health-2026-11-26.md`, PRs #1170 and #1172). Each item below is
+a QUEUE item, not a change. Labels: VERIFIED = a measurement or log read this session; UNVERIFIED = stated, not re-measured.
+
+1. **07001 (Woodbridge NJ): the Government Notices tile reads empty although 45 notices are stored.** VERIFIED cause: `app_refresh_zip`
+   materializes a notice only when `a.created_at >= now() - 14 days`, so notices stored earlier never reach `app_changes`. NOT fixed, on purpose:
+   - It is a national, resident-visible change (every ZIP), not a 07001 fix.
+   - It collides with the founder's cross-stream rule (`CROSS_STREAM_WINNER = "meetings"`): a government_notice row that is also a meeting
+     already shows on the Meetings tile. Measured (alerts, `government_notice`): **865 rows across 128 communities, 746 of them also stored as
+     meetings** (control: the same query counted the 07001 rows).
+   - Needs a founder ruling on what the notices tile is for (recent writes, or open notices) before any code. 07001 is the instance, not the scope.
+2. **Local development tiles for the DOT-only ZIPs stay a work queue item (not built).** 07001, 46124, 48854, 55024, 65742 and 96740 show
+   transportation-agency records only on development. Needs a first-party permit/planning source per county, found through the shipped
+   connectors (probe, verify, dry-run). UNVERIFIED which of the six has a shipped-connector source.
+3. **46124 (Johnson IN) and 55024 (Dakota MN) Local News are empty BY THE LOCKED TAXONOMY, not broken.** VERIFIED: stored stories exist (3 and 11) and none
+   carries an authorized subtopic, so `app_refresh_zip` correctly renders none (Rule #0b: the subtopic gate stays, no bypass). 07001's one topical story
+   was created the day of the audit and waits for the sweep. Do not widen the resolver or classifier for these.
+4. **City-community prerequisites before any city meetings feed can be armed** (`zip_government_bodies`, VERIFIED 2026-11-27):
+   - **Woodbridge Township (07001):** the ZIP lists only Middlesex County (share 1.0), so no city community exists. Needs a `level=city` community
+     (parent Middlesex), a `jurisdiction_slug`, enrollment in BOTH halves of the meetings gate, and a registry row.
+   - **Farmington (55024):** 17.2% of the ZIP's land, no source. Same four prerequisites (Dakota County is the parent; Lakeville, 2.1%, is also unsourced).
+   - **Mason (48854):** 4.5%, no source. Same four prerequisites (Ingham County is the parent).
+   Source candidates found by read-only recon are in ingest `scripts/recon/subscriber-meetings-sources-*.json`; none is armed.
+5. **Hawaii County (96740): a feed repoint candidate, not done.** The county's own feed is stale (Granicus, newest item 2026-09-16; also recorded in
+   ingest CLAUDE.md). It is a county ROOT, so a repoint needs no new community. Only a shipped adapter may be used; the one calendar URL guessed
+   returned 404. Probe, verify and dry-run first.
+6. **Main was red on three checks, all unrelated to the subscriber work, all fixed 2026-11-27** (ingest #1174 `unit`: fixture-pack age against the 30-day
+   source limit; #1175 `pin`: a Bluesky handle matched the origin regex; #1176 `geography-db`: community registry snapshot 721 vs 726 rows).
+
 ### 2026-10-01 — ✅ FIX 4: the 706 no-boundary ZIPs are classified — 0 HomeSignal omissions; 704 legitimate, 2 not established
 
 **Classified before changing anything. No HomeSignal data changed.** All 706 stay `not_measured`.
@@ -11134,3 +11164,26 @@ is exactly the property the 101.3h-vs-113.8h measurement said elapsed time lacks
 GETs (`If-None-Match` / `If-Modified-Since`) and killing the per-endpoint `sess.warm()` — moves ahead
 of any new state expansion, per `homesignal-ingest/CLAUDE.md`'s own ordering. Every tranche of feeds
 raises the burn, so the fetch layer has to get cheaper before the footprint gets bigger.
+
+## SYSTEMIC FINDINGS FROM site#3062 / #3111 — measured 2026-11-27 (queue items, nothing built)
+
+Scope rule 16: these are new items. No code, SQL, Rule D, 45-day window, classifier or MAPS change.
+
+**Q-A. The 3-mi ingest radius does not cover large ZIP polygons.** Verdict: GENUINE GAP (not closed by any open PR; the polygon-scope mode `ZIP_SCOPE_BOUNDS_MODE` exists but is documented OFF in `docs/zip-scope-bounds-runbook.md`; its current setting was NOT re-read this session, UNVERIFIED). Measured 2026-11-27 (read-only, farthest polygon vertex from the report centre, EPSG:5070 distances, approximate): of **12,041** registry ZIPs with a boundary and a report row, **8,198** (68%) have a vertex more than 3 mi out, **6,769** more than 4 mi, **4,562** more than 6 mi (max 316.9 mi). 85083 = 5.40 mi, 78681 = 6.87 mi. 706 ZIPs have no boundary and 4 have no report row (registry 12,751): not measured. Farthest-vertex is an upper bound on uncovered area, not a coverage measure; N5 unions candidates from every ZIP's report, so an edge record is reachable only through a neighbouring ZIP's refresh. Next: decide whether to enable polygon-scope retrieval (founder gate per its runbook).
+
+**Q-B. Permit renumbering breaks project identity.** Verdict: GENUINE GAP (same class as KCMO A4, confirmed in `REPORT-round2.md` row A4 of site#3111: 256 of 3,716 old KCMO `arcgis:` keys have the same official permit number under a new `socrata:` key; ledger continuity split). Phoenix: one confirmed case (`T165773` became `2605046` on issuance, one official GET, 2026-11-22). Measured in JODY (Phoenix, ZIPs 850xx, distinct keys): 15,282 keys, 1,575 T-prefixed; **46** T-keys have a numeric-key sibling with identical address, name and coordinates. These 46 are candidate renumbered pairs, NOT confirmed (the same address can hold separate identical permits). Keys that already vanished are not countable from JODY. Next: get the publisher's renumbering rule (one bounded lookup, needs approval), then an alias rule.
+
+**Q-C. N5 members with no `app_projects` row (defect A1 in #3111).** Verdict: GENUINE GAP (A1 is documented there; no open fix PR found by title). Count: SAMPLE ONLY. ZIP prefix 850xx (44 ZIPs): **281 of 14,848** distinct member keys (1.9%) have no development row. National count NOT run: a full anti-join would exceed the statement timeout, so the national figure is UNKNOWN. 85083 specifically: `T165906`. Recommended: an alarm on members with no project row, measured in chunks.
+
+**Six-ZIP re-measure (2026-11-27).** N = N5 members; M = distinct development keys whose stated ZIP is this ZIP (M, N are different populations, not a coverage ratio).
+| ZIP | N5 status | members N | dev keys M | facility rows | report refreshed (facilities) |
+|---|---|---|---|---|---|
+| 64166 | boundary_complete | 5 | 89 | 0 | 11-26 (11-26, ok) |
+| 65742 | boundary_complete | 8 | 4 | 3 | 11-26 (11-06, EPA unavailable) |
+| 78617 | boundary_complete | 567 | 559 | 39 | 11-26 (11-26, ok) |
+| 78681 | boundary_complete | 6 | 18 | 39 | 11-25 (11-03, EPA unavailable) |
+| 85083 | boundary_complete | 117 | 2,074 | 5 | 11-26 (11-26, ok) |
+| 98684 | boundary_complete | 3 | 13 | 14 | 11-26 (11-24, EPA unavailable) |
+None has M=0. Coverage is not established for any (no source reconciliation).
+
+**Recon round 2 (subscriber meetings sources, `scripts/recon/subscriber-meetings-sources-2-2026-11-27.json`).** Only the target list was read; the probe outputs are runner logs and were NOT read, so armability is UNVERIFIED. Targets and the shipped adapter each would fit: Hawaii County Granicus view 1 (granicus), Woodbridge NJ AgendaCenter and rss (civicplus), Farmington MN calendar/iCalendar (civicplus / civicplus_ical), Mason MI agenda PDF page (dated_pdf_links). Nothing armed.

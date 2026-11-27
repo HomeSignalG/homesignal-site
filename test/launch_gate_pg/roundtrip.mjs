@@ -178,7 +178,7 @@ function handlerFor(userId) {
     geocode: async (a) => { geocodeCalls++; return geocodeStandIn(a); },
     zipSupported: async () => true,
     radius: async () => [{ source_key: 'k1', feature_id: 'pt:1', registry_id: FAM, provenance: 'proven_stored_point', distance_mi: 0.21, geometry_type: 'Point', has_more: false }],
-    hydrate: async () => [proj], ledger: async () => [], events: async () => [], health: async () => [],
+    hydrate: async () => [proj], ledger: async () => [], events: async () => [], health: async () => [], jurisdictions: async () => [],
   });
 }
 // Sections 1-14 make ~140 reports in about a minute of wall clock, which is far above the report rate limit's ceiling by design; they test the ENTITLEMENT, so the

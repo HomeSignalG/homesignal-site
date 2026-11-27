@@ -19,7 +19,7 @@ const fam = [
   ['/project/austin-site-plan-cases/sp-2024-0123c-1a2b3c4d/', 'project'],
   ['/guides/what-is-being-built-near-me/', 'guide'],
   ['/', 'home'], ['/index.html', 'home'],
-  ['/homesignalmap.html', 'map'],
+  ['/development-map.html', 'map'],
   ['/alerts.html', 'other'], ['/community/0100/', 'other'], ['/city/austin/', 'other'],
   ['', 'home'], [null, 'home']
 ];
@@ -28,27 +28,27 @@ ok(fam.every(([, w]) => HS.PAGE_FAMILIES.includes(w)), 'every family returned is
 
 // 2. Entry: a script-free page in the referrer wins; otherwise the current page.
 const H = 'homesignal.net';
-let e = HS.entryFrom('/homesignalmap.html', 'https://homesignal.net/project/x/y-1a2b3c4d/', H);
+let e = HS.entryFrom('/development-map.html', 'https://homesignal.net/project/x/y-1a2b3c4d/', H);
 ok(e.family === 'project' && e.path === '/project/x/y-1a2b3c4d/', 'project page -> map: entry is the project page');
-e = HS.entryFrom('/homesignalmap.html', 'https://homesignal.net/city/tx/austin/', H);
+e = HS.entryFrom('/development-map.html', 'https://homesignal.net/city/tx/austin/', H);
 ok(e.family === 'city', 'city page -> map: entry is the city page');
-e = HS.entryFrom('/homesignalmap.html', 'https://homesignal.net/guides/what-is-being-built-near-me/', H);
+e = HS.entryFrom('/development-map.html', 'https://homesignal.net/guides/what-is-being-built-near-me/', H);
 ok(e.family === 'guide', 'guide page -> map: entry is the guide');
 e = HS.entryFrom('/community/01002/', 'https://www.google.com/', H);
 ok(e.family === 'zip' && e.path === '/community/01002/', 'Google -> ZIP page: entry is the ZIP page');
-e = HS.entryFrom('/homesignalmap.html', 'https://homesignal.net/community/01002/', H);
+e = HS.entryFrom('/development-map.html', 'https://homesignal.net/community/01002/', H);
 ok(e.family === 'map', 'scripted ZIP page -> map: the ZIP page recorded itself, so the referrer is not used');
-e = HS.entryFrom('/homesignalmap.html', 'https://evil.example/project/x/y/', H);
+e = HS.entryFrom('/development-map.html', 'https://evil.example/project/x/y/', H);
 ok(e.family === 'map', 'an off-site referrer shaped like a project URL is not an entry');
-e = HS.entryFrom('/homesignalmap.html', 'not a url', H);
+e = HS.entryFrom('/development-map.html', 'not a url', H);
 ok(e.family === 'map', 'an unparseable referrer falls back to the current page');
-e = HS.entryFrom('/homesignalmap.html', 'https://homesignal.net/project/x/y/?addr=1+Main+St', H);
+e = HS.entryFrom('/development-map.html', 'https://homesignal.net/project/x/y/?addr=1+Main+St', H);
 ok(!/addr|Main/.test(e.path), 'the entry path carries no query string');
 ok(HS.entryFrom('/' + 'a'.repeat(400), '', H).path.length === 200, 'entry path is capped at 200');
 
 // 3. The row carries no address, email or account field, and validates what it stores.
 const row = HS.eventRow('property_lookup', { zip_code: '78617' },
-  { sessionId: 's1', pageUrl: 'https://homesignal.net/homesignalmap.html', entry: { family: 'project', path: '/project/a/b/' }, zip: '01002' });
+  { sessionId: 's1', pageUrl: 'https://homesignal.net/development-map.html', entry: { family: 'project', path: '/project/a/b/' }, zip: '01002' });
 ok(row.entry_family === 'project' && row.entry_path === '/project/a/b/', 'row carries the entry');
 ok(row.zip_code === '78617', 'an explicit ZIP beats the viewed ZIP');
 ok(Object.keys(row).sort().join(',') ===
@@ -60,7 +60,7 @@ ok(HS.eventRow('x'.repeat(100)).event_type.length === 64, 'event type capped at 
 
 // 4. logEvent writes one row in live mode, nothing in seed mode, and never throws.
 const store = (m) => ({ getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); } });
-global.location = { origin: 'https://homesignal.net', hostname: 'homesignal.net', pathname: '/homesignalmap.html', search: '?addr=1+Main+St' };
+global.location = { origin: 'https://homesignal.net', hostname: 'homesignal.net', pathname: '/development-map.html', search: '?addr=1+Main+St' };
 global.sessionStorage = store({ 'hs:entry': JSON.stringify({ family: 'city', path: '/city/tx/austin/' }) });
 global.localStorage = store({});
 const inserts = [];
@@ -75,7 +75,7 @@ ok(inserts.length === 1 && inserts[0][0] === 'events', 'live mode: one insert in
 const r0 = inserts[0] ? inserts[0][1] : {};
 ok(r0.entry_family === 'city' && r0.entry_path === '/city/tx/austin/' && r0.zip_code === '78704',
    'live mode: the row carries the stored entry and the ZIP');
-ok(r0.page_url === 'https://homesignal.net/homesignalmap.html', 'page_url drops the query string (no address is stored)');
+ok(r0.page_url === 'https://homesignal.net/development-map.html', 'page_url drops the query string (no address is stored)');
 ok(/^s[a-z0-9]+$/.test(r0.session_id || ''), 'an anonymous session id is set');
 // The browser tests serve the site from 127.0.0.1 against the production database.
 for (const h of ['127.0.0.1', 'localhost', 'homesignal.github.io', '']) {
@@ -101,7 +101,7 @@ ok(global.window.hsLogEvent === HS.logEvent, 'window.hsLogEvent is HS.logEvent (
 
 // 5. Call sites and wiring.
 const shell = read('shell.js');
-const map = read('homesignalmap.html');
+const map = read('development-map.html');
 ok(/captureReferral\(\);[^\n]*\n\s*captureEntry\(\);/.test(shell), 'boot records the entry right after the referral');
 ok(/SS\.set\('entry',\s*JSON\.stringify\(HS\.entryFrom\(location\.pathname, document\.referrer, location\.host\)\)\)/.test(shell),
    'captureEntry uses HS.entryFrom, once per tab session');

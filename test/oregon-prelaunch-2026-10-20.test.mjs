@@ -117,7 +117,7 @@ ok(o.stip.file_date === '2028-06-01' && o.hr.file_date === '2026-11-15', 'schedu
 ok(o.old.file_date === '2025-04-02' && !('file_date_refused' in o.old), 'past dates unchanged');
 ok(out.length === 6, 'no record is dropped');
 const idx = readFileSync(join(fn, 'index.ts'), 'utf8');
-ok(/refuseFutureFilingDates\(\[\.\.\.tabsSites, \.\.\.socrataSites, \.\.\.arcgisSites, \.\.\.ckanSites, \.\.\.csvSites, \.\.\.cartoSites\], today\)/.test(idx),
+ok(/refuseFutureFilingDates\(\[\.\.\.tabsSites, \.\.\.socrataSites, \.\.\.arcgisSites, \.\.\.ckanSites, \.\.\.csvSites, \.\.\.cartoSites, \.\.\.countyCaseSites\], today\)/.test(idx),
   'index.ts applies it to every permit connector before dedup');
 
 console.log('\n5) an ADU is a dwelling');

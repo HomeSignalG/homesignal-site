@@ -29,10 +29,10 @@
 // Usage: node scripts/residential-measure.mjs   (env: SAMPLE=n to cap ZIPs, CONCURRENCY=n)
 import { readFileSync } from 'node:fs';
 
-const html = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const html = readFileSync(new URL('../development-map.html', import.meta.url), 'utf8');
 const grab = (n) => {
   const m = html.match(new RegExp(`var ${n}\\s*=\\s*["']([^"']+)["']`));
-  if (!m) throw new Error(`Could not read ${n} from homesignalmap.html`);
+  if (!m) throw new Error(`Could not read ${n} from development-map.html`);
   return m[1];
 };
 const SB = grab('ENDPOINT').replace(/\/functions\/v1\/.*$/, '');

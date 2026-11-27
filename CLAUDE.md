@@ -6946,6 +6946,8 @@ target / file wins; null = the generated line).
   the ending; refused while that file is being built. **Tab 17:** the choice only; the engine reads
   `video_endings_current` (service role only) and the visuals must be prepared again. **Tab 20:** mount with
   `{tab:'weekly', targets}` once the weekly report (PR #2772) renders videos; until then nothing is mounted.
+- Tests: `test/video_endings_pg` (`video-endings-suite.yml`, 24 checks), `test/video-endings.browser.test.mjs`.
+
 - **Two upload buttons (founder, 2026-11-12: "make the 2 buttons"):** "Upload ending for Shorts (vertical)" and "Upload ending
   for main videos (horizontal)". `video_endings.shape` records which; a Short's picker lists only vertical recordings, a main
   video's only horizontal ones, and `hs_video_ending_choose` refuses the other kind. The browser reads the file's width and
@@ -7061,3 +7063,39 @@ app.css's dashed panel style and overlapped the text.
   changed in the documents, which `page_semantics` excludes, so there is no IndexNow mass change.
 - Test: `test/ssr-block-styled.browser.test.mjs` (renders every generated document type with JS off at desktop and phone
   width; fails 46 checks on the old CSS).
+
+## COUNTY LAND-USE CASES: `county_cases` CONNECTOR, FIRST CONSUMER TILLAMOOK COUNTY OR (2026-11-16)
+
+`sources/county-cases.ts` (registry key `county_cases`). For a county that publishes planning cases only as an HTML index plus a public parcel
+layer. A case is pinned ONLY from the tax lots its own text names, joined to the county's Taxlots layer; EVERY named lot must resolve (a partial
+match is never a verified footprint), the parcels must lie together, and the pin must be a member of the ZIP polygon (`zip_scope_members`).
+The pin is a parcel centroid, labelled approximate (`location_approx`). Status is the county's own word (hearing stages only; post-decision
+words such as "Appeal Period" are excluded because they do not say which decision), and the case page's status-update text is kept verbatim.
+Cases that share a lot are one marker. Full record, terms check and robots crawl delay: `docs/source-registry.md` "TILLAMOOK COUNTY LAND-USE CASES".
+Tests: `test/county-cases-fixture.test.ts`. County-wide notices stay separate (homesignal-ingest feeds); this connector adds only verified pins.
+
+- **Fixes after the first live read (2026-11-17), from `docs/source-registry.md` "TILLAMOOK ... live read":**
+  - Live 2026-11-16: 315 index rows, 67 significant, 1 emitted. 17 were quarantined `no_complete_tax_lot_description`.
+  - **The county's list view CUTS long descriptions** (Sahhali South ends "…Tax Lots 1300, 1301, 1400, 15"); the case page has the whole text. A cut-off lot list now sends the connector to the case page, which is adopted only if it repeats THIS description and agrees with every complete lot the list showed. All named lots must still resolve.
+  - **Parcel keys pad the range to two digits** (`1S0926…`, the layer's own shape); "in Section X of Township …" wording is accepted. Quarantine reasons are now distinct: `no_tax_lot_named`, `tax_lot_text_truncated`, `tax_lot_wording_unrecognized`, `quarter_section_ambiguous`.
+  - **ZIP membership is by parcel, not centroid.** A project belongs on a ZIP when any part of its named parcels intersects the ZIP polygon (centroid, then points on the parcels). The pin is the centroid when that is a member, else a point ON the parcel inside this ZIP (`location_basis: parcel_portion_in_zip`). Measured: the Neskowin campground's centroid is in ZCTA 97112 and about 47% of its parcel is in 97149.
+  - **Single-lot amendments are routine only when they state no scale** (`single_lot_minor_if` / `scale_if` in the registry). A large project on one lot stays in.
+  - **A pin needs a working county case page** that carries its own case id; a 404, or a "not found" screen served as HTTP 200 (`page_gone_if`), is quarantined `record_page_gone`.
+- **Held cases (2026-11-17):** registry `hold_cases` [{case_id, reason}] quarantines a case as `held_pending_verification` whatever status the county list shows. Used for Sahhali South (851-25-000549/548-PLNG): the county's CivicPlus list page still reads Planning Commission Hearing (newest status text Jan 2026) while a decision is reported elsewhere that could not be retrieved. Remove the hold only with the verified decision on file. Test: `test/county-cases-fixture.test.ts`.
+
+## SOURCE ONBOARDING MUST ESTABLISH DEVELOPMENT ACTIVITY REPORT INTEGRATION (founder, 2026-11-19)
+
+Every existing and future JODY development-related data source must be evaluated for Development Activity Report integration.
+Source onboarding must establish whether eligible records reach the canonical address-level report pipeline (`n5_projects_within_radius` -> `app_projects`
+hydration -> `national-report.ts` assemble) or document a valid exclusion reason.
+Development Map integration alone does not establish Development Activity Report integration. Registry presence alone is not proof either, and a source
+that returns zero rows near an address is not proof it was checked.
+- Measured 2026-11-19 (1777 Broadway, Boulder CO): within 5 mi only `boulder-construction-permits` is served (1,171 points, 0 lines or areas). No other source
+  covers Boulder (no CDOT, Boulder County or city planning-case feed in the registry), so that gap is source inventory, not report integration.
+  The `record_kind = development` hydrate filter is NOT a defect there: 0 of 1,171 keys had another kind (the 159,733 `facility` rows are the EPA plane).
+- Defects fixed: a transportation agency's own project program whose title says nothing ("SH 119 safety improvements") was classed `not_established` and left out,
+  although Map 1 draws it; and a radius key with no hydrated row vanished silently (now `excluded.not_hydrated`).
+- Test: `test/report-source-completeness.test.mjs` (point, linear and area records from TX, UT, WA, CO, filed more than 90 days ago).
+- **Reconciled 2026-11-19:** the ledger is `docs/source-ledger/source-integration-ledger.json` (259 rows: 257 registry families + 2 unregistered; built by `scripts/build-source-ledger.py` from `docs/source-ledger/audit-snapshot-2026-11-19.csv`, rows md5 `a776c7e2…`); the backlog is `docs/source-remediation-backlog-2026-11-19.md`. "Spatially connected" (the active generation returns the source) is NOT end-to-end integration: hydration and report eligibility are UNVERIFIED for every real source, and no source is "fully verified". `record_kind = development` removes only the EPA facility plane (no development family is stored as `facility`).
+- **PERMANENT SOURCE-INTEGRATION ACCEPTANCE (CTO, 2026-11-19).** Onboarding or changing a development source is not done until: (1) it has a ledger row; (2) its served keys hydrate to `app_projects` development rows (a lost key is counted `not_hydrated` and the report says `RECORDS_NOT_LOADED`; only a family in `retired-sources.json`, which needs a cited decision, is exempt; absence of rows is NEVER evidence of retirement); (3) point, line and polygon geometry reach the report through the existing spatial interface; (4) a transportation record is filed as Roads & infrastructure by provenance only when the registry's own text documents a capital-project program (`capital-program-sources.generated.json`; an agency name or the word "project" is never evidence); (5) an empty or incomplete retrieval is never presented as a confirmed absence. Tests: `test/report-source-completeness.test.mjs`, `test/source-ledger.test.mjs`.
+- **Ledger is frozen evidence; failures are judged on every applicable source (2026-11-19).** `docs/source-ledger/audit-membership-2026-11-19.json` + the snapshot CSV are IMMUTABLE; the ledger never reads the live registry, and a source registered later is UNVERIFIED until audited (`test/lib/source-ledger-current.mjs`), so adding a source never breaks CI. `readReportInputs` reads failure evidence for the families that hydrated, the families of every key the spatial read found, and the families whose declared coverage (`source-coverage.generated.json`, `scripts/gen-source-coverage.mjs`) names the subject's verified state/county (`communities`); unknown geography applies nothing. Deploy set for the shared engine: get-development-activity-report, follow-development-report, run-property-watch, manage-property-watch.

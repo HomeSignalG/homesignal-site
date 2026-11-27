@@ -137,7 +137,7 @@ await page.route('**/*', async (route) => {
   return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
 });
 
-await page.goto(base + '/homesignalmap.html?zip=20171', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=20171', { waitUntil: 'domcontentloaded' });
 
 const lists = () => page.evaluate(() => {
   const t = (id) => ((document.getElementById(id) || {}).textContent || '');

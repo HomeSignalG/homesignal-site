@@ -8,7 +8,7 @@
 <title>Follow this property</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'none'">
 <link rel="stylesheet" href="layout.css?v=0a9f8b10">
-<link rel="stylesheet" href="app.css?v=a6a760af">
+<link rel="stylesheet" href="app.css?v=409c0e59">
 <style>
 /* The frame a shared report opens, only after the visitor clicks "Follow this property". It runs HomeSignal's OWN sign-in and add-an-address
    steps (partials/shell.html) - restyled to sit inline on the page instead of as a pop-up. Nothing here is a second follow system. */
@@ -30,6 +30,10 @@ html.hs-follow,html.hs-follow body{background:#fff;margin:0;min-height:0}
 .hs-follow .app{min-height:0}
 .hs-follow #hs-slot,.hs-follow .hs-main{display:none}
 #hsFollowRoot{padding:2px 2px 4px}
+/* which account the follow will be saved to - shown BEFORE it is saved, so a login left in this window is never a surprise */
+.hs-follow .hs-who{font-size:13px;margin:8px 0 0;color:#444;overflow-wrap:anywhere}
+.hs-follow .hs-who b{color:#111}
+.hs-follow .hs-who button{border:0;background:none;padding:6px 2px;font:inherit;color:#1f5f3e;text-decoration:underline;cursor:pointer}
 </style>
 </head>
 <body data-nav="" data-page-type="follow-embed">
@@ -38,12 +42,12 @@ html.hs-follow,html.hs-follow body{background:#fff;margin:0;min-height:0}
 <script src="config.js"></script>
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
-<script src="lib/data.js?v=4033ae3a"></script>
+<script src="lib/data.js?v=a09f47cd"></script>
 <script src="lib/topic-prefs.js?v=fe87d99b"></script>
-<script src="lib/templates.js?v=7373e258"></script>
+<script src="lib/templates.js?v=9e1170b0"></script>
 <script src="lib/premium-waitlist.js?v=3cb9baaf"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
-<script src="shell.js?v=4fa4fbd4"></script>
+<script src="shell.js?v=7ae564c0"></script>
 <script>
 (function(){
   'use strict';
@@ -73,18 +77,49 @@ html.hs-follow,html.hs-follow body{background:#fff;margin:0;min-height:0}
     put(document.querySelector('#homeConfirm button.mbtn:not(#homeSaveBtn)'), 'Change');
     put(document.getElementById('authTitle'), 'Sign in to follow this property');
   }
+  // The account the follow will be saved to. Read from the visitor's own session; shown in the frame (text only) and told to the report
+  // page after the save. Nothing about the report, the brokerage or the link is involved.
+  var sessionEmail = '', asking = false;
+  function paintWho(HS){
+    var box = document.getElementById('homeConfirm');
+    if (!box || !sessionEmail || box.querySelector('#hsWho')) return;
+    var p = document.createElement('p'); p.id = 'hsWho'; p.className = 'hs-who';
+    p.appendChild(document.createTextNode('Saving to '));
+    var b = document.createElement('b'); b.textContent = sessionEmail; p.appendChild(b);
+    p.appendChild(document.createTextNode(' \u00b7 Not you? '));
+    var out = document.createElement('button'); out.type = 'button'; out.textContent = 'Sign out';
+    out.addEventListener('click', function(){
+      out.disabled = true;
+      var done = function(){ try { location.hash = '#address=' + encodeURIComponent(address); location.reload(); } catch (e) {} };
+      try { HS.sb().auth.signOut().then(done, done); } catch (e) { done(); }
+    });
+    p.appendChild(out);
+    box.appendChild(p);
+  }
+  function learnWho(HS){
+    if (sessionEmail || asking) return;
+    asking = true;
+    try {
+      HS.sb().auth.getSession().then(function(r){
+        var u = r && r.data && r.data.session && r.data.session.user;
+        sessionEmail = (u && typeof u.email === 'string' && u.email.length <= 200) ? u.email : '';
+        asking = false; paintWho(HS);
+      }, function(){ asking = false; });
+    } catch (e) { asking = false; }
+  }
   function boot(HS){
     if (!address || address.length > 200) { tell({ type: 'unavailable' }); return; }
     var ok = HS.startFollowEmbed(address, {
       onSaved: function(info){
         var hm = document.getElementById('homeModal'); if (hm) hm.classList.remove('show');
-        tell({ type: 'following', existed: !!(info && info.existed), zip: (info && /^\d{5}$/.test(String(info.zip))) ? String(info.zip) : '' });
+        tell({ type: 'following', email: sessionEmail, existed: !!(info && info.existed), zip: (info && /^\d{5}$/.test(String(info.zip))) ? String(info.zip) : '' });
       }
     });
     if (!ok) { tell({ type: 'unavailable' }); return; }
     put(document.getElementById('authSub'), 'Enter your email and we\u2019ll send a 6-digit code. No password needed.');
     relabel();
-    new MutationObserver(relabel).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    learnWho(HS);
+    new MutationObserver(function(){ relabel(); learnWho(HS); paintWho(HS); }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
     tell({ type: 'ready' });
     height();
   }

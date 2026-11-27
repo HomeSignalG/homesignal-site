@@ -53,7 +53,7 @@ for (const f of ['alerts.html', 'dashboard.html', 'development.html', 'lib/commu
 // Map 1 uses replaceState for FILTER clicks on purpose (20 filter clicks must not become
 // 20 Back presses). It rebuilds from the live URL and only sets `stages`, so ?zip= — the
 // place — survives every filter interaction.
-const map = read('homesignalmap.html');
+const map = read('development-map.html');
 ok(!/history\.pushState/.test(strip(map)), 'Map 1 uses no pushState either');
 const writeStages = (map.match(/function writeStagesToUrl\(\)[\s\S]*?\n  \}/) || [''])[0];
 ok(/new URL\(window\.location\.href\)/.test(writeStages) && /u\.searchParams\.set\("stages"/.test(writeStages),

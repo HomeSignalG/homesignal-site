@@ -94,7 +94,7 @@ function reportHandler(userId) {
   return H.makeHandler({ ...real, authenticate: async () => ({ email: 'x@example.test', id: userId }), isAdmin: async () => false,
     geocode: async (a) => geocodeStandIn(a), zipSupported: async () => true,
     radius: async () => [{ source_key: 'k1', feature_id: 'pt:1', registry_id: FAM, provenance: 'proven_stored_point', distance_mi: 0.21, geometry_type: 'Point', has_more: false }],
-    hydrate: async () => [proj], ledger: async () => [], events: async () => [], health: async () => [] });
+    hydrate: async () => [proj], ledger: async () => [], events: async () => [], health: async () => [], jurisdictions: async () => [] });
 }
 async function report(userId, i, address = LOC.address) {
   one('truncate public.report_rate_window');   // the rate limit has its own suites; this run is about the entitlement

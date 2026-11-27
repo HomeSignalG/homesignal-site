@@ -12,7 +12,7 @@
 // truth contracts, so they get two modules. Nothing in the Alerts path is touched.
 //
 // GEOGRAPHY. The page is opened at ?zip=<zip> — ZIP mode — which is the same public URL
-// the post links to. In ZIP mode homesignalmap.html draws NO radius circle (`if(!ZIP_MODE)`)
+// the post links to. In ZIP mode development-map.html draws NO radius circle (`if(!ZIP_MODE)`)
 // and NO home marker (`HOME_ANCHOR = true`), so neither can appear in the capture; this
 // module asserts both absences rather than assuming them. Nothing is centred on a ZIP
 // centroid: the view is centred on the PROJECT's own authoritative coordinates, read from
@@ -92,7 +92,7 @@ const COORD_EPS = 1e-5;
 // refusal and the coordinate checks are the same code on both paths.
 //
 // EMBED MODE IS A REAL PRODUCT MODE, NOT A SCREENSHOT HACK. `?embed=1` is what the Place
-// page already uses to host Map 1 in an iframe (homesignalmap.html sets `hs-embed` in the
+// page already uses to host Map 1 in an iframe (development-map.html sets `hs-embed` in the
 // document head, before first paint). It hides the global sidebar, the global top bar, the
 // address SEARCH FORM, the radius picker, the 3D controls and everything below the map —
 // exactly the chrome a social capture must exclude — and its `.card.mapcard` becomes a flex
@@ -108,7 +108,7 @@ const EMBED_PARAM = 'embed=1';
 // re-typed the manoeuvre would pass while production stayed broken, which is exactly what
 // the previous browser suite did.
 //
-// `addScriptTag` (not `eval`): homesignalmap.html's CSP is
+// `addScriptTag` (not `eval`): development-map.html's CSP is
 // `script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net` — inline is allowed and
 // `unsafe-eval` is not. Injected into this throwaway DOM only, never into the deployed
 // site, the same established pattern as the selection halo.
@@ -358,12 +358,12 @@ async function capture(page, draft, proj, theme) {
   // EVERY MAPS capture is the Map 1 PRODUCT CARD, so it opens the page in the shipped embed
   // mode (founder requirement 2026-09-22 — see CARD_FRAME_REQUIRED). The theme only decides
   // which FILTER STATE the card is photographed in, never whether the card is in the frame.
-  const url = `${BASE}/homesignalmap.html?zip=${encodeURIComponent(draft.zip)}&${EMBED_PARAM}`;
+  const url = `${BASE}/development-map.html?zip=${encodeURIComponent(draft.zip)}&${EMBED_PARAM}`;
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   // THE POLICY MODULE RIDES WITH THE PAGE, never a copy of it in this file.
   await page.addScriptTag({ content: POLICY_SRC });
 
-  // The page exposes its drawn markers for exactly this purpose (see homesignalmap.html:
+  // The page exposes its drawn markers for exactly this purpose (see development-map.html:
   // "Lets the offline browser proof open a specific marker's real popup instead of
   // guessing at DOM order"). WAIT FOR THE DRAW TO SETTLE, not merely to start: a ZIP page
   // draws, then re-frames and re-draws (zipFitRadius, drawParcels), so the first non-empty
@@ -674,7 +674,7 @@ async function capture(page, draft, proj, theme) {
 // stands. That is the same view a resident opening the link would see, which is the honest
 // frame for a post whose subject is the whole ZIP.
 async function captureAbsence(page, draft, theme) {
-  const url = `${BASE}/homesignalmap.html?zip=${encodeURIComponent(draft.zip)}&${EMBED_PARAM}`;
+  const url = `${BASE}/development-map.html?zip=${encodeURIComponent(draft.zip)}&${EMBED_PARAM}`;
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.addScriptTag({ content: POLICY_SRC });
 
@@ -1286,7 +1286,7 @@ async function attach(draft, objectPath, r, proj, scope) {
     bucket: 'social-images',
     path: objectPath,
     captured_at: new Date().toISOString(),
-    page_url: `${BASE}/homesignalmap.html?zip=${draft.zip}`,
+    page_url: `${BASE}/development-map.html?zip=${draft.zip}`,
     // ⚖️ THE PROJECT BLOCK IS ABSENT ON AN ABSENCE CAPTURE, never null-filled — the same
     // convention the theme block below already uses, and for the same reason: a
     // present-but-empty `marker_lat` reads as a lookup that failed, while its absence reads

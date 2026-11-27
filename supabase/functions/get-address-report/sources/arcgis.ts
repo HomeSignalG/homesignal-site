@@ -27,12 +27,13 @@ import { http1Client } from "./http1.ts";
 import { attemptFetch } from "./fetch-retry.ts";
 import { dropNullIsland } from "./null-island.ts";
 import { scopeField } from "./scope-text.ts";
+import { sourceDatesField } from "./source-dates.ts";
 import { cleanApplicantTitle, isMinorRepairNoise } from "./record-hygiene.ts";
 import { centroidSquare, scopeBox, widensLegacy, type ZipBounds } from "./scope-box.ts";
 import { buildScopeReceipt, receiptVersion, type ScopeReceipt } from "./scope-receipt.ts";
 import {
   keepMembers, newScopeMetrics, widenedBounds, ScopeMembershipError, SCAN_FACTOR, SCOPE_ORIGIN_KEY, SCOPE_ORIGIN_MEMBER,
-  type MembershipFn, type RowClass, type ScopeMetrics,
+  type GeomMembershipFn, type MembershipFn, type RowClass, type ScopeMetrics,
 } from "./scope-members.ts";
 import type {
   Bucket, ColumnMap, ColumnRef, FileDateKind, NormalizedRecord, StatusToBucket,
@@ -94,6 +95,12 @@ export interface ArcgisRegistryEntry {
    *  "filed" | "issued" | "scheduled" | "estimated" | "decided". Absent ⇒ "filed".
    *  Declared, never inferred; it is what the page labels the date with. */
   file_date_kind?: FileDateKind;
+  /** Optional: what `column_map.file_date` IS, as the SOURCE establishes it — "filing" (the filing / application date) or "record_created" (the day the agency
+   *  created the record in its own system). Absent ⇒ unstated: the legacy label stays and the mapping is a follow-up (scripts/audit-date-basis.mjs). Declared,
+   *  never inferred. Read by the report engine through the generated publisher file, never by the connector. */
+  file_date_basis?: "filing" | "record_created";
+  /** Optional: the kinds of record this source covers (the closed vocabulary in scripts/gen-source-categories.mjs). Read only by the report's coverage disclosure. */
+  coverage_categories?: string[];
   recency_days?: number;
   /** hard cap on rows pulled per dataset. Default 20000. */
   max_rows?: number;
@@ -324,6 +331,9 @@ export interface ArcgisDeps {
    *  used ONLY together with this: without it the scope stays the legacy one, so a box can never
    *  admit a neighbouring ZIP's records unfiltered. */
   zipMembers?: MembershipFn | null;
+  /** whole-geometry membership for non-point features (docs/zip-scope-members-geom.sql); absent ⇒ a widened non-point feature
+   *  makes membership UNKNOWN and the source falls back to the legacy scope (receipt `fallback`, incomplete). */
+  zipGeomMembers?: GeomMembershipFn | null;
   /** Generated alias files by name (identity-aliases/index.ts). Read only by entries declaring
    *  identity_aliases_file; absent for every other entry. */
   identityAliases?: IdentityAliasFiles | null;
@@ -455,7 +465,7 @@ async function runEntry(
   let rows: Record<string, unknown>[];
   const legacyRun = async () => {
     fetchMeta = { truncated: false, cap: 0 };
-    return fetchRows(entry, zip, zipCol ?? "", { ...deps, zipBounds: null, zipMembers: null }, fetchMeta);
+    return fetchRows(entry, zip, zipCol ?? "", { ...deps, zipBounds: null, zipMembers: null, zipGeomMembers: null }, fetchMeta);
   };
   let widenedRan = false;
   try {
@@ -469,7 +479,8 @@ async function runEntry(
       if (!(e instanceof ScopeMembershipError) || !widenedOk) throw e;
       widenedRan = true;
       metrics.legacy_fallback = e.reason === "candidate_limit" ? "candidate_limit"
-        : e.reason === "scan_limit" ? "scan_limit" : "membership_error";
+        : e.reason === "scan_limit" ? "scan_limit"
+        : e.reason === "geometry_unavailable" ? "geometry_unavailable" : "membership_error";
       rows = await legacyRun();
       report.scope_fallback = "legacy_after_membership_error";
       report.quarantined.push({
@@ -704,6 +715,7 @@ async function normalizeRow(
     record_url: recordUrl,
     record_url_precision: precision,
     ...scopeField(readCol(row, cm.scope_text), title),
+    ...sourceDatesField(row, cm, readCol, isoDay),
     ...geoQuality,
   };
   if (row[SCOPE_ORIGIN_KEY] === SCOPE_ORIGIN_MEMBER) rec.scope_origin = SCOPE_ORIGIN_MEMBER;
@@ -752,6 +764,11 @@ function featureScopeClass(
       if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1];
     }
     if (x0 <= x1 && !(x1 < sq.xmin || x0 > sq.xmax || y1 < sq.ymin || y0 > sq.ymax)) return { cls: "legacy" };
+  }
+  if (Array.isArray(parts) && parts.length) {
+    // A polygon / line wholly outside the legacy square is judged by its WHOLE geometry (the serving rule), never by its pin:
+    // a pin outside the ZIP must not discard a line or area that crosses it.
+    return { cls: "widened_geom", geom: { k: g?.rings ? "rings" : "paths", c: parts as number[][][] } };
   }
   return lat >= sq.ymin && lat <= sq.ymax && lng >= sq.xmin && lng <= sq.xmax
     ? { cls: "legacy" } : { cls: "widened", lat, lng };
@@ -950,7 +967,7 @@ async function fetchRows(
     if (m && deps.zipMembers) {
       m.rows_scanned += feats.length;
       if (m.rows_scanned > scanCap) throw new ScopeMembershipError("scan_limit", `scanned more than ${scanCap} rows`);
-      for (const it of await keepMembers(pageItems, (x) => x.cls, deps.zipMembers, m, (x) => { x.row[SCOPE_ORIGIN_KEY] = SCOPE_ORIGIN_MEMBER; })) out.push(it.row);
+      for (const it of await keepMembers(pageItems, (x) => x.cls, deps.zipMembers, m, (x) => { x.row[SCOPE_ORIGIN_KEY] = SCOPE_ORIGIN_MEMBER; }, deps.zipGeomMembers)) out.push(it.row);
     } else {
       for (const it of pageItems) out.push(it.row);
     }
@@ -1044,7 +1061,7 @@ async function fetchCoordless(
     }
     if (m && deps.zipMembers) {
       const before = items.length;
-      const ins = await keepMembers(items, (x) => x.cls, deps.zipMembers, m, (x) => { x.row[SCOPE_ORIGIN_KEY] = SCOPE_ORIGIN_MEMBER; });
+      const ins = await keepMembers(items, (x) => x.cls, deps.zipMembers, m, (x) => { x.row[SCOPE_ORIGIN_KEY] = SCOPE_ORIGIN_MEMBER; }, deps.zipGeomMembers);
       c.outside_scope += before - ins.length;
       for (const it of ins) kept.push(it.row);
     } else {

@@ -41,12 +41,12 @@ const all = new Set([...found.values()].flatMap((s) => [...s]));
 const where = (v) => [...found].filter(([, s]) => s.has(v)).map(([f]) => f);
 
 ok(found.size >= 20, 'the scan reads the files that name a Leaflet version (positive control: at least 20 of them)', found.size);
-for (const must of ['homesignalmap.html', 'lib/map.js', '.github/workflows/unit-tests.yml', '.github/workflows/da-report-mutants.yml']) {
+for (const must of ['development-map.html', 'lib/map.js', '.github/workflows/unit-tests.yml', '.github/workflows/da-report-mutants.yml']) {
   ok(found.has(must), `${must} is among the files read`);
 }
 ok(all.size === 1, 'exactly ONE Leaflet version is named across the whole tree', Object.fromEntries([...all].map((v) => [v, where(v).slice(0, 6)])));
 
-const pageVersion = [...(found.get('homesignalmap.html') || [])];
+const pageVersion = [...(found.get('development-map.html') || [])];
 ok(pageVersion.length === 1, 'the map page names exactly one version', pageVersion);
 for (const wf of ['.github/workflows/unit-tests.yml', '.github/workflows/da-report-mutants.yml']) {
   const v = [...(found.get(wf) || [])];

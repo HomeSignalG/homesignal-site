@@ -24,7 +24,7 @@
 <meta name="twitter:image:alt" content="HomeSignal logo — Know what’s coming.">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; frame-src 'self'; child-src 'self'; form-action 'self'">
 <link rel="stylesheet" href="layout.css?v=0a9f8b10">
-<link rel="stylesheet" href="app.css?v=a6a760af">
+<link rel="stylesheet" href="app.css?v=409c0e59">
 <script>
   // A link from a buyer's shared report arrives as /#address=...: hide the document at once so no homepage paints while the
   // page script (at the end of the body) moves on. That script un-hides it when the fragment is not a usable address.
@@ -37,7 +37,7 @@
        1. the Development Activity report preview: a real report (4700 Point Fosdick Dr NW, Gig Harbor, WA 98335) rendered by
           the report view module, built by scripts/build-home-showcase-preview.mjs into assets/home-report-example-*.webp, and
        2. the development map, which is NOT an image: it is Map 1 itself, iframed in its embed
-          mode (homesignalmap.html?embed=1). The sample uses Map 1's layout-only preview mode
+          mode (development-map.html?embed=1). The sample uses Map 1's layout-only preview mode
           (&preview=1) so STATUS / PROJECT TYPE / REGULATORY RECORDS and the map key all show
           with no scrollbar inside the frame; a search turns it into the normal interactive embed.
      There is no second map, no copied filter or classifier, and no map image on this page. -->
@@ -93,12 +93,12 @@
           <h2 class="home-index__results-heading" id="homeResultsHeading" tabindex="-1">See an example: 98335 · Gig Harbor, Washington</h2>
           <p class="home-index__results-sub" id="homeResultsSub" hidden></p>
         </div>
-        <a class="home-index__results-cta" id="homeMapCta" href="homesignalmap.html?zip=98335">Explore this ZIP →</a>
+        <a class="home-index__results-cta" id="homeMapCta" href="development-map.html?zip=98335">Explore this ZIP →</a>
       </div>
       <div class="home-index__results-grid" id="homeResultsGrid">
         <div class="home-index__map-preview is-sample" id="homeMapWrap">
           <iframe class="home-index__map-frame" id="homeMapFrame"
-                  src="homesignalmap.html?embed=1&amp;preview=1&amp;zip=98335"
+                  src="development-map.html?embed=1&amp;preview=1&amp;zip=98335"
                   title="Sample HomeSignal development map"
                   loading="lazy"
                   tabindex="-1"></iframe>
@@ -112,7 +112,7 @@
     </section>
 
     <section class="home-index__feature-row" aria-label="What HomeSignal covers">
-      <div class="home-index__feature"><h3>Development</h3><p>Proposed, approved and operating projects on the map. <a href="homesignalmap.html">Open the Development Map</a></p></div>
+      <div class="home-index__feature"><h3>Development</h3><p>Proposed, approved and operating projects on the map. <a href="development-map.html">Open the Development Map</a></p></div>
       <div class="home-index__feature"><h3>Government</h3><p>Permits, zoning and public notices.</p></div>
       <div class="home-index__feature"><h3>Meetings</h3><p>City council, planning and other upcoming meetings.</p></div>
       <div class="home-index__feature"><h3>Local news</h3><p>Development, local issues and community updates.</p></div>
@@ -136,20 +136,20 @@
 <script src="config.js"></script>
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
-<script src="lib/data.js?v=4033ae3a"></script>
+<script src="lib/data.js?v=a09f47cd"></script>
 <script src="lib/topic-prefs.js?v=fe87d99b"></script>
-<script src="lib/templates.js?v=7373e258"></script>
+<script src="lib/templates.js?v=9e1170b0"></script>
 <script src="lib/project-type.js?v=852af398"></script>
 <script src="lib/premium-waitlist.js?v=3cb9baaf"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
-<script src="shell.js?v=4fa4fbd4"></script>
+<script src="shell.js?v=7ae564c0"></script>
 <script>
 (function () {
-  // EXPLORE SEARCH. A search hands the visitor to the Development Map (Map 1, homesignalmap.html)
+  // EXPLORE SEARCH. A search hands the visitor to the Development Map (Map 1, development-map.html)
   // (founder, 2026-10-04: "when an address or zip code is entered it should automatically take
   // you to the development map"). This replaces the 2026-09-30 "search stays on the homepage"
   // behaviour. Nothing here follows, saves, subscribes or changes a primary place.
-  //   - A 5-digit ZIP goes to homesignalmap.html?zip=<zip>, Map 1's own ZIP route.
+  //   - A 5-digit ZIP goes to development-map.html?zip=<zip>, Map 1's own ZIP route.
   //   - An address has no URL route on the full page (and an address must not be put in a URL),
   //     so it is handed over once through this tab's sessionStorage under HANDOFF_KEY. Map 1
   //     reads it at boot, removes it at once, and runs its own address search.
@@ -157,7 +157,7 @@
   //     the one place that explains a failed lookup.
   // The sample map and records below the hero stay a static example.
   var SAMPLE_ZIP = '98335';
-  var HANDOFF_KEY = 'hs.homeSearchAddress';   // read and removed by homesignalmap.html
+  var HANDOFF_KEY = 'hs.homeSearchAddress';   // read and removed by development-map.html
   var homeSearchRunId = 0;
   var sampleObserver = null;
   var $ = function (id) { return document.getElementById(id); };
@@ -178,7 +178,7 @@
     if (wanted.length <= 200 && searchKind(wanted) === 'address') {
       try {
         sessionStorage.setItem(HANDOFF_KEY, wanted);
-        location.replace('homesignalmap.html');
+        location.replace('development-map.html');
       } catch (err) { document.documentElement.style.visibility = ''; /* blocked storage: an ordinary homepage visit */ }
     } else { document.documentElement.style.visibility = ''; }
   }
@@ -305,7 +305,7 @@
     var q = String($('homeQuery').value || '').trim();
     searchError('');
     var kind = searchKind(q);
-    if (kind === 'zip') { location.assign('homesignalmap.html?zip=' + q); return; }
+    if (kind === 'zip') { location.assign('development-map.html?zip=' + q); return; }
     if (kind === 'short') {
       searchError('Enter a 5-digit ZIP code, or a street address with its city or ZIP.');
       $('homeQuery').focus();
@@ -315,7 +315,7 @@
     // cannot travel, and saying so beats landing on an empty map.
     try { sessionStorage.setItem(HANDOFF_KEY, q); }
     catch (err) { searchError('Your browser blocked the search. Open the Development Map and enter the address there.'); return; }
-    location.assign('homesignalmap.html');
+    location.assign('development-map.html');
   }
 
   HS.onReady(function () {
@@ -335,7 +335,7 @@
     // The frame is in the page from the moment the shell injects it, so Map 1 can finish
     // loading before this runs. about:blank also reads "complete", hence the URL check.
     var d = sampleDoc();
-    if (d && d.readyState === 'complete' && /homesignalmap\.html/.test(String(d.location && d.location.href))) watchSample();
+    if (d && d.readyState === 'complete' && /development-map\.html/.test(String(d.location && d.location.href))) watchSample();
     window.addEventListener('resize', function () { sizeSample(); });
     // The sample list: one read of the sample ZIP. Search replaces it.
     loadRecords(SAMPLE_ZIP, homeSearchRunId, 'No local permit/planning records to list here.');

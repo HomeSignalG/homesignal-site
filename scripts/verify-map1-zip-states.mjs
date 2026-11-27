@@ -66,10 +66,10 @@ const KINDS = ZIP_STATE_KINDS;
 
 // Read the Supabase URL + anon key out of the shipped page, so this gate cannot drift from what
 // the page actually calls. Same helper shape as scripts/verify-development.mjs.
-const pageHtml = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const pageHtml = readFileSync(new URL('../development-map.html', import.meta.url), 'utf8');
 const grabVar = (name) => {
   const m = pageHtml.match(new RegExp(`var ${name}\\s*=\\s*["']([^"']+)["']`));
-  if (!m) throw new Error(`Could not read ${name} from homesignalmap.html`);
+  if (!m) throw new Error(`Could not read ${name} from development-map.html`);
   return m[1];
 };
 const APIKEY = grabVar('APIKEY');
@@ -143,7 +143,7 @@ const facBaseline = {};
 // `__HS_SITES !== undefined` + a fixed 3s was the wrong condition, and it produced FALSE REDS
 // on exactly the ZIPs with the most data. Measured in production 2026-09-15, tracing every
 // write to __HS_SITES with a property setter (one write per load, from render() at
-// homesignalmap.html:2400):
+// development-map.html:2400):
 //
 //     01001  write lands at 4105 / 4734 / 5233 ms      01004  at 701 / 706 / 927 ms
 //     01009  write lands at 4376 / 4858 / 5343 ms      94128  at 681 / 736 / 892 ms
@@ -187,7 +187,7 @@ for (const c of CASES.filter((c) => c.zip)) {
       return route.continue();
     });
   }
-  await page.goto(`${BASE}/homesignalmap.html?zip=${c.zip}`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${BASE}/development-map.html?zip=${c.zip}`, { waitUntil: 'domcontentloaded' });
   const settle = await waitForRenderSettled(page);
   ok(settle.settled, `${c.zip}: the page finished rendering`,
      settle.settled ? `settled at ${settle.ms}ms with ${settle.n} site(s)`
@@ -234,7 +234,7 @@ for (const c of CASES.filter((c) => c.zip)) {
       couldNotRead: /could not be read/i.test(txt),
       // THE PAGE HAS TWO DIFFERENT FAILURE SENTENCES AND THIS GATE ONLY KNEW ONE.
       // `could not be read` is lib/zip-authoritative.js::zipAuthNote — a statement about the
-      // authoritative READ. homesignalmap.html's outer .catch() says "Couldn't load ZIP N."
+      // authoritative READ. development-map.html's outer .catch() says "Couldn't load ZIP N."
       // instead, which matches neither existing pattern, so a page that honestly reported a
       // failed load was scored as a page that violated its contract. Different failures,
       // different fixes; pinned against drift by test/map1-zip-state-kind-resolution.test.mjs,
@@ -376,7 +376,7 @@ page.on('request', (req) => {
     try { payload = JSON.parse(req.postData() || '{}'); } catch (_e) { payload = { _unparsed: true }; }
   }
 });
-await page.goto(`${BASE}/homesignalmap.html`, { waitUntil: 'domcontentloaded' });
+await page.goto(`${BASE}/development-map.html`, { waitUntil: 'domcontentloaded' });
 await page.waitForTimeout(2000);
 // choose a radius explicitly, the way a resident does
 await page.evaluate(() => {

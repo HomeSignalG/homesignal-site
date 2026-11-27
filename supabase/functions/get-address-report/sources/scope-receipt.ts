@@ -18,7 +18,7 @@
 import { type ScopeBox, scopeBox } from "./scope-box.ts";
 
 /** Bump when the membership/prefilter semantics change in a way that makes an older baseline incomparable. */
-export const SCOPE_RULE_VERSION = "v2";
+export const SCOPE_RULE_VERSION = "v3";
 
 export interface ScopeReceipt {
   scope: "expanded" | "fallback" | "legacy";
@@ -96,7 +96,10 @@ export interface ReceiptInput {
   /** report.truncated_at_max_rows */
   truncatedAt: number | null | undefined;
   /** scope accounting of the widened run, when one ran */
-  metrics?: { unresolved_excluded: number; rpc_failures: number; capacity_truncated: boolean } | null;
+  metrics?: {
+    unresolved_excluded: number; rpc_failures: number; capacity_truncated: boolean;
+    geometry_unresolved_kept?: number; geometry_untested_kept?: number;
+  } | null;
   version: string | null;
 }
 
@@ -105,6 +108,7 @@ export function buildScopeReceipt(i: ReceiptInput): ScopeReceipt {
   if (i.fallback) return { scope: "fallback", version: null, complete: false };
   if (!i.requested || !i.widens || !i.widenedRan) return { scope: "legacy", version: null, complete: !truncated };
   const m = i.metrics;
-  const complete = !truncated && !!m && m.unresolved_excluded === 0 && m.rpc_failures === 0 && !m.capacity_truncated;
+  const complete = !truncated && !!m && m.unresolved_excluded === 0 && m.rpc_failures === 0 && !m.capacity_truncated
+    && (m.geometry_unresolved_kept ?? 0) === 0 && (m.geometry_untested_kept ?? 0) === 0;
   return { scope: "expanded", version: i.version, complete: complete && i.version != null };
 }

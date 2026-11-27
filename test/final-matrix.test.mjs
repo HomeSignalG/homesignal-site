@@ -15,7 +15,7 @@
 // THREE SCOPE RULES, all load-bearing:
 //   1. It does NOT assert #zip-health-authed is absent anywhere — A-022 is authorized in
 //      lib/community-page.js for a signed-in non-demo session. The GATE is what matters.
-//   2. It does NOT ban the word "Export" on homesignalmap.html — #propExport IS A-016.
+//   2. It does NOT ban the word "Export" on development-map.html — #propExport IS A-016.
 //   3. It does NOT re-pin the four-item chrome, the stubs or Map 1's identity in detail;
 //      test/nav-identity.test.mjs and test/public-zip-contract.test.mjs own those. It pins
 //      only the one fact those files cannot: that the PAGES behind the folded entries still
@@ -29,7 +29,7 @@ const ok = (c, name, d) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + name
   + (!c && d !== undefined ? '  detail: ' + JSON.stringify(d).slice(0, 220) : '')); if (!c) fails++; };
 const read = (f) => fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8');
 const has  = (f) => fs.existsSync(new URL('../' + f, import.meta.url));
-// ⚠️ The block-comment strip must not fire inside a URL: homesignalmap.html's CSP carries
+// ⚠️ The block-comment strip must not fire inside a URL: development-map.html's CSP carries
 // `https://*.tile.openstreetmap.org`, whose `/*` opened a phantom comment swallowing 2,297
 // bytes of that file's head — so an absence-pin over the CSP or the head scripts passed by
 // reading nothing. Requiring the opener not to follow `:` or `/` keeps every real comment.
@@ -37,7 +37,7 @@ const strip = (x) => x.replace(/^\s*\/\/.*$/gm, '').replace(/<!--[\s\S]*?-->/g, 
 
 const shellJs = strip(read('shell.js'));
 const cp      = strip(read('lib/community-page.js'));
-const map     = strip(read('homesignalmap.html'));
+const map     = strip(read('development-map.html'));
 const dev     = strip(read('development.html'));
 const alerts  = strip(read('alerts.html'));
 const props   = strip(read('properties.html'));
@@ -47,16 +47,16 @@ const idxRaw  = read('index.html');
 // ── SHIPPED: only the fact the other pins cannot carry — the pages still exist ───────────
 // "Folded out of the sidebar" and "deleted" are one edit apart and look the same in a nav
 // diff. Every page that LOST its chrome entry is asserted present here.
-for (const f of ['today.html', 'reports.html', 'maps.html', 'homesignalmap.html',
+for (const f of ['today.html', 'reports.html', 'maps.html', 'development-map.html',
                  'community.html', 'development.html', 'properties.html', 'alerts.html',
                  'dashboard.html', 'property.html'])
   ok(has(f), 'SHIPPED the ' + f + ' page still exists — retired means redirected, never deleted');
 // Fix 8 D1: dashboard.html is OUT (account-wide All My Places surface, like properties.html).
-ok(shellJs.includes("HS.ZIP_NAV_PAGES = ['alerts.html', 'development.html', 'homesignalmap.html', 'community.html']" + ';'),
+ok(shellJs.includes("HS.ZIP_NAV_PAGES = ['alerts.html', 'development.html', 'development-map.html', 'community.html']" + ';'),
   'SHIPPED Fix 8 D1 ZIP_NAV_PAGES is the four ZIP-scoped tools — dashboard.html is OUT');
-ok(read('lib/view-zip.js').includes("var ZIP_NAV_PAGES = ['alerts.html', 'development.html', 'homesignalmap.html', 'community.html']" + ';'),
+ok(read('lib/view-zip.js').includes("var ZIP_NAV_PAGES = ['alerts.html', 'development.html', 'development-map.html', 'community.html']" + ';'),
   'SHIPPED ...and lib/view-zip.js carries the byte-identical literal');
-ok(/HS\.MAP_PAGES = \['homesignalmap\.html'\];/.test(shellJs), 'SHIPPED A-021 Map 1 is still in MAP_PAGES');
+ok(/HS\.MAP_PAGES = \['development-map\.html'\];/.test(shellJs), 'SHIPPED A-021 Map 1 is still in MAP_PAGES');
 ok(/var authedZipHealth = \(sess && !sess\.demo\)/.test(cp), 'SHIPPED A-022 the ZIP-health gate is on a real non-demo session');
 ok((cp.match(/robots-meta|name="robots"/g) || []).length === 0,
   'SHIPPED A-017 the runtime renderer still writes no robots directive');
@@ -100,9 +100,9 @@ ok(/id='propWatch'>Watch this address</.test(map), 'SHIPPED A-023 ...and the map
 // LEFTOVER 1 CLOSED 2026-10-02, then CHANGED 2026-10-04 (founder: "when an address or zip code is
 // entered it should automatically take you to the development map"). The homepage ZIP search
 // goes to Map 1's own ZIP route, and it still never asks HS.data.isCovered.
-ok(!/community\.html\?zip=/.test(idxRaw) && /location\.assign\('homesignalmap\.html\?zip=' \+ q\)/.test(idxRaw)
+ok(!/community\.html\?zip=/.test(idxRaw) && /location\.assign\('development-map\.html\?zip=' \+ q\)/.test(idxRaw)
    && !/HS\.data\.isCovered/.test(idxRaw),
-  'LEFTOVER 1 CLOSED: the homepage ZIP search goes to homesignalmap.html?zip=<zip>');
+  'LEFTOVER 1 CLOSED: the homepage ZIP search goes to development-map.html?zip=<zip>');
 ok(/HS\.shareUrlOverride = HS_CONFIG\.BASE_URL \+ '\/community\.html\?zip=' \+ zip;/.test(cp),
   'LEFTOVER 2 HS.shareUrlOverride is still the community.html?zip= URL');
 ok(!/hs-resolve\.js/.test(map + dev + alerts + props + dash + idxRaw + read('community.html')),
@@ -116,15 +116,15 @@ ok(/meetings\.find\(function\(x\)\{return x\.related_project_id===projectId;\}\)
   'LEFTOVER 6 HS.addToCalendar still falls back to meetings[0]');
 // 2026-10-02 (founder): the map→list back link was removed; navigation is the Explore dropdown.
 ok(!/data-znav="development\.html"/.test(map), 'LEFTOVER 7 map→list back link removed 2026-10-02 (Explore dropdown replaces it)');
-ok(/HS\.navHref\('homesignalmap\.html', S\.zip\)/.test(dev), 'LEFTOVER 7 ...and list→map is still the one direction that exists');
+ok(/HS\.navHref\('development-map\.html', S\.zip\)/.test(dev), 'LEFTOVER 7 ...and list→map is still the one direction that exists');
 ok(!/sampleBtn/.test(map), 'LEFTOVER 7 #sampleBtn is still absent');
 ok(!/repPreview|impact model|updated today/.test(strip(read('reports.html'))),
   'LEFTOVER 8 the reports preview document was not ported into the stub');
 // LEFTOVER 10 CLOSED 2026-10-01 (founder navigation plan v3). It recorded a stale "This page
 // is MAPS." narration sitting above data-nav="dev". v3 re-tokened Map 1 to Explore, so the
 // comment had to be rewritten anyway; it now names the section the token actually lights.
-ok(!/This page is MAPS\./.test(read('homesignalmap.html')) && /<body data-nav="explore"[ >]/.test(read('homesignalmap.html'))
-   && /Map 1 belongs to EXPLORE/.test(read('homesignalmap.html')),
+ok(!/This page is MAPS\./.test(read('development-map.html')) && /<body data-nav="explore"[ >]/.test(read('development-map.html'))
+   && /Map 1 belongs to EXPLORE/.test(read('development-map.html')),
   'LEFTOVER 10 CLOSED: the narration above Map 1\'s data-nav="explore" now matches what it lights');
 
 console.log(fails ? '\nFAILED ' + fails : '\nAll final-matrix checks passed');

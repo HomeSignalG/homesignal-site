@@ -17,7 +17,7 @@ import vm from 'node:vm';
 let pass = 0, fail = 0;
 function ok(c, msg) { if (c) { pass++; console.log('PASS — ' + msg); } else { fail++; console.log('FAIL — ' + msg); } }
 
-const PAGE = fs.readFileSync('homesignalmap.html', 'utf8');
+const PAGE = fs.readFileSync('development-map.html', 'utf8');
 // Comments may quote the old words as history; the shipped text may not.
 const CODE = PAGE.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 

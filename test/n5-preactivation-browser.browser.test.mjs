@@ -1,6 +1,6 @@
 // N5 PRE-ACTIVATION PROOF — THE BROWSER HALF (scripts/n5_preactivation_browser.mjs), offline.
 //
-// Drives the real homesignalmap.html in Chromium with two generations' answers for three ZIPs
+// Drives the real development-map.html in Chromium with two generations' answers for three ZIPs
 // (one that changes between them, one identical, one not measured) and asserts that the probe
 // passes when the page renders each answer, SEES the difference between the two (a live
 // control), and fails when the page is served something other than the answer it is checked

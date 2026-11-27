@@ -1,6 +1,6 @@
 // MAP 1 RESIDENTIAL — every record the ZIP-mode builder qualifies is DRAWN (2026-09-27).
 //
-// The real homesignalmap.html in a real browser, fed one ZIP whose Residential records qualify
+// The real development-map.html in a real browser, fed one ZIP whose Residential records qualify
 // on their CLASS FIELD (`type_raw`) alone, in every lifecycle slice. Before the fix the builder
 // qualified them and the draw-time check in render() removed them, because it read `type_raw`
 // off a site that carries the class as `permit_class`. This asserts, per slice, that the
@@ -107,7 +107,7 @@ await page.route('**/*', async (route) => {
   return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
 });
 
-await page.goto(base + '/homesignalmap.html?zip=' + ZIP, { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=' + ZIP, { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => window.__HS_VERIFY && Array.isArray(window.__HS_SITES) && Array.isArray(window.siteMarkers),
   null, { timeout: 30000 });
 await page.waitForTimeout(600);
@@ -152,7 +152,7 @@ ok(got.qualifiedRes === 6, 'qualified (the rendered set) = drawn: 6 Residential 
 ok(!got.drawnRefs[ROUTINE.project_ref], 'the routine Deck permit is still not drawn');
 ok(got.commercialDrawn === 1, 'the Commercial control is drawn, untouched');
 ok(got.pre === 1, 'CONTROL: before the fix only the name-qualified record of the 6 survived the draw-time check', got.pre);
-// Rail rows carry the page's own railKey ('ref:' + project ref), homesignalmap.html railKey().
+// Rail rows carry the page's own railKey ('ref:' + project ref), development-map.html railKey().
 ok(got.rails[0].indexOf('ref:' + CLASS_QUALIFIED[0].project_ref) !== -1
    && got.rails[1].indexOf('ref:' + CLASS_QUALIFIED[1].project_ref) !== -1,
    'the Approved and Proposed rails list the class-qualified records');

@@ -199,7 +199,7 @@ const sites = () => page.evaluate(() => (window.__HS_SITES || []).map(s => ({
   distance_mi: s.distance_mi, registry_id: s.registry_id, n5: s.n5_feature_id || null })));
 
 // ══════════════ 1. ZIP MODE still returns the ENTIRE ZIP ══════════════
-await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES) && window.__HS_SITES.length > 0, { timeout: 20000 });
 let s = await sites();
 ok(calls.some(c => c.kind === 'zipcache'), 'ZIP mode reads the cached entire-ZIP report');
@@ -302,7 +302,7 @@ ok(JSON.stringify(disabled) === '["3","10","20"]',
 
 // ══════════════ 4. BACK TO ZIP MODE — the entire-ZIP population returns ══════════════
 calls.length = 0;
-await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES) && window.__HS_SITES.length > 0, { timeout: 20000 });
 s = await sites();
 ok(s.some(x => x.label === 'ZIP-ONLY FACILITY'), 'ZIP mode repopulates from the ZIP cache');
@@ -315,7 +315,7 @@ ok(!/canonical project/.test(zipFresh || ''), 'N — the address-radius note doe
 // The strongest form of the guard: request A (5 mi) is made SLOW and request B (2 mi) fast, so
 // A resolves AFTER B. B is the newer selection, so B must own the page. Proving this by reading
 // the source would only show that a ticket exists; this shows it is checked.
-await page.goto(base + '/homesignalmap.html', { waitUntil: 'domcontentloaded' });
+await page.goto(base + '/development-map.html', { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('#addr', { timeout: 15000 });
 RPC_ROWS[5] = [
   { source_key: 'socrata:stale:SHOULD-NOT-RENDER', feature_id: 'pt:1', registry_id: 'stale',

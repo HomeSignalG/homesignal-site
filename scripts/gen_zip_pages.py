@@ -27,7 +27,7 @@ Rule D: >= 3 publishable Development entities from the compact ingest plane
 absent from the plane is not eligible. INDEX = Rule F OR Rule D.
 """
 import argparse, hashlib, html, json, os, re, subprocess, sys, tempfile, time, unicodedata, urllib.error, urllib.parse, urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 # Loaded by path in some tests (importlib spec_from_file_location), where this directory is not
 # on sys.path; the sibling module is the page-semantics authority and is imported by name.
@@ -66,6 +66,19 @@ DC_LISTING_CAP = 12                          # listings printed; the rest are na
 SIB_CAP = 10                                 # sibling ZIP links per page (see link_siblings)
 WEATHER_AGENCY = "api.weather.gov"
 GN_CATEGORIES = ("Government & civic", "Planning & zoning")
+
+# ZIPs that span more than one county while the page's sources come from ONE county's government
+# (founder, 2026-11-26). The page must not say the records "apply to the whole of" the ZIP, and its sibling
+# list must not imply the ZIP belongs only to that county. Data is untouched: no county ownership, feed or
+# source is changed here. Keyed by ZIP so another ZIP needs its own measured entry (80021: about 69%
+# Jefferson / 31% Broomfield by ZCTA area, founder-stated).
+ZIP_PARTIAL_COUNTY_NOTES = {
+    "80021": {
+        "disclosure": ("ZIP 80021 spans Jefferson and Broomfield counties. The government notices and meetings "
+                       "currently shown are from Jefferson County and may not cover the entire ZIP code."),
+        "sibling_heading": "Other ZIP codes with Jefferson County coverage",
+    },
+}
 ZIP_RE = re.compile(r"^[0-9]{5}$")
 
 # A build that HANGS is worse than a build that fails: the job burns its whole
@@ -1018,28 +1031,80 @@ def _weather_host(u):
     return pu.scheme in ("http", "https") and h == WEATHER_AGENCY
 
 
-def _items(items, heading, empty, kind, zip_code=""):
+# ---- Government notices on the ZIP page (what is listed, and in what order) --------------------------
+# A notice is left out only when the SAME item is already listed under Upcoming public meetings (same
+# record link AND same title). A county that files every calendar event as both a meeting and a notice
+# otherwise fills the notices list with copies of the meetings list. Distinct notices that happen to
+# share a generic link keep their own titles, so they stay.
+def _norm_title(t):
+    return re.sub(r"\s+", " ", (t or "").strip().lower())
+
+
+def _held_case_ids():
+    """Case ids the connector holds as unverified (registry county_cases[].hold_cases), the SAME list the
+    map path reads, so a held case is never shown as a current proposal through the notice path either.
+    The stored notice rows stay; only this display leaves them out."""
+    try:
+        reg = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "supabase", "functions", "get-address-report", "jurisdiction-registry.json")))
+    except (OSError, ValueError):
+        return ()
+    return tuple(h["case_id"].lower() for e in reg.get("county_cases") or [] for h in e.get("hold_cases") or [] if h.get("case_id"))
+
+
+def gn_for_display(gn, um_items, today):
+    """-> (shown, rest). `date` on a notice is the record's own date: a publication date for most, the event
+    date for a calendar event, so a future date is never treated as a publication date. Order shown:
+    notices dated within the next 30 days (soonest first), then notices already dated (newest first).
+    Everything else, including hearings and deadlines further out, is `rest` and is listed under a
+    "Show all" control, so nothing eligible is unreachable."""
+    held = _held_case_ids()
+    shown_um = {(it.get("url") or "", _norm_title(it.get("title"))) for it in um_items}
+    elig = []
+    for x in gn:
+        blob = f'{x.get("title") or ""} {x.get("url") or ""}'.lower()
+        if any(h in blob for h in held):
+            continue
+        if (x.get("url") or "", _norm_title(x.get("title"))) in shown_um:
+            continue
+        elig.append(x)
+    horizon = (datetime.strptime(today, "%Y-%m-%d") + timedelta(days=30)).strftime("%Y-%m-%d")
+    near = sorted((x for x in elig if today < (x.get("date") or "") <= horizon), key=lambda x: (x["date"], x["title"], x.get("url") or ""))
+    past = sorted((x for x in elig if (x.get("date") or "") <= today), key=lambda x: (x["date"], x["title"], x.get("url") or ""), reverse=True)
+    far = sorted((x for x in elig if (x.get("date") or "") > horizon), key=lambda x: (x["date"], x["title"], x.get("url") or ""))
+    first = near + past
+    if not first:                      # only far-out items: still list them, never "no notices"
+        return far[:GN_CAP], far[GN_CAP:]
+    return first[:GN_CAP], first[GN_CAP:] + far
+
+
+def _items(items, heading, empty, kind, zip_code="", rest=None):
     if not items:
         return f'<section class="zsec"><h2>{esc(heading)}</h2><p class="quiet">{esc(empty)}</p></section>'
-    li = []
-    for it in items:
-        t, u = esc(it["title"]), safe_url(it.get("url"))
-        note = ""
-        if kind == "wx" or _weather_host(it.get("url")):
-            u = WEATHER_ZIP_PAGE + zip_code if re.fullmatch(r"[0-9]{5}", zip_code or "") else None
-            note = f' <span class="quiet">{esc(WEATHER_NOTE)}</span>' if u else ""
-        when = esc(it.get("date") or "")
-        inner = f'<a href="{esc(u)}" rel="nofollow noopener">{t}</a>{note}' if u else t
-        badge = ' <span class="mtg-cancelled">Cancelled</span>' if it.get("cancelled") is True else ""
-        li.append(f'<li>{inner}{badge}{f" <time>{when}</time>" if when else ""}</li>')
-    return (f'<section class="zsec"><h2>{esc(heading)}</h2><ul>' + "".join(li) + "</ul></section>")
+    li = [_item_li(it, kind, zip_code) for it in items]
+    more = ""
+    if rest:
+        more = (f'<details class="zall"><summary>Show all {len(items) + len(rest)} {esc(heading.lower())}</summary><ul>'
+                + "".join(_item_li(it, kind, zip_code) for it in rest) + "</ul></details>")
+    return (f'<section class="zsec"><h2>{esc(heading)}</h2><ul>' + "".join(li) + "</ul>" + more + "</section>")
+
+
+def _item_li(it, kind, zip_code=""):
+    t, u = esc(it["title"]), safe_url(it.get("url"))
+    note = ""
+    if kind == "wx" or _weather_host(it.get("url")):
+        u = WEATHER_ZIP_PAGE + zip_code if re.fullmatch(r"[0-9]{5}", zip_code or "") else None
+        note = f' <span class="quiet">{esc(WEATHER_NOTE)}</span>' if u else ""
+    when = esc(it.get("date") or "")
+    inner = f'<a href="{esc(u)}" rel="nofollow noopener">{t}</a>{note}' if u else t
+    badge = ' <span class="mtg-cancelled">Cancelled</span>' if it.get("cancelled") is True else ""
+    return f'<li>{inner}{badge}{f" <time>{when}</time>" if when else ""}</li>'
 
 
 OG_IMAGE = f"{BASE}/og-default.png"
 # ONE stylesheet tag for every generated page type (ZIP and city), so its cache key is
 # written once and test/lib-cache-keys.test.mjs keeps seeing exactly one generator tag.
 APP_CSS_LINK = ('<link rel="stylesheet" href="/layout.css?v=0a9f8b10">\n'
-                '<link rel="stylesheet" href="/app.css?v=a6a760af">\n')
+                '<link rel="stylesheet" href="/app.css?v=409c0e59">\n')
 
 
 # The static pages (city, project, project list, guide and area hub) load no script, so they
@@ -1147,6 +1212,8 @@ def render(p, built):
                  "date": (m.get("meeting_date") or "")[:10],
                  "cancelled": m.get("is_cancelled") is True} for m in um_show]
 
+    gn_shown, gn_rest = gn_for_display(p["gn"], um_items, datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+
     county_bit = f" in {esc(p['county_label'])}" if p.get("county_label") else ""
     lead = ("Development records, government notices, public meetings and local news"
             if p.get("rule_d") else
@@ -1188,8 +1255,10 @@ def render(p, built):
         items = "".join(f'<li><a href="/community/{esc(s["zip"])}/">{esc(s["name"])}</a></li>'
                         for s in sibs)
         nearby_id = ' id="zip-nearby"' if cov else ""
+        sib_note = ZIP_PARTIAL_COUNTY_NOTES.get(z)
+        sib_head = esc(sib_note["sibling_heading"]) if sib_note else f"More ZIP codes in {where}"
         links += (f'<nav class="zsib"{nearby_id} aria-label="More ZIP codes in this county">'
-                  f'<h2>More ZIP codes in {where}</h2><ul>{items}</ul></nav>')
+                  f'<h2>{sib_head}</h2><ul>{items}</ul></nav>')
     elif cov:
         # The panel's "Search nearby ZIPs" link needs somewhere to land even when the county
         # offers no sibling ZIP.
@@ -1222,12 +1291,15 @@ def render(p, built):
         f'<h1>{esc(z)} · {esc(plabel)}</h1>'
         + (f'<p>{lead} ZIP {esc(z)}{county_bit}.</p></header>' + coverage_panel(p)
            if cov else
-           f'<p>{lead} that apply to the whole of '
-           f'ZIP {esc(z)}{county_bit}.</p></header>')
+           (f'<p>{lead} for ZIP {esc(z)}.</p>'
+            f'<p class="quiet zspan">{esc(ZIP_PARTIAL_COUNTY_NOTES[z]["disclosure"])}</p></header>'
+            if z in ZIP_PARTIAL_COUNTY_NOTES else
+            f'<p>{lead} that apply to the whole of '
+            f'ZIP {esc(z)}{county_bit}.</p></header>'))
         + ("" if cov else _dev_items(p.get("dev_entities") or []))
         + ("" if cov else _dc_listing_items(p.get("dc_listings") or [], z))
-        + _items(p["gn"][:GN_CAP], "Government notices",
-                 "No government notices on file for this ZIP yet.", "gn")
+        + _items(gn_shown, "Government notices",
+                 "No government notices on file for this ZIP yet.", "gn", rest=gn_rest)
         + _items(um_items, "Upcoming public meetings",
                  "No upcoming public meetings on file for this ZIP yet.", "um")
         + _items(ln_show, "Local news",
@@ -1245,7 +1317,7 @@ def render(p, built):
         '<meta charset="UTF-8">\n'
         # The document lives at /community/<zip>/, two levels deep, while the shared app
         # resolves several URLs RELATIVELY - shell.js fetches 'partials/shell.html' and
-        # HS.navHref emits bare 'homesignalmap.html?zip='. Without a base those resolve
+        # HS.navHref emits bare 'development-map.html?zip='. Without a base those resolve
         # under /community/<zip>/ and 404, which crashed hydration with
         # "Cannot read properties of null (reading 'addEventListener')" when the shell
         # partial came back as a 404 page. One <base> fixes every relative URL at once and
@@ -1280,7 +1352,7 @@ def render(p, built):
         "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' "
         'https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; '
         # frame-src/child-src 'self': the ZIP page's map is a same-origin iframe of
-        # homesignalmap.html, shown to every visitor since 2026-10-02 (it was signed-in
+        # development-map.html, shown to every visitor since 2026-10-02 (it was signed-in
         # only before). lib/map.js and the Esri/jsDelivr widening PCM-4 added are both gone.
         'frame-src \'self\'; child-src \'self\'; '
         'form-action \'self\'">\n'
@@ -1302,8 +1374,8 @@ def render(p, built):
         # both hosts run ONE runtime, so a dependency added to community.html alone breaks
         # this one. Fails CLOSED if absent (outcome 'unavailable', no absence claim).
         '<script src="/lib/zip-authoritative.js?v=20261029a"></script>\n'
-        '<script src="/lib/data.js?v=4033ae3a"></script>\n<script src="/lib/topic-prefs.js?v=fe87d99b"></script>\n'
-        '<script src="/lib/templates.js?v=7373e258"></script>\n<script src="/lib/impact.js"></script>\n'
+        '<script src="/lib/data.js?v=a09f47cd"></script>\n<script src="/lib/topic-prefs.js?v=fe87d99b"></script>\n'
+        '<script src="/lib/templates.js?v=9e1170b0"></script>\n<script src="/lib/impact.js"></script>\n'
         # lib/project-type.js: the canonical Development Type (pure — no DOM, no map runtime).
         # The Development & Growth Type badge reads HS.canonicalProjectType from it. Same parity
         # rule as the files around it: both hosts run ONE runtime. lib/map.js stays OFF (§5a).
@@ -1318,10 +1390,10 @@ def render(p, built):
         # one host only.
         '<script src="/lib/premium-waitlist.js?v=3cb9baaf"></script>\n'
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
-        '<script src="/shell.js?v=4fa4fbd4"></script>\n'
+        '<script src="/shell.js?v=7ae564c0"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
         '<script src="/lib/water-rights.js?v=add4200a"></script>\n'
-        '<script src="/lib/community-page.js?v=97633cae"></script>\n'
+        '<script src="/lib/community-page.js?v=2cd4d9bd"></script>\n'
         "</body>\n</html>\n")
 
 
@@ -1828,12 +1900,12 @@ GUIDE_RECENT_N = 12
 
 
 def _zip_form(label_id):
-    return (f'<form class="zsec" action="/homesignalmap.html" method="get" role="search">'
+    return (f'<form class="zsec" action="/development-map.html" method="get" role="search">'
             f'<label for="{label_id}">Your ZIP code</label> '
             f'<input id="{label_id}" name="zip" inputmode="numeric" pattern="[0-9]{{5}}" '
             f'maxlength="5" required placeholder="e.g. 78704"> '
             f'<button type="submit">Open the Development map</button></form>'
-            f'<p>Have a street address? <a href="/homesignalmap.html">Search it on the Development '
+            f'<p>Have a street address? <a href="/development-map.html">Search it on the Development '
             f'map</a> and choose how far around it to look.</p>')
 
 
@@ -2032,14 +2104,14 @@ SITEMAP_LEGACY_RE = re.compile(
 #   ?zip=78617 -> 309,689 bytes, md5 0282424d481b23d738a8dc038c0b7ee2
 #   ?zip=84302 -> 309,689 bytes, md5 0282424d481b23d738a8dc038c0b7ee2   <- identical
 # Both ship `noindex, nofollow` in their initial HTML and both canonicalise to the
-# ZIP-LESS https://homesignal.net/homesignalmap.html. homesignalmap.html flips its own
+# ZIP-LESS https://homesignal.net/development-map.html. development-map.html flips its own
 # robots-meta client-side from app_community_meta.indexable, but never rewrites the
 # canonical — so even a rendered crawl consolidates all 11,718 into one URL and not one
 # of them can rank for a ZIP. Advertising them is not a no-op: it is 11,718 "submitted
 # URL marked noindex" errors in Search Console and 59% of the crawl budget spent on
 # duplicates of one page, taken away from the real /community/<zip>/ documents.
 SITEMAP_DEV_RE = re.compile(
-    r"[ \t]*<url>\s*<loc>[^<]*homesignalmap\.html\?zip=\d{5}</loc>.*?</url>\s*", re.S)
+    r"[ \t]*<url>\s*<loc>[^<]*development-map\.html\?zip=\d{5}</loc>.*?</url>\s*", re.S)
 
 
 def _url_el(loc, lastmod=None, bare=False):
@@ -2083,7 +2155,7 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     halves of it. Only its static half reaches production; test/sitemap-static-half.test.mjs
     keeps that half equal to gen_sitemap.py STATIC.)
 
-    The development half (`homesignalmap.html?zip=`) is REMOVED, not carried over.
+    The development half (`development-map.html?zip=`) is REMOVED, not carried over.
 
     ⚠️ THIS REVERSES THIS FUNCTION'S ORIGINAL "leave the development half alone
     (page-purpose separation)" RULE, deliberately. That rule was right about page PURPOSE
@@ -2096,7 +2168,7 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     was simply never checked on this half.
 
     This removes the ADVERTISEMENT only. It changes no document, no robots directive, and
-    nothing a resident sees: /homesignalmap.html?zip=<zip> keeps working exactly as it
+    nothing a resident sees: /development-map.html?zip=<zip> keeps working exactly as it
     does today, and stays reachable from the Place pages. Restoring the advertisement is
     the job of making those URLs real documents (`/development/<zip>/`, the pattern
     `/community/<zip>/` already uses), at which point this filter is what should be
@@ -2196,8 +2268,8 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     # are noindex and canonicalise away from the ZIP, so one surviving here is a defect —
     # and a silent one, because a sitemap full of noindex URLs still parses and still
     # returns 200. Fail the build rather than ship it.
-    if re.search(r"homesignalmap\.html\?zip=", txt):
-        sys.exit("ERROR: a noindex homesignalmap.html?zip= URL survived in the artifact sitemap")
+    if re.search(r"development-map\.html\?zip=", txt):
+        sys.exit("ERROR: a noindex development-map.html?zip= URL survived in the artifact sitemap")
     return {"removed": removed, "removed_dev": removed_dev, "added": len(zips), "cities": len(cps),
             "projects": 0, "guides": len(gps), "maps": len(mps), "developments": len(dps),
                 "fact_checks": len(fps)}
@@ -2370,7 +2442,7 @@ def build(pages, out_dir, canonical, built, state=None):
             "max": mx, "max_zip": mxz}
 
 
-MAP_TEMPLATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "homesignalmap.html")
+MAP_TEMPLATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "development-map.html")
 MAP_ASSET_DIR = "map1"          # the shared runtime of every /map/<zip>/ document, content-addressed
 
 
@@ -2378,7 +2450,7 @@ class MapTemplate:
     """Map 1 as ONE shared implementation, rendered once per ZIP (founder, 2026-10-22: the address
     people see is /map/<zip>, and it must be a real page a search engine can list).
 
-    homesignalmap.html stays the only source. The build reads it, moves its two large inline
+    development-map.html stays the only source. The build reads it, moves its two large inline
     blocks (the page <style> and the page runtime <script>) into content-addressed files under
     /map1/, and gives each ZIP a small document with its own title, description, canonical and
     robots. The runtime is byte-identical to the inline one; the page reads its ZIP from the path
@@ -2435,8 +2507,8 @@ class MapTemplate:
         "<title>HomeSignal Development Map — What Is Built, Approved and Proposed Near You</title>",
         '<meta name="robots" content="index, follow" id="robots-meta"/>',
         '<meta name="description" content="Search a street address or ZIP code on the HomeSignal Development Map',
-        '<link rel="canonical" href="https://homesignal.net/homesignalmap.html"/>',
-        '<meta property="og:url" content="https://homesignal.net/homesignalmap.html"/>',
+        '<link rel="canonical" href="https://homesignal.net/development-map.html"/>',
+        '<meta property="og:url" content="https://homesignal.net/development-map.html"/>',
         '<meta property="og:title" content="HomeSignal Development Map — What Is Built, Approved and Proposed Near You"/>',
     )
 
@@ -2830,7 +2902,7 @@ def main():
     print(f"avg html bytes : {stats['avg']}")
     print(f"max html bytes : {stats['max']} (zip {stats['max_zip']})")
     print(f"sitemap        : -{sm['removed']} legacy community.html?zip= URLs, "
-          f"-{sm['removed_dev']} noindex homesignalmap.html?zip= URLs, "
+          f"-{sm['removed_dev']} noindex development-map.html?zip= URLs, "
           f"+{sm['added']} /community/<zip>/ URLs, +{sm['cities']} /city/ URLs, "
           f"+{sm['projects']} /project/ URLs, +{sm['guides']} /guides/ URLs, "
           f"+{sm['maps']} /map/ URLs")

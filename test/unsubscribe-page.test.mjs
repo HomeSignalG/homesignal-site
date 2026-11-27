@@ -27,7 +27,7 @@ test("the founder's text is in the page, verbatim and in order, ending with the 
     at = next;
   }
   assert.ok(src.indexOf('cta.textContent = "Return to the 97702 map";', at) > at, 'the CTA label');
-  assert.ok(page.includes('cta.href = "https://homesignal.net/homesignalmap.html?zip=" + zip;'), 'the CTA opens Map 1');
+  assert.ok(page.includes('cta.href = "https://homesignal.net/development-map.html?zip=" + zip;'), 'the CTA opens Map 1');
 });
 
 test('the general message and the other statuses are unchanged', () => {

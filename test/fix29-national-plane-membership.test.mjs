@@ -29,7 +29,7 @@ load('../lib/n5-radius.js');
 load('../lib/zip-authoritative.js');
 const HS = global.window.HS;
 
-const PAGE = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const PAGE = readFileSync(new URL('../development-map.html', import.meta.url), 'utf8');
 const LIB  = readFileSync(new URL('../lib/zip-authoritative.js', import.meta.url), 'utf8');
 
 // Real producer shapes (measured 2026-09-04/15 against app_zip_projects_markers).

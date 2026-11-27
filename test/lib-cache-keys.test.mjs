@@ -9,7 +9,7 @@
 // Every one of those fixes lives in lib/map.js, and that cache key had not moved since
 // 20 July while the file changed four times in an hour — so browsers kept serving a
 // July copy. lib/templates.js, which holds the neutral, carried NO key at all on any of
-// its 14 call sites. Meanwhile edits to homesignalmap.html itself DID appear, because an
+// its 14 call sites. Meanwhile edits to development-map.html itself DID appear, because an
 // HTML document revalidates; that contrast is what made the deploys look successful.
 //
 // THE KEY IS NOW THE CONTENT, NOT A DATE. A dated key is a promise a human has to keep
@@ -59,7 +59,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CONTENT_KEYED = ['lib/project-type.js', 'lib/map.js', 'lib/maps-social-theme.js', 'lib/maps-capture-policy.js',
   'lib/maps-capture-binding.js', 'lib/templates.js', 'shell.js', 'lib/premium-waitlist.js', 'lib/community-request.js', 'lib/community-page.js', 'lib/dashboard-aggregate.js', 'lib/share-text.js',
   'lib/nyc-v1-report.js', 'lib/nyc-v1-soda.js', 'lib/fsr-scale.js', 'lib/da-report-view.js', 'lib/da-report-compare.js',
-  'lib/data.js', 'lib/topic-prefs.js', 'lib/acq-impact-dc-check.js', 'lib/acq-impact-discovery.js', 'lib/acq-saleshandy.js', 'lib/acq-youtube-videos.js', 'lib/acq-bluesky-videos.js', 'lib/acq-bluesky-schedule.js', 'lib/acq-bluesky-queue-order.js',
+  'lib/data.js', 'lib/topic-prefs.js', 'lib/acq-impact-dc-check.js', 'lib/acq-impact-discovery.js', 'lib/acq-saleshandy.js', 'lib/acq-subscriber-zip-health.js', 'lib/acq-zip-feed-health.js', 'lib/acq-youtube-videos.js', 'lib/acq-bluesky-videos.js', 'lib/acq-bluesky-schedule.js', 'lib/acq-bluesky-queue-order.js',
   'lib/water-rights.js', 'lib/water-rights-map.js', 'lib/map1-project-panel.js', 'lib/dc-freshness.js'];
 const pages = readdirSync(root).filter((f) => f.endsWith('.html'))
   .concat(readdirSync(join(root, 'partials')).filter((f) => f.endsWith('.html')).map((f) => 'partials/' + f));

@@ -117,7 +117,7 @@ ok(/Array\.isArray\(pr\.impact_dimensions\)/.test(prop),
 // ── 8. The map contract from PCM-5 is untouched ──────────────────────────────
 ok(/var realAddress = pcmHasPoint\(p\) && !p\.sample && !p\.demo;/.test(prop),
   '8a the embed is still gated on a real point AND the demo-exclusion predicate');
-ok(/<iframe id="propMapFrame"/.test(prop) && /homesignalmap\.html\?embed=1/.test(prop),
+ok(/<iframe id="propMapFrame"/.test(prop) && /development-map\.html\?embed=1/.test(prop),
   '8b the context map is still an iframe of Map 1');
 ok(/Generate property report/.test(propRaw)
   && /id="propReportBtn"/.test(propRaw)

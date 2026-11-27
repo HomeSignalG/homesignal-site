@@ -182,7 +182,7 @@ ok(!hrefs.some((h) => /checkout|lemonsqueezy|stripe|subscribe/i.test(h)) && href
 ok(!/HS\.requireAuth|HS\.openAuth|signin=1/.test(noComments), 'the landing page itself never opens sign-in; the Billing card does');
 // sitemap.xml is not a link a visitor follows: it is judged by the sitemap tripwire below.
 const otherSources = ['index.html', 'about.html', 'contact.html', 'how-it-works.html', 'privacy.html', 'terms.html', 'dashboard.html', 'alerts.html',
-  'development.html', 'properties.html', 'property.html', 'reports.html', 'community.html', 'homesignalmap.html', 'partials/shell.html', 'shell.js',
+  'development.html', 'properties.html', 'property.html', 'reports.html', 'community.html', 'development-map.html', 'partials/shell.html', 'shell.js',
   'scripts/gen_zip_pages.py', 'lib/community-page.js'];
 const linkedFrom = otherSources.filter((f) => { try { return read(f).includes(PAGE); } catch (e) { return false; } });
 ok(shipped, 'DEPLOYED (founder, 2026-09-29): the page is in the scripts/stage_site.py allowlist, so it publishes');

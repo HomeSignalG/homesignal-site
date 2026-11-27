@@ -177,7 +177,7 @@ ok(HS.zipAuthMergeSites(report, []).every(s => s.label !== 'centroid-radius perm
 
 // ── F. the page is actually wired to all of this ─────────────────────────────────────────────
 console.log('\nF. page wiring');
-const page = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const page = readFileSync(new URL('../development-map.html', import.meta.url), 'utf8');
 ok(/lib\/zip-authoritative\.js/.test(page), 'F1 the page ships the library');
 ok(/rpc\/app_zip_projects_markers/.test(page), 'F2 ZIP mode calls the authoritative RPC');
 ok(/HS\.zipAuthSitesFrom\(/.test(page) && /HS\.zipModeSites\(/.test(page),

@@ -51,7 +51,7 @@ ok(r.tile === '4+', '6c. an unrecognised state is never a total', J(r));
 ok(F({ state: 'complete', member_count: 9 }, 2).tile === '2', '7. an explicit member count (Map 1: the drawn set) wins over the object');
 
 // The two pages read it, and the empty-page sentence needs a complete zero.
-const map = readFileSync(join(root, 'homesignalmap.html'), 'utf8');
+const map = readFileSync(join(root, 'development-map.html'), 'utf8');
 const comm = readFileSync(join(root, 'lib/community-page.js'), 'utf8');
 const data = readFileSync(join(root, 'lib/data.js'), 'utf8');
 ok(/HS\.facilityInventory\(data\.facInventory \|\| null, _facN\)/.test(map) && /facInventory: \(rs && rs\.facility_inventory\) \|\| null/.test(map),

@@ -44,15 +44,15 @@ ok(resolveViewedZip({ defaultZip: DEF }) === DEF,
   'default remains 78617 when no viewed or saved ZIP exists');
 ok(navHref('alerts.html', '84101') === 'alerts.html?zip=84101',
   'navHref carries zip on a nav link');
-ok(navHref('homesignalmap.html', '84101') === 'homesignalmap.html?zip=84101',
+ok(navHref('development-map.html', '84101') === 'development-map.html?zip=84101',
   'navHref carries zip on Development tracker link');
-ok(navHref('homesignalmap.html', null) === 'homesignalmap.html',
+ok(navHref('development-map.html', null) === 'development-map.html',
   'missing ZIP → bare page (graceful fallback, no invented zip)');
-ok(navHref('homesignalmap.html', 'abc') === 'homesignalmap.html',
+ok(navHref('development-map.html', 'abc') === 'development-map.html',
   'invalid ZIP → bare page');
-ok(navHref('homesignalmap.html', '84101').indexOf('78617') === -1,
+ok(navHref('development-map.html', '84101').indexOf('78617') === -1,
   'navHref does not substitute the sample ZIP when a different ZIP is passed');
-ok(navHref('homesignalmap.html', DEF) === 'homesignalmap.html?zip=78617',
+ok(navHref('development-map.html', DEF) === 'development-map.html?zip=78617',
   'navHref encodes an explicitly passed default ZIP');
 ok(alertsHrefForSavedPlace({ zip: '84101' }) === navHref('alerts.html', '84101'),
   'saved-place Alerts CTA reuses navHref (ZIP context)');
@@ -62,14 +62,14 @@ ok(pageHref('alerts.html', { zip: '84101', band: 'open' }) === 'alerts.html?zip=
   'pageHref preserves zip + deep-link params');
 
 // --- ONE map (the second map was retired 2026-09-04) ---
-ok(navHref('homesignalmap.html', '90210') === 'homesignalmap.html?zip=90210',
+ok(navHref('development-map.html', '90210') === 'development-map.html?zip=90210',
   'the primary map preserves ZIP');
-ok(MAP_PAGES.length === 1 && MAP_PAGES[0] === 'homesignalmap.html',
+ok(MAP_PAGES.length === 1 && MAP_PAGES[0] === 'development-map.html',
   'MAP_PAGES lists exactly ONE map experience');
 ok(MAP_PAGES.indexOf('maps.html') < 0 && ZIP_NAV_PAGES.indexOf('maps.html') < 0,
   'the retired map is in neither page list');
-ok(ZIP_NAV_PAGES.indexOf('homesignalmap.html') >= 0,
-  'ZIP_NAV_PAGES includes homesignalmap.html for cross-link stamping');
+ok(ZIP_NAV_PAGES.indexOf('development-map.html') >= 0,
+  'ZIP_NAV_PAGES includes development-map.html for cross-link stamping');
 
 // --- tracker boot: no sample ZIP without browsing context ---
 ok(hasViewedZipContext({ urlZip: '84101' }), 'URL zip counts as viewed context');
@@ -86,7 +86,7 @@ ok(/Object\.defineProperty\(state,\s*'zip'/.test(shell),
   'shell.js zip is a setter (community deep link + repaint)');
 ok(/function paintNavHrefs/.test(shell), 'shell.js defines paintNavHrefs');
 ok(/paintNavHrefs\(\)/.test(shell), 'shell.js calls paintNavHrefs from topbar');
-ok(ZIP_NAV_PAGES.indexOf('homesignalmap.html') >= 0 && ZIP_NAV_PAGES.indexOf('development.html') >= 0,
+ok(ZIP_NAV_PAGES.indexOf('development-map.html') >= 0 && ZIP_NAV_PAGES.indexOf('development.html') >= 0,
   'ZIP_NAV_PAGES includes the map and Development');
 // Carried over from test/maps-zip-preservation.test.mjs, which was retired with the second
 // map: this is the only assertion in the suite pinning the SHARED location flow, and it is
@@ -105,7 +105,7 @@ ok(/parseZipFromAddress/.test(shell), 'shell.js exposes parseZipFromAddress');
 
 // --- page contracts: cross-links + "See it on the map" ---
 const mapsHtml = fs.readFileSync(new URL('../maps.html', import.meta.url), 'utf8');
-const devMapHtml = fs.readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const devMapHtml = fs.readFileSync(new URL('../development-map.html', import.meta.url), 'utf8');
 const devPage = fs.readFileSync(new URL('../development.html', import.meta.url), 'utf8');
 const dash = fs.readFileSync(new URL('../dashboard.html', import.meta.url), 'utf8');
 const today = fs.readFileSync(new URL('../today.html', import.meta.url), 'utf8');
@@ -117,19 +117,19 @@ const howItWorks = fs.readFileSync(new URL('../how-it-works.html', import.meta.u
 const comm = fs.readFileSync(new URL('../lib/community-page.js', import.meta.url), 'utf8');
 
 // The retired map is a redirect stub, and the primary map no longer advertises it.
-ok(/location\.replace\('\/homesignalmap\.html'/.test(mapsHtml) && !/<template id="hs-content">/.test(mapsHtml),
+ok(/location\.replace\('\/development-map\.html'/.test(mapsHtml) && !/<template id="hs-content">/.test(mapsHtml),
   'the retired map is a redirect stub to the primary map, not a second map experience');
 ok(!/data-znav="maps\.html"/.test(devMapHtml) && !/href="maps\.html"/.test(devMapHtml),
   'the primary map no longer cross-links to the retired map');
 ok(/hasViewedZipContext/.test(devMapHtml),
-  'homesignalmap boot reuses shell ZIP context (no sample auto-load)');
-ok(/HS\.navHref\('homesignalmap\.html',\s*S\.zip\)/.test(devPage),
+  'development-map boot reuses shell ZIP context (no sample auto-load)');
+ok(/HS\.navHref\('development-map\.html',\s*S\.zip\)/.test(devPage),
   'development.html "See it on the map" uses HS.navHref with active ZIP');
 // FIX 8: the Dashboard map preview is REMOVED (§4 "no default Dashboard map"; §17 authorises
 // its removal). There is no Dashboard map link left to preserve a ZIP through, so the old
 // pins are replaced by the positive fact that no map is rendered there at all. Every OTHER
 // page's map links are still pinned above and below this line.
-ok(!/data-znav="homesignalmap\.html"/.test(dash) && !/id="dashMap"/.test(dash),
+ok(!/data-znav="development-map\.html"/.test(dash) && !/id="dashMap"/.test(dash),
   'Fix 8 dashboard.html renders no map and no map link — All My Places has no single centre');
 ok(!/maplibre|leaflet/i.test(dash),
   'Fix 8 dashboard.html loads no map library at all');
@@ -149,16 +149,16 @@ ok(/var q = window\.location\.search \|\| '';/.test(today),
     pair[0] + ' no longer routes anyone to the retired map');
 });
 ok(/parseZipFromAddress/.test(devMapHtml) && /HS\.state\.zip\s*=\s*addrZip/.test(devMapHtml),
-  'homesignalmap address search syncs App-map ZIP from geocoded address');
-ok(/data-znav="homesignalmap\.html"/.test(howItWorks),
+  'development-map address search syncs App-map ZIP from geocoded address');
+ok(/data-znav="development-map\.html"/.test(howItWorks),
   'how-it-works.html development map link preserves viewed ZIP via data-znav');
 ok(/View Development Map/.test(comm),
   'community page runtime has View Development Map link');
-ok(/HS\.navHref\('homesignalmap\.html',\s*zip\)/.test(comm),
+ok(/HS\.navHref\('development-map\.html',\s*zip\)/.test(comm),
   'community page runtime View Development Map uses HS.navHref with current zip');
-ok(/data-znav="homesignalmap\.html"/.test(comm),
+ok(/data-znav="development-map\.html"/.test(comm),
   'community page runtime View Development Map carries data-znav for ZIP stamping');
-ok(!/homesignalmap\.html\?zip=78617/.test(comm),
+ok(!/development-map\.html\?zip=78617/.test(comm),
   'community page runtime does not hardcode sample ZIP in development map link');
 
 if (fails) { console.error('\n' + fails + ' assertion(s) failed'); process.exit(1); }

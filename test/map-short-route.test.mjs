@@ -1,5 +1,5 @@
 // Map 1 per ZIP at /map/<zip>/ (founder: 2026-10-21 short address, 2026-10-22 "go": a real page search
-// engines can list). homesignalmap.html stays the ONE source; scripts/gen_zip_pages.py::MapTemplate
+// engines can list). development-map.html stays the ONE source; scripts/gen_zip_pages.py::MapTemplate
 // renders one small document per ZIP and moves the page's style and runtime into content-addressed
 // files under /map1/. This pins: the extracted runtime and style are byte-identical to the inline
 // ones, each document carries its own title / canonical / robots, the sitemap and the page-state
@@ -28,7 +28,7 @@ out = {"css_name": t.css_name, "js_name": t.js_name, "css": t.css, "js": t.js, "
 sys.stdout.write(json.dumps(out))`);
 assert.equal(R.status, 0, R.stderr);
 const T = JSON.parse(R.stdout);
-const SRC = readFileSync('homesignalmap.html', 'utf8');
+const SRC = readFileSync('development-map.html', 'utf8');
 
 // 1. ONE source: the runtime and style are the inline ones, byte for byte, and the names are their hashes
 const inlineJs = SRC.slice(SRC.lastIndexOf('\n<script>\n') + '\n<script>\n'.length, SRC.indexOf('\n</script>\n</body>') + 1);
@@ -62,7 +62,7 @@ ok(T.idx.includes('content="index, follow" id="robots-meta"'), 'indexable -> ind
 ok(T.cov.includes('content="index, follow" id="robots-meta"'), 'coverage-limited ZIP -> index, follow');
 ok(T.cov.includes(`<link rel="canonical" href="${T.base}/map/06704/"/>`), 'coverage-limited ZIP -> self-canonical');
 ok(/<meta name="description" content="Development records, permits and regulated facilities on file for ZIP 06704 \(Waterbury, CT\)/.test(T.plain), 'ZIP description names the ZIP once (test/zip-heading-place.test.mjs)');
-ok(!T.plain.includes('homesignalmap.html"/>'), 'no ZIP-less canonical left');
+ok(!T.plain.includes('development-map.html"/>'), 'no ZIP-less canonical left');
 {
   // Every user-facing page is a ZIP page: the static bytes a crawler reads first must not carry the
   // Box Elder pilot's county copy, and must name this ZIP and link to its community document.
@@ -84,7 +84,7 @@ ok(re.test('/map/06704/') && re.test('/map/06704'), 'HS.MAP_ROUTE_RE matches /ma
 ok(py('g.MapTemplate().render({"zip": "../x"})').status !== 0, 'non-ZIP refused');
 const tmp = mkdtempSync(join(tmpdir(), 'map-tpl-'));
 const moved = join(tmp, 'm.html');
-(await import('node:fs')).writeFileSync(moved, SRC.replace('<link rel="canonical" href="https://homesignal.net/homesignalmap.html"/>', ''));
+(await import('node:fs')).writeFileSync(moved, SRC.replace('<link rel="canonical" href="https://homesignal.net/development-map.html"/>', ''));
 ok(py('g.MapTemplate(sys.argv[1])', moved).status !== 0, 'a template with no canonical to replace is refused');
 
 // 5. the build: one page per community document, sitemap + family sitemap + page-state carry the indexable ones
@@ -100,7 +100,7 @@ ok(idx.length > 0 && idx.length === zips.length, `INDEX-ALL POLICY: every /map/<
 const sm = readFileSync(join(out, 'sitemap.xml'), 'utf8');
 const smMaps = [...sm.matchAll(/<loc>[^<]*\/map\/(\d{5})\/<\/loc>/g)].map((m) => m[1]).sort();
 ok(JSON.stringify(smMaps) === JSON.stringify(idx), 'sitemap lists exactly the indexable map pages');
-ok(!/homesignalmap\.html\?zip=/.test(sm), 'no homesignalmap.html?zip= URL in the sitemap');
+ok(!/development-map\.html\?zip=/.test(sm), 'no development-map.html?zip= URL in the sitemap');
 const fam = readFileSync(join(out, 'sitemaps', 'map.xml'), 'utf8');
 ok([...fam.matchAll(/<loc>[^<]*\/map\/(\d{5})\/<\/loc>/g)].length === idx.length, 'family sitemap map.xml');
 const st = JSON.parse(readFileSync(join(out, 'sitemaps', 'page-state.json'), 'utf8'));
@@ -129,7 +129,7 @@ function run(src, path, search, hash) {
 }
 const nf = readFileSync('404.html', 'utf8');
 const nfScript = nf.match(/<script>([\s\S]*?)<\/script>/)[1];
-ok(run(nfScript, '/map/84684', '?utm_source=bluesky', '') === '/homesignalmap.html?zip=84684&utm_source=bluesky', '404 map route');
-ok(run(nfScript, '/development/84302', '', '') === '/homesignalmap.html?zip=84302', '404 development route unchanged');
+ok(run(nfScript, '/map/84684', '?utm_source=bluesky', '') === '/development-map.html?zip=84684&utm_source=bluesky', '404 map route');
+ok(run(nfScript, '/development/84302', '', '') === '/development-map.html?zip=84302', '404 development route unchanged');
 
 console.log(`map-short-route: ${pass} checks passed`);

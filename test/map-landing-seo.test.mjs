@@ -1,4 +1,4 @@
-// The ZIP-less Development Map landing page (/homesignalmap.html) is INDEX-ELIGIBLE FROM ITS FIRST BYTE
+// The ZIP-less Development Map landing page (/development-map.html) is INDEX-ELIGIBLE FROM ITS FIRST BYTE
 // (founder, 2026-10-26), and nothing else about indexing moved.
 //
 // WHY: the source used to ship `noindex, nofollow` and let JavaScript promote it. Google does not render a
@@ -26,7 +26,7 @@ const out = buildJodyArtifact();
 const withoutTemplate = (h) => h.replace(/<template\b[\s\S]*?<\/template>/gi, '');
 
 // ── A. the artifact's files ────────────────────────────────────────────────────────────────────────────
-const L = readFileSync(join(out, 'homesignalmap.html'), 'utf8');
+const L = readFileSync(join(out, 'development-map.html'), 'utf8');
 ok(JSON.stringify(robotsOf(L)) === JSON.stringify(['index, follow']), 'A1 landing: exactly one robots meta, and it is "index, follow"', robotsOf(L));
 ok(!/noindex/i.test(L.slice(0, L.indexOf('</head>')).replace(/<script>[\s\S]*?<\/script>/g, '').replace(/<!--[\s\S]*?-->/g, '')),
   'A2 landing: no noindex anywhere in the head markup (the only noindex string is inside the guard script)');
@@ -53,11 +53,11 @@ ok(!/<h1\b/i.test(about), 'A13 the copy adds no second <h1> (the page keeps its 
 const sm = readFileSync(join(out, 'sitemap.xml'), 'utf8');
 ok((sm.match(new RegExp(`<loc>${LANDING.replace(/[.]/g, '\\.')}</loc>`, 'g')) || []).length === 1, 'A14 sitemap.xml lists the landing page exactly once');
 const allSitemaps = [join(out, 'sitemap.xml'), ...walk(join(out, 'sitemaps')).filter((f) => f.endsWith('.xml'))];
-ok(allSitemaps.every((f) => !/homesignalmap\.html\?/.test(readFileSync(f, 'utf8'))), 'A15 no sitemap advertises a homesignalmap.html?… URL (zip, addr, embed)', allSitemaps.length);
-ok(!/\/homesignalmap\.html/.test(allSitemaps.filter((f) => f !== join(out, 'sitemap.xml')).map((f) => readFileSync(f, 'utf8')).join('')),
+ok(allSitemaps.every((f) => !/development-map\.html\?/.test(readFileSync(f, 'utf8'))), 'A15 no sitemap advertises a development-map.html?… URL (zip, addr, embed)', allSitemaps.length);
+ok(!/\/development-map\.html/.test(allSitemaps.filter((f) => f !== join(out, 'sitemap.xml')).map((f) => readFileSync(f, 'utf8')).join('')),
   'A16 the landing page is advertised once, in sitemap.xml, not duplicated into a family sitemap');
 const robotsTxt = readFileSync(join(out, 'robots.txt'), 'utf8');
-ok(!/^Disallow:\s*\/(?:homesignalmap\.html|map\/?)\s*$/m.test(robotsTxt) && !/^Disallow:\s*\/\s*$/m.test(robotsTxt), 'A17 robots.txt does not block the landing page or /map/');
+ok(!/^Disallow:\s*\/(?:development-map\.html|map\/?)\s*$/m.test(robotsTxt) && !/^Disallow:\s*\/\s*$/m.test(robotsTxt), 'A17 robots.txt does not block the landing page or /map/');
 
 // per-ZIP documents: unchanged rules, no landing copy, one self-canonical each, none duplicates another
 const mapDocs = walk(join(out, 'map')).filter((f) => f.endsWith('index.html'));
@@ -90,12 +90,12 @@ for (const f of walk(out).filter((p) => p.endsWith('.html'))) {
 }
 const dup = [...seen].filter(([, v]) => v.length > 1);
 ok(dup.length === 0, 'A21 no two indexable documents share a canonical URL', JSON.stringify(dup.slice(0, 3)));
-ok((seen.get(LANDING) || []).length === 1 && seen.get(LANDING)[0] === '/homesignalmap.html', 'A22 exactly one indexable document canonicalises to the landing URL: the landing page itself', JSON.stringify(seen.get(LANDING)));
+ok((seen.get(LANDING) || []).length === 1 && seen.get(LANDING)[0] === '/development-map.html', 'A22 exactly one indexable document canonicalises to the landing URL: the landing page itself', JSON.stringify(seen.get(LANDING)));
 
 // mass-indexing guard: the ONLY static document that changed robots is the landing page; the other static pages keep theirs
 const generated = /^\/(community|city|project|guides|map|map1)\//;
 const staticIndexable = [...seen.values()].flat().filter((p) => !generated.test(p)).sort();
-ok(staticIndexable.includes('/homesignalmap.html'), 'A23 control: the landing page is among the indexable static documents', staticIndexable.length);
+ok(staticIndexable.includes('/development-map.html'), 'A23 control: the landing page is among the indexable static documents', staticIndexable.length);
 for (const p of ['/property.html', '/development.html', '/alerts.html', '/dashboard.html', '/community.html', '/maps.html', '/follow-embed.html']) {
   ok(!staticIndexable.includes(p), `A24 ${p} stays out of the index`);
 }

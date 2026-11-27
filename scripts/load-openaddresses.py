@@ -25,7 +25,7 @@ continues. A total download/auth failure is a HARD stop (reported, non-zero exit
 partial success.
 
 Config via env:
-  SUPABASE_URL                (else read from homesignalmap.html ENDPOINT)
+  SUPABASE_URL                (else read from development-map.html ENDPOINT)
   SUPABASE_SERVICE_ROLE_KEY   (set by the workflow from PROD_SUPABASE_SERVICE_ROLE_KEY in the GitHub environment
                               `production` — RLS on national_address_points is service-role only)
   ZIPS      comma list of target ZIPs   (else: distinct zips from property_reports)
@@ -71,10 +71,10 @@ def supabase_url() -> str:
     if u:
         return u.rstrip("/")
     # Fall back to the endpoint shipped in the page (same source verify-geocodes.mjs reads).
-    html = (Path(__file__).resolve().parent.parent / "homesignalmap.html").read_text("utf-8")
+    html = (Path(__file__).resolve().parent.parent / "development-map.html").read_text("utf-8")
     m = re.search(r'var ENDPOINT\s*=\s*["\']([^"\']+)["\']', html)
     if not m:
-        raise SystemExit("FATAL: SUPABASE_URL not set and ENDPOINT not found in homesignalmap.html")
+        raise SystemExit("FATAL: SUPABASE_URL not set and ENDPOINT not found in development-map.html")
     return re.sub(r"/functions/v1/.*$", "", m.group(1)).rstrip("/")
 
 

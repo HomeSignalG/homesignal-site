@@ -45,7 +45,7 @@ const ok = (c, name, detail) => {
   if (!c) fails++;
 };
 
-// The page's own record-URL gate (homesignalmap.html sourced()), so "assigned" is comparable to
+// The page's own record-URL gate (development-map.html sourced()), so "assigned" is comparable to
 // what the page can draw at all.
 const sourced = (s) => !!(s && ((s.url && String(s.url).trim()) || (s.record_url && String(s.record_url).trim())));
 const isRes = (s) => { try { return HS.resolveTrackerMarker(s).typeKey === 'residential'; } catch (e) { return false; } };
@@ -83,7 +83,7 @@ for (const zip of ZIPS) {
     });
   });
   try {
-    await page.goto(`${SITE_BASE}/homesignalmap.html?zip=${encodeURIComponent(zip)}`,
+    await page.goto(`${SITE_BASE}/development-map.html?zip=${encodeURIComponent(zip)}`,
                     { waitUntil: 'domcontentloaded', timeout: 60000 });
     await Promise.race([captured, new Promise((r) => setTimeout(r, 120000))]);
     await page.waitForFunction(() => window.__HS_VERIFY && Array.isArray(window.__HS_SITES)

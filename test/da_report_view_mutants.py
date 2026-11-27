@@ -188,7 +188,19 @@ m('bucket_line_back_on_customer_card', "      + (dc ? line('Jody detected'", "  
 m('verify_verdict_ignored', "old: judged ? isObj(v) : e.older_than_a_year === true,", "old: e.older_than_a_year === true,")
 m('malformed_verify_silences_warning', "judged = v === null || isObj(v);", "judged = v !== undefined;")
 m('saved_report_never_flagged', ": e.older_than_a_year === true,\n      filingOnly", ": false,\n      filingOnly")
-m('filing_only_wording_dropped', "(rd.filingOnly ? '. No later official date is on record.", "(false ? '. No later official date is on record.")
+m('filing_only_wording_dropped', "(rd.filingOnly ? '. No later official date is available in the source data used for this report.", "(false ? '. No later official date is available in the source data used for this report.")
+# report-accuracy-universal (2026-11-19): a creation date is never read as a filing, an edit is never a milestone, a status date is the source's own, and an empty answer speaks only for the connected sources
+m('creation_only_wording_dropped', ": rd.creationOnly ? '. No later project date is available in the source data used for this report", ": false ? '. No later project date is available in the source data used for this report", ['test/report-accuracy-universal.test.mjs', 'test/report-source-dates-path.test.mjs'])
+# read-completeness messages (follow-up): both decide from the same limitation codes
+m('read_failed_any_limitation', "return limitationCodes(report).indexOf('SOURCE_NOT_FULLY_READ') >= 0; }", "return limitationCodes(report).length > 0; }")
+m('incomplete_any_limitation', "'RECORDS_NOT_TRACEABLE'].some(function (k) { return c.indexOf(k) >= 0; });", "'RECORDS_NOT_TRACEABLE'].some(function (k) { return c.indexOf(k) >= 0; }) || c.length > 0;")
+m('incomplete_sentence_dropped', "if (recordsIncomplete(report)) body +=", "if (false) body +=")
+m('body_read_failed_sentence_dropped', "if (sourceReadFailed(report)) body +=", "if (false) body +=")
+m('caveat_read_failed_sentence_dropped', "if (sourceReadFailed(report) && (key ===", "if (false && (key ===")
+m('modification_shown_without_its_meaning', "a modification is not a project milestone and does not confirm the status.", "a modification confirms the status.", ['test/report-accuracy-universal.test.mjs', 'test/report-source-dates-path.test.mjs'])
+m('status_date_note_dropped', "return sd ? 'Agency status updated ' + sd + '.' : '';", "return '';", ['test/report-accuracy-universal.test.mjs', 'test/report-source-dates-path.test.mjs'])
+m('empty_answer_caveat_dropped', "var cav = key === 'NO_SIGNIFICANT_CHANGES' || key === 'NO_DATA_INGESTED' || key === 'NO_DEVELOPMENT_ACTIVITY' ? emptyCaveat(report) : '';", "var cav = '';", ['test/report-accuracy-universal.test.mjs', 'test/report-source-dates-path.test.mjs'])
+m('completeness_overclaimed', "'declared complete within its own area' : 'completeness not established'", "'declared complete within its own area' : 'declared complete within its own area'", ['test/report-accuracy-universal.test.mjs', 'test/report-source-dates-path.test.mjs'])
 m('unknown_reason_read_as_filing_only', "filingOnly: isObj(v) && v.reason === 'filing_only'", "filingOnly: isObj(v) && v.reason !== 'old_date'")
 m('words_match_substring', "return !!x && x === wordsOf(b); }", "return !!x && wordsOf(b).indexOf(x) >= 0; }")
 m('unstaged_row_not_filterable', "'<tr role=\"row\" data-da-type=\"' + esc(typeKeyOf(p)) + '\" data-da-stage=\"' + (k || (lifeKey(p) === 'operating' ? 'operating' : 'none')) + '\"' + subAttr(p, k) + '>'", "'<tr role=\"row\"' + (k ? ' data-da-type=\"' + esc(typeKeyOf(p)) + '\" data-da-stage=\"' + k + '\"' : '') + '>'", [BROWSER])
@@ -240,7 +252,7 @@ m('outcome_shown_over_projects', "    if (!o || report.projects.length !== 0) re
 m('outcome_inferred_from_an_empty_list', "return a && typeof a.outcome === 'string' && has(OUTCOMES, a.outcome) ? a.outcome : '';", "return a && typeof a.outcome === 'string' && has(OUTCOMES, a.outcome) ? a.outcome : 'NO_DATA_INGESTED';")  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('empty_report_claims_no_activity', "    var o = OUTCOMES[key], body = o.body;", "    key = 'NO_DEVELOPMENT_ACTIVITY'; var o = OUTCOMES[key], body = o.body;")
 m('outcome_titles_swapped', "      title: 'No data ingested',", "      title: 'No development activity',")
-m('no_data_ingested_explanation_dropped', 'return section(\'outcome\', o.title, \'<p class="da-rv-p da-rv-outcome-p">\' + esc(o.body) + \'</p>\', \'da-rv-hero\');', "return section('outcome', o.title, '', 'da-rv-hero');")  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
+m('no_data_ingested_explanation_dropped', 'return section(\'outcome\', o.title, \'<p class="da-rv-p da-rv-outcome-p">\' + esc(o.body) + \'</p>\' + (o.caveat', "return section('outcome', o.title, '' + (o.caveat", )  # re-anchored 2026-11-19 (report-accuracy-universal): the caveat paragraph now follows the explanation
 m('outcome_block_not_rendered', "    if (!report.projects.length) { parts.push(outcomeSection(report)); if (outcomeKeyOf(report) !== 'NO_SIGNIFICANT_CHANGES') parts.push(excludedNote(report)); }\n", "    if (!report.projects.length) { if (outcomeKeyOf(report) !== 'NO_SIGNIFICANT_CHANGES') parts.push(excludedNote(report)); }\n")  # re-anchored 2026-11-02 (activity-outcome-2)
 m('outcome_radius_invented', "'within ' + r + (r === 1 ? ' mile' : ' miles') + ' of this property' : 'near this property';", "'within ' + r + (r === 1 ? ' mile' : ' miles') + ' of this property' : 'within 0.5 miles of this property';")  # re-anchored 2026-11-02 (activity-outcome-2)
 m('nsc_excluded_note_shown', "if (outcomeKeyOf(report) !== 'NO_SIGNIFICANT_CHANGES') parts.push(excludedNote(report)); }", "parts.push(excludedNote(report)); }")

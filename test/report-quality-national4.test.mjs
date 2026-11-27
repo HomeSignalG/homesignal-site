@@ -37,9 +37,9 @@ const read = (f) => readFileSync(join(root, f), 'utf8');
   // "City of Seattle" for ht3q-kdvx and 76t5-zqzr and "Washington State Department of Ecology" for mmcb-z6jf
   ok(M.publisherOf('seattle-land-use-permits').agency === 'City of Seattle' && M.publisherOf('seattle-building-permits').agency === 'City of Seattle'
     && M.publisherOf('wa-ecology-sepa-register').agency.startsWith('Washington State Department of Ecology'), '1e the registry agency names agree with the publishers\' own dataset attribution');
-  // a credit line stays what it is: only a source whose publisher REQUIRES one carries it (source-attribution.json; this change adds none)
+  // a credit line stays what it is: only a source whose publisher REQUIRES one carries it (source-attribution.json; Boulder County's open data terms require attribution)
   const credits = JSON.parse(read('supabase/functions/_shared/source-attribution.json')).attribution;
-  ok(Object.keys(credits).sort().join() === 'nyc-dob-permit-issuance,nyc-dobnow-approved-permits,seattle-building-permits', '1f no credit line was invented: the agency name rides in its own field');
+  ok(Object.keys(credits).sort().join() === 'boulder-county-accela-applications,nyc-dob-permit-issuance,nyc-dobnow-approved-permits,seattle-building-permits', '1f no credit line was invented: the agency name rides in its own field');
 }
 
 // ---- 2. the record number, and a shortened title ------------------------------------------------------------------------------------------------

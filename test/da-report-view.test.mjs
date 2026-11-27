@@ -28,6 +28,7 @@ const V = sandbox.window.HS.daReportView;
 
 // ---- the engine: every response comes from its real handler (test/lib/da-report-view-world.mjs), and assemble() is called directly once, to compare
 const M = await import('../supabase/functions/_shared/national-report.ts');
+import { categoryCoverage } from '../supabase/functions/_shared/coverage-categories.ts';
 import { NOW, FAM_A, FAM_B, NO_FAMILY, ATTRIBUTION_AB, ADDRESS, row, proj, RICH, COLD, wire, clone } from './lib/da-report-view-world.mjs';
 /** The view of a response. A throw is returned as a marker so the check that looked at it fails BY NAME instead of the whole suite crashing. */
 let threw = 0;
@@ -59,7 +60,7 @@ try {
   ok(W.status === 'OK' && W.report.product === 'HOMESIGNAL DEVELOPMENT ACTIVITY' && Array.isArray(W.report.projects), '0a the response is the real handler\'s: status OK, the engine\'s product name, a projects array');
   const direct = M.assemble({ now: NOW, view: 'customer', zip_supported: true, radius_mi: 0.5, attribution: ATTRIBUTION_AB,
     subject: { address: ADDRESS, matched_address: '742 EVERGREEN TER, SPRINGFIELD, OR, 97477', lat: 44.04612, lng: -122.98123, zip: '97477' },
-    rows: RICH.rows, projects: RICH.projects, ledger: RICH.ledger, events: RICH.events, health: [] });
+    rows: RICH.rows, projects: RICH.projects, ledger: RICH.ledger, events: RICH.events, health: [], category_coverage: categoryCoverage([], []) });
   ok(JSON.stringify(W.report) === JSON.stringify(direct.intelligence), '0b the wire report equals assemble() called directly on the same inputs, byte for byte');
   const asObject = { status: 'OK', coverage_state: direct.coverage_state, report: direct.intelligence, render: direct.renderOnly, stored: false, report_id: null, storable: false, storage_blockers: [] };
   ok(view(asObject) === html, '0c the view of the wire response equals the view of assemble()\'s own object');
@@ -222,7 +223,7 @@ try {
     const base = stale(W);
     ok(base.has && /over a year old/.test(base.c) && /records? carr(?:y|ies) (?:an )?official dates?/.test(base.brief), '3d2a the fixture\'s old record is flagged in its row AND counted in the briefing (the baseline, and the positive control, for the checks below)', base.brief);
     const fo = stale(withRd((e) => { e.verify = { rule: 'freshness-1', reason: 'filing_only', latest_official_date: e.date }; }));
-    ok(fo.has && /Verify: Issued Jan 10, 2025\. No later official date is on record\. Confirm it is still active\./.test(fo.c) && !/over a year old/.test(fo.c), '3d2b a filing_only verdict says the date is the only one on record, and does not call the project old', fo.c);
+    ok(fo.has && /Verify: Issued Jan 10, 2025\. No later official date is available in the source data used for this report\. Confirm it is still active\./.test(fo.c) && !/over a year old/.test(fo.c), '3d2b a filing_only verdict says Jody holds no later official date, and does not call the project old', fo.c);
     const cleared = stale(withRd((e) => { e.verify = null; }));
     ok(!cleared.has && !/over a year old/.test(cleared.c) && !/records? carr(?:y|ies) (?:an )?official dates?/.test(cleared.brief), '3d2c verify: null (a later official date exists) clears the Verify line AND the briefing count, though the date is still over a year old', cleared);
     const plain = stale(withRd((e) => { e.verify = { rule: 'freshness-1', reason: 'old_date', latest_official_date: e.date }; }));
@@ -347,24 +348,54 @@ try {
     const q = (rj, lim) => { const x = clone(WNONE); x.report.activity = { outcome: 'NO_SIGNIFICANT_CHANGES', label: 'No significant nearby changes found', rule_version: 'activity-outcome-2', records_judged: rj };
       if (lim) x.report.coverage = Object.assign({}, x.report.coverage, { limitations: [{ code: 'SOURCE_NOT_FULLY_READ', text: 'A source was not fully read.' }] }); return textOf(V.html(x, {})); };
     const all = q({ total: 4, routine: 4, undescribed: 0, temporary_ended: 0 });
-    ok(/No significant nearby changes found/.test(all) && /Jody checked 4 official records (within [\d.]+ miles? of|near) this property\. All of them describe routine work, such as interior remodels, repairs and office fit-outs\. None documents a change the neighborhood would notice\./.test(all)
+    ok(/No significant nearby changes found/.test(all) && /Jody checked 4 official records (within [\d.]+ miles? of|near) this property\. All of them describe routine work, such as interior remodels, repairs and office fit-outs\. This is limited to the connected sources listed under Official evidence & coverage\./.test(all)
       && !/No data ingested|Records left out of this report|could still matter/.test(all), '5l2 all routine: the founder\'s wording, with the count, and no "No data ingested"', all.slice(0, 500));
     const mix = q({ total: 4, routine: 2, undescribed: 1, temporary_ended: 1 });
-    ok(/2 describe routine work, such as interior remodels, repairs and office fit-outs; 1 does not say what the work is, or when a temporary activity takes place; 1 was a temporary activity that has ended\. None documents/.test(mix)
+    ok(/2 describe routine work, such as interior remodels, repairs and office fit-outs; 1 does not say what the work is, or when a temporary activity takes place; 1 was a temporary activity that has ended\. This is limited to/.test(mix)
       && /could still matter: check it at its official source\./.test(mix), '5l3 mixed: each kind is counted, and an undescribed record is flagged as possibly mattering', mix.slice(0, 600));
     const bad = q({ total: 4, routine: 3, undescribed: 0, temporary_ended: 0 });
-    ok(/Jody read the official records (within [\d.]+ miles? of|near) this property and left every one out\. None documents/.test(bad) && !/checked 4/.test(bad), '5l4 counts that do not add up are not printed', bad.slice(0, 400));
+    ok(/None of the records Jody read (within [\d.]+ miles? of|near) this property met this report's criteria for a nearby change\. This is limited to/.test(bad) && !/checked 4/.test(bad), '5l4 counts that do not add up are not printed', bad.slice(0, 400));
     const lim = q({ total: 1, routine: 1, undescribed: 0, temporary_ended: 0 }, true);
     ok(/It describes routine work/.test(lim) && /Not every source was read in full, so this is not a complete answer/.test(lim), '5l5 one record, singular; a limitation says the answer is not complete', lim.slice(0, 500));
+    { // the read-failure sentence needs explicit read-failure evidence, never just any limitation
+      const SENT = /At least one connected source could not be read in full, so its records may be missing from this report\./;
+      const w = (lims, cats) => { const y = clone(WNONE); y.report.activity = { outcome: 'NO_SIGNIFICANT_CHANGES', label: 'No significant nearby changes found', rule_version: 'activity-outcome-2' };
+        y.report.coverage = Object.assign({}, y.report.coverage, { limitations: lims });
+        if (cats === null) delete y.report.coverage.categories; else y.report.coverage.categories = Object.assign({ rule: 'coverage-categories-2', connected: [], not_connected: [], not_established: [] }, cats);
+        return textOf(V.html(y, {})); };
+      const FAIL = [{ code: 'SOURCE_NOT_FULLY_READ', text: 'x' }];
+      ok(SENT.test(w(FAIL, {})), '5l6a an incomplete source read shows the read-failure sentence');
+      ok(!SENT.test(w([], { not_connected: [{ label: 'Building permits' }] })) && /No connected source covers Building permits/.test(w([], { not_connected: [{ label: 'Building permits' }] })), '5l6b missing category coverage alone does not claim a failed read (its own sentence still shows)');
+      ok(!SENT.test(w([], { not_established: [{ label: 'Building permits' }] })) && /Coverage is not established for Building permits/.test(w([], { not_established: [{ label: 'Building permits' }] })), '5l6c unknown category coverage alone does not claim a failed read');
+      ok(!SENT.test(w([{ code: 'AREA_TRUNCATED', text: 'This area holds more records than one report can carry; the list is incomplete.' }], {})), '5l6d an unrelated limitation alone does not claim a failed read');
+      ok(SENT.test(w(FAIL, null)), '5l6e the sentence appears with no category-coverage metadata at all');
+      ok(SENT.test(w(FAIL, { not_connected: [{ label: 'Building permits' }] })) && /No connected source covers Building permits\. At least one connected source could not be read/.test(w(FAIL, { not_connected: [{ label: 'Building permits' }] })), '5l6f with category coverage too, the coverage sentences come first and the read-failure sentence follows');
+      { // both read-completeness messages decide from the same evidence: BODY ("Not every source was read in full") and CAVEAT (the sentence above)
+        const BODY = /Not every source was read in full, so this is not a complete answer/, INC = /Some records near this property are not included in this report, so the list may be incomplete/;
+        const both = (t) => ({ body: BODY.test(t), cav: SENT.test(t), inc: INC.test(t) });
+        const cases = [
+          ['explicit failed read', w(FAIL, {}), { body: true, cav: true, inc: false }],
+          ['missing categories only', w([], { not_connected: [{ label: 'Building permits' }] }), { body: false, cav: false, inc: false }],
+          ['unknown coverage only', w([], { not_established: [{ label: 'Building permits' }] }), { body: false, cav: false, inc: false }],
+          ['an unrelated limitation only', w([{ code: 'SOMETHING_ELSE', text: 'Unrelated.' }], {}), { body: false, cav: false, inc: false }],
+          ['no limitations', w([], null), { body: false, cav: false, inc: false }],
+          ['truncation (its own explicit limitation)', w([{ code: 'AREA_TRUNCATED', text: 'This area holds more records than one report can carry; the list is incomplete.' }], {}), { body: false, cav: false, inc: true }],
+          ['records not loaded', w([{ code: 'RECORDS_NOT_LOADED', text: 'Some records found near this location could not be loaded for this report, so the list may be incomplete.' }], {}), { body: false, cav: false, inc: true }],
+          ['failed read and truncation together', w([FAIL[0], { code: 'AREA_TRUNCATED', text: 'x' }], {}), { body: true, cav: true, inc: true }]
+        ];
+        cases.forEach(([name, text, want]) => ok(JSON.stringify(both(text)) === JSON.stringify(want), '5l7 read-completeness messages: ' + name, both(text)));
+        ok(/This area holds more records than one report can carry; the list is incomplete\./.test(w([{ code: 'AREA_TRUNCATED', text: 'This area holds more records than one report can carry; the list is incomplete.' }], {})), '5l7 a truncation limitation is still listed in full under Official evidence & coverage, never hidden');
+      }
+    }
   }
   const proven = clone(WNONE); proven.report.activity = { outcome: 'NO_DEVELOPMENT_ACTIVITY', label: 'No development activity', rule_version: 'activity-outcome-1' };
   const hp = view(proven), op = sec(hp, 'outcome');
-  ok(op && op.label === 'No development activity' && textOf(op.html) === 'No development activity Jody\'s official development records for this address are coming in, and they show no development within 0.5 miles of this property.',
+  ok(op && op.label === 'No development activity' && textOf(op.html).startsWith('No development activity Jody\'s official development records for this address are coming in, and they show no development within 0.5 miles of this property.'),
     '5m once the engine can prove it, the empty report says "No development activity" and the radius it covers', op && textOf(op.html));
   const p1 = clone(proven); p1.report.radius_mi = 1;
-  ok(/within 1 mile of this property\.$/.test(textOf(sec(view(p1), 'outcome').html)), '5n one mile is "1 mile"');
+  ok(/within 1 mile of this property\./.test(textOf(sec(view(p1), 'outcome').html)), '5n one mile is "1 mile"');
   const p2 = clone(proven); delete p2.report.radius_mi;
-  ok(/show no development near this property\.$/.test(textOf(sec(view(p2), 'outcome').html)), '5n with no radius stated it says "near this property" and invents none');
+  ok(/show no development near this property\./.test(textOf(sec(view(p2), 'outcome').html)), '5n with no radius stated it says "near this property" and invents none');
   const labelLies = clone(WNONE); labelLies.report.activity = { outcome: 'NO_DATA_INGESTED', label: 'No development activity', rule_version: 'activity-outcome-1' };
   ok(sec(view(labelLies), 'outcome').label === 'No data ingested', '5o the words come from the outcome CODE, never the label text: a label that disagrees with its code cannot become a claim');
   const shownButSaysEmpty = clone(W); shownButSaysEmpty.report.activity = { outcome: 'NO_DEVELOPMENT_ACTIVITY', label: 'No development activity', rule_version: 'activity-outcome-1' };

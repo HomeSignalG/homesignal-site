@@ -15,7 +15,7 @@ What it changes for `--identity jody`
                    sitemaps/CNAME/indexnow key are removed.  A staging tree can never be mistaken for a launch.
 
 What it deliberately does NOT change (each is an identifier or an external dependency, not a brand word)
-  * file paths and URLs' paths (identical-path SEO migration, Step 4): homesignalmap.html stays
+  * file paths and URLs' paths (identical-path SEO migration, Step 4): development-map.html stays
   * e-mail addresses (@homesignal.net): the Jody mailboxes do not exist until Step 6
   * did:web:homesignal.net (immutable Bluesky identity), the Supabase project, repo names, CSS/storage keys
 Every rule is counted; a rule that matches nothing in a tree where it must, or a leftover the

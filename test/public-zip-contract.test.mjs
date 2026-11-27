@@ -15,7 +15,7 @@
 //      pinned is the GATE (`sess && !sess.demo`), never the block's absence — the absence
 //      form would fail the authorized feature it is supposed to protect.
 //   2. Rule F is pinned at BUILD time (scripts/gen_zip_pages.py) and by the ABSENCE of any
-//      robots write in the runtime. homesignalmap.html legitimately flips its own
+//      robots write in the runtime. development-map.html legitimately flips its own
 //      #robots-meta for Utah indexability; that is not Rule F and is not in scope here.
 //
 // Every check runs on a COMMENT-STRIPPED copy — assertions in this repo have already gone
@@ -26,7 +26,7 @@ let fails = 0;
 const ok = (c, name, d) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + name
   + (!c && d !== undefined ? '  detail: ' + JSON.stringify(d).slice(0, 220) : '')); if (!c) fails++; };
 const read = (f) => fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8');
-// ⚠️ The block-comment strip must not fire inside a URL: homesignalmap.html's CSP carries
+// ⚠️ The block-comment strip must not fire inside a URL: development-map.html's CSP carries
 // `https://*.tile.openstreetmap.org`, whose `/*` opened a phantom comment swallowing 2,297
 // bytes of that file's head — so an absence-pin over the CSP or the head scripts passed by
 // reading nothing. Requiring the opener not to follow `:` or `/` keeps every real comment.
@@ -104,7 +104,7 @@ for (const [f, body] of [['lib/community-page.js', cp], ['community.html', legac
   ok(nav.join('|') === 'explore->index.html|props->properties.html|enterprise->development-activity.html',
     'v3 ...Explore, My Places, Enterprise — in that order', nav);
   ok(!nav.some(n => /today/.test(n)), 'PS-001 Today is NOT in the chrome (A-020 retired it)', nav);
-  ok(!nav.some(n => /homesignalmap/.test(n)), 'PS-001 Maps is NOT in the chrome (Map 1 is an Explore child)', nav);
+  ok(!nav.some(n => /development-map/.test(n)), 'PS-001 Maps is NOT in the chrome (Map 1 is an Explore child)', nav);
   ok(!nav.some(n => /community\.html/.test(n)), 'PS-001 Zip Code Activity is NOT in the chrome — the public ZIP is an Explore child, not a primary item', nav);
 }
 
@@ -134,7 +134,7 @@ ok(/<title>HomeSignal — Activity<\/title>/.test(communityHtml) && !/<title>Hom
 ok(gen.includes('local government notices, meetings & news | HomeSignal'),
   'PS-001 the generated document keeps its search-facing title (deliberately not "Activity")');
 ok(/id="commFollowBtn"/.test(cp), 'PS-001 ...on the same control id');
-ok(/View Development Map →/.test(cp) && /HS\.navHref\('homesignalmap\.html', zip\)/.test(cp),
+ok(/View Development Map →/.test(cp) && /HS\.navHref\('development-map\.html', zip\)/.test(cp),
   'PS-001 "View Development Map →" still targets Map 1, not the development list');
 // The onclick lives inside a single-quoted JS string, so the inner quotes are escaped in
 // the SOURCE bytes: onclick="HS.openModal(\\'shareModal\\')". Match what is actually there.

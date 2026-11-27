@@ -1,7 +1,7 @@
 name: Verify dev-tracker 84336 render
 
 # Faithful, live render check of the 84336 development page (buckets a/b/c). Runs on the runner
-# (open egress): serves the static site, loads homesignalmap.html?zip=84336 against LIVE Supabase +
+# (open egress): serves the static site, loads development-map.html?zip=84336 against LIVE Supabase +
 # real OSM tiles via headless Chromium, screenshots the rendered page, and prints a structured
 # assertion of every honesty label. Commits the screenshot + assertions back to the branch (with
 # [skip ci] to avoid a loop) so they can be reviewed on the PR.
@@ -9,7 +9,7 @@ on:
   push:
     branches: [claude/dev-tracker-zip-scope]
     paths:
-      - homesignalmap.html
+      - development-map.html
       - verify/dev-tracker-verify.mjs
       - .github/workflows/verify-dev-tracker.yml
   workflow_dispatch:

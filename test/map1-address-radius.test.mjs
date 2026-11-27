@@ -3,7 +3,7 @@
 // Two halves, because half the contract is behaviour and half is wiring:
 //   * BEHAVIOUR runs the real lib/n5-radius.js (pure, no DOM, no fetch) over rows shaped exactly
 //     like the installed RPC's output;
-//   * WIRING asserts against homesignalmap.html, because "the page calls geocode-address and
+//   * WIRING asserts against development-map.html, because "the page calls geocode-address and
 //     passes its exact lat/lng to the RPC" cannot be executed offline but can be read.
 //
 // The invariant behind almost every case below: the RPC owns SPACE (membership + distance,
@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const page = readFileSync(join(root, 'homesignalmap.html'), 'utf8');
+const page = readFileSync(join(root, 'development-map.html'), 'utf8');
 
 global.window = { HS: {} };
 await import('../lib/n5-radius.js');

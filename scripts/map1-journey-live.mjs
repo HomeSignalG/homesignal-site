@@ -89,11 +89,11 @@ ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'explore',
   'A Explore is the ONLY active item on development.html', c.activeLabels);
 
 // ── B. Map 1 is part of Explore ─────────────────────────────────────────────────────────
-await page.goto(BASE + '/homesignalmap.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.goto(BASE + '/development-map.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
 await waitShell();
 await waitMap();
 c = await chrome();
-info('homesignalmap.html', { nav: c.navTokens, active: c.activeTokens });
+info('development-map.html', { nav: c.navTokens, active: c.activeTokens });
 ok(c.navTokens.join('|') === V3_NAV, 'B the same three header items on Map 1', c.navTokens);
 ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'explore',
   'B Explore is the ONLY active item on Map 1', c.activeLabels);
@@ -121,7 +121,7 @@ ok(z.devPoints > 0 && z.devPoints === z.authoritative,
 ok(z.distances === 0, 'E no radius distance in ZIP mode', z.distances);
 
 // ── C / D. Reaching Map 1 from the ZIP page and from the development list ──────────────
-const MAP_LINK = '#hs-slot a[data-znav="homesignalmap.html"]';
+const MAP_LINK = '#hs-slot a[data-znav="development-map.html"]';
 for (const [origin, label] of [['community.html', 'C ZIP page'], ['development.html', 'D Development list']]) {
   await page.goto(BASE + '/' + origin + '?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await waitShell();
@@ -135,15 +135,15 @@ for (const [origin, label] of [['community.html', 'C ZIP page'], ['development.h
   await waitMap().catch(() => {});
   c = await chrome();
   info(label + ' -> Map 1', { href, landed: c.path + c.search, active: c.activeTokens });
-  ok(href === 'homesignalmap.html?zip=' + ZIP, label + ' -> "View Development Map" carries the viewed ZIP', href);
+  ok(href === 'development-map.html?zip=' + ZIP, label + ' -> "View Development Map" carries the viewed ZIP', href);
   // Map 1 shows /map/<zip> in the address bar (founder, 2026-10-22).
-  ok(/\/homesignalmap\.html$/.test(c.path) || c.path === '/map/' + ZIP, label + ' -> lands on Map 1', c.path);
+  ok(/\/development-map\.html$/.test(c.path) || c.path === '/map/' + ZIP, label + ' -> lands on Map 1', c.path);
   ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'explore',
     label + ' -> Explore is still the active item once the page settles', c.activeTokens);
 }
 
 // ── F. A saved home in Del Valle, a map of Denver ───────────────────────────────────────
-await page.goto(BASE + '/homesignalmap.html?zip=' + OTHER_ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.goto(BASE + '/development-map.html?zip=' + OTHER_ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
 await waitShell();
 await waitMap();
 await installSavedHome();
@@ -158,7 +158,7 @@ ok(!!(c.savedHome && c.savedHome.address === '13313 COOMES DR'),
   'F the saved home is preserved, unchanged', c.savedHome);
 
 // positive control: on the saved place's OWN ZIP it still names that address as Viewing
-await page.goto(BASE + '/homesignalmap.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.goto(BASE + '/development-map.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
 await waitShell();
 await waitMap();
 await installSavedHome();
@@ -193,7 +193,7 @@ ok(/CALDWELL/i.test(c.locLabel || ''), 'G the current view follows the searched 
 ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'explore', 'G Explore is still the active item', c.activeTokens);
 
 // ── H. ZIP -> address -> ZIP ────────────────────────────────────────────────────────────
-await page.goto(BASE + '/homesignalmap.html?zip=' + OTHER_ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.goto(BASE + '/development-map.html?zip=' + OTHER_ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
 await waitShell();
 await waitMap();
 await installSavedHome();
@@ -226,7 +226,7 @@ const WHOLE_ZIP_FACILITY_CLAIM = /(facilit\w*[^.]{0,80}\b(?:for|in|across)\s+(?:
 // used to read "Showing EPA-registered facilities for this ZIP."
 const FAC_ZIP = process.env.FAC_ZIP || '71104';
 
-await page.goto(BASE + '/homesignalmap.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.goto(BASE + '/development-map.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
 await waitShell();
 await waitMap();
 await page.waitForTimeout(600);
@@ -249,7 +249,7 @@ ok(/^\d+$/.test((counts.dev||'').trim()) && /^\d+$/.test((counts.fac||'').trim()
   'I6 both counts still render', counts);
 
 // ── J. F1 — the facilities-only state, live ─────────────────────────────────────────────
-await page.goto(BASE + '/homesignalmap.html?zip=' + FAC_ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.goto(BASE + '/development-map.html?zip=' + FAC_ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
 await waitShell();
 await waitMap();
 await page.waitForTimeout(900);

@@ -28,7 +28,7 @@ export function readFileSync(p, ...rest) {
 }
 
 // THE SHORT MAP ADDRESS (founder, 2026-10-22). Map 1 lives at /map/<zip>/: a real document per ZIP,
-// rendered by scripts/gen_zip_pages.py::MapTemplate from homesignalmap.html, with the page's style and
+// rendered by scripts/gen_zip_pages.py::MapTemplate from development-map.html, with the page's style and
 // runtime in content-addressed files under /map1/. On GitHub Pages /map/<zip> 301s to /map/<zip>/
 // (query kept). A test server answers the same way: mapRoute(req.url) -> {status, headers, body} or null.
 // The document is rendered with no data (ZIP <zip>, not indexable); the browser suites stub the data.

@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 
-const raw = fs.readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const raw = fs.readFileSync(new URL('../development-map.html', import.meta.url), 'utf8');
 const src = raw.replace(/\/\/.*$/gm, '');
 
 // 1. The counter is computed through projectsIn over the active-undecided proposed points.

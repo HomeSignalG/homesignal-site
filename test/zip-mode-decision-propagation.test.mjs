@@ -50,7 +50,7 @@ function sitesFor(fixtures) {
   };
   return HS.zipModeSites([], payload, [], [], []);   // the real ZIP-mode assembler
 }
-// The page's decisionSubject (homesignalmap.html), pinned structurally below.
+// The page's decisionSubject (development-map.html), pinned structurally below.
 const subject = (s) => { const r = String((s && (s.type_raw || s.permit_class)) || '').trim(); return (!r || r.length > 48) ? 'Application' : r + ' application'; };
 const note = (s) => HS.decisionNotation(HS.decisionOf(s), subject(s));
 const line = (s) => HS.currentStatusLine(HS.decisionOf(s), s.decision_evidence || 'none');
@@ -125,7 +125,7 @@ ok(sites.filter((s) => s.bucket === 'proposed').length === all.length, 'the Prop
 
 
 // 9. the page renders through the same helpers (structural: nothing here re-decides)
-const page = readFileSync(join(root, 'homesignalmap.html'), 'utf8');
+const page = readFileSync(join(root, 'development-map.html'), 'utf8');
 ok(/function decisionSubject\(s\)\{[^}]*type_raw \|\| s\.permit_class/.test(page), 'the page subject helper reads permit_class, which the builder carries from type_raw');
 ok(/function decisionNoteHTML\(s, cls\)\{\s*var d = decisionOf\(s\);/.test(page), 'the page renders the note from decisionOf(site)');
 

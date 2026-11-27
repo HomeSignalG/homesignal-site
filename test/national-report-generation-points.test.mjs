@@ -51,7 +51,7 @@ async function report(rows, lat) {
     radius: async () => rows.map((r) => ({ source_key: r.source_key, feature_id: r.feature_id, registry_id: r.registry_id, provenance: r.provenance,
       distance_mi: r.distance_mi, geometry_type: r.geometry_type, has_more: r.has_more, marker_lat: r.marker_lat, marker_lng: r.marker_lng })),
     hydrate: async (keys) => hydrateAll.filter((p) => keys.includes(p.source_key)),
-    ledger: async () => [], events: async () => [], health: async () => [],
+    ledger: async () => [], events: async () => [], health: async () => [], jurisdictions: async () => [],
   };
   const res = await H.makeHandler(deps)(new Request('https://x.supabase.co/functions/v1/get-development-activity-report', {
     method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer t' }, body: JSON.stringify({ address: '1 Constructed Test Subject, Austin, TX 78704' }) }));

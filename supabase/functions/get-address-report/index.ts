@@ -58,7 +58,7 @@
 // tabs_quarantined. Address-mode behavior unchanged. v17 = PROPERTY REPORTS: canonicalAddr()
 // (the ONE address normalizer, engine-side — case-study §4.3) stamps canonical_addr on every
 // point record with a FILED street address, and the ZIP-mode refresh collapses those records
-// into per-address property_reports rows (the dossier cache behind homesignalmap.html?addr=…).
+// into per-address property_reports rows (the dossier cache behind development-map.html?addr=…).
 // sources_checked lists ONLY sources this refresh actually queried that came back empty at
 // that address — never an assumed check.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -77,7 +77,7 @@ import {
 } from "./sources/echo-cwa.ts";
 import { resolvePlanes } from "./sources/planes.ts";
 import { scopePolicy, zipScopeBounds } from "./sources/zip-bounds.ts";
-import { zipMembershipRpc } from "./sources/scope-members.ts";
+import { zipGeomMembershipRpc, zipMembershipRpc } from "./sources/scope-members.ts";
 import { tabsForZip, type TabsPins } from "./sources/tdlr-tabs.ts";
 import { siteKey, tceqForZip, type TceqCommunityRow, type TceqEntity } from "./sources/tceq-cr.ts";
 import tabsPinsTravis from "./pins/tdlr-tabs-projects.travis.json" with { type: "json" };
@@ -98,10 +98,12 @@ import { arcgisForZip, type ArcgisRegistryEntry } from "./sources/arcgis.ts";
 import { IDENTITY_ALIAS_FILES } from "./identity-aliases/index.ts";
 import { ckanForZip, type CkanCommunityRow, type CkanRegistryEntry } from "./sources/ckan.ts";
 import { csvForZip, type CsvCommunityRow, type CsvRegistryEntry } from "./sources/csv.ts";
+import { countyCasesForZip, namesHeldCase, type CountyCommunityRow, type CountyCasesRegistryEntry } from "./sources/county-cases.ts";
 import { cartoForZip, type CartoCommunityRow, type CartoRegistryEntry } from "./sources/carto.ts";
 const ARCGIS_ENTRIES = (jurisdictionRegistry as unknown as { arcgis?: ArcgisRegistryEntry[] }).arcgis ?? [];
 const CKAN_ENTRIES = (jurisdictionRegistry as unknown as { ckan?: CkanRegistryEntry[] }).ckan ?? [];
 const CSV_ENTRIES = (jurisdictionRegistry as unknown as { csv?: CsvRegistryEntry[] }).csv ?? [];
+const COUNTY_CASES_ENTRIES = (jurisdictionRegistry as unknown as { county_cases?: CountyCasesRegistryEntry[] }).county_cases ?? [];
 const CARTO_ENTRIES = (jurisdictionRegistry as unknown as { carto?: CartoRegistryEntry[] }).carto ?? [];
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -262,7 +264,7 @@ async function devSites(supabase: ReturnType<typeof createClient>, homeLat: numb
     supabase.from("alerts").select("title,category,agency_name,geographic_reference,source_url,comment_deadline").in("community_id", communityIds).eq("pipeline_type", "government_notice").in("category", DEV_CATEGORIES).order("published_at", { ascending: false }).order("id"));
   // AREA (jurisdiction-level) notices have NO trustworthy point — a county/city notice applies
   // county- or city-WIDE, not to one address. The page never trusts these coordinates: all three
-  // map views position area items synthetically around the report anchor (homesignalmap.html
+  // map views position area items synthetically around the report anchor (development-map.html
   // placeAreaSites / siteLL / siteEN). So the engine anchors every area item at the REPORT
   // CENTROID (homeLat/homeLng) and never at a hardcoded place.
   //   Why this changed (v18 backbone fix): the old code geocoded area items against a
@@ -277,6 +279,9 @@ async function devSites(supabase: ReturnType<typeof createClient>, homeLat: numb
   const [ae, an] = toEN(homeLat, homeLng, homeLat, homeLng);   // [0,0] — the report anchor
   for (const a of alerts) {
     const title = ((a.title as string) || "").trim();
+    // A case the registry holds as unverified (hold_cases) is not shown as a current proposal through this path either:
+    // its notice row stays stored, but no development item is built from it.
+    if (namesHeldCase(COUNTY_CASES_ENTRIES, `${title} ${(a.source_url as string) || ""}`)) continue;
     const approved = /\b(approved|approves|granted|adopted|entitled|permit issued|issued a permit|under construction|final plat|site plan approv|authoriz|ground ?break|breaks ground|begins construction|construction begins)\b/i.test(title);
     // A DECIDED item (approved OR denied/withdrawn/tabled) is not an open comment opportunity.
     // ── DENIAL AND WITHDRAWAL ARE DIFFERENT FACTS, AND EACH KEEPS ITS OWN WORD ──────
@@ -729,6 +734,7 @@ async function handleRequest(req: Request): Promise<Response> {
     // Widened-only records are tested against the canonical polygon through ONE batch RPC; the box is
     // never used without it (sources/scope-members.ts).
     const zipMembers = zipMembershipRpc(supabase, zip);
+    const zipGeomMembers = zipGeomMembershipRpc(supabase, zip);
     if (policy.on && !scope.bounds) console.warn(`[scope] ${zip}: legacy centroid scope — ${scope.reason}`);
     // UNIT 4 — the two planes run concurrently under separate deadlines (sources/planes.ts).
     // The join still waits for both; overlay is capped at 45s+grace instead of the unbounded
@@ -826,6 +832,7 @@ async function handleRequest(req: Request): Promise<Response> {
       zipCentroid: { lat: clat, lng: clng },
       zipBounds: scope.bounds,
       zipMembers: scope.bounds ? zipMembers : null,
+      zipGeomMembers: scope.bounds ? zipGeomMembers : null,
       identityAliases: IDENTITY_ALIAS_FILES,
       noteFence,
     });
@@ -876,6 +883,16 @@ async function handleRequest(req: Request): Promise<Response> {
       zipCentroid: { lat: clat, lng: clng },
       noteFence,
     });
+    // County land-use CASES (HTML index + the county's own parcel layer). A case is pinned only when every
+    // tax lot it names resolves in the parcel layer; the pin must be a member of this ZIP's polygon.
+    const countyCases = await countyCasesForZip(zip, (commRows ?? []) as CountyCommunityRow[], COUNTY_CASES_ENTRIES, {
+      fetch,
+      zipCentroid: { lat: clat, lng: clng },
+      // Membership comes from the ZIP's own polygon (zip_scope_members) whenever the ZIP has a boundary,
+      // independent of ZIP_SCOPE_BOUNDS_MODE (the map-publication policy). Other connectors still follow
+      // `scope.bounds`; without a boundary this stays null and the connector falls back to its radius test.
+      zipMembers: zipGeo.bounds ? zipMembers : null,
+    });
     // Anti-fabrication: a marker with no official record URL is not rendered, not counted.
     const dev = devRaw.filter((s) => (s.url as string) && (s.url as string).trim() !== "");
     // TABS filings are development records by construction (state permit registry) — stamp
@@ -925,6 +942,15 @@ async function handleRequest(req: Request): Promise<Response> {
       });
     // Carto records → engine site shape (identical mapping to socrataSites above).
     const cartoSites: Record<string, unknown>[] = (carto.sites as unknown as Record<string, unknown>[])
+      .filter((s) => String(s.record_url || "").trim() !== "")
+      .map((s) => {
+        const lat = s.lat as number | null, lng = s.lng as number | null;
+        const pt = lat != null && lng != null;
+        const [e, n] = pt ? toEN(clat, clng, lat as number, lng as number) : [0, 0];
+        return { ...s, url: s.record_url, e, n, lat: pt ? lat : clat, lng: pt ? lng : clng };
+      });
+    // County-case records → engine site shape (identical mapping to socrataSites above).
+    const countyCaseSites: Record<string, unknown>[] = (countyCases.sites as unknown as Record<string, unknown>[])
       .filter((s) => String(s.record_url || "").trim() !== "")
       .map((s) => {
         const lat = s.lat as number | null, lng = s.lng as number | null;
@@ -986,7 +1012,7 @@ async function handleRequest(req: Request): Promise<Response> {
     // never silent point-job loss. No stored id lists; recomputed per report.
     // A filing/issue date after today is refused (the record stays undated); sources/date-sanity.ts.
     const permitSites = dedupeExactPermits(applyYields(
-      refuseFutureFilingDates([...tabsSites, ...socrataSites, ...arcgisSites, ...ckanSites, ...csvSites, ...cartoSites], today),
+      refuseFutureFilingDates([...tabsSites, ...socrataSites, ...arcgisSites, ...ckanSites, ...csvSites, ...cartoSites, ...countyCaseSites], today),
       YIELDS_MAP,
     ));
     const devRecords = [...devReal, ...permitSites];
@@ -1016,7 +1042,7 @@ async function handleRequest(req: Request): Promise<Response> {
     const envTceq = fac.filter((s) => (s.env as { tceq?: unknown } | undefined)?.tceq).length;
     // TABS records are development filings → counts.development, never counts.facilities.
     const facCoverage = facilityCoverage(facResult.epa);
-    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, epa: facResult.epa, echo, cwa, counts: { facilities: fac.length, ...(facCoverage ? { facilities_coverage: facCoverage } : {}), proposed: proposedRecords.length, proposed_active: proposedActiveRecords.length, proposed_decided: decidedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, tabs_quarantined: tabs.quarantined, socrata_reports: socrata.reports, arcgis_reports: arcgis.reports, ckan_reports: ckan.reports, csv_reports: csv.reports, carto_reports: carto.reports, env_records: { epa_matched: envEpa, tceq_matched: tceqStats.matched, tceq_dataset: tceq.dataset ?? null, tceq_entities: tceq.entities.length, tceq_quarantined: tceq.quarantined }, note: "ZIP-wide view (not a home). Development items are jurisdiction-level (scope=area); facilities (scope=point) are the EPA-registered facilities inside the ZIP boundary. Environmental records (EPA ECHO federal + TCEQ Central Registry state) are geo-matched to each facility. Not for resale.", sites }, 200, cors);
+    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, epa: facResult.epa, echo, cwa, counts: { facilities: fac.length, ...(facCoverage ? { facilities_coverage: facCoverage } : {}), proposed: proposedRecords.length, proposed_active: proposedActiveRecords.length, proposed_decided: decidedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, tabs_quarantined: tabs.quarantined, socrata_reports: socrata.reports, arcgis_reports: arcgis.reports, ckan_reports: ckan.reports, csv_reports: csv.reports, carto_reports: carto.reports, county_cases_reports: countyCases.reports, env_records: { epa_matched: envEpa, tceq_matched: tceqStats.matched, tceq_dataset: tceq.dataset ?? null, tceq_entities: tceq.entities.length, tceq_quarantined: tceq.quarantined }, note: "ZIP-wide view (not a home). Development items are jurisdiction-level (scope=area); facilities (scope=point) are the EPA-registered facilities inside the ZIP boundary. Environmental records (EPA ECHO federal + TCEQ Central Registry state) are geo-matched to each facility. Not for resale.", sites }, 200, cors);
   }
 
   const address = (body.address || "").trim();

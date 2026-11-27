@@ -119,7 +119,7 @@ const main = async () => {
     ok((s.desc || '').includes(zip), `[${zip}] ZIP-specific meta description`);
     ok(['Government notices', 'Upcoming public meetings', 'Local news']
         .every((x) => s.headings.includes(x)), `[${zip}] all three Alerts headings present`);
-    ok((/href="\/map\/\d{5}\/"/.test(s.links) || /homesignalmap\.html\?zip=/.test(s.links)) && /href="\/"/.test(s.links),
+    ok((/href="\/map\/\d{5}\/"/.test(s.links) || /development-map\.html\?zip=/.test(s.links)) && /href="\/"/.test(s.links),
        `[${zip}] usable internal links in the initial HTML`);
     ok(!r.xRobots, `[${zip}] no X-Robots-Tag header overriding the page's own directive`);
   }
@@ -243,7 +243,7 @@ const main = async () => {
     const sm = (await get(`${SITE}/sitemap.xml`)).body;
     const canonZips = [...sm.matchAll(/<loc>[^<]*\/community\/(\d{5})\/<\/loc>/g)].map((m) => m[1]);
     const legacyZips = [...sm.matchAll(/community\.html\?zip=(\d{5})/g)].map((m) => m[1]);
-    const dev = [...sm.matchAll(/homesignalmap\.html\?zip=(\d{5})/g)].map((m) => m[1]);
+    const dev = [...sm.matchAll(/development-map\.html\?zip=(\d{5})/g)].map((m) => m[1]);
     const dupes = canonZips.length - new Set(canonZips).size;
     const bad5 = canonZips.filter((z) => !/^\d{5}$/.test(z));
     console.log(`  sitemap: canonical community ${canonZips.length} · legacy ${legacyZips.length} · `
@@ -258,11 +258,11 @@ const main = async () => {
     // the deployed twin and the build-time proof ever disagree, the DEPLOYMENT is what
     // changed — so leaving this one asserting the old rule would turn the daily live
     // verifier red the day after the merge and point at the wrong cause.
-    // Every homesignalmap.html?zip= URL serves a byte-identical noindex document that
+    // Every development-map.html?zip= URL serves a byte-identical noindex document that
     // canonicalises to the ZIP-less URL, so advertising them contradicted the assertions
     // directly above. The route itself is untouched and still returns 200 (STEP 12).
     ok(dev.length === 0,
-       'the sitemap advertises ZERO noindex homesignalmap.html?zip= URLs');
+       'the sitemap advertises ZERO noindex development-map.html?zip= URLs');
     console.log(`SITEMAP_CANONICAL_COUNT=${canonZips.length}`);
   }
 
@@ -293,7 +293,7 @@ const main = async () => {
       h1: (document.querySelector('h1') || {}).textContent || '',
       ssrItems: document.querySelectorAll('#hs-ssr li').length,
       text: (document.body.innerText || ''),
-      navLinks: document.querySelectorAll('a[href*="homesignalmap.html"], a[href^="/map/"]').length,
+      navLinks: document.querySelectorAll('a[href*="development-map.html"], a[href^="/map/"]').length,
     }));
     const want = seo(body[k].body).robots;
     ok(after.robots === want, `[${z}] robots is STILL "${want}" after JavaScript`);
@@ -321,7 +321,7 @@ const main = async () => {
     const page = await ctx.newPage();
     const errs = [];
     page.on('pageerror', (e) => errs.push(String(e)));
-    const r = await page.goto(`${SITE}/homesignalmap.html?zip=${C.point_dense}`,
+    const r = await page.goto(`${SITE}/development-map.html?zip=${C.point_dense}`,
       { waitUntil: 'domcontentloaded', timeout: 45000 });
     await page.waitForTimeout(7000);
     const map = await page.evaluate(() => ({
@@ -329,7 +329,7 @@ const main = async () => {
       sites: (window.__HS_SITES || []).length,
       addrBox: !!document.querySelector('input[id*="addr"], input[placeholder*="address" i]'),
     }));
-    ok(r.status() === 200, `[map ${C.point_dense}] homesignalmap.html?zip= returns 200`);
+    ok(r.status() === 200, `[map ${C.point_dense}] development-map.html?zip= returns 200`);
     ok(map.leaflet, `[map ${C.point_dense}] the Leaflet map still renders`);
     ok(map.sites > 0, `[map ${C.point_dense}] the map still loads real sites (${map.sites})`);
     ok(map.addrBox, `[map ${C.point_dense}] the address search box is still present`);

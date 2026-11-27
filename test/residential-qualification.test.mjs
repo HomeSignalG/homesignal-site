@@ -165,10 +165,10 @@ ok(verdict({ registry_id: 'denton-county-dev-permits', type_raw: 'HOUSE', name: 
 // copy would pass while the page regressed. Narrowing Residential made room under the 12-row
 // cap, which turned the probe's long-standing LATENT duplicate condition actual - 76135 drew
 // one TxDOT corridor project 7 times.
-const pageSrc = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const pageSrc = readFileSync(new URL('../development-map.html', import.meta.url), 'utf8');
 const grabFn = (name) => {
   const i = pageSrc.indexOf('function ' + name + '(');
-  if (i === -1) throw new Error('not found in homesignalmap.html: ' + name);
+  if (i === -1) throw new Error('not found in development-map.html: ' + name);
   let depth = 0, j = pageSrc.indexOf('{', i);
   for (let k = j; k < pageSrc.length; k++) {
     if (pageSrc[k] === '{') depth++;

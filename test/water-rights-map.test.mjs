@@ -45,7 +45,7 @@ const m = HS.resolveTrackerMarker(a);
 ok(m.isWaterRight && m.label === 'W' && m.color === '#1c6ea4' && m.typeKey === null && !m.isFacility,
   'B1 own marker: letter W, own colour, no Type, not a facility', m);
 HS.setWaterRightsVisible(false); ok(!HS.waterRightsVisible(), 'B2 the switch turns the layer off'); HS.setWaterRightsVisible(true);
-ok(HS.waterRightsFromUrl('https://x/homesignalmap.html?water=0') === false && HS.waterRightsFromUrl('https://x/?water=1') === true
+ok(HS.waterRightsFromUrl('https://x/development-map.html?water=0') === false && HS.waterRightsFromUrl('https://x/?water=1') === true
   && HS.waterRightsFromUrl('https://x/') === null, 'B3 ?water=0/1, else default');
 const twin = clone(FX.zip); twin.filings[1].points = clone(twin.filings[0].points).slice(0, 1);
 const g = HS.waterRightsSitesFrom(twin);
@@ -65,7 +65,7 @@ ok(HS.zipModeSites([], null, [], [], [a, noVerdict, outside]).length === 1, 'C1 
 ok(HS.zipModeSites([], null, [], []).length === 0, 'C2 the four-argument call still works');
 
 // ── D ──
-const PAGE = read('homesignalmap.html');
+const PAGE = read('development-map.html');
 ok(/rpc\/water_rights_for_zip/.test(PAGE) && /rpc\/map1_water_rights_near/.test(PAGE), 'D1 ZIP mode and address mode each read their reader');
 ok(/zipModeSites\(rsSites, auth, natlSites, cleanupSites, waterSites\)/.test(PAGE), 'D2 ZIP mode passes water sites through the one door');
 ok(/&& !\(HS\.isWaterRight && HS\.isWaterRight\(s\)\); \}\);/.test(PAGE), 'D3 water-rights pins never enter the facility set');
