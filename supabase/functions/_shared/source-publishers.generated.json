@@ -1039,11 +1039,13 @@
   },
   "udot-active-projects": {
    "agency": "Utah Department of Transportation",
-   "dataset": "services.arcgis.com, service All_Projects"
+   "dataset": "services.arcgis.com, service All_Projects",
+   "date_basis": "record_created"
   },
   "udot-active-projects-lines": {
    "agency": "Utah Department of Transportation",
-   "dataset": "services.arcgis.com, service All_Projects"
+   "dataset": "services.arcgis.com, service All_Projects",
+   "date_basis": "record_created"
   },
   "vdot-syip-approved-projects": {
    "agency": "Virginia Department of Transportation (VDOT) — Six-Year Improvement Program (SYIP), approved projects",

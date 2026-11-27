@@ -42,6 +42,12 @@ export const SURFACES = {
     tables: ['development_reports'],
     capped: false,
   },
+  'audit-date-basis': {
+    surface: 'n/a — data only (the source registry file; reads no table and no page)',
+    tables: [],
+    capped: false,
+    note: 'a field NAME is a lead, never proof of what a date means; it reclassifies nothing',
+  },
   'audit-official-links': {
     surface: 'map page (development-map.html?zip=)',
     tables: ['development_reports'],

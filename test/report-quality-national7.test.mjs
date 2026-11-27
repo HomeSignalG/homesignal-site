@@ -254,7 +254,7 @@ const rel = (name, type_raw = null, typeKey = null, registry_id = null) => M.rel
   const he = V.html({ status: 'OK', report: e, render: {} }, {});
   const n3 = onlyRoutine.length;
   ok(e.projects.length === 0 && e.activity.outcome === 'NO_SIGNIFICANT_CHANGES' && /<h2 class="da-rv-h2">No significant nearby changes found<\/h2>/.test(he)
-    && he.includes('Jody checked ' + n3 + ' official records within 0.5 miles of this property. All of them describe routine work, such as interior remodels, repairs and office fit-outs. None documents a change the neighborhood would notice.')
+    && he.replace(/&amp;/g, '&').includes('Jody checked ' + n3 + ' official records within 0.5 miles of this property. All of them describe routine work, such as interior remodels, repairs and office fit-outs. This is limited to the connected sources listed under Official evidence & coverage.')
     && !/No data ingested/.test(he) && !/Records left out of this report/.test(he),
     'R3 an empty report of routine work says "No significant nearby changes found" (founder 2026-11-02), with the count of records Jody checked, never "No data ingested"', he.replace(/<[^>]+>/g, ' ').slice(0, 600));
   // the test world's default agency class ('New Construction') does not bypass relevance: without it a generic record is left out

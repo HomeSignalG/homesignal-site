@@ -94,6 +94,12 @@ export interface ColumnMap {
   record_url?: ColumnRef;
   /** Optional: the publisher's own work description, emitted as `scope_text` (sources/scope-text.ts). Never part of the title. */
   scope_text?: ColumnRef;
+  /** Optional, all separate from `file_date` (sources/source-dates.ts): the day the agency CREATED the record, the day it last MODIFIED it (any edit),
+   *  the day its STATUS last changed (map only a column that says so), and the agency's own milestone dates. None is ever read as the filing date. */
+  source_created?: ColumnRef;
+  source_updated?: ColumnRef;
+  status_updated?: ColumnRef;
+  milestone_dates?: Array<{ column: ColumnRef; label: string; kind?: "planned" | "actual" }>;
 }
 
 export interface StatusToBucket {
@@ -224,6 +230,8 @@ export type FileDateKind =
  *  `type` is the LIFECYCLE bucket the page renders (built|approved|proposed); the mapped source
  *  classification is `use_type` (kept separate so the two never collide). */
 export interface NormalizedRecord {
+  /** The record's other source dates (created, last modified, status updated, milestones), beside `file_date` and never in place of it (sources/source-dates.ts). */
+  source_dates?: { created?: string; updated?: string; status_updated?: string; milestones?: Array<{ label: string; date: string; kind: "planned" | "actual" | "unstated" }> };
   /** Present ONLY on a record kept because the polygon widening reached it (sources/scope-members.ts). */
   scope_origin?: "polygon_member";
   source_id: string;                 // socrata:{domain}:{dataset_id}:{case_number|:id}
