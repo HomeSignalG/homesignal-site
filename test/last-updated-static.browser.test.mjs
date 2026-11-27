@@ -52,7 +52,7 @@ const srv = createServer((q, s) => { const p = decodeURIComponent(q.url.split('?
 await new Promise((res) => srv.listen(0, '127.0.0.1', res));
 const base = 'http://127.0.0.1:' + srv.address().port;
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ javaScriptEnabled: false });
+const ctx = await browser.newContext({ javaScriptEnabled: false, viewport: (() => { const m = /^(\d+)x(\d+)$/.exec(process.env.HS_VIEWPORT || ''); return m ? { width: +m[1], height: +m[2] } : { width: 1280, height: 900 }; })() });
 const visible = async (path) => { const pg = await ctx.newPage(); await pg.goto(base + path, { waitUntil: 'domcontentloaded' });
   const t = await pg.evaluate(() => document.body.innerText.replace(/\s+/g, ' ')); const lis = await pg.evaluate(() => Array.from(document.querySelectorAll('main li')).map((l) => l.innerText.replace(/\s+/g, ' ')));
   await pg.close(); return { t, lis }; };

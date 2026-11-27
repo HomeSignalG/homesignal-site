@@ -61,7 +61,7 @@ const browser = await chromium.launch(launchOpts);
 
 async function open(name) {
   const c = CASES[name], zip = '23150';
-  const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+  const page = await (await browser.newContext({ viewport: (() => { const m = /^(\d+)x(\d+)$/.exec(process.env.HS_VIEWPORT || ''); return m ? { width: +m[1], height: +m[2] } : { width: 1280, height: 900 }; })() })).newPage();
   const pageErrors = [];
   page.on('pageerror', e => pageErrors.push(String(e).slice(0, 300)));
   page.on('console', m => { if (m.type() === 'error') pageErrors.push('console: ' + m.text().slice(0, 200)); });

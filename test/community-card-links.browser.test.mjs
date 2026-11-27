@@ -90,7 +90,7 @@ window.supabase = { createClient: function () {
 
 
 const browser = await chromium.launch();
-const ctx = await browser.newContext();
+const ctx = await browser.newContext({ viewport: (() => { const m = /^(\d+)x(\d+)$/.exec(process.env.HS_VIEWPORT || ''); return m ? { width: +m[1], height: +m[2] } : { width: 1280, height: 720 }; })() });
 const seenExternal = [];
 
 async function hydrate(zip) {
