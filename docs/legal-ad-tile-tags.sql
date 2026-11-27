@@ -1,4 +1,5 @@
--- PARKED, NOT APPLIED (founder routing rule 2026-11-27: legal ads show on Government Notices AND Local News).
+-- APPLIED 2026-11-27 (founder approval): column, constraint, review table, archive row, DB-computed backfill (31 rows: 12 local_news + 19 government_notice) and the app_refresh_zip splice. Rollback: docs/legal-ad-tile-tags-rollback.sql.
+-- (was: PARKED, NOT APPLIED) (founder routing rule 2026-11-27: legal ads show on Government Notices AND Local News).
 -- Evidence (2026-11-27): public.alerts has ONE `pipeline_type` (NOT NULL) and ONE `category` (NOT NULL) per row, plus
 -- `subtopics text[]` (topics, not tiles). 31 bid-like rows = 19 government_notice + 12 news/local_news, each on one tile only.
 -- Smallest change: a second tag on the SAME row (no duplicate rows).
