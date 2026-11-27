@@ -2388,6 +2388,9 @@
           util.homePlaceFor(state.properties, state.zip));
       } catch (e) { groups = null; /* one government, as before */ }
     }
+    // COVERAGE FIRST. What the resident is told, and whether Save exists at all, follows what is
+    // verifiably there for this ZIP; nothing here changes what is saved or delivered.
+    const cov = await coverageStateFor(key, state.zip);
     $('tmTitle').textContent = d.title; $('tmSub').textContent = d.sub; $('tmBadge').textContent = d.badge;
     $('tmEmail').textContent = state.session ? state.session.user.email : 'sign in to save';
     const saved = state.topicPrefs[key];
@@ -2420,8 +2423,72 @@
     // consent ALWAYS defaults unchecked unless the user previously opted in (policy > mockup)
     $('tmConsent').checked = saved ? !!saved.share_consent : false;
     $('tmForm').classList.remove('hidden'); $('tmDone').classList.add('hidden');
-    updTCount(); HS.openModal('topicsModal');
+    updTCount(); paintCoverage(cov);
+    HS.openModal('topicsModal');
   };
+  // The state of this ZIP for the picker of category `key`:
+  //   'no_community' | 'unavailable' | 'no_meetings' | 'has_meetings' | null (no claim)
+  // 'unavailable' / 'no_meetings' / 'has_meetings' are about UPCOMING MEETINGS only, so only that
+  // picker asks for them. For Government Notices and Local News the only question is whether a
+  // community exists, because that is what a subscription is filed on.
+  async function coverageStateFor(key, zip) {
+    if (!CAT_TO_TOPICS_KEY[key] || !HS.data) return null;
+    try {
+      if (key === 'meetings' && HS.data.meetingCoverage) {
+        const c = await HS.data.meetingCoverage(zip);
+        return (c && c.state && c.state !== 'unknown') ? c.state : null;
+      }
+      if (HS.data.communityGovTopics) {
+        const ct = await HS.data.communityGovTopics(zip);
+        return (ct && ct.rootId) ? null : (CFG.DATA_SOURCE === 'supabase' ? 'no_community' : null);
+      }
+    } catch (e) { /* a failed read makes no claim */ }
+    return null;
+  }
+  const COVER_TEXT = {
+    no_meetings: 'No upcoming meetings are scheduled right now. Pick the topics you want and you will be alerted when one is posted.',
+    unavailable: 'Meeting coverage unavailable for this ZIP. You can still pick topics and save them. Alerts start only if verified coverage is added.'
+  };
+  // One element, redrawn on every open. no_community hides the whole picker and the Save
+  // button: nothing could be written, so nothing may say "saved" or "you will be notified".
+  function paintCoverage(cov) {
+    let box = $('tmCover');
+    if (!box) {
+      box = document.createElement('div'); box.id = 'tmCover'; box.setAttribute('role', 'status');
+      box.style.cssText = 'margin:0 0 12px;padding:10px 12px;border:1px solid #d6d3c4;border-radius:8px;font-size:14px;line-height:1.4';
+      $('tmGrid').parentNode.insertBefore(box, $('tmGrid'));
+    }
+    const none = cov === 'no_community';
+    const zip = String(state.zip || '').trim();
+    box.dataset.state = cov || '';
+    box.classList.toggle('hidden', !cov || cov === 'has_meetings');
+    if (none) {
+      box.innerHTML = "<b>HomeSignal doesn't cover this ZIP yet.</b> There is nothing to sign up for yet. "
+        + '<a href="#" id="tmCoverReq">Request coverage for ' + HS.esc(zip) + '</a>';
+      const a = $('tmCoverReq');
+      if (a) a.onclick = function (e) {
+        e.preventDefault();
+        HS.closeModal('topicsModal');
+        HS.openLoc(false);
+        $('reqZipLabel').textContent = zip;
+        $('locForm').classList.add('hidden');
+        $('locRequest').classList.remove('hidden');
+      };
+    } else if (cov && COVER_TEXT[cov]) {
+      box.textContent = COVER_TEXT[cov];
+    } else {
+      box.textContent = '';
+    }
+    ['tmGrid', 'tmCount'].forEach(id => { const el = $(id); if (el) el.style.display = none ? 'none' : ''; });
+    const consent = document.querySelector('#topicsModal label.consent');
+    if (consent) consent.style.display = none ? 'none' : '';
+    const sl = document.querySelector('#topicsModal .savingline');
+    if (sl) sl.style.display = none ? 'none' : '';
+    const btn = document.querySelector('#tmForm .mbtn');
+    if (btn) btn.style.display = none ? 'none' : '';
+    const note = document.querySelector('#tmForm .mnote');
+    if (note) note.style.display = none ? 'none' : '';
+  }
   function updTCount() {
     const n = document.querySelectorAll('#tmGrid .tchip.on').length;
     $('tmCount').textContent = n + ' topic' + (n === 1 ? '' : 's') + ' selected';
@@ -2435,24 +2502,36 @@
     if (!HS.requireAuth('save-topics', HS.saveTopics)) return;
     const chips = [...document.querySelectorAll('#tmGrid .tchip.on')].map(b => b.dataset.key || b.querySelector('span:last-child').textContent);
     const cats = HS.data.topicCategories();
+    // A ZIP with no community has nowhere to file a subscription: write nothing, claim nothing.
+    // (The picker already hides Save for it; this is the same rule at the write itself.)
+    const covNow = ($('tmCover') && $('tmCover').dataset.state) || '';
+    if (covNow === 'no_community') return;
+    // ORDER: the delivery subscription (user_subscriptions, via signup_complete) is written
+    // FIRST. Only when it succeeds are the app-local picks (app_topic_prefs + local cache)
+    // saved, so a failure never leaves the app saying "followed" over nothing delivery knows.
+    // persistSignup reads state.topicPrefs, so the picks are set in memory first and put back
+    // exactly as they were if the write fails.
+    const prevPrefs = state.topicPrefs[TCUR];
     state.topicPrefs[TCUR] = { topics: chips, share_consent: $('tmConsent').checked };
-    cacheTopicPrefs(state.topicPrefs, state.session && state.session.user && state.session.user.id);
-    await persistTopics(TCUR, chips, $('tmConsent').checked);
-    // THE signup write: users row + user_subscriptions via signup_complete — the
-    // thing that makes digest emails actually deliver. FAIL LOUD: if it errors,
-    // the modal shows the failure and never claims "Alerts saved" (topic_prefs
-    // alone is app state, not a subscription).
+    // FAIL LOUD: if it errors, the modal shows the failure and never claims "Alerts saved".
     try {
       await persistSignup();
     } catch (e) {
+      if (prevPrefs === undefined) delete state.topicPrefs[TCUR]; else state.topicPrefs[TCUR] = prevPrefs;
       const m = $('tmCount');
       if (m) m.textContent = "Couldn't save your alerts — please try again. (" + ((e && e.message) || 'save error') + ')';
       return;
     }
+    cacheTopicPrefs(state.topicPrefs, state.session && state.session.user && state.session.user.id);
+    await persistTopics(TCUR, chips, $('tmConsent').checked);
     logEvent('alert_signup_topics', { topic: TCUR });
     HS.paintTopicCounts();
     $('tmForm').classList.add('hidden');
-    $('tmDoneMsg').textContent = "You'll be alerted about " + chips.length + ' ' + cats[TCUR].title.toLowerCase() + ' topic' + (chips.length === 1 ? '' : 's') + '.';
+    $('tmDoneMsg').textContent = covNow === 'unavailable'
+      ? 'Saved. Alerts start only if verified coverage is added.'
+      : "You'll be alerted about " + chips.length + ' ' + cats[TCUR].title.toLowerCase() + ' topic' + (chips.length === 1 ? '' : 's') + '.';
+    const dh = $('tmDone').querySelector('h4');
+    if (dh) dh.textContent = covNow === 'unavailable' ? 'Saved' : 'Alerts saved';
     $('tmDone').classList.remove('hidden');
   };
   // Build the COMPLETE desired subscription set across all deliverable categories
