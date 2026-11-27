@@ -163,8 +163,8 @@ ok(Array.isArray(a.p_subscriptions) && a.p_subscriptions.some(s => s.topic === C
 ok(a.p_email === 'resident@example.com', '3d as the account that just signed in', a.p_email);
 ok(page.url() === base + LANDING, '3e the page did NOT navigate: ?zip= is intact', page.url());
 ok(await page.locator('#tmDone').isVisible()
-   && /You'll be alerted about 1 government notices topic/.test(await page.locator('#tmDoneMsg').textContent()),
-  '3f the picker says the alerts were saved', await page.locator('#tmDoneMsg').textContent());
+   && (await page.locator('#tmDoneMsg').textContent()) === 'Saved. Alerts start only if verified coverage is added.',
+  '3f the picker says it was saved, and promises no delivery for Government Notices', await page.locator('#tmDoneMsg').textContent());
 ok(!(await page.locator('#authModal').isVisible()), '3g the sign-in closed itself');
 const iVerify = F.log.findIndex(e => e.kind === 'verify');
 const iSave = F.log.findIndex(e => e.kind === 'rpc' && e.name === 'signup_complete');

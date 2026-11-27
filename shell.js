@@ -2454,10 +2454,8 @@
     for (const c of cats) await persistTopics(c, chosen[c], picks[c].share_consent);
     state.pendingPicks = null;
     box.dataset.busy = '0'; box.dataset.done = '1';
-    const n = cats.reduce((s, c) => s + chosen[c].length, 0);
-    box.innerHTML = coverage === 'unavailable'
-      ? '<b>Saved.</b> Alerts start only if verified coverage is added.'
-      : '<b>Saved.</b> You will be alerted about ' + n + ' topic' + (n === 1 ? '' : 's') + '.';
+    const counts = {}; cats.forEach(c => { counts[c] = chosen[c].length; });
+    box.textContent = util.savedMessage(counts, coverage).text;   // a promise only where delivery is verified
     HS.paintTopicCounts();
   };
 
@@ -2628,11 +2626,12 @@
     logEvent('alert_signup_topics', { topic: TCUR });
     HS.paintTopicCounts();
     $('tmForm').classList.add('hidden');
-    $('tmDoneMsg').textContent = covNow === 'unavailable'
-      ? 'Saved. Alerts start only if verified coverage is added.'
-      : "You'll be alerted about " + chips.length + ' ' + cats[TCUR].title.toLowerCase() + ' topic' + (chips.length === 1 ? '' : 's') + '.';
+    // "You will be alerted" only for Upcoming Meetings in a community with stored meetings; every other
+    // pick (Government Notices, Local News, unverified meetings) gets the careful wording.
+    const doneMsg = util.savedMessage({ [TCUR]: chips.length }, TCUR === 'meetings' ? covNow : null);
+    $('tmDoneMsg').textContent = doneMsg.text;
     const dh = $('tmDone').querySelector('h4');
-    if (dh) dh.textContent = covNow === 'unavailable' ? 'Saved' : 'Alerts saved';
+    if (dh) dh.textContent = doneMsg.heading;
     $('tmDone').classList.remove('hidden');
   };
   // Build the COMPLETE desired subscription set across all deliverable categories

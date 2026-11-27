@@ -185,7 +185,41 @@ await run('E finish, no feed', '52638', Object.assign({ communities: NOFEED, pro
 await run('F finish, feed exists', '97702', Object.assign({ communities: FEED, meetings: [{ community_id: 'c1', meeting_date: FUTURE }], props: props('97702') }, prefsOnly), async page => {
   await page.click('#finishGo');
   await page.waitForSelector('#finishAlerts:has-text("Saved.")', { timeout: 5000 });
-  ok(/You will be alerted about 2 topics/.test(await txt(page, '#finishAlerts')), 'F1 a community with delivered meetings says it will alert', await txt(page, '#finishAlerts'));
+  const f1 = (await txt(page, '#finishAlerts')).trim();
+  ok(f1 === 'Saved. You will be alerted about 1 Upcoming Meetings topic. Alerts for the other topics start only if verified coverage is added.', 'F1 only the Upcoming Meetings pick is promised; the Government Notices pick is not', f1);
+});
+
+// I/J/K. What the finish message may promise, with meetings stored (coverage verified for meetings only).
+const feedCfg = (prefs) => ({ communities: FEED, meetings: [{ community_id: 'c1', meeting_date: FUTURE }], props: props('97702'), prefs });
+await run('I Local News only', '97702', feedCfg([{ category: 'news', topics: ['Water Quality'], share_consent: false }]), async page => {
+  await page.click('#finishGo');
+  await page.waitForSelector('#finishAlerts:has-text("Saved.")', { timeout: 5000 });
+  const m = (await txt(page, '#finishAlerts')).trim();
+  ok(!/alerted/i.test(m) && m === 'Saved. Alerts start only if verified coverage is added.', 'I1 a Local News pick never shows "will be alerted"', m);
+});
+await run('J Government Notices only', '97702', feedCfg([{ category: 'gov', topics: [T], share_consent: false }]), async page => {
+  await page.click('#finishGo');
+  await page.waitForSelector('#finishAlerts:has-text("Saved.")', { timeout: 5000 });
+  const m = (await txt(page, '#finishAlerts')).trim();
+  ok(!/alerted/i.test(m) && m === 'Saved. Alerts start only if verified coverage is added.', 'J1 a Government Notices pick never shows "will be alerted"', m);
+});
+await run('K Upcoming Meetings only', '97702', feedCfg([{ category: 'meetings', topics: [T], share_consent: false }]), async page => {
+  await page.click('#finishGo');
+  await page.waitForSelector('#finishAlerts:has-text("Saved.")', { timeout: 5000 });
+  ok((await txt(page, '#finishAlerts')).trim() === 'Saved. You will be alerted about 1 Upcoming Meetings topic.', 'K1 Upcoming Meetings with stored meetings may say it will alert');
+});
+await run('L the wording rule itself', '97702', feedCfg([]), async page => {
+  const r = await page.evaluate(() => {
+    const f = HS.topicPrefsUtil.savedMessage;
+    const out = {};
+    for (const st of [null, 'unavailable', 'no_meetings', 'has_meetings']) {
+      for (const counts of [{ gov: 2 }, { news: 1 }, { gov: 1, news: 1 }, { meetings: 1 }, { gov: 1, meetings: 1 }, { dev: 1 }]) out[st + '|' + JSON.stringify(counts)] = f(counts, st).text;
+    }
+    return out;
+  });
+  const bad = Object.entries(r).filter(([k, v]) => /alerted/i.test(v) && !(/meetings/.test(k.split('|')[1]) && /^(no_meetings|has_meetings)/.test(k)));
+  ok(bad.length === 0, 'L1 "will be alerted" appears only for Upcoming Meetings picks with stored meetings', bad);
+  ok(Object.entries(r).every(([k, v]) => !/alerted about \d+ (Government|Local)/.test(v)) && Object.entries(r).filter(([k]) => !/meetings/.test(k.split('|')[1])).every(([k, v]) => !/alerted/i.test(v)), 'L2 never promises Government Notices or Local News, and a save with no meetings pick promises nothing', r);
 });
 
 // G. Unticking a topic leaves it out; nothing ticked asks for one.
