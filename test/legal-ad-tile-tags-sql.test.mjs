@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+const s = fs.readFileSync(new URL('../docs/legal-ad-tile-tags.sql', import.meta.url), 'utf8');
+const code = s.split('\n').filter((l) => !l.trim().startsWith('--')).join('\n');
+let bad = 0;
+const ok = (c, m) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + m); if (!c) bad++; };
+ok(/add column if not exists tile_tags text\[\] not null default/.test(code), 'second tag is an additive column on the same row');
+ok(!/\bdelete\s+from\b|\bdrop table\b|\btruncate\b|insert into public\.alerts/i.test(code), 'no destructive or duplicate-row statement');
+ok(!/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(code), 'no transcribed uuid list');
+ok(/enable row level security/.test(code), 'review list has RLS on and no policy');
+ok(/not valid/.test(code), 'constraint added NOT VALID until backfill');
+process.exit(bad ? 1 : 0);
