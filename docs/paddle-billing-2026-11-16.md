@@ -161,3 +161,11 @@ Read-back after: those five show `status active`, `free_reports_granted false`, 
 ## 11. Pre-checkout list: complimentary access for Veronica and Devin (production step, NOT DONE)
 
 Founder decision (2026-11-27): Veronica and Devin get named complimentary access, an exception, not a plan. After `docs/paddle-billing.sql` is applied, the database owner inserts one `public.billing_complimentary` row for each: the account's `brokerage_id`, a reason of at least 8 characters, `approved_by` the founder, and an expiry or an explicitly recorded "no expiry". Look up the two `brokerage_id` values first (read-only, by the accounts' own emails) and confirm them with the founder; they are not guessed here. Confirm after: `billing_complimentary_active(brokerage_id)` is true for these two and false for every other account, and `billing_gate` is unchanged.
+
+### 11a. Founder decision, 2026-11-28: Veronica and Devin get FREE accounts (production step, NOT DONE)
+
+Veronica (veronica@bolorealtors.com) and Devin (dbacon@nwmls.com) never pay and never see checkout. Each gets a `billing_complimentary` exception. Order: (1) "go migration"; (2) they sign up as individuals; (3) look up the two brokerage IDs read-only and show the founder; (4) grant with `public.billing_complimentary_grant(<id>, <reason>, 'founder', <expiry>)`, the two calls shown to the founder before they run.
+
+**Open founder choice: the expiry was sent as "[none / 2027-01-31]". Nothing is granted until one is picked.**
+
+**Known gap, to build before launch:** the exception is enforced in SQL only (`billing_free_reports_usable`), and no page or function reads `billing_complimentary_active`. As written, these two would be allowed to make reports but would still be shown checkout. Hiding checkout for a complimentary account needs a code change (billing summary and billing page); it is not done.
