@@ -1,0 +1,62 @@
+name: verify-report-functions
+# Type-checks the report functions, and runs a no-permission smoke of their side-effect-free modules, under the supported Deno version.
+# No secrets, no environment, read-only token, workflow_dispatch only. It never starts a server and never calls a HomeSignal,
+# Supabase, geocoding, email or other application service. The ONLY network use is `deno check` downloading library types
+# (jsr/npm) — dependency resolution, not an application call.
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: read
+concurrency:
+  group: verify-report-functions-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  DENO_NO_UPDATE_CHECK: '1'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: false }
+      - uses: denoland/setup-deno@v2
+        with: { deno-version: v2.1.4 }
+      # Entry points are TYPE-CHECKED ONLY. They call Deno.serve() and read Deno.env at module top level, so they are never imported or run here.
+      # EVERY error fails the job, on changed or unchanged lines alike. Nothing is filtered by diff.
+      - name: deno check — four entry points, their handlers and the changed connectors
+        run: |
+          deno check \
+            supabase/functions/get-address-report/index.ts \
+            supabase/functions/get-address-report/sources/arcgis.ts \
+            supabase/functions/get-address-report/sources/socrata.ts \
+            supabase/functions/get-address-report/sources/source-dates.ts \
+            supabase/functions/get-development-activity-report/index.ts \
+            supabase/functions/get-development-activity-report/handler.ts \
+            supabase/functions/follow-development-report/index.ts \
+            supabase/functions/follow-development-report/handler.ts \
+            supabase/functions/run-property-watch/index.ts \
+            supabase/functions/run-property-watch/handler.ts \
+            supabase/functions/_shared/national-report.ts \
+            supabase/functions/_shared/report-run.ts \
+            supabase/functions/_shared/coverage-categories.ts \
+            supabase/functions/_shared/record-dates.ts
+      # Runtime import + pure-function checks with NO permissions (no --allow-*): any env read, network or file access throws.
+      - name: deno run — import handlers and pure modules with no permissions
+        run: deno run --no-prompt --no-remote scripts/deno-report-smoke.ts
+  baseline:
+    # INFORMATIONAL ONLY. Runs the same `deno check` on the base ref so a failure in `check` can be classified as new or pre-existing.
+    # It never gates; `check` above is the gate and is never filtered.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main, persist-credentials: false }
+      - uses: denoland/setup-deno@v2
+        with: { deno-version: v2.1.4 }
+      - run: |
+          deno check \
+            supabase/functions/get-address-report/index.ts \
+            supabase/functions/get-development-activity-report/index.ts \
+            supabase/functions/follow-development-report/index.ts \
+            supabase/functions/run-property-watch/index.ts
