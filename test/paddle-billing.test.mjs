@@ -188,7 +188,7 @@ async function hook(d, bodyObj, { secret = LIVE, header, method = 'POST', raw } 
 // ---- 5. manage-billing --------------------------------------------------------------------------------------------------------------------------
 const mcalls = [];
 const summary = (over = {}) => ({ brokerage_id: BK, role: 'owner', state: 'none', credit_limit: 100, credits_used: 0, credits_remaining: 0, period_ends_at: null, plan_key: null, plan_label: null, kind: null, access_months: null,
-  next_reset_at: null, access_ends_at: null, renews_at: null, cancel_effective_at: null, ...over });
+  next_reset_at: null, access_ends_at: null, renews_at: null, cancel_effective_at: null, complimentary: false, ...over });
 function mdeps(over = {}) {
   const rec = (name, f) => async (...a) => { mcalls.push([name, ...a]); return f(...a); };
   return {
@@ -260,6 +260,37 @@ const CODE = 'partner-code-0123456789abcdef';
     r = await ask(mdeps({ summaryOf: async () => summary({ state }) }), { action: 'checkout', plan: 'professional' });
     ok(r.status === 200, '5p state ' + state + ' may buy');
   }
+  // 5p2-5p9: a complimentary account (an open, unexpired named exception) is never offered or sold anything; an expired one is an ordinary account again
+  const COMP = async () => summary({ complimentary: true });
+  const NOBUY = (n) => !mcalls.some((c) => ['makeSession', 'checkoutClaim', 'termsAccept', 'partnerStart'].includes(c[0])) && n;
+  r = await ask(mdeps({ summaryOf: COMP }), { action: 'status' });
+  ok(r.status === 200 && r.json.checkout === 'complimentary' && r.json.plan.complimentary === true && !r.text.includes(BK), '5p2 status of a complimentary account: checkout is "complimentary", the plan says so, no account id');
+  r = await ask(mdeps({ summaryOf: COMP }), { action: 'checkout', plan: 'professional' });
+  ok(r.status === 409 && r.json.error === 'complimentary_account' && NOBUY(true), '5p3 a DIRECT checkout call for a complimentary account is refused, and nothing is claimed, signed or recorded');
+  r = await ask(mdeps({ summaryOf: COMP }), { action: 'checkout', plan: 'private_partner', partner_code: CODE });
+  ok(r.status === 409 && r.json.error === 'complimentary_account' && NOBUY(true), '5p4 the partner offer cannot be bought by a complimentary account either');
+  r = await ask(mdeps({ summaryOf: COMP }), { action: 'offer', partner_code: CODE });
+  ok(r.status === 409 && r.json.error === 'complimentary_account' && NOBUY(true), '5p5 the partner offer check is refused for a complimentary account');
+  r = await ask(mdeps({ summaryOf: COMP, checkoutEnabled: false }), { action: 'checkout', plan: 'professional' });
+  ok(r.status === 409 && r.json.error === 'complimentary_account', '5p6 with the kill switch off the answer is the same: the account never needs checkout');
+  r = await ask(mdeps({ summaryOf: async () => summary({ complimentary: true, state: 'paid', plan_key: 'professional', kind: 'recurring' }) }), { action: 'checkout', plan: 'professional' });
+  ok(r.status === 409 && r.json.error === 'complimentary_account', '5p7 an exception wins over a plan state: still no checkout');
+  r = await ask(mdeps({ summaryOf: async () => summary({ complimentary: true, role: 'agent' }) }), { action: 'checkout', plan: 'professional' });
+  ok(r.status === 403 && r.json.detail === 'owner_only' && NOBUY(true), '5p8 an AGENT of a complimentary account still gets the ordinary owner-only refusal');
+  r = await ask(mdeps({ summaryOf: async () => summary({ complimentary: false }) }), { action: 'status' });
+  ok(r.json.checkout === 'available' && r.json.plan.complimentary === false, '5p9 EXPIRED or revoked (the database reads complimentary false): an ordinary account again, checkout available');
+  r = await ask(mdeps({ summaryOf: async () => summary({ complimentary: false }) }), { action: 'checkout', plan: 'professional' });
+  ok(r.status === 200 && r.json.session.priceId === PRO, '5p10 ...and it can pay: the checkout is made as for any other account');
+  {
+    const { readFileSync } = await import('node:fs');
+    const page = readFileSync(new URL('../development-activity-reports.html', import.meta.url), 'utf8');
+    const k = page.indexOf("if (plan.complimentary === true) {", page.indexOf('function showBilling'));
+    const blk = page.slice(k, page.indexOf('var owner = plan.role', k));
+    ok(k > 0 && blk.includes("'Your account is complimentary. No payment needed.'") && blk.includes("$('subscribe').hidden = true") && blk.includes("$('billing-terms').hidden = true") && blk.includes("$('partner').hidden = true") && blk.trimEnd().endsWith('}') && blk.includes('return;')
+      && !/\$\d/.test(blk), '5p12 the page shows "Your account is complimentary. No payment needed." instead of prices, Subscribe, the terms line and the partner offer (and no dollar amount in that branch)');
+    ok(/function showTrialCta[\s\S]{0,400}plan\.complimentary === true\) \{ wrap\.hidden = true/.test(page) && /async function loadPartner[\s\S]{0,300}plan\.complimentary === true\) return/.test(page), '5p13 the tile\'s Subscribe prompt and the partner-offer lookup are both skipped for a complimentary account');
+  }
+  ok(!JSON.stringify(B.dashboardPlan(null)).includes('"complimentary":true') && B.dashboardPlan(null).complimentary === false, '5p11 no account reads as not complimentary');
   r = await ask(mdeps({ checkoutEnabled: false }), { action: 'checkout', plan: 'professional' });
   ok(r.status === 503 && r.json.error === 'checkout_disabled' && !mcalls.some((c) => c[0] === 'makeSession'), '5q the committed kill switch refuses every checkout, whatever Paddle\'s settings');
   r = await ask(mdeps({ configured: false }), { action: 'checkout', plan: 'professional' });

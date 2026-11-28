@@ -887,6 +887,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     var wrap = $('trial-cta-wrap'), btn = $('trial-cta');
     ctaSay('', false);
     if (a !== 'trial' && a !== 'complete') { wrap.hidden = true; return; }
+    if (plan && plan.complimentary === true) { wrap.hidden = true; return; }   // a complimentary account is never offered a payment
     var manage = !!plan && (plan.state === 'paid' || plan.state === 'past_due');
     btn.textContent = manage ? 'Manage plan' : 'Subscribe';
     btn.dataset.mode = manage ? 'manage' : 'subscribe';
@@ -923,6 +924,13 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       $('account').open = true;
       p.className = 'plan out'; p.textContent = 'Your plan could not be read just now';
       sub.textContent = 'Press Check again in a minute. Your saved reports are not affected.';
+      return;
+    }
+    if (plan.complimentary === true) {
+      // an open named exception: no payment is needed, so no prices, no Subscribe, no terms-to-pay and no partner offer. It reads false again on the day it expires.
+      p.textContent = 'Your account is complimentary. No payment needed.'; sub.textContent = '';
+      detailsFor(null); $('billing-terms').hidden = true; $('partner').hidden = true; $('subscribe').hidden = true; $('agree-pro-wrap').hidden = true; $('billing-hint').hidden = true;
+      $('billing-update').hidden = true; $('billing-cancel').hidden = true;
       return;
     }
     var owner = plan.role === 'owner';
@@ -1009,6 +1017,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     if (httpStatus === 409 && body.error === 'terms_not_accepted') return body.detail === 'terms_changed' ? 'The Terms of Service or Refund Policy were updated. Reload this page, read them, and agree again before subscribing.' : 'Agree to the Terms of Service and the Refund Policy before subscribing.';
     if (httpStatus === 409 && body.error === 'already_paid') return 'Your account already has a plan.';
     if (httpStatus === 409 && body.error === 'offer_used') return 'The Private Partner Offer can be used once per account, and this account has used it.';
+    if (httpStatus === 409 && body.error === 'complimentary_account') return 'Your account is complimentary. No payment needed.';
     if (httpStatus === 409 && body.error === 'checkout_in_progress') return 'A payment window was just opened for your account. Use that one, or wait a few minutes and try again.';
     if (httpStatus === 409) return 'Your account already has a subscription, so a second one was not started.';
     if (httpStatus === 404 && body.error === 'offer_unavailable') return 'This offer link is not valid for your account. Ask your brokerage for a new link.';
@@ -1108,7 +1117,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   async function loadPartner(){
     partnerOk = false; $('partner').hidden = true;
     if (!partnerCode || !plan || plan.role !== 'owner') return;
-    if (plan.state === 'paid') return;
+    if (plan.state === 'paid' || plan.complimentary === true) return;
     var r = await post(BILLING_FN, { action: 'offer', partner_code: partnerCode });
     if (r.status === 200 && r.body && r.body.eligible === true) { partnerOk = true; $('partner').hidden = false; partnerSay('', false); }
     else if (r.status === 404 || r.status === 409 || r.status === 403) { $('partner').hidden = false; $('partner-buy').hidden = true; partnerSay(billingMessage(r.status, r.body), true); }

@@ -62,17 +62,20 @@ export type AppliedEvent = { outcome: ApplyOutcome; bound: boolean; state: PlanS
 export type BillingSummary = BillingUsage & {
   plan_key: PlanKey | null; plan_label: string | null; kind: 'recurring' | 'one_time' | null; access_months: number | null;
   next_reset_at: string | null; access_ends_at: string | null; renews_at: string | null; cancel_effective_at: string | null;
+  /** An open, unexpired named exception: no payment is needed and no checkout is offered. False the moment it expires. */
+  complimentary: boolean;
 };
 export type DashboardPlan = {
   state: PlanState; role: 'owner' | 'agent' | null; plan_key: PlanKey | null; plan_label: string | null; kind: 'recurring' | 'one_time' | null;
   credit_limit: number; credits_used: number; credits_remaining: number;
   next_reset_at: string | null; access_ends_at: string | null; renews_at: string | null; cancel_effective_at: string | null;
+  complimentary: boolean;
 };
 export function dashboardPlan(u: BillingSummary | null): DashboardPlan {
-  if (!u) return { state: 'none', role: null, plan_key: null, plan_label: null, kind: null, credit_limit: 0, credits_used: 0, credits_remaining: 0, next_reset_at: null, access_ends_at: null, renews_at: null, cancel_effective_at: null };
+  if (!u) return { state: 'none', role: null, plan_key: null, plan_label: null, kind: null, credit_limit: 0, credits_used: 0, credits_remaining: 0, next_reset_at: null, access_ends_at: null, renews_at: null, cancel_effective_at: null, complimentary: false };
   return {
     state: u.state, role: u.role, plan_key: u.plan_key, plan_label: u.plan_label, kind: u.kind, credit_limit: u.credit_limit, credits_used: u.credits_used,
-    credits_remaining: u.credits_remaining, next_reset_at: u.next_reset_at, access_ends_at: u.access_ends_at, renews_at: u.renews_at, cancel_effective_at: u.cancel_effective_at,
+    credits_remaining: u.credits_remaining, next_reset_at: u.next_reset_at, access_ends_at: u.access_ends_at, renews_at: u.renews_at, cancel_effective_at: u.cancel_effective_at, complimentary: u.complimentary,
   };
 }
 export type PartnerStart = { outcome: 'OK' | 'LINK_INVALID' | 'NOT_ENTITLED' | 'ALREADY_USED' | 'ALREADY_PAID'; enrollment_id: string | null; brokerage_id: string | null };
@@ -127,12 +130,12 @@ export function makeBillingReads(rpc: ServiceRpc) {
           || !(PLAN_STATES as readonly string[]).includes(u.state) || !Number.isInteger(u.credit_limit) || !Number.isInteger(u.credits_used) || !Number.isInteger(u.credits_remaining)
           || u.credits_used < 0 || u.credits_remaining < 0 || !(u.plan_key === null || u.plan_key === 'professional' || u.plan_key === 'private_partner')
           || !(u.kind === null || u.kind === 'recurring' || u.kind === 'one_time') || !nullableTime(u.next_reset_at) || !nullableTime(u.access_ends_at)
-          || !nullableTime(u.renews_at) || !nullableTime(u.cancel_effective_at)) throw new DataUnavailable('shape');
+          || !nullableTime(u.renews_at) || !nullableTime(u.cancel_effective_at) || typeof u.complimentary !== 'boolean') throw new DataUnavailable('shape');
       return {
         brokerage_id: u.brokerage_id.toLowerCase(), role: u.role, state: u.state, credit_limit: u.credit_limit, credits_used: u.credits_used, credits_remaining: u.credits_remaining,
         period_ends_at: u.next_reset_at ?? null, plan_key: u.plan_key ?? null, plan_label: typeof u.plan_label === 'string' ? u.plan_label : null, kind: u.kind ?? null,
         access_months: Number.isInteger(u.access_months) ? u.access_months : null, next_reset_at: u.next_reset_at ?? null, access_ends_at: u.access_ends_at ?? null,
-        renews_at: u.renews_at ?? null, cancel_effective_at: u.cancel_effective_at ?? null,
+        renews_at: u.renews_at ?? null, cancel_effective_at: u.cancel_effective_at ?? null, complimentary: u.complimentary,
       };
     },
 

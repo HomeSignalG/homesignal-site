@@ -469,6 +469,11 @@ select pg_temp._ck('K08 after revoking, the account is refused again', pg_temp._
 select pg_temp._run('k expired row', $$insert into public.billing_complimentary (brokerage_id, reason, approved_by, expires_at) values (pg_temp._bk('gnew'), 'partner, approved by founder', 'founder', now() - interval '1 day')$$);
 select pg_temp._run('k expired report', $$select pg_temp._iss('cx5', 33, 3306)$$);
 select pg_temp._ck('K09 an exception past its expiry grants nothing', not public.billing_complimentary_active(pg_temp._bk('gnew')) and pg_temp._allot('cx5') like 'EV013%', pg_temp._allot('cx5'));
+select pg_temp._ck('K10 the dashboard reader says complimentary = false for an expired exception: the account is an ordinary paying account again', (select not complimentary from public.billing_summary(pg_temp._u(33))), (select complimentary::text from public.billing_summary(pg_temp._u(33))));
+select pg_temp._run('k clean0', $$select public.billing_complimentary_revoke(pg_temp._bk('gnew'))$$);
+select pg_temp._run('k open grant', $$select public.billing_complimentary_grant(pg_temp._bk('gnew'), 'complimentary access December 2026, approved by founder', 'founder', now() + interval '30 days')$$);
+select pg_temp._ck('K11 an open, unexpired exception reads complimentary = true, for the owner of that account only', (select complimentary from public.billing_summary(pg_temp._u(33))) and not (select complimentary from public.billing_summary(pg_temp._u(34))));
+select pg_temp._ck('K12 the complimentary flag is the SAME decision as the report gate (billing_complimentary_active)', (select complimentary = public.billing_complimentary_active(brokerage_id) from public.billing_summary(pg_temp._u(33))));
 select pg_temp._run('k clean', $$select public.billing_complimentary_revoke(pg_temp._bk('gnew'))$$);
 select pg_temp._run('k disarm', $$select public.billing_gate_set(false, false)$$);
 

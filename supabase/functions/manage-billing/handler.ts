@@ -72,7 +72,7 @@ const FIELDS: Record<string, string[]> = {
 /** A partner code is a long random token; its shape is checked before it is hashed, so a stray string never reaches the database. */
 const PARTNER_CODE = /^[A-Za-z0-9_-]{16,128}$/;
 
-export type Availability = 'available' | 'not_owner' | 'already_paid' | 'subscription_exists' | 'account_suspended' | 'disabled' | 'not_set_up' | 'environment_mismatch' | 'gate_not_armed';
+export type Availability = 'available' | 'not_owner' | 'already_paid' | 'subscription_exists' | 'account_suspended' | 'complimentary' | 'disabled' | 'not_set_up' | 'environment_mismatch' | 'gate_not_armed';
 /**
  * Who may start a checkout and why not: the ONE reading of it. A checkout is offered only where a NEW purchase is what the account needs: never bought
  * ('none'), ended ('canceled', 'expired'), or a test purchase only ('test_only', which never grants). Over a purchase that exists and may recover (paid,
@@ -80,6 +80,7 @@ export type Availability = 'available' | 'not_owner' | 'already_paid' | 'subscri
  */
 export function checkoutAvailability(u: BillingSummary, configured: boolean, enabled: boolean, ready: { environmentOk: boolean; gateArmed: boolean } = { environmentOk: true, gateArmed: true }): Availability {
   if (u.role !== 'owner') return 'not_owner';
+  if (u.complimentary) return 'complimentary';   // an open named exception: no payment is needed, so no checkout, whatever the plan state
   if (u.state === 'paid') return 'already_paid';
   if (u.state === 'suspended') return 'account_suspended';
   if (u.state !== 'none' && u.state !== 'canceled' && u.state !== 'expired' && u.state !== 'test_only') return 'subscription_exists';
@@ -98,6 +99,7 @@ const REFUSALS: Record<Exclude<Availability, 'available'>, [number, Record<strin
   already_paid: [409, { error: 'already_paid' }],
   subscription_exists: [409, { error: 'subscription_exists' }],
   account_suspended: [403, { error: 'account_suspended' }],
+  complimentary: [409, { error: 'complimentary_account' }],
   disabled: [503, { error: 'checkout_disabled' }],
   not_set_up: [503, { error: 'billing_not_set_up' }],
   environment_mismatch: [503, { error: 'billing_environment_mismatch' }],
@@ -151,6 +153,9 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
         if (!urls) return reply(req, { error: 'portal_unavailable' }, 409);
         return reply(req, { status: 'OK', update_payment_method: urls.update_payment_method, cancel: urls.cancel });
       }
+
+      // offer / checkout: an account holding an open named exception never buys anything, so both are refused before a code or a plan is even read
+      if (summary.complimentary && summary.role === 'owner' && (action === 'offer' || action === 'checkout')) return reply(req, { error: 'complimentary_account' }, 409);
 
       // offer / checkout: a partner code, when one is sent, is shape-checked and hashed here; the token itself is never stored or logged
       let tokenHash: string | null = null;

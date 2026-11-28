@@ -196,7 +196,7 @@ function world({ trial = 'active', used = 0, admin = false, untraceable = false,
     credits_used: w.plan === 'paid' ? w.paidUsed : 0, credits_remaining: w.plan === 'paid' ? 100 - w.paidUsed : 0, period_ends_at: w.plan === 'paid' ? PAID_END : null });
   const summary = () => { const u = usage(); return u === null ? null : { brokerage_id: u.brokerage_id, role: u.role, state: u.state, plan_key: u.state === 'paid' ? 'professional' : null, plan_label: null,
     kind: u.state === 'paid' ? 'recurring' : null, credit_limit: u.credit_limit, credits_used: u.credits_used, credits_remaining: u.credits_remaining,
-    next_reset_at: u.period_ends_at, access_ends_at: null, renews_at: u.period_ends_at, cancel_effective_at: null, access_months: null }; };
+    next_reset_at: u.period_ends_at, access_ends_at: null, renews_at: u.period_ends_at, cancel_effective_at: null, access_months: null, complimentary: w.complimentary === true }; };
   w.billingHandler = BH.makeHandler({
     ...gate,
     summaryOf: async () => { if (w.billingFails) throw new RH.DataUnavailable('x'); return summary(); },
@@ -2460,6 +2460,29 @@ for (const [w, h] of [[1440, 900], [1920, 1080], [390, 844]]) {
   await page.click('#rail-actions [data-da-action="watch"]');
   ok((await drawn(page, '#watch-start')) && /Start watching/.test(await text(page, '#watch-start')), 'O6 Watch Property reveals the existing watch panel with its start control');
   ok(errors.length === 0, 'O7 no page error', errors);
+  await ctx.close();
+}
+
+{
+  // 14. a COMPLIMENTARY account (an open named exception) is told so, and is shown no price, no Subscribe, no terms-to-pay and no partner offer; its checkout call is refused
+  const w = world({ role: 'owner', used: 3 }); w.complimentary = true;
+  const { ctx, page, errors, billingCalls, checkouts } = await open({ w });
+  await waitBilling(page, /complimentary/);
+  const t = await billingText(page);
+  ok(/Your account is complimentary\. No payment needed\./.test(t) && !/\$78|\$234|Subscribe|Professional plan|per month/.test(t), '14a a complimentary owner sees "Your account is complimentary. No payment needed." and no price', t);
+  ok(await page.$eval('#subscribe', (e) => e.hidden) && await page.$eval('#agree-pro-wrap', (e) => e.hidden) && await page.$eval('#billing-terms', (e) => e.hidden) && await page.$eval('#trial-cta-wrap', (e) => e.hidden) && await page.$eval('#partner', (e) => e.hidden),
+    '14b Subscribe, the agreement box, the terms line, the tile\'s Subscribe prompt and the partner card are all hidden');
+  ok(checkouts.length === 0 && !billingCalls.some((c) => c.body.action === 'checkout' || c.body.action === 'offer') && errors.length === 0, '14c nothing was asked for a checkout or an offer, and the page had no error', billingCalls.map((c) => c.body));
+  const direct = await page.evaluate(async (fn) => { const r = await fetch(fn, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer user-token' }, body: JSON.stringify({ action: 'checkout', plan: 'professional', terms_version: '2026-11-27' }) }); return { status: r.status, body: await r.json() }; }, BILLING_FN).catch((e) => ({ status: 0, body: String(e) }));
+  ok(direct.status === 409 && direct.body.error === 'complimentary_account' && w.checkoutMade === 0, '14d calling the checkout function directly is refused for this account and nothing is made', direct);
+  await ctx.close();
+}
+{
+  // 14e. the exception has expired (the database now says complimentary false): an ordinary account again, with Subscribe
+  const w = world({ role: 'owner', used: 3 }); w.complimentary = false;
+  const { ctx, page } = await open({ w });
+  await waitBilling(page, /No active plan/);
+  ok(await billingShown(page) && await page.$eval('#subscribe', (e) => !e.hidden && !e.disabled) && !/complimentary/i.test(await billingText(page)), '14e after the exception expires the account is an ordinary one: the offer and Subscribe are back');
   await ctx.close();
 }
 

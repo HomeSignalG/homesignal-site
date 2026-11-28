@@ -712,9 +712,13 @@ end $$;
 -- next_reset_at: when the monthly allowance next resets (paid only, and not past the last month of a one-time plan).
 -- access_ends_at: when paid access ends (a one-time plan's six months, or a recurring plan's scheduled cancellation).
 -- renews_at: a recurring plan's next charge (null when cancelling).
-create or replace function public.billing_summary(p_user_id uuid)
+-- complimentary (2026-11-28): true while the account holds an open, unexpired named exception (public.billing_complimentary_active). The dashboard then says no payment is needed
+-- and the checkout function refuses the account. When the exception expires or is revoked this reads false again and the account is an ordinary paying account.
+drop function if exists public.billing_summary(uuid);
+create function public.billing_summary(p_user_id uuid)
 returns table (brokerage_id uuid, role text, state text, plan_key text, plan_label text, kind text, credit_limit integer, credits_used integer,
-               credits_remaining integer, next_reset_at timestamptz, access_ends_at timestamptz, renews_at timestamptz, cancel_effective_at timestamptz, access_months integer)
+               credits_remaining integer, next_reset_at timestamptz, access_ends_at timestamptz, renews_at timestamptz, cancel_effective_at timestamptz, access_months integer,
+               complimentary boolean)
 language sql stable security definer set search_path = public, pg_temp
 as $$
   select m.brokerage_id, m.role, coalesce(pl.state, 'none'), pp.plan_key, pp.plan_label, pp.kind, public.billing_report_limit(),
@@ -726,7 +730,8 @@ as $$
               when pp.kind = 'recurring' and ob.cancel_effective_at is not null then ob.cancel_effective_at end,
          case when pp.kind = 'recurring' and pl.state = 'paid' and ob.cancel_effective_at is null then ob.next_billed_at end,
          case when pp.kind = 'recurring' then ob.cancel_effective_at end,
-         pp.access_months
+         pp.access_months,
+         public.billing_complimentary_active(m.brokerage_id)
     from public.brokerage_membership_of(p_user_id) m
     left join lateral public.billing_plan_of(m.brokerage_id) pl on true
     left join public.brokerage_subscription bs on bs.binding_id = pl.binding_id
