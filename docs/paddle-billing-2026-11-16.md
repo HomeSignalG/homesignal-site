@@ -127,7 +127,9 @@ A revoked evaluation is terminal, and `brokerage_report_issue` refuses a revoked
 
 **Required before `CHECKOUT_ENABLED` is set:** apply `docs/paddle-billing.sql` (so free reports are a cleared flag, not the evaluation's status), then reopen these five evaluations by an explicit, logged, exact-ID edit (status back to `active`, `revoked_at` null; the revoked-is-terminal guard must be bypassed for that one statement) and confirm `free_reports_granted` is false on each, so they hold no free reports but can pay. The "Founder Test Workspace" and "Brigham City Test Realty 2" evaluations were not touched.
 
-### 10a. Exact SQL to reopen the five evaluations (NOT RUN; run only after `docs/paddle-billing.sql` is applied and the founder says go)
+### 10a. Exact SQL to reopen the five evaluations (NOT RUN; run only after `docs/paddle-billing.sql` is applied and the founder says "go reopen", which is a separate approval after "go migration")
+
+*Dated note, 2026-11-28:* prepared, read-only checked against production on 2026-11-28 (all five rows `revoked` at 2026-11-27 18:45:14Z, `evaluation_guard_trg` enabled and the only thing that blocks reopening). Not run. The migration ("go migration") and this reopen ("go reopen") are two separate steps with two separate approvals.
 
 `evaluation_guard` makes `revoked` terminal, so the guard trigger is disabled inside one transaction for these five exact IDs only, then enabled again. `free_reports_granted` is set false so they hold no free reports. The transaction aborts unless exactly 5 rows change. The original `revoked` events stay in `evaluation_event` (it is append-only and its kind list has no "reopened", so no new event is invented).
 
