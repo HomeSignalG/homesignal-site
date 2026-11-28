@@ -20,7 +20,7 @@ check('S0 overlay ran', r.status === 0, r.err);
 for (const p of PAGES) {
   const t = readFileSync(join(d, p), 'utf8');
   check(`S1 ${p}: no hello@homesignal.net`, !t.includes('hello@homesignal.net'));
-  check(`S2 ${p}: info@jodytracks.com present`, t.includes('info@jodytracks.com'));
+  if (p !== 'refund-policy.html') check(`S2 ${p}: info@jodytracks.com present`, t.includes('info@jodytracks.com')); // the Refund Policy carries no HomeSignal contact (founder 2026-11-27)
 }
 const expect = PAGES.reduce((n, p) => n + (readFileSync(join(root, p), 'utf8').match(/hello@homesignal\.net/g) || []).length, 0);
 check(`S3 count recorded (= ${expect} occurrences in the source pages)`, r.rep && r.rep.counts.support === expect && expect > 0, JSON.stringify(r.rep && r.rep.counts));

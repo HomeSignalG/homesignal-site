@@ -204,16 +204,21 @@ ok(scanned.length > 100 && namesLedger.includes(SQL_PATH),
 const BILLING_SQL_PATH = 'docs/brokerage-billing.sql', BILLING_READS_PATH = 'supabase/functions/_shared/billing-reads.ts';
 const billingCode = stripSql(read(BILLING_SQL_PATH));
 const readsCode = read(BILLING_READS_PATH).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-ok(namesLedger.every((f) => [SQL_PATH, WF_PATH, BILLING_SQL_PATH, BILLING_READS_PATH].includes(f)) && namesLedger.includes(BILLING_SQL_PATH) && namesLedger.includes(BILLING_READS_PATH)
+// docs/paddle-billing.sql (2026-11-16) replaces the ledger's status mapping with a paddle branch, reads the ledger (the price an event named, the newest event of a subscription) and
+// reaches the recorder ONLY through billing_event_apply; it writes no ledger row itself.
+const PADDLE_SQL_PATH = 'docs/paddle-billing.sql';
+const paddleLedgerCode = stripSql(read(PADDLE_SQL_PATH));
+ok(namesLedger.every((f) => [SQL_PATH, WF_PATH, BILLING_SQL_PATH, BILLING_READS_PATH, PADDLE_SQL_PATH].includes(f)) && namesLedger.includes(BILLING_SQL_PATH) && namesLedger.includes(BILLING_READS_PATH)
+   && namesLedger.includes(PADDLE_SQL_PATH) && !/payment_event_record\(/.test(paddleLedgerCode) && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(only\s+)?public\.payment_event\b/i.test(paddleLedgerCode)
    && (billingCode.match(/public\.payment_event_record\(/g) || []).length === 2 && /select \* into r from public\.payment_event_record\(p_event\);/.test(billingCode)
    && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(only\s+)?public\.payment_event\b/i.test(billingCode)
-   && (readsCode.match(/\bpayment_event\w*/g) || []).join() === 'payment_event' && /\/\^payment_event:\|\^billing_event_apply:\//.test(readsCode),
+   && (readsCode.match(/\bpayment_event\w*/g) || []).join() === 'payment_event' && /\/\^payment_event:\|\^billing_event_apply:\|\^paddle_event_apply:\|\^paddle_adjustment_apply:\//.test(readsCode),
   '9: ONE CALLER — only the SQL of record, its own check workflow, the billing SQL (build step 11: calls the recorder once, from billing_event_apply, writes no row of the ledger itself) and the shared billing reader (which names the ledger once, to recognise its refusal text) name the ledger or its recorder; no page, script, function handler, library or other SQL does', namesLedger.join(','));
 const fnDirs = readdirSync(join(ROOT, 'supabase/functions'));
 const processorDirs = fnDirs.filter((d) => /lemon|squeez|payment|webhook|checkout|stripe|billing/i.test(d)).sort();
 ok(fnDirs.length >= 5 && fnDirs.includes('get-address-report') && !fnDirs.includes('lemonsqueezy-webhook')
-   && JSON.stringify(processorDirs) === '["development-activity-billing-webhook","manage-billing"]',
-  '9b: the map product\'s user-scoped processor webhook (lemonsqueezy-webhook) is NOT in this repo (it lives in homesignal-ingest and stays there); the only function directories here that are a webhook, a checkout or a payment handler are the two build step 11 added for a BROKERAGE\'s subscription — manage-billing and development-activity-billing-webhook, exactly these (control: the directory lists other functions)', fnDirs.join(','));
+   && JSON.stringify(processorDirs) === '["manage-billing","paddle-webhook"]',
+  '9b: the map product\'s user-scoped processor webhook (lemonsqueezy-webhook) is NOT in this repo (it lives in homesignal-ingest and stays there); the only function directories here that are a webhook, a checkout or a payment handler are the two build step 11 added for a BROKERAGE\'s subscription — manage-billing and paddle-webhook, exactly these (control: the directory lists other functions)', fnDirs.join(','));
 ok(!/\b(lemonsqueezy|lemon squeezy)\b/i.test(CODE) && /'lemonsqueezy'/.test(MAP.body),
   '9c: the only processor named in executable code is the mapping\'s one reviewed branch for it; the recorder, the table and the ordering are processor-neutral');
 

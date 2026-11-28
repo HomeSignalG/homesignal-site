@@ -207,6 +207,8 @@ export async function issueSnapshot(
 export class EvaluationComplete extends Error {}
 /** The paid month's 100 reports are used (EV010). Nothing was stored and nothing was charged. */
 export class AllotmentComplete extends Error {}
+/** The account has no paid plan and no free reports it may use (EV013). No free plan exists: nothing was stored and nothing was charged. */
+export class PaidPlanRequired extends Error {}
 /** The person is not an active member of an active, unexpired evaluation (EV003). Nothing was stored and nothing was charged. */
 export class NotEntitled extends Error {}
 
@@ -250,6 +252,7 @@ export async function issueBrokerageReport(
     // the database's refusals carry their name as the message (docs/evaluation-entitlement.sql and docs/brokerage-billing.sql, ERRORS); anything else is a failure
     if (error.message === 'EVALUATION_COMPLETE') throw new EvaluationComplete('the evaluation\'s reports are used up');
     if (error.message === 'ALLOTMENT_COMPLETE') throw new AllotmentComplete('the month\'s reports are used up');
+    if (error.message === 'PAID_PLAN_REQUIRED') throw new PaidPlanRequired('a paid plan is required');
     if (error.message === 'NOT_ENTITLED') throw new NotEntitled('not an active member');
     throw new Error('issueBrokerageReport: the report was not stored: ' + error.message);
   }

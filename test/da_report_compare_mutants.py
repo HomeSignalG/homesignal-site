@@ -126,7 +126,7 @@ m('compare_action_compares_at_once', "else if (act === 'compare' && !$('saved').
 m('card_shown_to_everyone', 'id="compare" aria-labelledby="compare-title" role="group" hidden>', 'id="compare" aria-labelledby="compare-title" role="group">', PAGEOFF + [PB], PAGE)
 m('unreadable_saved_list_says_nothing', "paintCompare(null); return; }", "return; }", PAGEOFF + [PB], PAGE)
 m('a_not_found_report_is_compared_anyway', "if (r.status !== 200 || body.status !== 'OK' || body.reopened !== true || !V.renderable(body)) { compareSay(compareMessage(r.status), true); return; }", "if (r.status !== 200) { compareSay(compareMessage(r.status), true); return; }", PAGEOFF + [PB], PAGE)
-m('opening_is_said_to_use_a_free_report', "Opening them did not use a free report.'", "Opening them used one free report each.'", [PB], PAGE)
+m('opening_is_said_to_use_a_free_report', "Opening them did not use a report.'", "Opening them used one report each.'", [PB], PAGE)
 # the tags, built from the page as it is (the content key changes whenever a lib does)
 _tag = re.search(r'<script src="lib/da-report-compare\.js\?v=([0-9a-f]{8})"></script>\n', (ROOT / PAGE).read_text())
 _view = re.search(r'<script src="lib/da-report-view\.js\?v=([0-9a-f]{8})"></script>\n', (ROOT / PAGE).read_text())

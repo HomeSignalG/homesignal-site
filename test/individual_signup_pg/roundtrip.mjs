@@ -29,6 +29,7 @@ const J = "select coalesce(json_agg(row_to_json(t)), '[]') from ";
 // the database's own functions, called the way PostgREST would call them. An UNLISTED call stops the run: that is how a second way in would show.
 const RPC = {
   evaluation_usage: (a) => [J + "public.evaluation_usage(:'u'::uuid) t", { u: a.p_user_id }],
+  billing_summary: (a) => [J + "public.billing_summary(:'u'::uuid) t", { u: a.p_user_id }],
   billing_usage: (a) => [J + "public.billing_usage(:'u'::uuid) t", { u: a.p_user_id }],
   report_rate_claim: (a) => [J + "public.report_rate_claim(:'u'::uuid) t", { u: a.p_user }],
   brokerage_report_issue: (a) => [J + "public.brokerage_report_issue(:'u'::uuid, :'k'::uuid, :'b', :'h', :'v', :'i'::jsonb, nullif(:'p', '')::jsonb) t",
@@ -79,7 +80,7 @@ async function trialAsk(userId, body) {
   return { status: res.status, json: await res.json() };
 }
 async function billingAsk(userId, body) {
-  const real = BD.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc', billing: { apiKey: '', storeId: '', variantId: '', secret: '', testMode: true } }, fetchToSql);
+  const real = BD.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc', paddle: { environment: 'sandbox', clientToken: '', apiKey: '', bindingSecret: '' } }, fetchToSql);
   const h = BH.makeHandler({ ...real, checkoutEnabled: () => true, authenticate: async () => ({ email: 'x@example.test', id: userId }), isAdmin: async () => false });
   const res = await h(new Request('https://x/functions/v1/manage-billing', { method: 'POST', headers: { authorization: 'Bearer t', 'content-type': 'application/json' }, body: JSON.stringify(body) }));
   return { status: res.status, json: await res.json() };
@@ -115,8 +116,8 @@ ok(t.status === 403, '1c and has no billing (no account, no plan)', t.json);
 t = await trialAsk(UNCONFIRMED, { action: 'signup', name: 'New Person' });
 ok(t.status === 400 && t.json.error === 'signup_refused' && count('brokerage_account') === 1, '2a an unconfirmed email is refused and writes nothing (only the legacy account exists)', t.json);
 t = await trialAsk(ANN, { action: 'signup', name: '  Ann   Agent ' });
-ok(t.status === 200 && t.json.replayed === false && t.json.access === 'trial' && t.json.role === 'owner' && t.json.account_type === 'individual'
-   && t.json.trial.credits_used === 0 && t.json.trial.credits_remaining === 10, '2b ONE call: an individual account, owner, ten free reports', t.json);
+ok(t.status === 200 && t.json.replayed === false && t.json.role === 'owner' && t.json.account_type === 'individual'
+   && t.json.trial.credits_used === 0 && t.json.trial.credits_remaining === 0, '2b ONE call: an individual account, owner, no free reports', t.json);
 ok(one("select a.account_type || '|' || a.name || '|' || m.role || '|' || e.status || '|' || e.seat_limit from public.brokerage_member m join public.brokerage_account a on a.id = m.brokerage_id join public.evaluation e on e.brokerage_id = a.id where m.user_id = :'u'::uuid", { u: ANN }) === 'individual|Ann Agent|owner|active|0',
   '2c the database holds the account (type individual, named by the person, cleaned), the owner membership, and an active evaluation with no seats');
 ok(!/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/.test(JSON.stringify(t.json)), '2d the answer carries no id');
@@ -127,33 +128,28 @@ ok(legacyFp() === legacyBefore, '2f the existing brokerage (account, owner, eval
 t = await trialAsk(LEGACY, { action: 'signup', name: 'Legacy Owner' });
 ok(t.status === 409 && t.json.error === 'already_a_member', '2g a member of an existing brokerage cannot also sign up for an individual account (409)', t.json);
 
-// ---- 3. reports: the ten free ones ------------------------------------------------------------------------------------------------
+// ---- 3. reports: no free plan, an unpaid account makes none ---------------------------------------------------------------------
 r = await report(ANN, 1);
-ok(r.status === 200 && r.json.charged === true && r.json.stored === true && r.json.trial.credits_used === 1 && r.json.trial.credits_remaining === 9, '3a the first report is made, stored and charged: one used, nine left', [r.status, r.json.trial, r.json.error]);
-ok(JSON.stringify(r.json.header) === '{"brokerage":"Ann Agent","agent":null}', '3b the report header names the account by the person\'s own name', r.json.header);
-const first = r;
-for (let i = 2; i <= 10; i++) { r = await report(ANN, i); if (r.status !== 200 || r.json.trial.credits_used !== i) break; }
-ok(r.status === 200 && r.json.trial.credits_used === 10 && r.json.trial.credits_remaining === 0 && count('evaluation_credit') === 10 && count('report_snapshot') === 10, '3c ten reports: ten stored, ten charged, none left', [r.status, r.json.trial, r.json.error]);
-const before11 = [count('evaluation_credit'), count('report_snapshot')];
-r = await report(ANN, 11);
-ok(r.status !== 200 && [count('evaluation_credit'), count('report_snapshot')].join() === before11.join(), '3d the eleventh FREE report is refused: nothing stored, nothing charged', [r.status, r.json.error]);
+ok(r.status === 402 && r.json.error === 'payment_required' && count('evaluation_credit') === 0 && count('report_snapshot') === 0, '3a an unpaid account cannot make a report: refused 402, nothing stored, nothing charged', [r.status, r.json.error]);
+r = await report(ANN, 2);
+ok(r.status === 402 && count('report_snapshot') === 0, '3c asking again is still refused and still stores nothing', [r.status, r.json.error]);
 t = await trialAsk(ANN, { action: 'status' });
-ok(t.json.access === 'complete' && t.json.trial.credits_remaining === 0 && t.json.account_type === 'individual', '3f status now reads complete: free reports used', t.json);
-ok(count('evaluation_credit') === 10 && Number(one("select count(*) from public.evaluation_credit c join public.evaluation e using (evaluation_id) where e.evaluation_id = :'e'::uuid", { e: legacyEval })) === 0, '3g the legacy brokerage\'s ledger was not touched by any of it');
+ok(t.json.trial.credits_remaining === 0 && t.json.account_type === 'individual', '3f status shows no free reports', t.json);
+ok(count('evaluation_credit') === 0 && Number(one("select count(*) from public.evaluation_credit c join public.evaluation e using (evaluation_id) where e.evaluation_id = :'e'::uuid", { e: legacyEval })) === 0, '3g no ledger entry exists for the new account or the legacy brokerage');
 
 // ---- 4. the paid plan is the existing one -----------------------------------------------------------------------------------------------
 t = await billingAsk(ANN, { action: 'status' });
 ok(t.status === 200 && t.json.plan.state === 'none' && t.json.plan.role === 'owner' && t.json.checkout === 'not_set_up',
   '4a billing sees the individual as the OWNER of a plan-less account, and checkout reads not_set_up because no payment provider is configured here: nothing was activated', t.json);
-t = await billingAsk(ANN, { action: 'checkout' });
+t = await billingAsk(ANN, { action: 'checkout', plan: 'professional' });
 ok(t.status === 503 && t.json.error === 'billing_not_set_up' && !seen.some((s) => /billing_checkout_claim/.test(s)), '4b a checkout cannot be started without the provider configured: refused (503) before any slot or processor call', t.json);
 
 // ---- 5. a team cannot form in an individual account --------------------------------------------------------------------------------
 const invites = count('evaluation_invite');
 t = await trialAsk(ANN, { action: 'invite' });
-ok(t.status !== 200 && count('evaluation_invite') === invites, '5a the owner of an individual account cannot make an invite (complete trial: the handler refuses; the database refuses regardless)', t.json);
+ok(t.status !== 200 && count('evaluation_invite') === invites, '5a the owner of an individual account cannot make an invite (the handler refuses; the database refuses regardless)', t.json);
 t = await trialAsk(BEN, { action: 'signup', name: 'Ben Fresh' });
-ok(t.status === 200 && t.json.trial.credits_remaining === 10, '5b a second person signs up on their own and has their own ten (a separate account)', t.json);
+ok(t.status === 200 && t.json.trial.credits_remaining === 0, '5b a second person signs up on their own (a separate account, also no free reports)', t.json);
 t = await trialAsk(BEN, { action: 'invite' });
 ok(t.status === 403 && t.json.error === 'not_owner' && count('evaluation_invite') === invites, '5c on an ACTIVE individual account the invite is refused by the DATABASE (NOT_ENTITLED -> not_owner): no invite exists', t.json);
 let refused = null;
