@@ -3,13 +3,13 @@
 -- with their reason; NOT $0 Paddle checkouts), which never weaken the gate. Idempotent: running it twice changes nothing the second time. All or nothing: if either
 -- partner has no account yet, nothing is changed.
 --
--- psql -v ON_ERROR_STOP=1 -v free_reports_mode=none -v complimentary_expiry=2027-01-31 -v partner_email_1=<first email> -v partner_email_2=<second email> -f docs/paddle-billing-staging-seed.sql
+-- psql -v ON_ERROR_STOP=1 -v free_reports_mode=none -v complimentary_expiry=2026-12-31 -v partner_email_1=<first email> -v partner_email_2=<second email> -f docs/paddle-billing-staging-seed.sql
 --   free_reports_mode      none   = no free reports for any existing account (the only mode built; 'credit' is refused)
---   complimentary_expiry   none   = no expiry, or a date such as 2027-01-31 (end of that day, America/Los_Angeles) = a review/expiry date, the same for both
+--   complimentary_expiry   none   = no expiry, or a date such as 2026-12-31 (end of that day, America/Los_Angeles) = a review/expiry date, the same for both
 --   partner_email_1/_2     the two partner contacts' sign-in emails (kept out of the repository on purpose); they must be different people
 \set ON_ERROR_STOP on
 \if :{?free_reports_mode} \else \echo 'REFUSED: set -v free_reports_mode=none'  \quit \endif
-\if :{?complimentary_expiry} \else \echo 'REFUSED: set -v complimentary_expiry=none or a date (2027-01-31)' \quit \endif
+\if :{?complimentary_expiry} \else \echo 'REFUSED: set -v complimentary_expiry=none or a date (2026-12-31)' \quit \endif
 \if :{?partner_email_1} \else \echo 'REFUSED: set -v partner_email_1=<first partner contact''s sign-in email>' \quit \endif
 \if :{?partner_email_2} \else \echo 'REFUSED: set -v partner_email_2=<second partner contact''s sign-in email>' \quit \endif
 
@@ -28,7 +28,7 @@ begin
     raise exception 'staging seed: free_reports_mode=% is not built. Only "none" exists; choose and build the credit option deliberately.', current_setting('seed.free_reports_mode');
   end if;
   if current_setting('seed.complimentary_expiry') <> 'none' and current_setting('seed.complimentary_expiry') !~ '^\d{4}-\d{2}-\d{2}$' then
-    raise exception 'staging seed: complimentary_expiry must be none or a date like 2027-01-31';
+    raise exception 'staging seed: complimentary_expiry must be none or a date like 2026-12-31';
   end if;
 end $guard$;
 

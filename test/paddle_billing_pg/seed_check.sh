@@ -5,7 +5,7 @@ set -euo pipefail
 case "$PGDATABASE" in *disposable*) ;; *) echo "ABORT: PGDATABASE must name a disposable database"; exit 1;; esac
 root="$(cd "$(dirname "$0")/../.." && pwd)"; SEED="$root/docs/paddle-billing-staging-seed.sql"
 Q() { psql -X -tA -v ON_ERROR_STOP=1 "$@"; }
-run() { psql -X -q -v free_reports_mode=none -v complimentary_expiry="${EXP:-2027-01-31}" -v partner_email_1="$1" -v partner_email_2="$2" -f "$SEED" 2>&1 || true; }
+run() { psql -X -q -v free_reports_mode=none -v complimentary_expiry="${EXP:-2026-12-31}" -v partner_email_1="$1" -v partner_email_2="$2" -f "$SEED" 2>&1 || true; }
 ok() { echo "PASS $1"; }; bad() { echo "FAIL $1"; exit 1; }
 P1=person1@example.test; P2=person2@example.test; NOBODY=nobody@example.test
 # the disposable database holds suite payments, which (rightly) stop the mode being switched; the test lifts that one guard on its own throwaway copy
@@ -18,8 +18,8 @@ Q -c "update public.evaluation set free_reports_granted = true where evaluation_
   && ok "S2 a partner with no account yet stops the whole run: no exception for the other one, no promise cleared" || bad "S2"
 [[ "$(run $P1 $P1)" == *"must be different"* ]] && [ "$(Q -c "select count(*) from public.billing_complimentary where revoked_at is null")" = 0 ] && ok "S3 the same email twice is refused" || bad "S3"
 [[ "$(run $P1 $P2)" == *"two named exceptions"* ]] || bad "S4 apply"
-[ "$(Q -c "select count(*) from public.billing_complimentary where revoked_at is null and reason = 'partner, approved by founder' and approved_by = 'founder' and expires_at = '2027-02-01 07:59:59+00'")" = 2 ] \
-  && ok "S4 BOTH partners hold a named exception with the reason, the approver and the 2027-01-31 expiry (end of day, Los Angeles)" || bad "S4"
+[ "$(Q -c "select count(*) from public.billing_complimentary where revoked_at is null and reason = 'partner, approved by founder' and approved_by = 'founder' and expires_at = '2027-01-01 07:59:59+00'")" = 2 ] \
+  && ok "S4 BOTH partners hold a named exception with the reason, the approver and the 2026-12-31 expiry (end of day, Los Angeles)" || bad "S4"
 [ "$(Q -c "select count(*) from public.evaluation where free_reports_granted")" = 0 ] && ok "S5 no existing account holds a free-report promise any more" || bad "S5"
 Q -c "select public.billing_complimentary_active(m.brokerage_id) from public.brokerage_member m where m.user_id = 'a0000000-0000-4000-8000-000000000001' and m.status = 'active' limit 1" | grep -q t \
   && Q -c "select public.billing_complimentary_active(m.brokerage_id) from public.brokerage_member m where m.user_id = 'a0000000-0000-4000-8000-000000000002' and m.status = 'active' limit 1" | grep -q t \

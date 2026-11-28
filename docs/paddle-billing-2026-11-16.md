@@ -162,10 +162,21 @@ Read-back after: those five show `status active`, `free_reports_granted false`, 
 
 Founder decision (2026-11-27): Veronica and Devin get named complimentary access, an exception, not a plan. After `docs/paddle-billing.sql` is applied, the database owner inserts one `public.billing_complimentary` row for each: the account's `brokerage_id`, a reason of at least 8 characters, `approved_by` the founder, and an expiry or an explicitly recorded "no expiry". Look up the two `brokerage_id` values first (read-only, by the accounts' own emails) and confirm them with the founder; they are not guessed here. Confirm after: `billing_complimentary_active(brokerage_id)` is true for these two and false for every other account, and `billing_gate` is unchanged.
 
-### 11a. Founder decision, 2026-11-28: Veronica and Devin get FREE accounts (production step, NOT DONE)
+### 11a. Founder decision, 2026-11-28: Veronica and Devin get FREE accounts, December 1 to December 31, 2026 (production step, NOT DONE)
 
-Veronica (veronica@bolorealtors.com) and Devin (dbacon@nwmls.com) never pay and never see checkout. Each gets a `billing_complimentary` exception. Order: (1) "go migration"; (2) they sign up as individuals; (3) look up the two brokerage IDs read-only and show the founder; (4) grant with `public.billing_complimentary_grant(<id>, <reason>, 'founder', <expiry>)`, the two calls shown to the founder before they run.
+Veronica (veronica@bolorealtors.com) and Devin (dbacon@nwmls.com) never pay and never see checkout **while the exception lasts**: from December 1, 2026 to the end of December 31, 2026, America/Los_Angeles (`complimentary_expiry=2026-12-31`, stored as `2027-01-01 07:59:59+00`). After that each account is a normal account and must pay: the exception simply stops counting (`billing_complimentary_active` is false once `expires_at` passes), nothing is deleted, and there is no renewal.
 
-**Open founder choice: the expiry was sent as "[none / 2027-01-31]". Nothing is granted until one is picked.**
+Order: (1) "go migration"; (2) they sign up as individuals; (3) read-only look-up of the two brokerage IDs, shown to the founder; (4) the two grant statements below are shown to the founder with the real IDs and run only after approval.
 
-**Known gap, to build before launch:** the exception is enforced in SQL only (`billing_free_reports_usable`), and no page or function reads `billing_complimentary_active`. As written, these two would be allowed to make reports but would still be shown checkout. Hiding checkout for a complimentary account needs a code change (billing summary and billing page); it is not done.
+**Start date.** The table has no start column, so a grant is live the moment it runs. To honour "from December 1", the two grants are run on or after December 1, 2026 (Los Angeles). A sign-up before then gets no exception until then.
+
+Grant statements (IDs filled in only after the look-up; not run):
+
+```sql
+select public.billing_complimentary_grant('<veronica brokerage_id>'::uuid, 'complimentary access December 2026, approved by founder', 'founder', timestamptz '2027-01-01 07:59:59+00');
+select public.billing_complimentary_grant('<devin brokerage_id>'::uuid,    'complimentary access December 2026, approved by founder', 'founder', timestamptz '2027-01-01 07:59:59+00');
+```
+
+The staging seed (`docs/paddle-billing-staging-seed.sql`, staging only) takes the same `complimentary_expiry=2026-12-31` and its test pins the same instant.
+
+**Known gap, to build before launch:** the exception is enforced in SQL only (`billing_free_reports_usable`). No page or function reads `billing_complimentary_active`, so these two could make reports but would still be shown checkout. Hiding checkout for an account with an open exception needs a code change (billing summary and billing page); not done.
