@@ -107,7 +107,7 @@ ok(!('return_centroid' in E),
 ok(E.spatial_zip_radius_mi === 3, 'spatial ZIP scoping at 3 mi (the layer has no ZIP column)');
 
 // ── use_type ───────────────────────────────────────────────────────────────────
-ok(E.use_type_const === 'Utility', 'DOT road work → Utility (Caltrans/ODOT/GDOT precedent)');
+ok(E.use_type_const === 'Roads & infrastructure', 'DOT road work → Utility (Caltrans/ODOT/GDOT precedent)');
 ok(!('type_map' in E) || Object.keys(E.type_map).length > 0,
   'no empty type_map stub');
 

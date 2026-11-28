@@ -73,7 +73,7 @@ ok(PTS.column_map.case_number === 'PROJECT_NUMBER' && LIN.column_map.case_number
 }
 
 // ── 4. use_type stays inside the closed six-value set ────────────────────────────
-const USE_TYPES = new Set(['Industrial', 'Development', 'Residential', 'Utility', 'Commercial', 'Civic/Public']);
+const USE_TYPES = new Set(['Industrial', 'Development', 'Residential', 'Utility', 'Roads & infrastructure', 'Commercial', 'Civic/Public']);
 ok(USE_TYPES.has(LIN.use_type_const), `use_type_const '${LIN.use_type_const}' is one of the six canonical use_types`);
 ok(LIN.use_type_const === PTS.use_type_const, 'the pair classifies identically — same projects, same type');
 

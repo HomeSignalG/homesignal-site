@@ -141,9 +141,9 @@ for (const [n, e] of BOTH) {
 }
 
 // ── 7. Type: constant, because no work-type column exists ───────────────────────
-const CLOSED = new Set(['Residential', 'Commercial', 'Utility', 'Development', 'Industrial', 'Civic/Public']);
+const CLOSED = new Set(['Residential', 'Commercial', 'Utility', 'Roads & infrastructure', 'Development', 'Industrial', 'Civic/Public']);
 for (const [n, e] of BOTH) {
-  ok(e.use_type_const === 'Utility', `${n}: statewide-DOT roadway work → Utility (the udot/txdot/wydot fleet)`);
+  ok(e.use_type_const === 'Roads & infrastructure', `${n}: statewide-DOT roadway work → Utility (the udot/txdot/wydot fleet)`);
   ok(CLOSED.has(e.use_type_const), `${n}: use_type_const is in the closed six-value vocabulary`);
   ok(!Object.hasOwn(e, 'type_map'), `${n}: no type_map — the layer ships no work-type vocabulary to map`);
   ok(!e.column_map.type_source, `${n}: no type_source — same reason`);

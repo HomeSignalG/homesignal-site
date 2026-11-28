@@ -34,7 +34,7 @@ const ok = (c, name, detail) => {
 
 const REG = JSON.parse(readFileSync(join(root, 'supabase/functions/get-address-report/jurisdiction-registry.json'), 'utf8'));
 const byId = (id) => REG.arcgis.find((e) => e.registry_id === id);
-const USE_TYPES = new Set(['Industrial', 'Development', 'Residential', 'Utility', 'Commercial', 'Civic/Public']);
+const USE_TYPES = new Set(['Industrial', 'Development', 'Residential', 'Utility', 'Roads & infrastructure', 'Commercial', 'Civic/Public']);
 
 const PAIRS = [
   { state: 'OH', pts: 'odot-current-projects', lin: 'odot-current-projects-lines',

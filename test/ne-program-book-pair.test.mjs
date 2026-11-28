@@ -85,11 +85,11 @@ for (const [n, e] of [['points', PTS], ['segments', SEG]]) {
 // ── 5. use_type must MATCH the sibling, or one geometry renders differently ─────
 ok(PTS.use_type_const === SEG.use_type_const,
   'both entries use the SAME use_type_const — otherwise the same project renders as a different type depending on which geometry published it');
-ok(PTS.use_type_const === 'Utility', 'use_type_const is Utility (DOT infrastructure precedent)');
+ok(PTS.use_type_const === 'Roads & infrastructure', 'use_type_const is Utility (DOT infrastructure precedent)');
 ok(!PTS.type_map,
   'TypeImprovement is deliberately NOT mapped — 47 free-text values with publisher typos ("Br" vs "Br.", "Mill, Rusurf.")');
 {
-  const CLOSED = new Set(['Residential', 'Commercial', 'Utility', 'Development', 'Industrial', 'Civic/Public']);
+  const CLOSED = new Set(['Residential', 'Commercial', 'Utility', 'Roads & infrastructure', 'Development', 'Industrial', 'Civic/Public']);
   ok(CLOSED.has(PTS.use_type_const), 'use_type_const is in the closed six-value vocabulary');
 }
 
