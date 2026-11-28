@@ -1390,7 +1390,7 @@ def render(p, built):
         # one host only.
         '<script src="/lib/premium-waitlist.js?v=3cb9baaf"></script>\n'
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
-        '<script src="/shell.js?v=2e576ee0"></script>\n'
+        '<script src="/shell.js?v=92aa00b7"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
         '<script src="/lib/water-rights.js?v=add4200a"></script>\n'
         '<script src="/lib/community-page.js?v=2cd4d9bd"></script>\n'

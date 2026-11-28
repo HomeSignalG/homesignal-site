@@ -2059,6 +2059,7 @@
   const AREA_DEFAULT_TOPICS = ['Planning, zoning & development', 'County Commission & county business'];
   // Consent copy for enable_area_email_alerts if that RPC is invoked elsewhere.
   // The post-save card does not display or affirm this copy.
+  const AREA_CONSENT_VERSION = '2026-07-16';   // the area opt-in keeps its own wording and version
   const AREA_CONSENT_COPY = 'Email me new development & hearing alerts for this ZIP. No spam · unsubscribe anytime.';
   HS.ensureAreaSubscribed = async function (zip, willNavigate, suppressUi, throwOnError) {
     if (CFG.DATA_SOURCE !== 'supabase' || !state.session || state.session.demo || !HS.sb) return null;
@@ -2169,7 +2170,7 @@
     const topics = { notices: (info.topics || []).slice() };   // floor labels are government_notice -> 'notices'
     try {
       const r = await HS.sb().rpc('enable_area_email_alerts',
-        HS.optinRpcArgs(state.session.user.email, info.communityId, info.zip, topics, CONSENT_VERSION, AREA_CONSENT_COPY));
+        HS.optinRpcArgs(state.session.user.email, info.communityId, info.zip, topics, AREA_CONSENT_VERSION, AREA_CONSENT_COPY));
       if (r && r.error) throw new Error(r.error.message || 'consent save failed');
     } catch (e) {
       console.warn('area-optin', e);
@@ -2411,6 +2412,7 @@
       });
     });
     html += '</div><div id="finishErr" role="alert" style="color:#c23b34"></div>'
+      + '<div class="mnote" id="finishConsent">' + HS.esc(CONSENT_COPY) + '</div>'
       + '<button class="mbtn" type="button" id="finishGo" onclick="HS.finishPendingAlerts()">Finish saving</button> '
       + '<button type="button" class="linkbtn" id="finishNo" onclick="HS.declinePendingAlerts()">Not now</button>';
     box.innerHTML = html;
@@ -2466,10 +2468,14 @@
   const CAT_TO_PIPELINE = { gov: 'government_notice', meetings: 'government_notice', news: 'news_alert' };
   // Shell category -> users.topics jsonb key (Option A shape digest.py reads).
   const CAT_TO_TOPICS_KEY = { gov: 'notices', meetings: 'meetings', news: 'news' };
-  const CONSENT_VERSION = '2026-07-16';
-  const CONSENT_COPY = "You'll be alerted about the topics you selected. No spam · Unsubscribe anytime.";
+  // The sentence below is BOTH shown beside Save alerts / Finish saving and recorded with the save.
+  const CONSENT_VERSION = '2026-11-27';
+  const CONSENT_COPY = 'Email me JODY alerts for the topics I selected. Alerts start only where verified coverage exists. No spam · Unsubscribe anytime.';
+  HS.CONSENT_COPY = CONSENT_COPY;
+  function paintConsentCopy() { const n = $('tmConsentCopy'); if (n) n.textContent = CONSENT_COPY; }
   let TCUR = null;
   HS.openTopics = async function (key) {
+    paintConsentCopy();
     TCUR = key;
     const cats = HS.data.topicCategories(), d = Object.assign({}, cats[key]);
     // Government categories render the LIVE community's labels (cascaded up the
