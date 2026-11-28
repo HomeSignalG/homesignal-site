@@ -2468,7 +2468,7 @@ for (const [w, h] of [[1440, 900], [1920, 1080], [390, 844]]) {
   const w = world({ role: 'owner', used: 3 }); w.complimentary = true;
   const { ctx, page, errors, billingCalls, checkouts } = await open({ w });
   await waitBilling(page, /complimentary/);
-  const t = await billingText(page);
+  const t = await page.$eval('#billing', (e) => e.innerText.replace(/\s+/g, ' ').trim());   // what a person SEES: hidden controls (a hidden Subscribe button still has text) are not part of it
   ok(/Your account is complimentary\. No payment needed\./.test(t) && !/\$78|\$234|Subscribe|Professional plan|per month/.test(t), '14a a complimentary owner sees "Your account is complimentary. No payment needed." and no price', t);
   ok(await page.$eval('#subscribe', (e) => e.hidden) && await page.$eval('#agree-pro-wrap', (e) => e.hidden) && await page.$eval('#billing-terms', (e) => e.hidden) && await page.$eval('#trial-cta-wrap', (e) => e.hidden) && await page.$eval('#partner', (e) => e.hidden),
     '14b Subscribe, the agreement box, the terms line, the tile\'s Subscribe prompt and the partner card are all hidden');
@@ -2482,7 +2482,7 @@ for (const [w, h] of [[1440, 900], [1920, 1080], [390, 844]]) {
   const w = world({ role: 'owner', used: 3 }); w.complimentary = false;
   const { ctx, page } = await open({ w });
   await waitBilling(page, /No active plan/);
-  ok(await billingShown(page) && await page.$eval('#subscribe', (e) => !e.hidden && !e.disabled) && !/complimentary/i.test(await billingText(page)), '14e after the exception expires the account is an ordinary one: the offer and Subscribe are back');
+  ok(await billingShown(page) && await page.$eval('#subscribe', (e) => !e.hidden && !e.disabled) && !/complimentary/i.test(await page.$eval('#billing', (e) => e.innerText)), '14e after the exception expires the account is an ordinary one: the offer and Subscribe are back');
   await ctx.close();
 }
 
